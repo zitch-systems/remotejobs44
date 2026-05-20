@@ -1,27 +1,24 @@
-// hooks/usePaystack.ts — Client-side Paystack payment hook
-// Usage: const { pay, loading } = usePaystack()
-// Then: pay({ plan: 'pro', billing: 'monthly' })
+// hooks/usePaystack.ts — Client-side Paystack redirect flow
+// No react-paystack needed — we use Paystack's hosted payment page
 'use client';
 import { useState } from 'react';
 import { useUIStore } from '@/lib/store';
 
 interface PayOptions {
-  plan: 'daily' | 'pro';
-  billing: 'daily' | 'monthly' | 'annually';
-  currency?: string;
+  plan: 'daily' | 'pro' | 'pro_annual';
 }
 
 export function usePaystack() {
   const [loading, setLoading] = useState(false);
   const { toast } = useUIStore();
 
-  async function pay({ plan, billing, currency = 'NGN' }: PayOptions) {
+  async function pay({ plan }: PayOptions) {
     setLoading(true);
     try {
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, billing, currency }),
+        body: JSON.stringify({ plan }),
       });
 
       const data = await res.json();
@@ -30,8 +27,7 @@ export function usePaystack() {
         throw new Error(data.error ?? 'Payment initialization failed');
       }
 
-      // Redirect to Paystack hosted payment page
-      // User pays → Paystack redirects back to /api/paystack/verify
+      // Redirect to Paystack's hosted payment page
       window.location.href = data.authorizationUrl;
     } catch (err: any) {
       toast(err.message, 'error');
