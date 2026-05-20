@@ -21,7 +21,7 @@ export type JobCategory =
   | 'sales' | 'data' | 'hr' | 'product' | 'legal' | 'operations' | 'other';
 
 export type JobType = 'full-time' | 'part-time' | 'contract' | 'freelance';
-export type JobSource = 'rss' | 'scrape' | 'manual' | 'embedded-rss' | 'custom-rss' | 'api';
+export type JobSourceType = 'rss' | 'scrape' | 'manual' | 'embedded-rss' | 'custom-rss' | 'api';
 export type JobLevel = 'entry' | 'mid' | 'senior' | 'lead' | 'executive';
 
 export interface Job {
@@ -48,7 +48,7 @@ export interface Job {
   expires?: string;
   featured: boolean;
   isNew: boolean;
-  source: JobSource;
+  source: JobSourceType;
   sourceUrl?: string;
   views?: number;
   applications?: number;

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 // components/jobs/PaywallModal.tsx
 import Link from 'next/link';
 import { modalService } from '@/components/ui/Modal';
@@ -7,16 +7,16 @@ import { usePaystack } from '@/hooks/usePaystack';
 interface PaywallModalProps { mode: 'login' | 'subscribe'; }
 
 const PLANS = [
-  { id: 'daily',      label: 'Day Pass',    price: '₦1,000',  sub: '24-hour full access' },
-  { id: 'pro',        label: 'Pro Monthly', price: '₦8,999',  sub: 'per month', highlight: true },
-  { id: 'pro_annual', label: 'Pro Annual',  price: '₦89,999', sub: 'per year · save ₦17,989' },
-];
+  { id: 'daily' as const,      label: 'Day Pass',    price: '₦1,000',  sub: '24-hour full access', highlight: false },
+  { id: 'pro' as const,        label: 'Pro Monthly', price: '₦8,999',  sub: 'per month', highlight: true },
+  { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦89,999', sub: 'per year · save ₦17,989', highlight: false },
+] as const;
 
 export function PaywallModal({ mode }: PaywallModalProps) {
   const isLogin = mode === 'login';
   const { pay, loading } = usePaystack();
 
-  async function handlePay(planId: string) {
+  async function handlePay(planId: 'daily' | 'pro' | 'pro_annual') {
     modalService.close();
     await pay({ plan: planId });
   }
