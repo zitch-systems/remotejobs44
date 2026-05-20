@@ -79,7 +79,7 @@ export function JobCard({ job, variant = 'default' }: JobCardProps) {
       <div className="flex flex-wrap gap-1.5">
         {job.isNew && <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">✨ New</span>}
         {job.featured && <span className="badge bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">⭐ Featured</span>}
-        <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">{catMeta.emoji} {catMeta.label}</span>
+        <span className={cn('badge', catMeta.color)}>{catMeta.icon} {catMeta.label}</span>
         <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">{capitalize(job.type)}</span>
       </div>
 

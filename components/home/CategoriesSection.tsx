@@ -28,7 +28,7 @@ export function CategoriesSection() {
                 href={`/jobs?category=${cat}`}
                 className="group flex flex-col items-center gap-2 p-4 rounded-xl border border-stone-200 dark:border-[#234533] bg-white dark:bg-[#152B20] hover:border-brand-600 dark:hover:border-brand-500 hover:-translate-y-0.5 hover:shadow-md-brand transition-all duration-200"
               >
-                <span className="text-2xl">{meta.emoji}</span>
+                <span className="text-2xl">{meta.icon}</span>
                 <span className="font-semibold text-sm text-stone-700 dark:text-stone-300 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{meta.label}</span>
                 <span className="text-xs text-stone-400 dark:text-stone-500">{(JOB_COUNTS[cat] ?? 0).toLocaleString()} jobs</span>
               </Link>

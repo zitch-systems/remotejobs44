@@ -1,5 +1,4 @@
-﻿'use client';
-// components/jobs/PaywallModal.tsx
+'use client';
 import Link from 'next/link';
 import { modalService } from '@/components/ui/Modal';
 import { usePaystack } from '@/hooks/usePaystack';
@@ -7,10 +6,10 @@ import { usePaystack } from '@/hooks/usePaystack';
 interface PaywallModalProps { mode: 'login' | 'subscribe'; }
 
 const PLANS = [
-  { id: 'daily' as const,      label: 'Day Pass',    price: '₦1,000',  sub: '24-hour full access', highlight: false },
-  { id: 'pro' as const,        label: 'Pro Monthly', price: '₦8,999',  sub: 'per month', highlight: true },
+  { id: 'daily'      as const, label: 'Day Pass',    price: '₦1,000',  sub: '24-hour full access',   highlight: false },
+  { id: 'pro'        as const, label: 'Pro Monthly', price: '₦8,999',  sub: 'per month',             highlight: true  },
   { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦89,999', sub: 'per year · save ₦17,989', highlight: false },
-] as const;
+];
 
 export function PaywallModal({ mode }: PaywallModalProps) {
   const isLogin = mode === 'login';
@@ -68,7 +67,6 @@ export function PaywallModal({ mode }: PaywallModalProps) {
               </button>
             ))}
           </div>
-
           <Link href="/pricing" onClick={() => modalService.close()}
             className="text-xs text-stone-400 dark:text-stone-500 hover:underline block mb-3">
             See full plan comparison →

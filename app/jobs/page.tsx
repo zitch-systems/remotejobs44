@@ -128,7 +128,7 @@ function JobsContent() {
     sort !== 'newest' && sort,
   ].filter(Boolean).length;
 
-  const catMeta = CATEGORY_META[category] ?? CATEGORY_META.all;
+  const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['engineering'];
 
   return (
     <div className="max-w-[1240px] mx-auto px-5 py-8">
@@ -194,7 +194,7 @@ function JobsContent() {
       {/* Category chips */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4 -mx-1 px-1">
         {CATEGORIES.map((cat) => {
-          const meta = CATEGORY_META[cat];
+          const meta = CATEGORY_META[cat as keyof typeof CATEGORY_META];
           const active = category === cat;
           return (
             <button

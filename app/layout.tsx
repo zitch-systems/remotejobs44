@@ -25,6 +25,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.vercel.app'),
   title: { default: 'RemoteJobs44 – Global Remote Jobs', template: '%s | RemoteJobs44' },
   description: 'Find remote jobs from top companies worldwide. Subscribe from ₦1,000, apply instantly, and track your career – all in one place.',
   keywords: ['remote jobs', 'work from home', 'remote work', 'Nigeria', 'global jobs'],
