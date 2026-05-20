@@ -1,4 +1,4 @@
-// middleware.ts — Supabase session refresh on every request
+﻿// middleware.ts â€” Supabase session refresh on every request
 // Must be at the root of the project (next to package.json)
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
@@ -11,13 +11,13 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get:    (name)                 => request.cookies.get(name)?.value,
-        set:    (name, value, options) => {
+        get: (name: string)                 => request.cookies.get(name)?.value,
+        set: (name: string, value: string, options?: any) => {
           request.cookies.set({ name, value, ...options });
           response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({ name, value, ...options });
         },
-        remove: (name, options) => {
+        remove: (name: string, options?: any) => {
           request.cookies.set({ name, value: '', ...options });
           response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({ name, value: '', ...options });
@@ -38,3 +38,4 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|og-image.png).*)',
   ],
 };
+
