@@ -2,9 +2,11 @@
 module.exports = {
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
     './hooks/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   darkMode: 'class',
   theme: {
@@ -30,7 +32,6 @@ module.exports = {
           dark:    '#d48a0a',
         },
       },
-      // Use CSS variables injected by next/font
       fontFamily: {
         display: ['var(--font-sora)',    'system-ui', 'sans-serif'],
         body:    ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
@@ -71,10 +72,10 @@ module.exports = {
         'spin-slow':'spin 2s linear infinite',
       },
       keyframes: {
-        fadeIn:  { from: { opacity: '0' },                                      to: { opacity: '1' } },
-        slideUp: { from: { transform: 'translateY(16px)', opacity: '0' },        to: { transform: 'translateY(0)', opacity: '1' } },
+        fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
+        slideUp: { from: { transform: 'translateY(16px)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
         modalIn: { from: { transform: 'scale(0.94) translateY(12px)', opacity: '0' }, to: { transform: 'scale(1) translateY(0)', opacity: '1' } },
-        toastIn: { from: { transform: 'translateY(20px)', opacity: '0' },        to: { transform: 'translateY(0)', opacity: '1' } },
+        toastIn: { from: { transform: 'translateY(20px)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
         shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
       },
       screens: { xs: '480px' },

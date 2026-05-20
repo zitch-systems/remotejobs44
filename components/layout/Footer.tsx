@@ -1,25 +1,22 @@
 'use client';
-// components/layout/Footer.tsx
 import Link from 'next/link';
 
 const FOOTER_LINKS = {
   Jobs: [
-    { label: 'Engineering', href: '/jobs?category=engineering' },
-    { label: 'Design', href: '/jobs?category=design' },
-    { label: 'Marketing', href: '/jobs?category=marketing' },
-    { label: 'Finance', href: '/jobs?category=finance' },
+    { label: 'Engineering',  href: '/jobs?category=engineering' },
+    { label: 'Design',       href: '/jobs?category=design' },
+    { label: 'Marketing',    href: '/jobs?category=marketing' },
+    { label: 'Finance',      href: '/jobs?category=finance' },
     { label: 'Data & Analytics', href: '/jobs?category=data' },
   ],
   Company: [
-    { label: 'About', href: '/about' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Blog', href: '/blog' },
-    { label: 'Contact', href: '/contact' },
+    { label: 'Pricing',  href: '/pricing' },
+    { label: 'Contact',  href: '/contact' },
   ],
   Legal: [
     { label: 'Privacy Policy', href: '/privacy' },
     { label: 'Terms of Service', href: '/terms' },
-    { label: 'Cookie Policy', href: '/cookies' },
+    { label: 'Cookie Policy',  href: '/cookies' },
   ],
 };
 
@@ -28,7 +25,6 @@ export function Footer() {
     <footer className="bg-white dark:bg-[#152B20] border-t border-stone-200 dark:border-[#234533] pt-16 pb-8 hidden md:block">
       <div className="max-w-[1240px] mx-auto px-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          {/* Brand */}
           <div>
             <Link href="/" className="flex items-center gap-2 font-display font-bold text-[17px] text-stone-900 dark:text-stone-100 tracking-tight mb-3">
               <svg viewBox="0 0 32 32" className="w-7 h-7 text-brand-700 dark:text-brand-400" fill="none">
@@ -41,22 +37,14 @@ export function Footer() {
             <p className="text-sm text-stone-400 dark:text-stone-500 max-w-[200px] leading-relaxed mb-4">
               Your global remote career starts here.
             </p>
-            <div className="flex gap-2">
-              {['𝕏', 'in', '✈'].map((s, i) => (
-                <a key={i} href="#" className="w-9 h-9 flex items-center justify-center rounded-md border border-stone-200 dark:border-[#234533] text-stone-400 dark:text-stone-500 text-sm font-bold hover:border-brand-600 hover:text-brand-700 dark:hover:border-brand-400 dark:hover:text-brand-400 transition-all duration-150">
-                  {s}
-                </a>
-              ))}
-            </div>
           </div>
-          {/* Link columns */}
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
             <div key={title}>
               <h4 className="text-xs font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-4">{title}</h4>
               <ul className="space-y-3">
-                {links.map((link) => (
+                {links.map(link => (
                   <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-stone-500 dark:text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors duration-100">
+                    <Link href={link.href} className="text-sm text-stone-500 dark:text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
                       {link.label}
                     </Link>
                   </li>

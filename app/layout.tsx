@@ -69,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
       className={`${sora.variable} ${dmSans.variable}`}
     >
-      <body className="min-h-dvh flex flex-col bg-stone-50 text-stone-900 antialiased">
+      <body className="min-h-dvh flex flex-col bg-stone-50 text-stone-900 font-body antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
