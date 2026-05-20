@@ -1,71 +1,45 @@
-// app/api/ats/route.ts — Unified ATS fetcher: Greenhouse, Lever, Ashby, Workable, Recruitee
+// app/auth/callback/route.ts
+// Supabase Auth callback handler — required for magic link + OAuth flows
 import { NextRequest, NextResponse } from 'next/server';
-import { autoFetchFromCareerUrl, fetchATSJobs, detectATSFromUrl, type ATSPlatform } from '@/lib/ats-engine';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-export const runtime = 'nodejs';
-export const revalidate = 300;
+export async function GET(request: NextRequest) {
+  const { searchParams, origin } = new URL(request.url);
+  const code  = searchParams.get('code');
+  const next  = searchParams.get('next') ?? '/dashboard';
+  const error = searchParams.get('error');
 
-export async function GET(req: NextRequest) {
-  const url      = req.nextUrl.searchParams.get('url');
-  const platform = req.nextUrl.searchParams.get('platform') as ATSPlatform | null;
-  const slug     = req.nextUrl.searchParams.get('slug');
-
-  if (!url && !(platform && slug)) {
-    return NextResponse.json({ error: 'Provide url OR platform+slug' }, { status: 400 });
+  // Handle OAuth/magic-link errors from Supabase
+  if (error) {
+    console.error('Auth callback error:', error, searchParams.get('error_description'));
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 
-  try {
-    // Direct slug+platform mode (fastest)
-    if (platform && slug) {
-      const result = await fetchATSJobs(platform, slug, `https://${platform}/${slug}`);
-      return NextResponse.json(result);
+  if (code) {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get:    (name) => cookieStore.get(name)?.value,
+          set:    (name, value, options) => { try { cookieStore.set({ name, value, ...options }); } catch {} },
+          remove: (name, options)        => { try { cookieStore.set({ name, value: '', ...options }); } catch {} },
+        },
+      }
+    );
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (!exchangeError) {
+      // Redirect to intended page after successful auth
+      return NextResponse.redirect(`${origin}${next}`);
     }
 
-    // Auto-detect mode from URL
-    const result = await autoFetchFromCareerUrl(url!);
-    return NextResponse.json(result);
-  } catch (err: any) {
-    return NextResponse.json({ jobs: [], total: 0, error: err.message }, { status: 200 });
+    console.error('Code exchange error:', exchangeError.message);
   }
-}
 
-// POST: bulk-detect many URLs at once
-export async function POST(req: NextRequest) {
-  try {
-    const { urls }: { urls: string[] } = await req.json();
-    if (!Array.isArray(urls) || urls.length === 0) {
-      return NextResponse.json({ error: 'urls array required' }, { status: 400 });
-    }
-    if (urls.length > 500) {
-      return NextResponse.json({ error: 'Max 500 URLs per batch' }, { status: 400 });
-    }
-
-    // Fast pre-detection (no HTTP requests for direct ATS URLs)
-    const preDetected = urls.map(url => {
-      const detected = detectATSFromUrl(url.trim());
-      return {
-        url: url.trim(),
-        detected,
-        platform: detected?.platform ?? 'unknown',
-        slug: detected?.slug ?? '',
-        apiEndpoint: detected?.apiEndpoint ?? null,
-        confidence: detected?.confidence ?? null,
-        status: detected ? 'detected' : 'needs-scraping',
-      };
-    });
-
-    const stats = {
-      total: preDetected.length,
-      greenhouse: preDetected.filter(r => r.platform === 'greenhouse').length,
-      lever: preDetected.filter(r => r.platform === 'lever').length,
-      ashby: preDetected.filter(r => r.platform === 'ashby').length,
-      workable: preDetected.filter(r => r.platform === 'workable').length,
-      recruitee: preDetected.filter(r => r.platform === 'recruitee').length,
-      needsScraping: preDetected.filter(r => r.status === 'needs-scraping').length,
-    };
-
-    return NextResponse.json({ results: preDetected, stats });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
-  }
+  // Fallback — something went wrong
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 }
