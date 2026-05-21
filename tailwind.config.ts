@@ -1,6 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-
-// Safely require plugins — won't crash if not installed
 function safeRequire(pkg: string) {
   try { return require(pkg); } catch { return null; }
 }
@@ -16,21 +14,26 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Emerald Pro — richer, more saturated than before
         brand: {
-          50:  '#edfaf2',
-          100: '#d4f3e3',
-          200: '#abe6c8',
-          300: '#72d3a7',
-          400: '#3dbb7b',
-          500: '#1ea05e',
-          600: '#0f7a48',
-          700: '#0a5c36',
-          800: '#0a4c2e',
-          900: '#083e26',
-          950: '#042314',
-          DEFAULT: '#0a5c36',
+          50:  '#ecfdf5',
+          100: '#d1fae5',
+          200: '#a7f3d0',
+          300: '#6ee7b7',
+          400: '#34d399',
+          500: '#10b981',
+          600: '#059669',
+          700: '#0d7a5f',
+          800: '#065f46',
+          900: '#064e3b',
+          950: '#022c22',
+          DEFAULT: '#0d7a5f',
         },
-        accent: { DEFAULT: '#F5A623', light: '#fbbf46', dark: '#d48a0a' },
+        accent: {
+          DEFAULT: '#f59e0b',
+          light:   '#fbbf24',
+          dark:    '#d97706',
+        },
       },
       fontFamily: {
         display: ['var(--font-sora)',    'system-ui', 'sans-serif'],
@@ -50,31 +53,34 @@ module.exports = {
         '4xl': ['50px', { lineHeight: '1.08' }],
         '5xl': ['64px', { lineHeight: '1.05' }],
       },
-      borderRadius: {
-        sm: '6px', md: '10px', lg: '16px', xl: '24px', '2xl': '32px',
-      },
+      borderRadius: { sm:'6px', md:'10px', lg:'16px', xl:'24px', '2xl':'32px' },
       boxShadow: {
-        'sm-brand': '0 1px 4px rgba(10,92,54,0.06)',
-        'md-brand': '0 4px 16px rgba(10,92,54,0.10)',
-        'lg-brand': '0 8px 32px rgba(10,92,54,0.14)',
-        'xl-brand': '0 16px 56px rgba(10,92,54,0.18)',
+        'sm-brand': '0 1px 4px rgba(13,122,95,0.08)',
+        'md-brand': '0 4px 20px rgba(13,122,95,0.12)',
+        'lg-brand': '0 8px 40px rgba(13,122,95,0.16)',
+        'xl-brand': '0 16px 60px rgba(13,122,95,0.20)',
+        'glow':     '0 0 0 3px rgba(16,185,129,0.25)',
       },
       animation: {
-        'fade-in':  'fadeIn 0.24s ease both',
-        'slide-up': 'slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
-        'modal-in': 'modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
-        'toast-in': 'toastIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
-        'shimmer':  'shimmer 1.5s ease infinite',
-        'spin-slow':'spin 2s linear infinite',
+        'fade-in':   'fadeIn 0.2s ease both',
+        'slide-up':  'slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1) both',
+        'modal-in':  'modalIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both',
+        'toast-in':  'toastIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both',
+        'shimmer':   'shimmer 1.6s ease infinite',
+        'bounce-in': 'bounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both',
+        'spin-slow': 'spin 2s linear infinite',
+        'pulse-brand':'pulseBrand 2s ease-in-out infinite',
       },
       keyframes: {
-        fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
-        slideUp: { from: { transform: 'translateY(16px)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
-        modalIn: { from: { transform: 'scale(0.94) translateY(12px)', opacity: '0' }, to: { transform: 'scale(1) translateY(0)', opacity: '1' } },
-        toastIn: { from: { transform: 'translateY(20px)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
-        shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
+        fadeIn:     { from:{opacity:'0'},                               to:{opacity:'1'} },
+        slideUp:    { from:{transform:'translateY(14px)',opacity:'0'},   to:{transform:'translateY(0)',opacity:'1'} },
+        modalIn:    { from:{transform:'scale(0.95) translateY(10px)',opacity:'0'}, to:{transform:'scale(1) translateY(0)',opacity:'1'} },
+        toastIn:    { from:{transform:'translateY(16px)',opacity:'0'},   to:{transform:'translateY(0)',opacity:'1'} },
+        bounceIn:   { from:{transform:'scale(0.8)',opacity:'0'},         to:{transform:'scale(1)',opacity:'1'} },
+        shimmer:    { '0%':{backgroundPosition:'200% 0'},'100%':{backgroundPosition:'-200% 0'} },
+        pulseBrand: { '0%,100%':{opacity:'1'},'50%':{opacity:'0.6'} },
       },
-      screens: { xs: '480px' },
+      screens: { xs:'480px' },
     },
   },
   plugins: [

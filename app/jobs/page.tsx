@@ -1,39 +1,91 @@
 'use client';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Bookmark } from 'lucide-react';
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, MapPin, DollarSign, Briefcase, TrendingUp, Clock, Zap } from 'lucide-react';
 import { jobsApi } from '@/lib/api';
 import { JobCard } from '@/components/jobs/JobCard';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import type { Job, JobCategory, JobType, JobLevel } from '@/lib/types';
 
 const CATEGORIES: (JobCategory | 'all')[] = ['all','engineering','design','marketing','finance','sales','data','hr','product','legal','operations','other'];
-const TYPES:   JobType[]  = ['full-time','part-time','contract','freelance'];
-const LEVELS:  JobLevel[] = ['entry','mid','senior','lead','executive'];
+const TYPES:   { value: JobType|'';   label: string }[] = [
+  { value:'',            label:'Any type' },
+  { value:'full-time',  label:'Full-time' },
+  { value:'part-time',  label:'Part-time' },
+  { value:'contract',   label:'Contract' },
+  { value:'freelance',  label:'Freelance' },
+];
+const LEVELS: { value: JobLevel|''; label: string }[] = [
+  { value:'',          label:'Any level' },
+  { value:'entry',     label:'Entry level' },
+  { value:'mid',       label:'Mid level' },
+  { value:'senior',    label:'Senior' },
+  { value:'lead',      label:'Lead / Staff' },
+  { value:'executive', label:'Executive / VP' },
+];
+const SALARY_RANGES = [
+  { value:'',         label:'Any salary' },
+  { value:'0-30',     label:'Under $30k' },
+  { value:'30-60',    label:'$30k – $60k' },
+  { value:'60-100',   label:'$60k – $100k' },
+  { value:'100-150',  label:'$100k – $150k' },
+  { value:'150-999',  label:'$150k+' },
+];
+const TIMEZONES = [
+  { value:'',    label:'Any timezone' },
+  { value:'WAT', label:'West Africa (WAT)' },
+  { value:'GMT', label:'GMT / UTC' },
+  { value:'EST', label:'US Eastern (EST)' },
+  { value:'PST', label:'US Pacific (PST)' },
+  { value:'CET', label:'Europe (CET)' },
+  { value:'IST', label:'India (IST)' },
+  { value:'Any', label:'Timezone flexible' },
+];
+const POSTED_WITHIN = [
+  { value:'',   label:'Any time' },
+  { value:'1',  label:'Last 24 hours' },
+  { value:'7',  label:'Last 7 days' },
+  { value:'14', label:'Last 14 days' },
+  { value:'30', label:'Last 30 days' },
+];
 const SORTS = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'salary', label: 'Highest salary' },
+  { value:'newest', label:'Newest first' },
+  { value:'salary', label:'Highest salary' },
+  { value:'relevant', label:'Most relevant' },
 ];
 
 function SkeletonCard() {
   return (
-    <div className="card p-5 animate-pulse">
+    <div className="bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl p-5 animate-pulse">
       <div className="flex items-start gap-3 mb-4">
-        <div className="skeleton w-12 h-12 rounded-lg shrink-0" />
-        <div className="flex-1">
-          <div className="skeleton h-4 w-3/4 rounded mb-2" />
-          <div className="skeleton h-3 w-1/2 rounded" />
-        </div>
+        <div className="skeleton w-12 h-12 rounded-xl shrink-0" />
+        <div className="flex-1"><div className="skeleton h-4 w-3/4 rounded mb-2" /><div className="skeleton h-3 w-1/2 rounded" /></div>
       </div>
-      <div className="flex gap-2 mb-3">
-        <div className="skeleton h-5 w-16 rounded-full" />
-        <div className="skeleton h-5 w-20 rounded-full" />
+      <div className="flex gap-2 mb-3"><div className="skeleton h-5 w-16 rounded-full" /><div className="skeleton h-5 w-20 rounded-full" /></div>
+      <div className="skeleton h-3 w-full rounded mb-1" /><div className="skeleton h-3 w-2/3 rounded mb-4" />
+      <div className="flex justify-between pt-3 border-t border-stone-100 dark:border-[#1a3d2e]">
+        <div className="skeleton h-4 w-24 rounded" /><div className="skeleton h-8 w-20 rounded-lg" />
       </div>
-      <div className="skeleton h-3 w-full rounded mb-2" />
-      <div className="flex justify-between pt-3 border-t border-stone-100 dark:border-[#234533]">
-        <div className="skeleton h-4 w-24 rounded" />
-        <div className="skeleton h-8 w-20 rounded-lg" />
-      </div>
+    </div>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options, icon }: {
+  label: string; value: string; onChange: (v:string)=>void;
+  options: {value:string;label:string}[]; icon?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-2">
+        {icon}{label}
+      </label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1a3d2e] bg-white dark:bg-[#0f2820] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
     </div>
   );
 }
@@ -41,136 +93,147 @@ function SkeletonCard() {
 function JobsContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-
-  const [jobs,     setJobs]     = useState<Job[]>([]);
-  const [total,    setTotal]    = useState(0);
-  const [pages,    setPages]    = useState(1);
-  const [loading,  setLoading]  = useState(true);
+  const [jobs,    setJobs]    = useState<Job[]>([]);
+  const [total,   setTotal]   = useState(0);
+  const [pages,   setPages]   = useState(1);
+  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
 
   const q        = searchParams.get('q')        ?? '';
-  const category = (searchParams.get('category') ?? 'all') as JobCategory | 'all';
-  const type     = (searchParams.get('type')     ?? '') as JobType | '';
-  const level    = (searchParams.get('level')    ?? '') as JobLevel | '';
-  const sort     = (searchParams.get('sort')     ?? 'newest');
+  const category = (searchParams.get('category') ?? 'all') as JobCategory|'all';
+  const type     = searchParams.get('type')     ?? '';
+  const level    = searchParams.get('level')    ?? '';
+  const salary   = searchParams.get('salary')   ?? '';
+  const timezone = searchParams.get('timezone') ?? '';
+  const posted   = searchParams.get('posted')   ?? '';
+  const sort     = searchParams.get('sort')     ?? 'newest';
   const page     = parseInt(searchParams.get('page') ?? '1');
 
-  const activeFilters = [type, level].filter(Boolean).length;
+  const activeFilterCount = [type, level, salary, timezone, posted].filter(Boolean).length;
+
+  useEffect(() => { setSearchInput(q); }, [q]);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await jobsApi.getJobs({ q, category, type, level, sort: sort as any, page, perPage: 12 });
+      const res = await jobsApi.getJobs({ q, category, type: type as any, level: level as any, sort: sort as any, page, perPage: 12 });
       setJobs(res.jobs);
       setTotal(res.total);
       setPages(res.pages);
     } finally {
       setLoading(false);
     }
-  }, [q, category, type, level, sort, page]);
+  }, [q, category, type, level, salary, timezone, posted, sort, page]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   function setParam(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== 'all' && value !== '') params.set(key, value);
-    else params.delete(key);
-    params.delete('page');
-    router.push(`/jobs?${params.toString()}`);
+    const p = new URLSearchParams(searchParams.toString());
+    if (value && value !== 'all') p.set(key, value); else p.delete(key);
+    p.delete('page');
+    router.push(`/jobs?${p.toString()}`);
   }
-
-  function setPage(p: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', String(p));
-    router.push(`/jobs?${params.toString()}`);
+  function setPage(n: number) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set('page', String(n));
+    router.push(`/jobs?${p.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-
-  function clearFilters() {
+  function handleSearch() {
+    const p = new URLSearchParams(searchParams.toString());
+    if (searchInput.trim()) p.set('q', searchInput.trim()); else p.delete('q');
+    p.delete('page');
+    router.push(`/jobs?${p.toString()}`);
+  }
+  function clearAll() {
+    setSearchInput('');
     router.push('/jobs');
   }
 
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
+  const hasActive = q || category !== 'all' || activeFilterCount > 0;
 
   return (
-    <div className="max-w-[1240px] mx-auto px-5 py-8">
+    <div className="max-w-[1240px] mx-auto px-4 sm:px-5 py-6">
 
-      {/* Search bar */}
-      <div className="mb-6">
-        <div className="flex gap-3 flex-col sm:flex-row">
-          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 transition-colors">
+      {/* Search */}
+      <div className="mb-5">
+        <div className="flex gap-2 flex-col sm:flex-row">
+          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 focus-within:shadow-glow transition-all shadow-sm">
             <Search className="w-4 h-4 text-stone-400 shrink-0" />
             <input
               type="text"
-              defaultValue={q}
-              onKeyDown={e => { if (e.key === 'Enter') setParam('q', (e.target as HTMLInputElement).value); }}
-              onBlur={e => setParam('q', e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
               placeholder="Job title, skill, or company…"
               className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400"
             />
-            {q && (
-              <button onClick={() => setParam('q', '')} className="text-stone-400 hover:text-stone-600">
-                <X className="w-4 h-4" />
+            {searchInput && (
+              <button onClick={() => { setSearchInput(''); setParam('q', ''); }} className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-
           <div className="flex gap-2">
             <select value={sort} onChange={e => setParam('sort', e.target.value)}
-              className="input text-sm w-auto pr-8">
+              className="input text-sm py-3 pl-3 pr-8 rounded-xl w-auto min-w-[140px]">
               {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <button onClick={() => setShowFilters(!showFilters)}
-              className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors', showFilters || activeFilters > 0 ? 'bg-brand-700 dark:bg-brand-500 text-white border-brand-700 dark:border-brand-500' : 'bg-white dark:bg-[#152B20] border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829]')}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
+                showFilters || activeFilterCount > 0
+                  ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
+                  : 'bg-white dark:bg-[#0f2820] border-stone-200 dark:border-[#1a3d2e] text-stone-600 dark:text-stone-300 hover:border-brand-600 dark:hover:border-brand-500')}>
               <SlidersHorizontal className="w-4 h-4" />
-              Filters {activeFilters > 0 && `(${activeFilters})`}
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[11px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
+            {searchInput && (
+              <button onClick={handleSearch}
+                className="px-5 py-2.5 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shadow-sm">
+                Search
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Filters panel */}
+        {/* Advanced filters panel */}
         {showFilters && (
-          <div className="mt-3 p-4 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">Job Type</label>
-                <div className="flex flex-wrap gap-2">
-                  {TYPES.map(t => (
-                    <button key={t} onClick={() => setParam('type', type === t ? '' : t)}
-                      className={cn('chip', type === t && 'active')}>
-                      {t.replace('-', ' ')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">Level</label>
-                <div className="flex flex-wrap gap-2">
-                  {LEVELS.map(l => (
-                    <button key={l} onClick={() => setParam('level', level === l ? '' : l)}
-                      className={cn('chip', level === l && 'active')}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
+          <div className="mt-3 p-5 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl shadow-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <FilterSelect label="Job Type"    value={type}     onChange={v=>setParam('type',v)}     options={TYPES}        icon={<Briefcase className="w-3 h-3"/>}   />
+              <FilterSelect label="Level"       value={level}    onChange={v=>setParam('level',v)}    options={LEVELS}       icon={<TrendingUp className="w-3 h-3"/>}  />
+              <FilterSelect label="Salary"      value={salary}   onChange={v=>setParam('salary',v)}   options={SALARY_RANGES}icon={<DollarSign className="w-3 h-3"/>}  />
+              <FilterSelect label="Timezone"    value={timezone} onChange={v=>setParam('timezone',v)} options={TIMEZONES}    icon={<MapPin className="w-3 h-3"/>}      />
+              <FilterSelect label="Posted"      value={posted}   onChange={v=>setParam('posted',v)}   options={POSTED_WITHIN}icon={<Clock className="w-3 h-3"/>}       />
+              <div className="flex items-end">
+                {activeFilterCount > 0 && (
+                  <button onClick={clearAll}
+                    className="w-full py-2.5 text-xs font-semibold text-red-500 border border-red-200 dark:border-red-900 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                    Clear all filters
+                  </button>
+                )}
               </div>
             </div>
-            {activeFilters > 0 && (
-              <button onClick={clearFilters} className="mt-3 text-xs text-red-500 hover:underline">
-                Clear all filters
-              </button>
-            )}
           </div>
         )}
       </div>
 
       {/* Category chips */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-6">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-5">
         {CATEGORIES.map(cat => {
           const m = CATEGORY_META[cat as keyof typeof CATEGORY_META];
           return (
             <button key={cat} onClick={() => setParam('category', cat)}
-              className={cn('chip shrink-0', category === cat && 'active')}>
+              className={cn('chip shrink-0 text-xs transition-all',
+                category === cat && 'active scale-[1.02]')}>
               {m?.icon} {m?.label}
             </button>
           );
@@ -178,37 +241,35 @@ function JobsContent() {
       </div>
 
       {/* Results header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <h1 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">
-            {category === 'all' ? 'All Remote Jobs' : `${catMeta.icon} ${catMeta.label} Jobs`}
+            {q ? `Results for "${q}"` : category === 'all' ? 'All Remote Jobs' : `${catMeta.icon} ${catMeta.label} Jobs`}
           </h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {loading ? 'Loading…' : `${total.toLocaleString()} jobs found${q ? ` for "${q}"` : ''}`}
+            {loading ? 'Searching…' : `${total.toLocaleString()} jobs found`}
+            {!loading && total > 0 && <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400"><Zap className="w-3 h-3"/>Updated daily</span>}
           </p>
         </div>
-        {(q || category !== 'all' || activeFilters > 0) && (
-          <button onClick={clearFilters} className="text-xs text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 hover:underline">
-            Clear all
+        {hasActive && (
+          <button onClick={clearAll} className="text-xs text-stone-400 hover:text-red-500 transition-colors flex items-center gap-1">
+            <X className="w-3.5 h-3.5" /> Clear all
           </button>
         )}
       </div>
 
-      {/* Jobs grid */}
+      {/* Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : jobs.length === 0 ? (
-        <div className="card p-16 text-center">
+        <div className="bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-2xl p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
           <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">No jobs found</h2>
-          <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto">
-            Try different keywords or remove some filters to see more results.
-          </p>
-          <button onClick={clearFilters}
-            className="px-6 py-2.5 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors">
-            Clear filters
+          <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
+          <button onClick={clearAll} className="px-6 py-2.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors">
+            Show all jobs
           </button>
         </div>
       ) : (
@@ -219,27 +280,24 @@ function JobsContent() {
 
           {/* Pagination */}
           {pages > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <button onClick={() => setPage(page - 1)} disabled={page <= 1}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-stone-200 dark:border-[#234533] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] disabled:opacity-40 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Previous
+            <div className="flex items-center justify-center gap-1.5">
+              <button onClick={() => setPage(page-1)} disabled={page<=1}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1a3d2e] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] disabled:opacity-40 transition-colors">
+                <ChevronLeft className="w-4 h-4"/>Previous
               </button>
-
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
-                  const p = pages <= 7 ? i + 1 : i === 0 ? 1 : i === 6 ? pages : page - 2 + i;
-                  return (
-                    <button key={p} onClick={() => setPage(p)}
-                      className={cn('w-9 h-9 rounded-lg text-sm font-semibold transition-colors', p === page ? 'bg-brand-700 dark:bg-brand-500 text-white' : 'border border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829]')}>
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button onClick={() => setPage(page + 1)} disabled={page >= pages}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-stone-200 dark:border-[#234533] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] disabled:opacity-40 transition-colors">
-                Next <ChevronRight className="w-4 h-4" />
+              {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                const p = pages<=5 ? i+1 : i===0 ? 1 : i===4 ? pages : page-1+i;
+                return (
+                  <button key={p} onClick={()=>setPage(p)}
+                    className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all',
+                      p===page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1a3d2e] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820]')}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button onClick={()=>setPage(page+1)} disabled={page>=pages}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1a3d2e] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] disabled:opacity-40 transition-colors">
+                Next<ChevronRight className="w-4 h-4"/>
               </button>
             </div>
           )}
@@ -252,13 +310,11 @@ function JobsContent() {
 export default function JobsPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-[1240px] mx-auto px-5 py-8">
-        <div className="skeleton h-12 rounded-xl mb-6" />
-        <div className="flex gap-2 mb-6">
-          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-9 w-24 rounded-full" />)}
-        </div>
+      <div className="max-w-[1240px] mx-auto px-5 py-6">
+        <div className="skeleton h-12 rounded-xl mb-5" />
+        <div className="flex gap-2 mb-5">{Array.from({length:6}).map((_,i)=><div key={i} className="skeleton h-9 w-24 rounded-full"/>)}</div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
+          {Array.from({length:9}).map((_,i)=><SkeletonCard key={i}/>)}
         </div>
       </div>
     }>

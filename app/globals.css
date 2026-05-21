@@ -27,7 +27,7 @@
 
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #0a5c36;
+    box-shadow: 0 0 0 2px #0d7a5f;
   }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -44,7 +44,7 @@
   }
   .dark .card {
     background: #152b20;
-    border-color: #234533;
+    border-color: #1a3d2e;
   }
 
   .input {
@@ -61,11 +61,11 @@
   }
   .dark .input {
     background: #152b20;
-    border-color: #234533;
+    border-color: #1a3d2e;
     color: #e8f2ec;
   }
   .input:focus {
-    border-color: #0a5c36;
+    border-color: #0d7a5f;
     box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
   }
   .input::placeholder { color: #a8a29e; }
@@ -101,13 +101,13 @@
   }
   .dark .chip {
     background: #152b20;
-    border-color: #234533;
+    border-color: #1a3d2e;
     color: #a8a29e;
   }
-  .chip:hover { border-color: #0a5c36; color: #0a5c36; }
+  .chip:hover { border-color: #0d7a5f; color: #0d7a5f; }
   .chip.active {
-    background: #0a5c36;
-    border-color: #0a5c36;
+    background: #0d7a5f;
+    border-color: #0d7a5f;
     color: #ffffff;
     font-weight: 600;
   }
@@ -126,7 +126,7 @@
     border-radius: 6px;
   }
   .dark .skeleton {
-    background: linear-gradient(90deg, #1c2b24 25%, #234533 50%, #1c2b24 75%);
+    background: linear-gradient(90deg, #1c2b24 25%, #1a3d2e 50%, #1c2b24 75%);
     background-size: 200% 100%;
   }
 
@@ -143,7 +143,7 @@
     text-decoration: none;
   }
   .dark .bottom-nav-item { color: #78716c; }
-  .bottom-nav-item.active { color: #0a5c36; }
+  .bottom-nav-item.active { color: #0d7a5f; }
 
   .admin-nav-item {
     display: flex;
@@ -164,8 +164,8 @@
   .dark .admin-nav-item:hover { background: #1c3829; color: #e8f2ec; }
   .admin-nav-item.active {
     background: #edfaf2;
-    color: #0a5c36;
-    border-right-color: #0a5c36;
+    color: #0d7a5f;
+    border-right-color: #0d7a5f;
     font-weight: 600;
   }
   .dark .admin-nav-item.active {
@@ -184,7 +184,7 @@
   .text-highlight {
     position: relative;
     display: inline-block;
-    color: #0a5c36;
+    color: #0d7a5f;
   }
   .dark .text-highlight { color: #3dbb7b; }
   .text-highlight::after {
