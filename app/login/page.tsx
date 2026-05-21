@@ -26,6 +26,22 @@ function LoginForm() {
     }
   }, []);
 
+  async function handleGoogleLogin() {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const supabase = createClient();
+      const next = searchParams.get('next') ?? '/dashboard';
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${next}` },
+      });
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMsg(err?.message ?? 'Google sign-in failed. Please try again.');
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -110,6 +126,28 @@ function LoginForm() {
           <p className="text-sm text-red-700 dark:text-red-400">{errorMsg}</p>
         </div>
       )}
+
+      {/* Google OAuth */}
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-3 py-3 mb-4 border border-stone-200 dark:border-[#234533] rounded-lg bg-white dark:bg-[#152B20] hover:bg-stone-50 dark:hover:bg-[#1C3829] text-stone-800 dark:text-stone-100 text-sm font-semibold transition-all disabled:opacity-50"
+      >
+        <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
+          <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
+          <path d="M24 48c6.5 0 12-2.1 16-5.8l-7.9-6c-2.2 1.5-5 2.3-8.1 2.3-6.2 0-11.5-4.2-13.4-9.9H2.5v6.2C6.5 42.6 14.7 48 24 48z" fill="#34A853"/>
+          <path d="M10.6 28.6A14.8 14.8 0 0 1 9.8 24c0-1.6.3-3.2.8-4.6v-6.2H2.5A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.8l8.1-6.2z" fill="#FBBC05"/>
+          <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div className="flex items-center gap-3 mb-4">
+        <hr className="flex-1 border-stone-200 dark:border-[#234533]" />
+        <span className="text-xs text-stone-400 dark:text-stone-500 font-medium">or</span>
+        <hr className="flex-1 border-stone-200 dark:border-[#234533]" />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
