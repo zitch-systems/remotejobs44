@@ -61,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        setAdminName(profile?.name ?? session.user.email ?? 'Admin');
+        setAdminName(profile?.name ?? authUser.email ?? 'Admin');
         setChecking(false);
       } catch {
         if (!cancelled) {
