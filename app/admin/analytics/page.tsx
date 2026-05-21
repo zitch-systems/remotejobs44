@@ -29,14 +29,14 @@ export default function AdminAnalyticsPage() {
     { label: 'Total Users',    value: formatNumber(counts.users),    icon: <Users className="w-5 h-5" />,          color: 'brand' },
     { label: 'Pro Subscribers',value: formatNumber(counts.pro),      icon: <TrendingUp className="w-5 h-5" />,     color: 'amber' },
     { label: 'Day Pass Users', value: formatNumber(counts.daily),    icon: <MousePointerClick className="w-5 h-5" />, color: 'blue' },
-    { label: 'Est. MRR (₦)',   value: `₦${formatNumber(counts.revenue)}`, icon: <DollarSign className="w-5 h-5" />, color: 'green' },
+    { label: 'Est. MRR (₦)',   value: `₦${formatNumber(counts.revenue)}`, icon: <DollarSign className="w-5 h-5" />, color: 'amber' },
   ];
 
   const colorMap: Record<string, string> = {
     brand: 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400',
     amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
     blue:  'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-    green: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    green: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   };
 
   return (

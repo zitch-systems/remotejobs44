@@ -14,7 +14,7 @@ function StrengthBar({ password }: { password: string }) {
     { label: 'Number',        pass: /\d/.test(password) },
   ];
   const score = checks.filter(c => c.pass).length;
-  const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-green-500'];
+  const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-brand-500'];
   return (
     <div className="mt-2">
       <div className="flex gap-1 mb-1.5">
@@ -24,7 +24,7 @@ function StrengthBar({ password }: { password: string }) {
       </div>
       <div className="flex gap-3 flex-wrap">
         {checks.map(c => (
-          <span key={c.label} className={`flex items-center gap-1 text-xs ${c.pass ? 'text-green-600 dark:text-green-400' : 'text-stone-400'}`}>
+          <span key={c.label} className={`flex items-center gap-1 text-xs ${c.pass ? 'text-brand-600 dark:text-brand-400' : 'text-stone-400'}`}>
             <Check className="w-3 h-3" />{c.label}
           </span>
         ))}

@@ -27,7 +27,7 @@ export function HeroSection() {
 
         {/* Eyebrow */}
         <div className="animate-fade-in inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest"
-          style={{ background:'rgba(37,99,235,0.08)', borderColor:'rgba(13,122,95,0.2)', color:'#2563eb' }}>
+          style={{ background:'rgba(37,99,235,0.08)', borderColor:'rgba(37,99,235,0.25)', color:'#2563eb' }}>
           🌍 50,000+ remote jobs worldwide
         </div>
 

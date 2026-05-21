@@ -29,14 +29,18 @@ function LoginForm() {
   async function handleGoogleLogin() {
     setLoading(true);
     setErrorMsg('');
+    // Safety: reset loading if OAuth redirect doesn't happen within 10s
+    const fallback = setTimeout(() => setLoading(false), 10000);
     try {
       const supabase = createClient();
       const next = searchParams.get('next') ?? '/dashboard';
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: `${window.location.origin}/auth/callback?next=${next}` },
       });
+      if (error) throw error;
     } catch (err: any) {
+      clearTimeout(fallback);
       setLoading(false);
       setErrorMsg(err?.message ?? 'Google sign-in failed. Please try again.');
     }
@@ -48,11 +52,10 @@ function LoginForm() {
     setErrorMsg('');
     setSuccess(false);
 
-    // Timeout guard — prevent infinite spinner
     const timer = setTimeout(() => {
       setLoading(false);
       setErrorMsg('Request timed out. Check your connection and try again.');
-    }, 15000);
+    }, 10000);
 
     try {
       const supabase = createClient();
@@ -66,8 +69,12 @@ function LoginForm() {
         clearTimeout(timer);
         setLoading(false);
         if (error.message.toLowerCase().includes('email not confirmed')) {
-          setErrorMsg('Please check your inbox and confirm your email before logging in.');
-        } else if (error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')) {
+          setErrorMsg('Please confirm your email first — check your inbox.');
+        } else if (
+          error.message.toLowerCase().includes('invalid') ||
+          error.message.toLowerCase().includes('credentials') ||
+          error.message.toLowerCase().includes('password')
+        ) {
           setErrorMsg('Wrong email or password. Please try again.');
         } else {
           setErrorMsg(error.message);
@@ -82,15 +89,17 @@ function LoginForm() {
         return;
       }
 
-      // Fetch profile to determine role
+      // Fetch profile with 4s timeout — gracefully skip if DB not ready
       let profile: any = null;
       try {
-        const { data: p } = await supabase
+        const profilePromise = supabase
           .from('profiles')
           .select('name,plan,role,created_at,profile_completion')
           .eq('id', data.user.id)
           .maybeSingle();
-        profile = p;
+        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 4000));
+        const result = await Promise.race([profilePromise, timeoutPromise]);
+        if (result && 'data' in result) profile = result.data;
       } catch {}
 
       clearTimeout(timer);
@@ -105,7 +114,7 @@ function LoginForm() {
         profileCompletion: profile?.profile_completion ?? 20,
       });
 
-      // Redirect admins to admin panel, others to their intended destination
+      setLoading(false);
       const isAdmin = profile?.role === 'admin';
       const next = searchParams.get('next') ?? (isAdmin ? '/admin' : '/dashboard');
       window.location.replace(next);

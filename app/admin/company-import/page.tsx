@@ -27,7 +27,7 @@ interface CompanyEntry {
 }
 
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
-  greenhouse: { label: 'Greenhouse', color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20' },
+  greenhouse: { label: 'Greenhouse', color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
   lever:      { label: 'Lever',      color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' },
   ashby:      { label: 'Ashby',      color: 'text-purple-700 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20' },
   workable:   { label: 'Workable',   color: 'text-cyan-700 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20' },
@@ -287,7 +287,7 @@ export default function CompanyImportPage() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
             {[
               { label: 'Total', value: stats.total, color: 'text-stone-700 dark:text-stone-300' },
-              { label: 'Detected', value: stats.detected, color: 'text-green-600 dark:text-green-400' },
+              { label: 'Detected', value: stats.detected, color: 'text-brand-600 dark:text-brand-400' },
               { label: 'Done', value: stats.done, color: 'text-brand-700 dark:text-brand-400' },
               { label: 'Errors', value: stats.errors, color: 'text-red-500' },
               { label: 'Jobs found', value: stats.jobs.toLocaleString(), color: 'text-amber-600 dark:text-amber-400' },
@@ -384,7 +384,7 @@ export default function CompanyImportPage() {
                     onClick={() => toggleExpand(entry.id)}>
                     {/* Status icon */}
                     <div className="shrink-0">
-                      {entry.status === 'done' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                      {entry.status === 'done' && <CheckCircle className="w-4 h-4 text-brand-500" />}
                       {entry.status === 'error' && <XCircle className="w-4 h-4 text-red-400" />}
                       {entry.status === 'fetching' && <RefreshCw className="w-4 h-4 text-brand-600 animate-spin" />}
                       {entry.status === 'ready' && <div className="w-4 h-4 rounded-full border-2 border-blue-400" />}
@@ -397,7 +397,7 @@ export default function CompanyImportPage() {
                         <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold', pm.color)}>{pm.label}</span>
                         {entry.slug && <span className="text-xs text-stone-400 font-mono">{entry.slug}</span>}
                         {entry.status === 'done' && entry.jobCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400">
                             {entry.jobCount} jobs
                           </span>
                         )}

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       <div
         style={{
           width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-          backgroundColor: '#0a5c36', padding: '60px',
+          backgroundColor: '#0f1e38', padding: '60px',
           fontFamily: 'system-ui, sans-serif',
         }}
       >
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
             {title}
           </div>
           {salary && (
-            <div style={{ fontSize: '28px', color: '#7FE5B0', fontWeight: 700 }}>{salary}</div>
+            <div style={{ fontSize: '28px', color: '#60a5fa', fontWeight: 700 }}>{salary}</div>
           )}
         </div>
 
