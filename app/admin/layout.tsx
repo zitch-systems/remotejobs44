@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Briefcase, Users, BarChart3,
   Rss, Building2, Settings, CreditCard,
-  PlusCircle, ChevronRight, Shield
+  PlusCircle, ChevronRight, Shield, KeyRound, Loader2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checking, setChecking] = useState(true);
   const [adminName, setAdminName] = useState('');
   const [accessError, setAccessError] = useState('');
+  const [notAdmin, setNotAdmin]     = useState(false);
+  const [secret, setSecret]         = useState('');
+  const [promoting, setPromoting]   = useState(false);
+  const [promoteMsg, setPromoteMsg] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +55,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        if (profile?.role !== 'admin') { router.replace('/dashboard'); return; }
+        if (profile?.role !== 'admin') {
+          setNotAdmin(true);
+          setChecking(false);
+          return;
+        }
 
         setAdminName(profile?.name ?? session.user.email ?? 'Admin');
         setChecking(false);
@@ -87,6 +95,62 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="px-5 py-2 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors">
             Try again
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (notAdmin) {
+    async function handlePromote(e: React.FormEvent) {
+      e.preventDefault();
+      setPromoting(true);
+      setPromoteMsg('');
+      try {
+        const res = await fetch('/api/admin/promote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setPromoteMsg('✅ ' + data.message);
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          setPromoteMsg('❌ ' + (data.error ?? 'Promotion failed'));
+        }
+      } catch { setPromoteMsg('❌ Network error'); }
+      setPromoting(false);
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8faff] dark:bg-[#0f1e38] px-4">
+        <div className="w-full max-w-sm bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-2xl p-7 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center shrink-0">
+              <KeyRound className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-stone-900 dark:text-stone-100">Admin Setup</p>
+              <p className="text-xs text-stone-400">Your account isn't admin yet. Enter the setup secret to promote it.</p>
+            </div>
+          </div>
+          <form onSubmit={handlePromote} className="space-y-3">
+            <input
+              type="password"
+              value={secret}
+              onChange={e => setSecret(e.target.value)}
+              placeholder="ADMIN_SETUP_SECRET"
+              className="input text-sm"
+              required
+            />
+            <button type="submit" disabled={promoting || !secret}
+              className="w-full py-3 rounded-xl bg-brand-700 text-white font-bold text-sm hover:bg-brand-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+              {promoting ? <><Loader2 className="w-4 h-4 animate-spin" />Promoting…</> : 'Promote to Admin'}
+            </button>
+          </form>
+          {promoteMsg && <p className="mt-3 text-sm text-center font-medium">{promoteMsg}</p>}
+          <p className="mt-4 text-xs text-stone-400 text-center">
+            Set <code className="font-mono bg-stone-100 dark:bg-[#162033] px-1 rounded">ADMIN_SETUP_SECRET</code> in Vercel env vars first.
+          </p>
         </div>
       </div>
     );

@@ -12,7 +12,7 @@ const PLANS = [
     price:     '₦1,000',
     period:    '/ 24 hours',
     desc:      'Full access for a day. Great for an active job hunt.',
-    features:  ['All apply links & emails', 'CV auto-apply', 'Application tracker', '24-hour access'],
+    features:  ['Up to 10 job applications', 'All apply links & emails', 'CV auto-apply', '24-hour access'],
     cta:       'Get Day Pass',
     highlight: false,
     badge:     null as string | null,

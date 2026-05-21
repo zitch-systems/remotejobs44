@@ -111,6 +111,7 @@ export function Header() {
     await supabase.auth.signOut();
     setUser(null);
     setUserOpen(false);
+    try { localStorage.removeItem('rj44-auth'); localStorage.removeItem('rj44-jobs'); } catch {}
     window.location.replace('/');
   }
 

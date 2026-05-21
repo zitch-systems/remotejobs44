@@ -21,6 +21,8 @@ export function JobCard({ job }: JobCardProps) {
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
   const isDaily = user?.plan === 'daily';
   const isFree = !isLoggedIn() || user?.plan === 'free';
+  // Day pass users also see company blurred — revealed when they click Apply
+  const hideCompany = isFree || isDaily;
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
 
   function handleSave(e: React.MouseEvent) {
@@ -71,10 +73,10 @@ export function JobCard({ job }: JobCardProps) {
           <h3 className="font-display font-bold text-base text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors line-clamp-2 leading-snug">
             {job.title}
           </h3>
-          {isFree ? (
+          {hideCompany ? (
             <p className="text-sm font-medium mt-0.5 flex items-center gap-1 text-stone-400">
               <span className="text-xs">🔒</span>
-              <span className="blur-[3px] select-none">Company Name</span>
+              <span className="blur-[3px] select-none pointer-events-none">{isDaily ? 'Click Apply' : 'Company Name'}</span>
             </p>
           ) : (
             <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>

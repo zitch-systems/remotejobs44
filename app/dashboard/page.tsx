@@ -21,22 +21,24 @@ function DashboardContent() {
   useEffect(() => {
     async function loadSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.replace('/login?next=/dashboard'); return; }
+        // Use getUser() (server-validated) instead of getSession() (cached)
+        // so we always get the freshest auth state, especially post-payment.
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) { router.replace('/login?next=/dashboard'); return; }
 
         let profile: any = null;
         try {
           const profilePromise = supabase
-            .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+            .from('profiles').select('*').eq('id', authUser.id).maybeSingle();
           const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
           const result = await Promise.race([profilePromise, timeoutPromise]);
           if (result && 'data' in result) profile = result.data;
         } catch {}
 
         setUser({
-          id:    session.user.id,
-          email: session.user.email!,
-          name:  profile?.name ?? session.user.email!.split('@')[0],
+          id:    authUser.id,
+          email: authUser.email!,
+          name:  profile?.name ?? authUser.email!.split('@')[0],
           plan:  profile?.plan  ?? 'free',
           role:  profile?.role  ?? 'user',
           joinedAt: profile?.created_at ?? new Date().toISOString(),
