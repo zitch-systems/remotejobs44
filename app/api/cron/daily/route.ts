@@ -4,6 +4,8 @@
 // Does two things: (1) ingest fresh jobs, (2) expire day passes
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { sendEmail } from '@/lib/email/send';
+import { jobAlertEmail } from '@/lib/email/templates';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
 
@@ -112,6 +114,38 @@ export async function GET(req: NextRequest) {
     .update({ is_new: false })
     .eq('is_new', true)
     .lt('posted_at', sevenDaysAgo);
+
+
+  // ── TASK 4: Send job alert emails to Pro users ────────────────────────
+  try {
+    const { data: alerts } = await supabase
+      .from('job_alerts')
+      .select('user_id, category, keywords, profiles(name, email, plan)')
+      .eq('active', true)
+      .eq('frequency', 'daily');
+
+    if (alerts && alerts.length > 0) {
+      // Get today's new jobs
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: newJobs } = await supabase
+        .from('jobs')
+        .select('id, title, company, location')
+        .eq('is_active', true)
+        .gte('posted_at', yesterday)
+        .limit(10);
+
+      if (newJobs && newJobs.length > 0) {
+        for (const alert of alerts) {
+          const profile = (alert as any).profiles;
+          if (!profile?.email || !['pro','admin'].includes(profile.plan)) continue;
+          const { subject, html } = jobAlertEmail(profile.name ?? 'there', newJobs);
+          await sendEmail({ to: profile.email, subject, html });
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('Alert emails error:', err.message);
+  }
 
   log.completedAt = new Date().toISOString();
 

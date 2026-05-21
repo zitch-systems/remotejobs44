@@ -10,8 +10,10 @@ import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
-  { href: '/jobs',    label: 'Jobs'    },
-  { href: '/pricing', label: 'Pricing' },
+  { href: '/jobs',      label: 'Jobs'      },
+  { href: '/companies', label: 'Companies' },
+  { href: '/pricing',   label: 'Pricing'   },
+  { href: '/about',     label: 'About'     },
 ];
 
 function getInitials(name: string): string {

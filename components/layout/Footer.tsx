@@ -10,9 +10,10 @@ const FOOTER_LINKS = {
     { label: 'Data & Analytics', href: '/jobs?category=data' },
   ],
   Company: [
-    { label: 'About',    href: '/about' },
-    { label: 'Pricing',  href: '/pricing' },
-    { label: 'Contact',  href: '/contact' },
+    { label: 'About',     href: '/about' },
+    { label: 'Companies', href: '/companies' },
+    { label: 'Pricing',   href: '/pricing' },
+    { label: 'Contact',   href: '/contact' },
   ],
   Legal: [
     { label: 'Privacy Policy', href: '/privacy' },
