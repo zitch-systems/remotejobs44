@@ -23,10 +23,11 @@ create table if not exists public.profiles (
 alter table public.profiles enable row level security;
 
 -- Policies
-drop policy if exists "Users can view own profile"   on public.profiles;
-drop policy if exists "Users can update own profile" on public.profiles;
-drop policy if exists "Admins can view all profiles" on public.profiles;
-drop policy if exists "Admins can update all profiles" on public.profiles;
+drop policy if exists "Users can view own profile"                on public.profiles;
+drop policy if exists "Users can update own profile"              on public.profiles;
+drop policy if exists "Admins can view all profiles"              on public.profiles;
+drop policy if exists "Admins can update all profiles"            on public.profiles;
+drop policy if exists "Service role full access to profiles"      on public.profiles;
 
 create policy "Users can view own profile"
   on public.profiles for select
