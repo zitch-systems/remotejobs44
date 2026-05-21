@@ -68,7 +68,6 @@ export const metadata: Metadata = {
     shortcut: '/icons/icon-32.png',
   },
   appleWebApp: {
-    capable: true,
     statusBarStyle: 'black-translucent',
     title: 'RemoteJobs44',
     startupImage: '/icons/apple-touch-icon.png',
@@ -126,7 +125,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}} />
       </head>
-      <body className="min-h-dvh flex flex-col font-body bg-[#f8faff] text-slate-900 antialiased dark:bg-[#0f1e38] dark:text-[#e8eeff]">
+      <body suppressHydrationWarning className="min-h-dvh flex flex-col font-body bg-[#f8faff] text-slate-900 antialiased dark:bg-[#0f1e38] dark:text-[#e8eeff]">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
           <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-brand-700 focus:text-white focus:rounded-lg focus:font-semibold">
             Skip to content

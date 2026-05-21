@@ -42,6 +42,9 @@ export default function SourcesPage() {
   const [nameInput, setNameInput] = useState('');
   const [adding, setAdding] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkAdding, setBulkAdding] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{done:number;total:number} | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -83,6 +86,56 @@ export default function SourcesPage() {
     setAdding(false);
   }
 
+  async function handleBulkAdd() {
+    const urls = bulkText
+      .split(/[\n,\s]+/)
+      .map(u => u.trim())
+      .filter(u => u.startsWith('http'));
+    if (!urls.length) return;
+
+    setBulkAdding(true);
+    setBulkProgress({ done: 0, total: urls.length });
+
+    // Add placeholders for all URLs immediately
+    const placeholders: Source[] = urls.map((url, i) => ({
+      id: `bulk-${Date.now()}-${i}`,
+      url,
+      name: extractName(url),
+      method: 'detecting' as SourceMethod,
+      status: 'detecting' as SourceStatus,
+      jobCount: 0,
+    }));
+
+    setSources(prev => {
+      const existing = new Set(prev.map(s => s.url));
+      const fresh = placeholders.filter(p => !existing.has(p.url));
+      return [...prev, ...fresh];
+    });
+    setBulkText('');
+
+    // Process up to 4 at a time
+    const CONCURRENCY = 4;
+    let done = 0;
+    for (let i = 0; i < placeholders.length; i += CONCURRENCY) {
+      const batch = placeholders.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async (placeholder) => {
+        const result = await detectAndFetch(placeholder.url);
+        setSources(prev => {
+          const updated = prev.map(s =>
+            s.id === placeholder.id ? { ...s, ...result, lastSync: new Date().toISOString() } : s
+          );
+          localStorage.setItem('rj44_sources_v2', JSON.stringify(updated.map(s => ({ ...s, jobs: undefined }))));
+          return updated;
+        });
+        done++;
+        setBulkProgress({ done, total: placeholders.length });
+      }));
+    }
+
+    setBulkAdding(false);
+    setBulkProgress(null);
+  }
+
   async function handleRefresh(source: Source) {
     setSources(prev => prev.map(s => s.id === source.id ? { ...s, status: 'detecting' } : s));
     const result = await detectAndFetch(source.url);
@@ -107,7 +160,7 @@ export default function SourcesPage() {
       </div>
 
       <div className="card p-5 mb-5">
-        <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-3">Add New Source</h2>
+        <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-3">Add Single Source</h2>
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input ref={urlRef} type="url" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdd()} placeholder="Paste URL — RSS, JSON API, or jobs page…" className="input flex-1 text-sm" />
           <input type="text" value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="Label (optional)" className="input sm:w-44 text-sm" />
@@ -126,6 +179,45 @@ export default function SourcesPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Bulk URL paste */}
+      <div className="card p-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100">Bulk Add URLs</h2>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Paste hundreds of job board / career page URLs — one per line. Auto-detects RSS, JSON API, Greenhouse, Lever, Ashby, etc.</p>
+          </div>
+          {bulkProgress && (
+            <span className="text-xs font-bold text-brand-700 dark:text-brand-400 shrink-0">
+              {bulkProgress.done} / {bulkProgress.total} done
+            </span>
+          )}
+        </div>
+        <textarea
+          value={bulkText}
+          onChange={e => setBulkText(e.target.value)}
+          placeholder={'https://jobs.ashby.com/company-x\nhttps://company.greenhouse.io/boards/\nhttps://weworkremotely.com/remote-jobs.rss\n...'}
+          rows={6}
+          className="input text-sm font-mono resize-y mb-3"
+          disabled={bulkAdding}
+        />
+        {bulkProgress && (
+          <div className="w-full bg-stone-100 dark:bg-[#162033] rounded-full h-1.5 mb-3 overflow-hidden">
+            <div
+              className="h-full bg-brand-600 rounded-full transition-all duration-300"
+              style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
+            />
+          </div>
+        )}
+        <button
+          onClick={handleBulkAdd}
+          disabled={!bulkText.trim() || bulkAdding}
+          className="flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+        >
+          {bulkAdding ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+          {bulkAdding ? `Detecting… ${bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : ''}` : 'Add All & Auto-Detect'}
+        </button>
       </div>
 
       {sources.length === 0 ? (

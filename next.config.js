@@ -7,6 +7,7 @@ const nextConfig = {
       { protocol: 'https', hostname: 'bookface-images.s3.amazonaws.com' },
       { protocol: 'https', hostname: 'cdn-customers.getro.com' },
       { protocol: 'https', hostname: 'cdn.filestackcontent.com' },
+      { protocol: 'https', hostname: 'gnyilmahiyddplsrrhoq.supabase.co' },
     ],
     formats: ['image/avif', 'image/webp'],
   },

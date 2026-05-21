@@ -20,8 +20,8 @@ const SUBSCRIPTION_PLAN_CODES: Record<string, string | undefined> = {
 
 export async function POST(req: NextRequest) {
   try {
-    // Use the request's own origin so it works on any deployment
-    const APP_URL = new URL(req.url).origin;
+    // Prefer NEXT_PUBLIC_APP_URL to avoid localhost bleed on Paystack callback
+    const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '') || new URL(req.url).origin;
     const { plan } = await req.json();
 
     if (!plan || !PLAN_AMOUNTS[plan]) {
