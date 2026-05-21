@@ -19,9 +19,9 @@ const METHOD_META: Record<SourceMethod, { label: string; color: string }> = {
   'rss':           { label: 'RSS Feed',      color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20' },
   'json-api':      { label: 'JSON API',      color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' },
   'scrape':        { label: 'HTML Scrape',   color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20' },
-  'greenhouse-api':{ label: 'Greenhouse',    color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20' },
-  'lever-api':     { label: 'Lever ATS',     color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20' },
-  'ashby-api':     { label: 'Ashby ATS',     color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20' },
+  'greenhouse-api':{ label: 'Greenhouse',    color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
+  'lever-api':     { label: 'Lever ATS',     color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
+  'ashby-api':     { label: 'Ashby ATS',     color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
   'workable-api':  { label: 'Workable',      color: 'text-cyan-700 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20' },
   'detecting':     { label: 'Detecting…',    color: 'text-stone-500 bg-stone-100 dark:bg-stone-800' },
   'unknown':       { label: 'Unknown',        color: 'text-stone-500 bg-stone-100 dark:bg-stone-800' },
@@ -93,7 +93,7 @@ export default function SourcesPage() {
     if (!source.jobs?.length) return;
     setImportedCount(c => c + source.jobs!.length);
     const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0a5c36;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999';
     el.textContent = `✅ ${source.jobs.length} jobs from ${source.name} imported`;
     document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
   }
@@ -103,7 +103,7 @@ export default function SourcesPage() {
       <div className="mb-7">
         <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-1">Job Sources</h1>
         <p className="text-sm text-stone-400 dark:text-stone-500">Auto-detects RSS, JSON API, Greenhouse, Lever, Ashby, or Workable from any URL.</p>
-        {importedCount > 0 && <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-sm font-bold"><CheckCircle className="w-4 h-4" /> {importedCount} jobs imported</div>}
+        {importedCount > 0 && <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 rounded-lg text-sm font-bold"><CheckCircle className="w-4 h-4" /> {importedCount} jobs imported</div>}
       </div>
 
       <div className="card p-5 mb-5">
@@ -141,12 +141,12 @@ export default function SourcesPage() {
             return (
               <div key={source.id} className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', { 'bg-green-500': source.status === 'ok', 'bg-amber-400': source.status === 'js-only', 'bg-red-500': source.status === 'error', 'bg-brand-500 animate-pulse': source.status === 'detecting', 'bg-stone-300': source.status === 'idle' })} />
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', { 'bg-brand-500': source.status === 'ok', 'bg-amber-400': source.status === 'js-only', 'bg-red-500': source.status === 'error', 'bg-brand-400 animate-pulse': source.status === 'detecting', 'bg-stone-300': source.status === 'idle' })} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                       <span className="font-bold text-sm text-stone-900 dark:text-stone-100">{source.name}</span>
                       <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold', mm.color)}>{mm.label}</span>
-                      {source.status === 'ok' && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">{source.jobCount} jobs</span>}
+                      {source.status === 'ok' && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400">{source.jobCount} jobs</span>}
                       {source.status === 'js-only' && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">⚡ JS site</span>}
                     </div>
                     <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{source.url}</p>

@@ -54,7 +54,7 @@ export function PricingPreview() {
   }
 
   return (
-    <section className="py-20 bg-stone-50 dark:bg-[#0D1F18]">
+    <section className="py-20 bg-stone-50 dark:bg-[#0f1e38]">
       <div className="max-w-[1240px] mx-auto px-5">
 
         {/* Heading */}

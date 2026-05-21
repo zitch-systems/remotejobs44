@@ -22,7 +22,7 @@ export function HowItWorks() {
   ];
 
   return (
-    <section className="py-20 bg-white dark:bg-[#0D1F18]">
+    <section className="py-20 bg-white dark:bg-[#0f1e38]">
       <div className="max-w-[1240px] mx-auto px-5">
         <div className="text-center mb-14">
           <h2 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">

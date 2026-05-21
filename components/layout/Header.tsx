@@ -56,25 +56,33 @@ export function Header() {
   useEffect(() => {
     const supabase = createClient();
 
+    async function fetchProfile(userId: string, email: string) {
+      try {
+        const profilePromise = supabase
+          .from('profiles').select('name,plan,role,created_at,profile_completion')
+          .eq('id', userId).maybeSingle();
+        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+        const result = await Promise.race([profilePromise, timeoutPromise]);
+        const profile = (result && 'data' in result) ? result.data : null;
+        return profile;
+      } catch { return null; }
+    }
+
     async function syncAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { setUser(null); return; }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name,plan,role,created_at,profile_completion')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      setUser({
-        id:    session.user.id,
-        email: session.user.email!,
-        name:  profile?.name ?? session.user.email!.split('@')[0],
-        plan:  profile?.plan ?? 'free',
-        role:  profile?.role ?? 'user',
-        joinedAt: profile?.created_at ?? new Date().toISOString(),
-        profileCompletion: profile?.profile_completion ?? 20,
-      });
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { setUser(null); return; }
+        const profile = await fetchProfile(session.user.id, session.user.email!);
+        setUser({
+          id:    session.user.id,
+          email: session.user.email!,
+          name:  profile?.name ?? session.user.email!.split('@')[0],
+          plan:  profile?.plan ?? 'free',
+          role:  profile?.role ?? 'user',
+          joinedAt: profile?.created_at ?? new Date().toISOString(),
+          profileCompletion: profile?.profile_completion ?? 20,
+        });
+      } catch { setUser(null); }
     }
 
     syncAuth();
@@ -82,9 +90,7 @@ export function Header() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) { setUser(null); return; }
       if (event === 'SIGNED_IN' && session.user) {
-        const { data: profile } = await supabase
-          .from('profiles').select('name,plan,role,created_at,profile_completion')
-          .eq('id', session.user.id).maybeSingle();
+        const profile = await fetchProfile(session.user.id, session.user.email!);
         setUser({
           id:    session.user.id,
           email: session.user.email!,

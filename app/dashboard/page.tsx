@@ -20,23 +20,29 @@ function DashboardContent() {
 
   useEffect(() => {
     async function loadSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace('/login?next=/dashboard'); return; }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { router.replace('/login?next=/dashboard'); return; }
 
-      const { data: profile } = await supabase
-        .from('profiles').select('*').eq('id', session.user.id).single();
+        let profile: any = null;
+        try {
+          const profilePromise = supabase
+            .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+          const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+          const result = await Promise.race([profilePromise, timeoutPromise]);
+          if (result && 'data' in result) profile = result.data;
+        } catch {}
 
-      if (profile) {
         setUser({
           id:    session.user.id,
           email: session.user.email!,
-          name:  profile.name ?? session.user.email!.split('@')[0],
-          plan:  profile.plan  ?? 'free',
-          role:  profile.role  ?? 'user',
-          joinedAt: profile.created_at,
-          profileCompletion: profile.profile_completion ?? 20,
+          name:  profile?.name ?? session.user.email!.split('@')[0],
+          plan:  profile?.plan  ?? 'free',
+          role:  profile?.role  ?? 'user',
+          joinedAt: profile?.created_at ?? new Date().toISOString(),
+          profileCompletion: profile?.profile_completion ?? 20,
         });
-      }
+      } catch {}
       setLoading(false);
     }
     loadSession();

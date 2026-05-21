@@ -37,8 +37,8 @@ export default function VCBoardsPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="card p-4 text-center cursor-pointer hover:border-green-400 transition-colors" onClick={() => setFilterStatus('free-api')}>
-          <div className="text-2xl font-display font-extrabold text-green-600 dark:text-green-400">{stats.freeApi}</div>
+        <div className="card p-4 text-center cursor-pointer hover:border-brand-400 transition-colors" onClick={() => setFilterStatus('free-api')}>
+          <div className="text-2xl font-display font-extrabold text-brand-600 dark:text-brand-400">{stats.freeApi}</div>
           <div className="text-xs font-semibold text-stone-400 dark:text-stone-500 mt-0.5">✅ Free API</div>
         </div>
         <div className="card p-4 text-center cursor-pointer hover:border-amber-400 transition-colors" onClick={() => setFilterStatus('js-only')}>
@@ -81,7 +81,7 @@ export default function VCBoardsPage() {
           return (
             <div key={board.id} className="card overflow-hidden">
               <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors" onClick={() => setExpandedId(isExpanded ? null : board.id)}>
-                <div className={cn('w-2 h-2 rounded-full shrink-0', { 'bg-green-500': board.ingestionStatus === 'free-api', 'bg-amber-400': board.ingestionStatus === 'js-only', 'bg-blue-500': board.ingestionStatus === 'rss' })} />
+                <div className={cn('w-2 h-2 rounded-full shrink-0', { 'bg-brand-500': board.ingestionStatus === 'free-api', 'bg-amber-400': board.ingestionStatus === 'js-only', 'bg-blue-400': board.ingestionStatus === 'rss' })} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
                     <span className="font-semibold text-sm text-stone-900 dark:text-stone-100">{board.name}</span>
@@ -116,7 +116,7 @@ export default function VCBoardsPage() {
                     <div>
                       <p className="font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Ingestion strategy</p>
                       <div className="text-stone-600 dark:text-stone-300">
-                        {board.ingestionStatus === 'free-api' && <span className="text-green-700 dark:text-green-400">✅ Fully automated — click Import to pull jobs now.</span>}
+                        {board.ingestionStatus === 'free-api' && <span className="text-brand-700 dark:text-brand-400">✅ Fully automated — click Import to pull jobs now.</span>}
                         {board.ingestionStatus === 'js-only' && (
                           <div className="space-y-1">
                             <div className="text-amber-700 dark:text-amber-400">⚡ JS-rendered — no free API available.</div>
@@ -137,10 +137,10 @@ export default function VCBoardsPage() {
         })}
       </div>
 
-      <div className="mt-8 card p-5 bg-stone-50 dark:bg-[#0D1F18]">
+      <div className="mt-8 card p-5 bg-stone-50 dark:bg-[#0f1e38]">
         <p className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-3">Ingestion Summary</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div><p className="font-semibold text-green-700 dark:text-green-400 mb-1">✅ Works now (free)</p><p className="text-stone-500 dark:text-stone-400">YC / workatastartup — 1,400+ hiring companies, ~15k jobs, via yc-oss.github.io public API.</p></div>
+          <div><p className="font-semibold text-brand-700 dark:text-brand-400 mb-1">✅ Works now (free)</p><p className="text-stone-500 dark:text-stone-400">YC / workatastartup — 1,400+ hiring companies, ~15k jobs, via yc-oss.github.io public API.</p></div>
           <div><p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">⚡ Use Bulk Import instead</p><p className="text-stone-500 dark:text-stone-400">HV Capital, Insight Partners, Antler, Atomico, EQT + others on Getro. Add individual Greenhouse/Lever URLs via Bulk Import.</p></div>
         </div>
       </div>
