@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Briefcase } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { useAuthStore, useJobsStore } from '@/lib/store';
+import { useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
 
 const STATUS_CONFIG = {
@@ -19,16 +19,23 @@ const STATUS_CONFIG = {
 function ApplicationsList() {
   const router   = useRouter();
   const supabase = createClient();
-  const { isLoggedIn } = useAuthStore();
   const { applications } = useJobsStore();
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) router.replace('/login?next=/applications');
+      if (!session) { router.replace('/login?next=/applications'); return; }
+      setChecked(true);
     });
   }, []);
 
-  if (!isLoggedIn()) return null;
+  if (!checked) return (
+    <div className="max-w-[900px] mx-auto px-5 py-8 animate-pulse space-y-4">
+      <div className="skeleton h-8 w-48 rounded" />
+      <div className="skeleton h-32 rounded-lg" />
+      <div className="skeleton h-32 rounded-lg" />
+    </div>
+  );
 
   const byStatus = {
     active:   applications.filter(a => ['applied','screening','interview'].includes(a.status)),

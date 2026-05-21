@@ -91,13 +91,24 @@ const PLANS = [
 ];
 
 export default function PricingPage() {
-  const { isPro, isLoggedIn } = useAuthStore();
+  const { user, isPro, isLoggedIn } = useAuthStore();
   const { pay, loading } = usePaystack();
   const [activePlan, setActivePlan] = useState<string | null>(null);
 
+  const currentPlan = user?.plan ?? 'free';
+
+  function isCurrent(planId: string) {
+    if (planId === 'free')       return currentPlan === 'free';
+    if (planId === 'daily')      return currentPlan === 'daily';
+    if (planId === 'pro')        return currentPlan === 'pro';
+    if (planId === 'pro_annual') return currentPlan === 'pro'; // annual bills as 'pro'
+    return false;
+  }
+
   async function handleSubscribe(planId: string) {
-    if (planId === 'free') { window.location.href = '/register'; return; }
-    if (!isLoggedIn()) { window.location.href = '/register'; return; }
+    if (planId === 'free') { window.location.href = isLoggedIn() ? '/dashboard' : '/register'; return; }
+    if (!isLoggedIn()) { window.location.href = `/login?next=/pricing`; return; }
+    if (isCurrent(planId)) return;
     setActivePlan(planId);
     await pay({ plan: planId as 'daily' | 'pro' | 'pro_annual' });
     setActivePlan(null);
@@ -119,7 +130,7 @@ export default function PricingPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-16">
         {PLANS.map(plan => {
           const isActive = activePlan === plan.id;
-          const isCurrent = isPro() && (plan.id === 'pro' || plan.id === 'pro_annual');
+          const planIsCurrent = isCurrent(plan.id);
           return (
             <div key={plan.id} className={cn(
               'card flex flex-col p-6 transition-all duration-200 relative',
@@ -167,7 +178,7 @@ export default function PricingPage() {
 
               <button
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={isActive || isCurrent}
+                disabled={isActive || planIsCurrent}
                 className={cn(
                   'w-full py-3 rounded-xl font-bold text-sm transition-all duration-150 disabled:opacity-60',
                   plan.id === 'free'
@@ -179,7 +190,7 @@ export default function PricingPage() {
               >
                 {isActive
                   ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Processing…</span>
-                  : isCurrent ? 'Current Plan'
+                  : planIsCurrent ? 'Current Plan'
                   : plan.cta}
               </button>
             </div>

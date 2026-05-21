@@ -37,7 +37,7 @@ export const useAuthStore = create<AuthState>()(
       updateUser: (patch) =>
         set((s) => ({ user: s.user ? { ...s.user, ...patch } : null })),
 
-      isLoggedIn: () => !!get().user && !!get().token,
+      isLoggedIn: () => !!get().user,
       isPro:      () => ['daily', 'pro', 'admin'].includes(get().user?.plan ?? ''),
       isAdmin:    () => get().user?.role === 'admin',
     }),
