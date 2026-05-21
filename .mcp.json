@@ -1,14 +1,10 @@
 {
   "mcpServers": {
     "supabase": {
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--access-token",
-        "${SUPABASE_ACCESS_TOKEN}",
-        "--project-ref",
-        "gnyilmahiyddplsrrhoq"
+        "-c",
+        "set -a && source /home/user/remotejobs44/.env.local && set +a && exec npx -y @supabase/mcp-server-supabase@latest --access-token \"$SUPABASE_ACCESS_TOKEN\" --project-ref gnyilmahiyddplsrrhoq"
       ]
     }
   }
