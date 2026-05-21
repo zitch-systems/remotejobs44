@@ -5,7 +5,6 @@ import { sendEmail } from '@/lib/email/send';
 import { paymentSuccessEmail } from '@/lib/email/templates';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 function getPlanExpiry(plan: string): Date {
   const now = new Date();
@@ -24,6 +23,8 @@ function getPlanTier(plan: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  // Use the request's own origin so it works on any deployment
+  const APP_URL = new URL(req.url).origin;
   const reference = req.nextUrl.searchParams.get('reference') ?? req.nextUrl.searchParams.get('trxref');
   if (!reference) return NextResponse.redirect(`${APP_URL}/pricing?error=no_reference`);
 

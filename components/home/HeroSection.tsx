@@ -41,8 +41,8 @@ export function HeroSection() {
         <p className="text-stone-500 dark:text-stone-400 max-w-lg leading-relaxed"
           style={{ fontSize:'clamp(1rem,2vw,1.1rem)' }}>
           Connect with top companies hiring remotely across engineering, design, marketing and more.
-          Full access from just{' '}
-          <span className="font-bold text-brand-700 dark:text-brand-400">₦1,000</span>.
+          Day pass from <span className="font-bold text-brand-700 dark:text-brand-400">₦1,000</span>{' '}
+          (10 applications) or go Pro for unlimited access.
         </p>
 
         {/* Search bar */}

@@ -34,11 +34,12 @@ const PLANS = [
     price: '₦1,000',
     period: '/ 24 hours',
     icon: <Clock className="w-4 h-4" />,
-    desc: 'Full access for 24 hours. Great for an active job-hunting day.',
+    desc: 'Full access for 24 hours with 10 applications. Perfect for a focused job-hunt day.',
     cta: 'Get Day Pass',
     popular: false,
     features: [
       { text: 'Everything in Free', ok: true },
+      { text: 'Up to 10 job applications', ok: true },
       { text: 'All apply links & contact emails', ok: true },
       { text: 'CV upload & auto-apply', ok: true },
       { text: 'Full application tracker', ok: true },

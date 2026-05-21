@@ -14,11 +14,13 @@ const storage = () =>
 interface AuthState {
   user: User | null;
   token: string | null;
+  dailyAppsUsed: number;
   // Actions
   login:      (user: User, token: string) => void;
   logout:     () => void;
   setUser:    (user: User | null) => void;          // ← alias used by some components
   updateUser: (patch: Partial<User>) => void;
+  incrementDailyApp: () => void;
   // Selectors (functions so they always read latest state)
   isLoggedIn: () => boolean;
   isPro:      () => boolean;
@@ -30,12 +32,17 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user:  null,
       token: null,
+      dailyAppsUsed: 0,
 
       login:      (user, token) => set({ user, token }),
       logout:     () => set({ user: null, token: null }),
-      setUser:    (user) => set({ user }),
+      setUser:    (user) => set((s) => ({
+        user,
+        dailyAppsUsed: (user?.plan === 'daily' && s.user?.plan !== 'daily') ? 0 : s.dailyAppsUsed,
+      })),
       updateUser: (patch) =>
         set((s) => ({ user: s.user ? { ...s.user, ...patch } : null })),
+      incrementDailyApp: () => set((s) => ({ dailyAppsUsed: s.dailyAppsUsed + 1 })),
 
       isLoggedIn: () => !!get().user,
       isPro:      () => ['daily', 'pro', 'admin'].includes(get().user?.plan ?? ''),

@@ -18,7 +18,11 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
-  const { isPro, isLoggedIn } = useAuthStore();
+  const { user, isPro, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
+  const isDaily = user?.plan === 'daily';
+  const isFree = !isLoggedIn() || user?.plan === 'free';
+  const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
+  const [companyRevealed, setCompanyRevealed] = useState(false);
   const { isSaved, toggleSave, hasApplied, addApplication } = useJobsStore();
   const { toast } = useUIStore();
 
@@ -54,11 +58,17 @@ export default function JobDetailPage() {
   async function handleApply() {
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
     if (!isPro()) { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (isDaily && dailyLimitReached) {
+      toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
+      return;
+    }
+    if (isDaily) { setCompanyRevealed(true); incrementDailyApp(); }
     if (applied) { toast('Already applied', 'info'); return; }
     setApplying(true);
     try {
       const app = await applicationsApi.apply(job!.id);
       addApplication(app);
+      setCompanyRevealed(true);
       toast('Application submitted! 🎉', 'success');
     } catch (err: any) {
       toast(err.message, 'error');
@@ -83,7 +93,21 @@ export default function JobDetailPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="font-display font-extrabold text-xl text-stone-900 dark:text-stone-100 tracking-tight mb-1">{job.title}</h1>
-                <p className="text-base text-stone-500 dark:text-stone-400 font-semibold">{job.company}</p>
+                {isFree ? (
+                  <p className="text-base font-semibold flex items-center gap-2 text-stone-400">
+                    <span className="text-sm">🔒</span>
+                    <span className="blur-[4px] select-none">Hidden Company</span>
+                    <span className="no-blur text-xs font-normal text-stone-400 ml-1">(upgrade to reveal)</span>
+                  </p>
+                ) : isDaily && !companyRevealed ? (
+                  <p className="text-base font-semibold flex items-center gap-2 text-stone-400">
+                    <span className="text-sm">🔒</span>
+                    <span className="blur-[4px] select-none">{job.company}</span>
+                    <span className="text-xs font-normal text-stone-400">(revealed on apply)</span>
+                  </p>
+                ) : (
+                  <p className="text-base text-stone-500 dark:text-stone-400 font-semibold">{job.company}</p>
+                )}
                 <div className="flex flex-wrap gap-3 mt-2 text-sm text-stone-400 dark:text-stone-500">
                   <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{job.location}</span>
                   {job.timezone && <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
@@ -151,11 +175,24 @@ export default function JobDetailPage() {
               </div>
             ) : (
               <>
-                <button onClick={handleApply} disabled={applying}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 disabled:opacity-60 transition-colors mb-3">
-                  {applying ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Applying…</> : isPro() ? <><Zap className="w-4 h-4" /> Apply Now</> : <><>🔒</> Subscribe to Apply</>}
+                <button onClick={handleApply} disabled={applying || dailyLimitReached}
+                  className={cn(
+                    'w-full flex items-center justify-center gap-2 py-3 font-bold rounded-xl transition-colors mb-3',
+                    dailyLimitReached
+                      ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 cursor-not-allowed'
+                      : 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60'
+                  )}>
+                  {applying ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Applying…</>
+                    : dailyLimitReached ? '10/10 applications used'
+                    : isPro() ? <><Zap className="w-4 h-4" /> Apply Now</>
+                    : <><span>🔒</span> Subscribe to Apply</>}
                 </button>
-                {!isPro() && (
+                {isDaily && dailyLimitReached && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                    Day Pass limit reached. <Link href="/pricing" className="font-semibold underline">Upgrade to Pro</Link> for unlimited.
+                  </p>
+                )}
+                {!isPro() && !dailyLimitReached && (
                   <p className="text-xs text-stone-400 dark:text-stone-500 text-center">
                     <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Pro</Link> unlocks apply links & auto-apply
                   </p>

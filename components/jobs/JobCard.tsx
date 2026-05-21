@@ -11,7 +11,7 @@ import type { Job } from '@/lib/types';
 interface JobCardProps { job: Job; }
 
 export function JobCard({ job }: JobCardProps) {
-  const { isPro, isLoggedIn } = useAuthStore();
+  const { user, isPro, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
   const { isSaved, toggleSave, hasApplied, addApplication } = useJobsStore();
   const { toast } = useUIStore();
   const saved   = isSaved(job.id);
@@ -19,6 +19,9 @@ export function JobCard({ job }: JobCardProps) {
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
   const srcMeta = SOURCE_META[job.source as keyof typeof SOURCE_META]       ?? SOURCE_META['manual'];
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
+  const isDaily = user?.plan === 'daily';
+  const isFree = !isLoggedIn() || user?.plan === 'free';
+  const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
@@ -31,10 +34,15 @@ export function JobCard({ job }: JobCardProps) {
     e.preventDefault(); e.stopPropagation();
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
     if (!isPro())      { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (isDaily && dailyLimitReached) {
+      toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
+      return;
+    }
     if (applied) { toast('Already applied to this job', 'info'); return; }
     try {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
+      if (isDaily) incrementDailyApp();
       toast('Application submitted! 🎉', 'success');
     } catch (err: any) { toast(err.message, 'error'); }
   }
@@ -63,7 +71,14 @@ export function JobCard({ job }: JobCardProps) {
           <h3 className="font-display font-bold text-base text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors line-clamp-2 leading-snug">
             {job.title}
           </h3>
-          <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>
+          {isFree ? (
+            <p className="text-sm font-medium mt-0.5 flex items-center gap-1 text-stone-400">
+              <span className="text-xs">🔒</span>
+              <span className="blur-[3px] select-none">Company Name</span>
+            </p>
+          ) : (
+            <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>
+          )}
         </div>
         <button onClick={handleSave} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
@@ -113,13 +128,16 @@ export function JobCard({ job }: JobCardProps) {
             'shrink-0 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150',
             applied
               ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
+              : dailyLimitReached
+              ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed'
               : isPro()
               ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800 shadow-sm'
               : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'
           )}>
-          {applied ? '✓ Applied' : isPro() ? (
-            <span className="flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Apply</span>
-          ) : '🔒 Subscribe'}
+          {applied ? '✓ Applied'
+            : dailyLimitReached ? '10/10 Limit'
+            : isPro() ? <span className="flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Apply</span>
+            : '🔒 Subscribe'}
         </button>
       </div>
     </Link>
