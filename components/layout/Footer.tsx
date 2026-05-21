@@ -110,7 +110,7 @@ const FOOTER_LINKS = {
 
 export function Footer() {
   return (
-    <footer className="bg-white dark:bg-[#0a1f18] border-t border-stone-200 dark:border-[#1a3d2e] pt-16 pb-8 hidden md:block">
+    <footer className="bg-white dark:bg-[#0f1e38] border-t border-stone-200 dark:border-[#1e3a5f] pt-16 pb-8 hidden md:block">
       <div className="max-w-[1240px] mx-auto px-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
 
@@ -118,7 +118,7 @@ export function Footer() {
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[18px] text-stone-900 dark:text-stone-100 tracking-tight mb-3 hover:opacity-80 transition-opacity">
               <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
-                <rect width="32" height="32" rx="8" fill="#0d7a5f"/>
+                <rect width="32" height="32" rx="8" fill="#2563eb"/>
                 <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
                 <circle cx="23" cy="12" r="2.5" fill="#f59e0b"/>
               </svg>
@@ -137,7 +137,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={s.name}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-stone-200 dark:border-[#1a3d2e] text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:border-brand-500 dark:hover:text-brand-400 transition-all duration-150 hover:scale-110"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:border-brand-500 dark:hover:text-brand-400 transition-all duration-150 hover:scale-110"
                   style={{ '--hover-color': s.color } as React.CSSProperties}
                 >
                   {s.svg}
@@ -164,7 +164,7 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-8 border-t border-stone-100 dark:border-[#1a3d2e]">
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-8 border-t border-stone-100 dark:border-[#1e3a5f]">
           <p className="text-xs text-stone-400 dark:text-stone-500">
             © {new Date().getFullYear()} RemoteJobs44. All rights reserved.
           </p>

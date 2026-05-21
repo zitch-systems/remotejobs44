@@ -66,7 +66,7 @@ export default function AdminPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={handleSync} disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#1C3829] disabled:opacity-50 transition-colors">
+            className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing…' : 'Sync Jobs Now'}
           </button>
@@ -78,7 +78,7 @@ export default function AdminPage() {
       </div>
 
       {syncResult && (
-        <div className="mb-5 px-4 py-3 rounded-lg bg-stone-50 dark:bg-[#1C3829] border border-stone-200 dark:border-[#234533] text-sm text-stone-700 dark:text-stone-300">
+        <div className="mb-5 px-4 py-3 rounded-lg bg-stone-50 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] text-sm text-stone-700 dark:text-stone-300">
           {syncResult}
         </div>
       )}
@@ -117,15 +117,15 @@ export default function AdminPage() {
 
       {/* Recent jobs */}
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#234533]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#1e3a5f]">
           <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100">Recent Jobs</h2>
           <Link href="/admin/jobs" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1">
             Manage all <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
         {MOCK_JOBS.slice(0, 5).map(job => (
-          <div key={job.id} className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors border-b border-stone-50 dark:border-[#1C3829] last:border-0">
-            <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">{job.logo}</div>
+          <div key={job.id} className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors border-b border-stone-50 dark:border-[#162033] last:border-0">
+            <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">{job.logo}</div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>
               <p className="text-xs text-stone-400">{job.company} · {formatRelativeDate(job.posted)}</p>

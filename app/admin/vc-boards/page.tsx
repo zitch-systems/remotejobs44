@@ -60,7 +60,7 @@ export default function VCBoardsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-lg focus-within:border-brand-600 transition-colors">
+        <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg focus-within:border-brand-600 transition-colors">
           <Search className="w-4 h-4 text-stone-400 shrink-0" />
           <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Search boards…" className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400" />
         </div>
@@ -80,7 +80,7 @@ export default function VCBoardsPage() {
           const isExpanded = expandedId === board.id;
           return (
             <div key={board.id} className="card overflow-hidden">
-              <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors" onClick={() => setExpandedId(isExpanded ? null : board.id)}>
+              <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors" onClick={() => setExpandedId(isExpanded ? null : board.id)}>
                 <div className={cn('w-2 h-2 rounded-full shrink-0', { 'bg-green-500': board.ingestionStatus === 'free-api', 'bg-amber-400': board.ingestionStatus === 'js-only', 'bg-blue-500': board.ingestionStatus === 'rss' })} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -95,7 +95,7 @@ export default function VCBoardsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <a href={board.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-[#234533] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
+                  <a href={board.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-[#1e3a5f] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
                   {board.ingestionStatus === 'free-api' && (
                     <button onClick={e => { e.stopPropagation(); }} className="px-3 py-1.5 text-xs font-bold bg-brand-700 dark:bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors">Import</button>
                   )}
@@ -103,13 +103,13 @@ export default function VCBoardsPage() {
                 </div>
               </div>
               {isExpanded && (
-                <div className="border-t border-stone-100 dark:border-[#234533] px-4 py-4 bg-stone-50 dark:bg-[#1C3829] animate-fade-in text-xs">
+                <div className="border-t border-stone-100 dark:border-[#1e3a5f] px-4 py-4 bg-stone-50 dark:bg-[#162033] animate-fade-in text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Platform</p>
                       <div className="text-stone-600 dark:text-stone-300 space-y-1">
                         <div>{pm?.label} — {pm?.apiNote}</div>
-                        {board.apiEndpoint && <div className="font-mono text-xs bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded px-2 py-1 mt-1 break-all">{board.apiEndpoint}</div>}
+                        {board.apiEndpoint && <div className="font-mono text-xs bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded px-2 py-1 mt-1 break-all">{board.apiEndpoint}</div>}
                         {board.notes && <div className="text-stone-400 dark:text-stone-500 mt-1">{board.notes}</div>}
                       </div>
                     </div>
@@ -127,7 +127,7 @@ export default function VCBoardsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <a href={board.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-stone-200 dark:border-[#234533] rounded-lg text-stone-500 hover:bg-white dark:hover:bg-[#152B20] transition-colors"><ExternalLink className="w-3.5 h-3.5" /> Visit board</a>
+                    <a href={board.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-500 hover:bg-white dark:hover:bg-[#0d1a2e] transition-colors"><ExternalLink className="w-3.5 h-3.5" /> Visit board</a>
                     <Link href="/admin/company-import" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-brand-600 dark:border-brand-500 rounded-lg text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors">Bulk Import →</Link>
                   </div>
                 </div>

@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 font-display font-bold text-xl text-stone-900 dark:text-stone-100">
             <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
-              <rect width="32" height="32" rx="8" fill="#0d7a5f"/>
+              <rect width="32" height="32" rx="8" fill="#2563eb"/>
               <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
               <circle cx="23" cy="12" r="2.5" fill="#f59e0b"/>
             </svg>

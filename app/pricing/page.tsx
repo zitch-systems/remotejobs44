@@ -171,7 +171,7 @@ export default function PricingPage() {
                 className={cn(
                   'w-full py-3 rounded-xl font-bold text-sm transition-all duration-150 disabled:opacity-60',
                   plan.id === 'free'
-                    ? 'border border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829]'
+                    ? 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033]'
                     : plan.popular
                     ? 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 dark:hover:bg-brand-400'
                     : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'

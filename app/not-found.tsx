@@ -22,7 +22,7 @@ export default function NotFound() {
             Go Home
           </Link>
           <Link href="/jobs"
-            className="px-6 py-3 border border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+            className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
             Browse Jobs
           </Link>
         </div>

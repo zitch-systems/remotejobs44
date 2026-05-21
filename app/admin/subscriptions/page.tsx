@@ -74,7 +74,7 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl mb-5 max-w-sm">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl mb-5 max-w-sm">
         <Search className="w-4 h-4 text-stone-400 shrink-0" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by email or name…"
           className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400 text-stone-900 dark:text-stone-100" />
@@ -86,8 +86,8 @@ export default function SubscriptionsPage() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-stone-400">No subscriptions yet</div>
         ) : (
-          <div className="divide-y divide-stone-100 dark:divide-[#1a3d2e]">
-            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#0f2820] text-xs font-bold uppercase tracking-wider text-stone-400">
+          <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
+            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#0a1628] text-xs font-bold uppercase tracking-wider text-stone-400">
               <div className="col-span-4">User</div>
               <div className="col-span-2">Plan</div>
               <div className="col-span-2">Amount</div>
@@ -95,7 +95,7 @@ export default function SubscriptionsPage() {
               <div className="col-span-2">Renews</div>
             </div>
             {filtered.map(sub => (
-              <div key={sub.id} className="grid grid-cols-12 gap-2 px-5 py-3.5 items-center hover:bg-stone-50 dark:hover:bg-[#0f2820] transition-colors">
+              <div key={sub.id} className="grid grid-cols-12 gap-2 px-5 py-3.5 items-center hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                 <div className="col-span-4 min-w-0">
                   <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{sub.profiles?.name || '—'}</p>
                   <p className="text-xs text-stone-400 truncate">{sub.profiles?.email}</p>

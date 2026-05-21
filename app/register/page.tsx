@@ -138,7 +138,7 @@ export default function RegisterPage() {
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-stone-300 dark:border-[#234533] text-brand-700 focus:ring-brand-600"
+                className="mt-0.5 w-4 h-4 rounded border-stone-300 dark:border-[#1e3a5f] text-brand-700 focus:ring-brand-600"
               />
               <span className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 I agree to the{' '}

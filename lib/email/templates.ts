@@ -14,7 +14,7 @@ export function welcomeEmail(name: string) {
   <div style="padding:40px">
     <h2 style="margin:0 0 16px;color:#1c1917;font-size:20px">Welcome, ${name}! 👋</h2>
     <p style="margin:0 0 20px;color:#57534e;line-height:1.6">You're now part of RemoteJobs44 — your platform for finding the best remote jobs worldwide.</p>
-    <div style="background:#edfaf2;border-radius:8px;padding:20px;margin:0 0 24px">
+    <div style="background:#eff6ff;border-radius:8px;padding:20px;margin:0 0 24px">
       <p style="margin:0 0 12px;color:#0a5c36;font-weight:600;font-size:14px">What you can do for free:</p>
       <ul style="margin:0;padding:0 0 0 20px;color:#166534;font-size:14px;line-height:2">
         <li>Browse 50,000+ remote jobs</li>

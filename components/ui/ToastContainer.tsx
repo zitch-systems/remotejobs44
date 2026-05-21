@@ -19,7 +19,7 @@ export function ToastContainer() {
       {toasts.map((t) => (
         <div key={t.id} className={cn(
           'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg pointer-events-auto animate-toast-in',
-          'bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533]',
+          'bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f]',
           BORDERS[t.type]
         )}>
           <span className="text-lg shrink-0">{ICONS[t.type]}</span>

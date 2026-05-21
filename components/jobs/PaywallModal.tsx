@@ -46,7 +46,7 @@ export function PaywallModal({ mode }: PaywallModalProps) {
         <div className="flex flex-col gap-3">
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-3 border border-stone-200 dark:border-[#234533] rounded-xl bg-white dark:bg-[#152B20] hover:bg-stone-50 dark:hover:bg-[#1C3829] text-stone-800 dark:text-stone-100 text-sm font-semibold transition-all"
+            className="w-full flex items-center justify-center gap-3 py-3 border border-stone-200 dark:border-[#1e3a5f] rounded-xl bg-white dark:bg-[#0d1a2e] hover:bg-stone-50 dark:hover:bg-[#162033] text-stone-800 dark:text-stone-100 text-sm font-semibold transition-all"
           >
             <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
               <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
@@ -58,14 +58,14 @@ export function PaywallModal({ mode }: PaywallModalProps) {
           </button>
 
           <div className="flex items-center gap-3">
-            <hr className="flex-1 border-stone-200 dark:border-[#234533]" />
+            <hr className="flex-1 border-stone-200 dark:border-[#1e3a5f]" />
             <span className="text-xs text-stone-400 dark:text-stone-500 font-medium">or</span>
-            <hr className="flex-1 border-stone-200 dark:border-[#234533]" />
+            <hr className="flex-1 border-stone-200 dark:border-[#1e3a5f]" />
           </div>
 
           <div className="flex gap-3 flex-wrap">
             <Link href="/login" onClick={() => modalService.close()}
-              className="flex-1 min-w-[120px] py-3 px-6 text-sm font-semibold border border-stone-200 dark:border-[#234533] rounded-xl hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors text-center">
+              className="flex-1 min-w-[120px] py-3 px-6 text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors text-center">
               Log In
             </Link>
             <Link href="/register" onClick={() => modalService.close()}
@@ -85,7 +85,7 @@ export function PaywallModal({ mode }: PaywallModalProps) {
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border-2 text-left transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                   p.highlight
                     ? 'border-brand-600 dark:border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                    : 'border-stone-200 dark:border-[#234533] hover:border-stone-300 dark:hover:border-[#2d5240]'
+                    : 'border-stone-200 dark:border-[#1e3a5f] hover:border-stone-300 dark:hover:border-[#2d5240]'
                 }`}
               >
                 <div>

@@ -245,13 +245,13 @@ export default function CompanyImportPage() {
               Detect ATS ({parseUrls(rawInput).length} URLs)
             </button>
             <button onClick={() => setRawInput('')}
-              className="px-4 py-2.5 border border-stone-200 dark:border-[#234533] text-stone-500 text-sm font-medium rounded-lg hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+              className="px-4 py-2.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-500 text-sm font-medium rounded-lg hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
               Clear
             </button>
           </div>
 
           {/* ATS reference */}
-          <div className="mt-5 pt-4 border-t border-stone-100 dark:border-[#234533]">
+          <div className="mt-5 pt-4 border-t border-stone-100 dark:border-[#1e3a5f]">
             <p className="text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-3">Supported ATS URL patterns</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {[
@@ -263,14 +263,14 @@ export default function CompanyImportPage() {
               ].map(p => {
                 const pm = PLATFORM_META[p.platform];
                 return (
-                  <div key={p.platform} className="p-3 rounded-lg border border-stone-200 dark:border-[#234533] bg-stone-50 dark:bg-[#1C3829]">
+                  <div key={p.platform} className="p-3 rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033]">
                     <span className={cn('inline-block px-2 py-0.5 rounded-full text-xs font-bold mb-1.5', pm.color)}>{pm.label}</span>
                     <p className="text-xs font-mono text-stone-500 dark:text-stone-400 mb-0.5">{p.pattern}</p>
                     <p className="text-xs text-stone-400 dark:text-stone-500">{p.count}</p>
                   </div>
                 );
               })}
-              <div className="p-3 rounded-lg border border-stone-200 dark:border-[#234533] bg-stone-50 dark:bg-[#1C3829]">
+              <div className="p-3 rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033]">
                 <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold mb-1.5 bg-stone-100 dark:bg-stone-800 text-stone-500">Any URL</span>
                 <p className="text-xs text-stone-500 dark:text-stone-400 mb-0.5">e.g. anthropic.com/careers</p>
                 <p className="text-xs text-stone-400 dark:text-stone-500">Page scraped for ATS links</p>
@@ -318,7 +318,7 @@ export default function CompanyImportPage() {
                 <span>Processing… {progress}%</span>
                 <span>{stats.done + stats.errors} / {stats.total}</span>
               </div>
-              <div className="h-2 bg-stone-100 dark:bg-[#1C3829] rounded-full overflow-hidden">
+              <div className="h-2 bg-stone-100 dark:bg-[#162033] rounded-full overflow-hidden">
                 <div className="h-full bg-brand-600 dark:bg-brand-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
             </div>
@@ -341,18 +341,18 @@ export default function CompanyImportPage() {
               </button>
             )}
             <button onClick={exportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-stone-200 dark:border-[#234533] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
               <Download className="w-4 h-4" /> Export CSV
             </button>
             <button onClick={clearAll}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-stone-200 dark:border-[#234533] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors ml-auto">
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors ml-auto">
               <Trash2 className="w-4 h-4" /> Reset
             </button>
           </div>
 
           {/* Filters */}
           <div className="flex gap-3 mb-4 flex-wrap">
-            <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg">
               <Search className="w-3.5 h-3.5 text-stone-400" />
               <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
                 placeholder="Search…" className="border-none outline-none bg-transparent text-xs text-stone-900 dark:text-stone-100 w-28" />
@@ -380,7 +380,7 @@ export default function CompanyImportPage() {
               const pm = PLATFORM_META[entry.platform] ?? PLATFORM_META.unknown;
               return (
                 <div key={entry.id} className="card overflow-hidden">
-                  <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors"
+                  <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors"
                     onClick={() => toggleExpand(entry.id)}>
                     {/* Status icon */}
                     <div className="shrink-0">
@@ -411,7 +411,7 @@ export default function CompanyImportPage() {
                   </div>
 
                   {entry.expanded && (
-                    <div className="border-t border-stone-100 dark:border-[#234533] px-4 py-3 bg-stone-50 dark:bg-[#1C3829] text-xs animate-fade-in">
+                    <div className="border-t border-stone-100 dark:border-[#1e3a5f] px-4 py-3 bg-stone-50 dark:bg-[#162033] text-xs animate-fade-in">
                       {entry.apiEndpoint && (
                         <div className="mb-2">
                           <span className="text-stone-400 dark:text-stone-500">API: </span>
@@ -421,7 +421,7 @@ export default function CompanyImportPage() {
                       {entry.jobs && entry.jobs.length > 0 && (
                         <div className="space-y-1 mt-2">
                           {entry.jobs.map((job: any, i: number) => (
-                            <div key={i} className="flex items-center gap-2 py-1 border-b border-stone-100 dark:border-[#234533] last:border-0">
+                            <div key={i} className="flex items-center gap-2 py-1 border-b border-stone-100 dark:border-[#1e3a5f] last:border-0">
                               <span className="flex-1 font-medium text-stone-700 dark:text-stone-300 truncate">{job.title}</span>
                               <span className="text-stone-400 shrink-0">{job.location}</span>
                             </div>

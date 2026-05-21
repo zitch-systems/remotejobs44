@@ -68,13 +68,13 @@ export function PricingPreview() {
         </div>
 
         {/* Free strip */}
-        <div className="bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl p-4 flex items-center justify-between flex-wrap gap-4 mb-6">
+        <div className="bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-xl p-4 flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
             <p className="font-bold text-sm text-stone-900 dark:text-stone-100">Free Plan</p>
             <p className="text-xs text-stone-400 dark:text-stone-500">Browse all jobs, save favourites, explore companies — no card needed.</p>
           </div>
           <Link href="/register"
-            className="px-5 py-2.5 border border-stone-200 dark:border-[#234533] rounded-xl text-sm font-bold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+            className="px-5 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-xl text-sm font-bold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
             Start for Free →
           </Link>
         </div>
@@ -84,10 +84,10 @@ export function PricingPreview() {
           {PLANS.map((plan) => (
             <div
               key={plan.id}
-              className={`bg-white dark:bg-[#152B20] border rounded-xl flex flex-col p-6 transition-all duration-200 ${
+              className={`bg-white dark:bg-[#0d1a2e] border rounded-xl flex flex-col p-6 transition-all duration-200 ${
                 plan.highlight
                   ? 'border-brand-600 dark:border-brand-500'
-                  : 'border-stone-200 dark:border-[#234533]'
+                  : 'border-stone-200 dark:border-[#1e3a5f]'
               }`}
             >
               <div className="flex items-start justify-between mb-4">

@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
           <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">Users</h1>
           <p className="text-sm text-stone-400 mt-1">{users.length} total registered users</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-lg w-64">
+        <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg w-64">
           <Search className="w-4 h-4 text-stone-400 shrink-0" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search users…"
             className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400" />
@@ -71,16 +71,16 @@ export default function AdminUsersPage() {
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-stone-400">No users found</div>
         ) : (
-          <div className="divide-y divide-stone-100 dark:divide-[#234533]">
+          <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#1C3829] text-xs font-bold uppercase tracking-wider text-stone-400">
+            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400">
               <div className="col-span-4">User</div>
               <div className="col-span-2">Plan</div>
               <div className="col-span-3">Joined</div>
               <div className="col-span-3">Actions</div>
             </div>
             {filtered.map(user => (
-              <div key={user.id} className="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+              <div key={user.id} className="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
                 <div className="col-span-4 flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
                     {(user.name?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
@@ -103,7 +103,7 @@ export default function AdminUsersPage() {
                   <select
                     value={user.plan}
                     onChange={e => updatePlan(user.id, e.target.value)}
-                    className="text-xs border border-stone-200 dark:border-[#234533] rounded-md px-2 py-1 bg-white dark:bg-[#152B20] text-stone-700 dark:text-stone-300 cursor-pointer"
+                    className="text-xs border border-stone-200 dark:border-[#1e3a5f] rounded-md px-2 py-1 bg-white dark:bg-[#0d1a2e] text-stone-700 dark:text-stone-300 cursor-pointer"
                   >
                     <option value="free">Free</option>
                     <option value="daily">Day Pass</option>

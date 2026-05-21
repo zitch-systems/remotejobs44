@@ -20,7 +20,7 @@ export function FeaturedJobs() {
   }, []);
 
   return (
-    <section className="py-16 bg-white dark:bg-[#0a1f18]">
+    <section className="py-16 bg-white dark:bg-[#0f1e38]">
       <div className="max-w-[1240px] mx-auto px-5">
         <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
           <div>
@@ -46,7 +46,7 @@ export function FeaturedJobs() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-stone-200 dark:border-[#1a3d2e] bg-white dark:bg-[#0f2820] p-5 animate-pulse">
+              <div key={i} className="rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] p-5 animate-pulse">
                 <div className="flex gap-3 mb-4">
                   <div className="skeleton w-12 h-12 rounded-xl shrink-0" />
                   <div className="flex-1"><div className="skeleton h-4 rounded mb-2" /><div className="skeleton h-3 w-2/3 rounded" /></div>

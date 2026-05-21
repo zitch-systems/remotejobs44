@@ -42,11 +42,11 @@ export function JobCard({ job }: JobCardProps) {
   return (
     <Link href={`/jobs/${job.id}`}
       className={cn(
-        'group relative flex flex-col gap-4 p-5 rounded-xl border bg-white dark:bg-[#0f2820] cursor-pointer transition-all duration-200',
+        'group relative flex flex-col gap-4 p-5 rounded-xl border bg-white dark:bg-[#0a1628] cursor-pointer transition-all duration-200',
         'hover:-translate-y-0.5 hover:shadow-md-brand hover:border-brand-500 dark:hover:border-brand-600',
         job.featured
           ? 'border-accent dark:border-accent/60'
-          : 'border-stone-200 dark:border-[#1a3d2e]',
+          : 'border-stone-200 dark:border-[#1e3a5f]',
       )}
     >
       {/* Featured top bar */}
@@ -56,7 +56,7 @@ export function JobCard({ job }: JobCardProps) {
 
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 shrink-0 rounded-xl bg-stone-100 dark:bg-[#0a1f18] border border-stone-200 dark:border-[#1a3d2e] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 overflow-hidden">
+        <div className="w-12 h-12 shrink-0 rounded-xl bg-stone-100 dark:bg-[#0f1e38] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 overflow-hidden">
           {job.logo}
         </div>
         <div className="flex-1 min-w-0">
@@ -67,7 +67,7 @@ export function JobCard({ job }: JobCardProps) {
         </div>
         <button onClick={handleSave} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
-            saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0a1f18]')}>
+            saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0f1e38]')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
         </button>
       </div>
@@ -101,7 +101,7 @@ export function JobCard({ job }: JobCardProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-stone-100 dark:border-[#1a3d2e] flex-wrap gap-2 mt-auto">
+      <div className="flex items-center justify-between pt-3 border-t border-stone-100 dark:border-[#1e3a5f] flex-wrap gap-2 mt-auto">
         <div>
           {salary && (
             <span className="font-display font-bold text-sm text-brand-700 dark:text-brand-400">{salary}</span>
