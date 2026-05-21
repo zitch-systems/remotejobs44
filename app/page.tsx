@@ -1,10 +1,11 @@
-// app/page.tsx — RemoteJobs44 homepage
-// Only imports components guaranteed to exist in this repo
+// app/page.tsx
 import type { Metadata } from 'next';
-import { HeroSection }    from '@/components/home/HeroSection';
-import { HowItWorks }     from '@/components/home/HowItWorks';
-import { PricingPreview } from '@/components/home/PricingPreview';
-import { CTASection }     from '@/components/home/CTASection';
+import { HeroSection }       from '@/components/home/HeroSection';
+import { CategoriesSection } from '@/components/home/CategoriesSection';
+import { FeaturedJobs }      from '@/components/home/FeaturedJobs';
+import { HowItWorks }        from '@/components/home/HowItWorks';
+import { PricingPreview }    from '@/components/home/PricingPreview';
+import { CTASection }        from '@/components/home/CTASection';
 
 export const metadata: Metadata = {
   title: 'RemoteJobs44 – Global Remote Jobs',
@@ -16,6 +17,8 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <CategoriesSection />
+      <FeaturedJobs />
       <HowItWorks />
       <PricingPreview />
       <CTASection />

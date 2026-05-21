@@ -2,15 +2,14 @@
 // Covers all 40+ VC boards from the user's list
 
 export type Platform =
-  | 'consider'   // Consider/Talent Circle — needs API key
-  | 'getro'      // Getro — JS SPA, paid API
-  | 'yc'         // YC public API (yc-oss.github.io) — FREE
-  | 'custom'     // Custom site — may have RSS or JSON
-  | 'workable'   // Workable ATS — public JSON API per org
-  | 'greenhouse' // Greenhouse — free public JSON API per board
-  | 'lever'      // Lever — free public JSON API per org
-  | 'ashby'      // Ashby — free public JSON API per org
-  | 'js-spa';    // Generic JS SPA, no API available
+  | 'getro'
+  | 'yc'
+  | 'custom'
+  | 'workable'
+  | 'greenhouse'
+  | 'lever'
+  | 'ashby'
+  | 'js-spa'
 
 export type IngestionStatus =
   | 'free-api'    // Free public API — works out of the box
@@ -49,16 +48,13 @@ export const VC_BOARDS: VCBoard[] = [
     focus: 'Global / All Stages',
   },
 
-  // ── CONSIDER PLATFORM (needs API key from support@consider.com) ────────
   {
     id: 'sequoia',
     name: 'Sequoia Capital',
     url: 'https://www.sequoiacap.com/jobs',
     hq: 'Menlo Park, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
-    apiEndpoint: 'https://boards.considerapi.com/v0/jobs',
-    notes: 'Consider platform. API at boards.considerapi.com/v0/jobs — needs key from support@consider.com',
     approxJobs: 2000,
     focus: 'Global / Growth',
   },
@@ -67,10 +63,9 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Andreessen Horowitz (a16z)',
     url: 'https://a16z.com/jobs',
     hq: 'Menlo Park, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
-    apiEndpoint: 'https://boards.considerapi.com/v0/jobs',
-    notes: 'Consider platform. Same API key works for all Consider boards.',
+    notes: 'JS-rendered platform. Add individual Greenhouse/Lever URLs from portfolio companies.',
     approxJobs: 3000,
     focus: 'Global / All Stages',
   },
@@ -79,9 +74,9 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Khosla Ventures',
     url: 'https://www.khoslaventures.com/careers',
     hq: 'Menlo Park, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
-    notes: 'Consider platform.',
+    notes: 'JS-rendered platform. Add individual Greenhouse/Lever URLs from portfolio companies.',
     approxJobs: 800,
     focus: 'Deep Tech / US',
   },
@@ -90,7 +85,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'General Catalyst',
     url: 'https://www.generalcatalyst.com/jobs',
     hq: 'Cambridge, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 1200,
     focus: 'Global / Growth',
@@ -100,7 +95,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: "Founders Fund",
     url: 'https://www.foundersfund.com/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 600,
     focus: 'Deep Tech / US',
@@ -110,7 +105,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Greylock',
     url: 'https://greylock.com/jobs/',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 900,
     focus: 'Enterprise / US',
@@ -120,7 +115,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'First Round Capital',
     url: 'https://www.firstround.com/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 700,
     focus: 'Early Stage / US',
@@ -130,7 +125,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Bessemer Venture Partners',
     url: 'https://www.bvp.com/portfolio/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 1000,
     focus: 'Global / Growth',
@@ -140,7 +135,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Spark Capital',
     url: 'https://www.sparkcapital.com/jobs',
     hq: 'Boston, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 500,
     focus: 'US / Consumer',
@@ -150,7 +145,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Matrix Partners',
     url: 'https://www.matrixpartners.com/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 400,
     focus: 'US / Enterprise',
@@ -160,7 +155,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Bain Capital Ventures',
     url: 'https://www.baincapitalventures.com/careers/',
     hq: 'Boston, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 500,
     focus: 'US / Fintech',
@@ -170,7 +165,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Redpoint Ventures',
     url: 'https://www.redpoint.com/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 400,
     focus: 'US / Enterprise',
@@ -180,7 +175,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Menlo Ventures',
     url: 'https://www.menlovc.com/jobs',
     hq: 'Menlo Park, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 300,
     focus: 'US / AI & Enterprise',
@@ -190,7 +185,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'CRV',
     url: 'https://www.crv.com/jobs',
     hq: 'Cambridge, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 350,
     focus: 'US / Early Stage',
@@ -200,7 +195,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Scale Venture Partners',
     url: 'https://www.scalevp.com/jobs',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 300,
     focus: 'US / SaaS',
@@ -210,7 +205,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'IVP',
     url: 'https://www.ivp.com/portfolio-jobs/',
     hq: 'San Francisco, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 400,
     focus: 'US / Growth',
@@ -220,7 +215,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Battery Ventures',
     url: 'https://www.battery.com/jobs/',
     hq: 'Boston, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 500,
     focus: 'US / Enterprise',
@@ -230,7 +225,7 @@ export const VC_BOARDS: VCBoard[] = [
     name: 'Lightspeed Venture Partners',
     url: 'https://lsvp.com/careers/',
     hq: 'Menlo Park, USA',
-    platform: 'consider',
+    platform: 'js-spa',
     ingestionStatus: 'key-needed',
     approxJobs: 1000,
     focus: 'Global / Growth',
@@ -457,9 +452,8 @@ export const VC_BOARDS: VCBoard[] = [
 
 // Platform metadata for UI display
 export const PLATFORM_META: Record<Platform, { label: string; color: string; apiAvailable: boolean; apiNote: string }> = {
+  getro:      { label: 'Getro',      color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20', apiAvailable: false, apiNote: 'JS-rendered, paid API' },
   yc:         { label: 'YC Public API',   color: 'text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20',   apiAvailable: true,  apiNote: 'Free — no key needed (yc-oss.github.io)' },
-  consider:   { label: 'Consider',        color: 'text-purple-700 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20',   apiAvailable: true,  apiNote: 'Needs key from support@consider.com' },
-  getro:      { label: 'Getro',           color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20',           apiAvailable: false, apiNote: 'Paid API only — JS SPA, no free endpoint' },
   greenhouse: { label: 'Greenhouse ATS',  color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company board' },
   lever:      { label: 'Lever ATS',       color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },
   ashby:      { label: 'Ashby ATS',       color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },

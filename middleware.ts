@@ -1,4 +1,4 @@
-﻿// middleware.ts â€” Supabase session refresh on every request
+// middleware.ts — Supabase session refresh on every request
 // Must be at the root of the project (next to package.json)
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
@@ -38,4 +38,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|og-image.png).*)',
   ],
 };
-

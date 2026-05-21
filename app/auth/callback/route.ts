@@ -1,7 +1,9 @@
-﻿// app/auth/callback/route.ts
-// Supabase Auth callback handler â€” required for magic link + OAuth flows
+// app/auth/callback/route.ts
+// Supabase Auth callback handler — required for magic link + OAuth flows
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { sendEmail } from '@/lib/email/send';
+import { welcomeEmail } from '@/lib/email/templates';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -34,13 +36,21 @@ export async function GET(request: NextRequest) {
 
     if (!exchangeError) {
       // Redirect to intended page after successful auth
+      // Send welcome email on first sign-in
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser?.email) {
+          const name = authUser.user_metadata?.name ?? authUser.email.split('@')[0];
+          const { subject, html } = welcomeEmail(name);
+          await sendEmail({ to: authUser.email, subject, html });
+        }
+      } catch {}
       return NextResponse.redirect(`${origin}${next}`);
     }
 
     console.error('Code exchange error:', exchangeError.message);
   }
 
-  // Fallback â€” something went wrong
+  // Fallback — something went wrong
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 }
-

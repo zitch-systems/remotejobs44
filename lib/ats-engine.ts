@@ -291,7 +291,7 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
   // 2. Fetch the page and inspect HTML for ATS links
   try {
     const pageRes = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RemoteNest/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RemoteJobs44/1.0)' },
       signal: AbortSignal.timeout(10000),
     });
     if (pageRes.ok) {
