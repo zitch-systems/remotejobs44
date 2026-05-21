@@ -18,7 +18,7 @@ const sora = Sora({
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
-  weight: ['300','400','500'],
+  weight: ['300','400','500','600','700'],
   variable: '--font-dm-sans',
   display: 'swap',
 });
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
     startupImage: '/icons/apple-touch-icon.png',
   },
   other: {
-    'msapplication-TileColor': '#0d7a5f',
+    'msapplication-TileColor': '#2563eb',
     'msapplication-TileImage': '/icons/icon-192.png',
     // AI search/LLM optimization
     'ai-content-declaration': 'human-curated job listings',
@@ -87,8 +87,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#0d7a5f' },
-    { media: '(prefers-color-scheme: dark)',  color: '#0a1f18' },
+    { media: '(prefers-color-scheme: light)', color: '#2563eb' },
+    { media: '(prefers-color-scheme: dark)',  color: '#0f1e38' },
   ],
 };
 
@@ -117,15 +117,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         })}} />
         <style dangerouslySetInnerHTML={{ __html: `
           :root {
-            --brand-50:#ecfdf5;--brand-100:#d1fae5;--brand-200:#a7f3d0;
-            --brand-300:#6ee7b7;--brand-400:#34d399;--brand-500:#10b981;
-            --brand-600:#059669;--brand-700:#0d7a5f;--brand-800:#065f46;
-            --brand-900:#064e3b;--brand-950:#022c22;
-            --accent:#f59e0b;--accent-light:#fbbf24;--accent-dark:#d97706;
+            --brand-50:#eff6ff;--brand-100:#dbeafe;--brand-200:#bfdbfe;
+            --brand-300:#93c5fd;--brand-400:#60a5fa;--brand-500:#3b82f6;
+            --brand-600:#2563eb;--brand-700:#1d4ed8;--brand-800:#1e40af;
+            --brand-900:#1e3a5f;--brand-950:#0f1e38;
+            --accent:#f97316;--accent-light:#fb923c;--accent-dark:#ea580c;
           }
         `}} />
       </head>
-      <body className="min-h-dvh flex flex-col font-body bg-stone-50 text-stone-900 antialiased dark:bg-[#0a1f18] dark:text-[#e8f2ec]">
+      <body className="min-h-dvh flex flex-col font-body bg-[#f8faff] text-slate-900 antialiased dark:bg-[#0f1e38] dark:text-[#e8eeff]">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
           <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-brand-700 focus:text-white focus:rounded-lg focus:font-semibold">
             Skip to content

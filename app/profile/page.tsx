@@ -135,7 +135,7 @@ function ProfileContent() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-stone-50 dark:bg-[#1C3829] border border-stone-200 dark:border-[#234533] mb-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-stone-50 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] mb-3">
               <FileText className="w-5 h-5 text-stone-400 shrink-0" />
               <p className="text-sm text-stone-400">No CV uploaded yet</p>
             </div>
@@ -145,7 +145,7 @@ function ProfileContent() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading || !isPro()}
-            className="flex items-center gap-2 px-4 py-2.5 border border-stone-200 dark:border-[#234533] rounded-lg text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors"
           >
             <Upload className="w-4 h-4" />
             {uploading ? 'Uploading…' : cvUrl ? 'Replace CV' : 'Upload CV'}
@@ -157,8 +157,8 @@ function ProfileContent() {
         <div className="card p-5">
           <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-3">Quick links</h2>
           <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard"    className="px-4 py-2 text-xs font-semibold border border-stone-200 dark:border-[#234533] rounded-lg text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">Dashboard</Link>
-            <Link href="/applications" className="px-4 py-2 text-xs font-semibold border border-stone-200 dark:border-[#234533] rounded-lg text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">Applications</Link>
+            <Link href="/dashboard"    className="px-4 py-2 text-xs font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">Dashboard</Link>
+            <Link href="/applications" className="px-4 py-2 text-xs font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">Applications</Link>
             <Link href="/pricing"      className="px-4 py-2 text-xs font-semibold border border-brand-600 dark:border-brand-500 rounded-lg text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors flex items-center gap-1">
               <Zap className="w-3 h-3" /> Upgrade Plan
             </Link>

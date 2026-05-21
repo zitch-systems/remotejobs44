@@ -17,7 +17,7 @@ export function CategoriesSection() {
   const router = useRouter();
 
   return (
-    <section className="py-14 bg-stone-50 dark:bg-[#0a1f18]">
+    <section className="py-14 bg-stone-50 dark:bg-[#0f1e38]">
       <div className="max-w-[1240px] mx-auto px-5">
         <div className="text-center mb-10">
           <h2 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-2">
@@ -36,7 +36,7 @@ export function CategoriesSection() {
               <Link
                 key={cat}
                 href={`/jobs?category=${cat}`}
-                className="group flex flex-col items-center gap-2.5 p-4 rounded-xl border border-stone-200 dark:border-[#1a3d2e] bg-white dark:bg-[#0f2820] hover:border-brand-500 dark:hover:border-brand-600 hover:-translate-y-0.5 hover:shadow-md-brand transition-all duration-200"
+                className="group flex flex-col items-center gap-2.5 p-4 rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] hover:border-brand-500 dark:hover:border-brand-600 hover:-translate-y-0.5 hover:shadow-md-brand transition-all duration-200"
               >
                 <span className="text-2xl leading-none">{meta.icon}</span>
                 <div className="text-center">
@@ -54,7 +54,7 @@ export function CategoriesSection() {
 
         <div className="text-center mt-6">
           <Link href="/jobs"
-            className="inline-flex items-center gap-2 px-6 py-2.5 border border-stone-200 dark:border-[#1a3d2e] rounded-xl text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] hover:border-brand-500 transition-all">
+            className="inline-flex items-center gap-2 px-6 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-xl text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] hover:border-brand-500 transition-all">
             View all categories →
           </Link>
         </div>

@@ -72,12 +72,12 @@ export function PWAInstall() {
 
   return (
     <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-[600] animate-slide-up">
-      <div className="bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-stone-100 dark:border-[#1a3d2e]">
+        <div className="flex items-center gap-3 p-4 border-b border-stone-100 dark:border-[#1e3a5f]">
           <div className="w-10 h-10 rounded-xl bg-brand-700 flex items-center justify-center shrink-0">
             <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
-              <rect width="32" height="32" rx="8" fill="#0d7a5f"/>
+              <rect width="32" height="32" rx="8" fill="#2563eb"/>
               <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
               <circle cx="23" cy="12" r="2.5" fill="#f59e0b"/>
             </svg>
@@ -89,7 +89,7 @@ export function PWAInstall() {
                platform === 'android' ? 'Add to Android' : 'Install desktop app'}
             </p>
           </div>
-          <button onClick={dismiss} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 dark:hover:bg-[#1a3d2e] transition-colors" aria-label="Dismiss">
+          <button onClick={dismiss} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 dark:hover:bg-[#1e3a5f] transition-colors" aria-label="Dismiss">
             <X className="w-4 h-4" />
           </button>
         </div>

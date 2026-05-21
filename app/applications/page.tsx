@@ -74,7 +74,7 @@ function ApplicationsList() {
                   const cfg = STATUS_CONFIG[app.status];
                   return (
                     <div key={app.id} className="card p-4 flex items-center gap-4 hover:border-brand-600 dark:hover:border-brand-500 transition-colors">
-                      <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-sm font-black text-brand-700 dark:text-brand-400 shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-sm font-black text-brand-700 dark:text-brand-400 shrink-0">
                         {(app.companyLogo ?? app.company[0]).toString()}
                       </div>
                       <div className="flex-1 min-w-0">

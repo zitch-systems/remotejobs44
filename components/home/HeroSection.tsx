@@ -27,7 +27,7 @@ export function HeroSection() {
 
         {/* Eyebrow */}
         <div className="animate-fade-in inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest"
-          style={{ background:'rgba(13,122,95,0.08)', borderColor:'rgba(13,122,95,0.2)', color:'#0d7a5f' }}>
+          style={{ background:'rgba(37,99,235,0.08)', borderColor:'rgba(13,122,95,0.2)', color:'#2563eb' }}>
           🌍 50,000+ remote jobs worldwide
         </div>
 
@@ -47,7 +47,7 @@ export function HeroSection() {
 
         {/* Search bar */}
         <div className="w-full max-w-2xl">
-          <div className="flex flex-col sm:flex-row gap-2 p-2 bg-white dark:bg-[#0f2820] rounded-2xl border border-stone-200 dark:border-[#1a3d2e] shadow-md-brand focus-within:border-brand-500 dark:focus-within:border-brand-600 focus-within:shadow-glow transition-all duration-200">
+          <div className="flex flex-col sm:flex-row gap-2 p-2 bg-white dark:bg-[#0a1628] rounded-2xl border border-stone-200 dark:border-[#1e3a5f] shadow-md-brand focus-within:border-brand-500 dark:focus-within:border-brand-600 focus-within:shadow-glow transition-all duration-200">
             <div className="flex items-center gap-3 flex-1 px-3">
               <Search className="w-4 h-4 text-stone-400 shrink-0" />
               <input
@@ -68,7 +68,7 @@ export function HeroSection() {
             <span className="text-xs text-stone-400 dark:text-stone-500">Popular:</span>
             {POPULAR.map(term => (
               <button key={term} onClick={() => search(term)}
-                className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-all">
+                className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-all">
                 {term}
               </button>
             ))}
@@ -82,13 +82,13 @@ export function HeroSection() {
             Browse All Jobs <ArrowRight className="w-4 h-4" />
           </Link>
           <Link href="/pricing"
-            className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1a3d2e] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f2820] transition-colors text-sm">
+            className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
             View Plans
           </Link>
         </div>
 
         {/* Stats */}
-        <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap pt-6 border-t border-stone-200 dark:border-[#1a3d2e] w-full max-w-lg">
+        <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap pt-6 border-t border-stone-200 dark:border-[#1e3a5f] w-full max-w-lg">
           {STATS.map(s => (
             <div key={s.label} className="text-center">
               <div className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">{s.value}</div>

@@ -92,7 +92,7 @@ export function Header() {
   return (
     <header className={cn(
       'fixed top-0 left-0 right-0 z-50 h-[68px] glass-nav border-b transition-shadow duration-200',
-      'border-stone-200/70 dark:border-[#234533]/70',
+      'border-stone-200/70 dark:border-[#1e3a5f]/70',
       scrolled && 'shadow-sm shadow-black/5'
     )}>
       <div className="max-w-[1240px] mx-auto px-5 h-full flex items-center gap-6">
@@ -114,7 +114,7 @@ export function Header() {
               'px-3 py-2 rounded-md text-sm font-medium transition-colors',
               pathname.startsWith(link.href)
                 ? 'text-brand-700 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-[#1C3829]'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-[#162033]'
             )}>
               {link.label}
             </Link>
@@ -129,7 +129,7 @@ export function Header() {
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle theme"
-              className="w-9 h-9 flex items-center justify-center rounded-md border border-stone-200 dark:border-[#234533] text-stone-500 hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-md border border-stone-200 dark:border-[#1e3a5f] text-stone-500 hover:bg-stone-100 dark:hover:bg-[#162033] transition-all"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -146,9 +146,9 @@ export function Header() {
               </button>
 
               {userOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl shadow-xl overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-xl overflow-hidden z-50">
                   {/* Profile header */}
-                  <div className="flex items-center gap-3 p-4 bg-stone-50 dark:bg-[#1C3829] border-b border-stone-100 dark:border-[#234533]">
+                  <div className="flex items-center gap-3 p-4 bg-stone-50 dark:bg-[#162033] border-b border-stone-100 dark:border-[#1e3a5f]">
                     <div className="w-10 h-10 rounded-full bg-brand-700 text-white text-sm font-bold flex items-center justify-center shrink-0">
                       {getInitials(user?.name ?? user?.email ?? 'U')}
                     </div>
@@ -172,13 +172,13 @@ export function Header() {
                     ].map(item => (
                       <li key={item.href}>
                         <Link href={item.href} onClick={() => setUserOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
                           <span className="text-stone-400">{item.icon}</span>
                           {item.label}
                         </Link>
                       </li>
                     ))}
-                    <li className="border-t border-stone-100 dark:border-[#234533] mt-1 pt-1">
+                    <li className="border-t border-stone-100 dark:border-[#1e3a5f] mt-1 pt-1">
                       <button onClick={handleLogout}
                         className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
                         <LogOut className="w-4 h-4" /> Log Out
@@ -191,7 +191,7 @@ export function Header() {
           ) : (
             <div className="hidden md:flex items-center gap-2">
               <Link href="/login"
-                className="px-4 py-2 text-sm font-semibold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-[#234533] rounded-md hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-all">
+                className="px-4 py-2 text-sm font-semibold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-[#1e3a5f] rounded-md hover:bg-stone-50 dark:hover:bg-[#162033] transition-all">
                 Log in
               </Link>
               <Link href="/register"
@@ -205,7 +205,7 @@ export function Header() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-md border border-stone-200 dark:border-[#234533] hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-colors"
+            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-md border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors"
           >
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-transform duration-200', mobileMenuOpen && 'translate-y-[6.5px] rotate-45')} />
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-opacity duration-200', mobileMenuOpen && 'opacity-0')} />
@@ -216,7 +216,7 @@ export function Header() {
 
       {/* Mobile menu */}
       <div className={cn(
-        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#152B20] border-b border-stone-200 dark:border-[#234533] shadow-lg transition-all duration-300 overflow-hidden',
+        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#0d1a2e] border-b border-stone-200 dark:border-[#1e3a5f] shadow-lg transition-all duration-300 overflow-hidden',
         mobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
       )}>
         <div className="p-4 space-y-1">
@@ -232,12 +232,12 @@ export function Header() {
         <div className="px-4 pb-4 flex gap-3">
           {isLoggedIn() ? (
             <>
-              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#234533] rounded-lg">Dashboard</Link>
+              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg">Dashboard</Link>
               <button onClick={handleLogout} className="flex-1 py-2.5 text-sm font-semibold bg-brand-700 text-white rounded-lg">Log Out</button>
             </>
           ) : (
             <>
-              <Link href="/login"    className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#234533] rounded-lg">Log in</Link>
+              <Link href="/login"    className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg">Log in</Link>
               <Link href="/register" className="flex-1 py-2.5 text-center text-sm font-semibold bg-brand-700 text-white rounded-lg">Get Started</Link>
             </>
           )}

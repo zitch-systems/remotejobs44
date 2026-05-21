@@ -108,27 +108,27 @@ export function Header() {
     window.location.replace('/');
   }
 
-  const planLabel = user?.plan === 'daily' ? '☀️ Day Pass' :
-                    user?.plan === 'pro'   ? '⭐ Pro' :
-                    user?.plan === 'admin' ? '🔧 Admin' : 'Free';
+  const planLabel = user?.plan === 'daily' ? 'Day Pass' :
+                    user?.plan === 'pro'   ? 'Pro' :
+                    user?.plan === 'admin' ? 'Admin' : 'Free';
   const planColor = user?.plan === 'free'
-    ? 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
-    : 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400';
+    ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+    : 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400';
 
   return (
     <header className={cn(
       'fixed top-0 left-0 right-0 z-50 h-[68px] glass-nav border-b transition-shadow duration-200',
-      'border-stone-200/70 dark:border-[#1a3d2e]/70',
+      'border-stone-200/70 dark:border-[#1e3a5f]/70',
       scrolled && 'shadow-sm shadow-black/5'
     )}>
       <div className="max-w-[1240px] mx-auto px-4 sm:px-5 h-full flex items-center gap-4">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[17px] tracking-tight text-stone-900 dark:text-stone-100 hover:opacity-80 transition-opacity shrink-0">
-          <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
-            <rect width="32" height="32" rx="8" fill="#0d7a5f"/>
-            <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-            <circle cx="23" cy="12" r="2.5" fill="#f59e0b"/>
+        <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-slate-100 hover:opacity-80 transition-opacity shrink-0">
+          <svg viewBox="0 0 40 40" className="w-9 h-9" fill="none">
+            <rect width="40" height="40" rx="10" fill="#2563eb"/>
+            <path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none"/>
+            <circle cx="29" cy="15" r="3.5" fill="#f97316"/>
           </svg>
           RemoteJobs44
         </Link>
@@ -140,7 +140,7 @@ export function Header() {
               'px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150',
               pathname.startsWith(link.href)
                 ? 'text-brand-700 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-[#0f2820]'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-[#0a1628]'
             )}>
               {link.label}
             </Link>
@@ -155,9 +155,9 @@ export function Header() {
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle theme"
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-stone-200 dark:border-[#1a3d2e] text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0f2820] transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-[#1e3a5f] text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0a1628] transition-all"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           )}
 
@@ -167,7 +167,7 @@ export function Header() {
               <div ref={userRef} className="relative hidden md:block">
                 <button
                   onClick={() => setUserOpen(o => !o)}
-                  className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-stone-100 dark:hover:bg-[#0f2820] transition-colors"
+                  className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-stone-100 dark:hover:bg-[#0a1628] transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-brand-700 dark:bg-brand-600 text-white text-xs font-bold flex items-center justify-center">
                     {getInitials(user?.name ?? user?.email ?? 'U')}
@@ -176,9 +176,9 @@ export function Header() {
                 </button>
 
                 {userOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl shadow-xl overflow-hidden z-50 animate-fade-in">
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-xl overflow-hidden z-50 animate-fade-in">
                     {/* Profile header */}
-                    <div className="flex items-center gap-3 p-4 border-b border-stone-100 dark:border-[#1a3d2e] bg-stone-50 dark:bg-[#0a1f18]">
+                    <div className="flex items-center gap-3 p-4 border-b border-stone-100 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#0f1e38]">
                       <div className="w-10 h-10 rounded-full bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
                         {getInitials(user?.name ?? user?.email ?? 'U')}
                       </div>
@@ -194,7 +194,7 @@ export function Header() {
                     {/* Upgrade nudge for free users */}
                     {user?.plan === 'free' && (
                       <Link href="/pricing" onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-50 dark:bg-brand-900/20 border-b border-stone-100 dark:border-[#1a3d2e] text-sm text-brand-700 dark:text-brand-400 font-semibold hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors">
+                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-50 dark:bg-brand-900/20 border-b border-stone-100 dark:border-[#1e3a5f] text-sm text-brand-700 dark:text-brand-400 font-semibold hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors">
                         <Zap className="w-4 h-4" />
                         Upgrade from ₦1,000 →
                       </Link>
@@ -210,13 +210,13 @@ export function Header() {
                       ].map(item => (
                         <li key={item.href}>
                           <Link href={item.href} onClick={() => setUserOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1f18] hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f1e38] hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
                             <span className="text-stone-400">{item.icon}</span>
                             {item.label}
                           </Link>
                         </li>
                       ))}
-                      <li className="border-t border-stone-100 dark:border-[#1a3d2e] mt-1 pt-1">
+                      <li className="border-t border-stone-100 dark:border-[#1e3a5f] mt-1 pt-1">
                         <button onClick={handleLogout}
                           className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
                           <LogOut className="w-4 h-4" /> Log Out
@@ -229,7 +229,7 @@ export function Header() {
             ) : (
               <div className="hidden md:flex items-center gap-2">
                 <Link href="/login"
-                  className="px-4 py-2 text-sm font-semibold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-[#1a3d2e] rounded-lg hover:bg-stone-50 dark:hover:bg-[#0f2820] transition-all">
+                  className="px-4 py-2 text-sm font-semibold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-[#1e3a5f] rounded-lg hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-all">
                   Log in
                 </Link>
                 <Link href="/register"
@@ -244,7 +244,7 @@ export function Header() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
-            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-lg border border-stone-200 dark:border-[#1a3d2e] hover:bg-stone-100 dark:hover:bg-[#0f2820] transition-colors"
+            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-lg border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-100 dark:hover:bg-[#0a1628] transition-colors"
           >
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-all duration-200', mobileMenuOpen && 'translate-y-[6.5px] rotate-45')} />
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-all duration-200', mobileMenuOpen && 'opacity-0')} />
@@ -255,7 +255,7 @@ export function Header() {
 
       {/* Mobile menu */}
       <div className={cn(
-        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#0f2820] border-b border-stone-200 dark:border-[#1a3d2e] shadow-lg transition-all duration-300 overflow-hidden',
+        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#0a1628] border-b border-stone-200 dark:border-[#1e3a5f] shadow-lg transition-all duration-300 overflow-hidden',
         mobileMenuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
       )}>
         <div className="p-4 space-y-1">
@@ -264,7 +264,7 @@ export function Header() {
               className={cn('block px-4 py-3 rounded-xl text-base font-medium transition-colors',
                 pathname.startsWith(link.href)
                   ? 'text-brand-700 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20'
-                  : 'text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1f18]'
+                  : 'text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f1e38]'
               )}>
               {link.label}
             </Link>
@@ -273,7 +273,7 @@ export function Header() {
         <div className="px-4 pb-4 flex gap-2">
           {isLoggedIn() ? (
             <>
-              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1a3d2e] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1f18] transition-colors text-stone-700 dark:text-stone-300">
+              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
                 Dashboard
               </Link>
               <button onClick={handleLogout} className="flex-1 py-2.5 text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">
@@ -282,7 +282,7 @@ export function Header() {
             </>
           ) : (
             <>
-              <Link href="/login" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1a3d2e] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1f18] transition-colors text-stone-700 dark:text-stone-300">
+              <Link href="/login" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
                 Log in
               </Link>
               <Link href="/register" className="flex-1 py-2.5 text-center text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">

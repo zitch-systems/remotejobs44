@@ -56,14 +56,14 @@ const SORTS = [
 
 function SkeletonCard() {
   return (
-    <div className="bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl p-5 animate-pulse">
+    <div className="bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl p-5 animate-pulse">
       <div className="flex items-start gap-3 mb-4">
         <div className="skeleton w-12 h-12 rounded-xl shrink-0" />
         <div className="flex-1"><div className="skeleton h-4 w-3/4 rounded mb-2" /><div className="skeleton h-3 w-1/2 rounded" /></div>
       </div>
       <div className="flex gap-2 mb-3"><div className="skeleton h-5 w-16 rounded-full" /><div className="skeleton h-5 w-20 rounded-full" /></div>
       <div className="skeleton h-3 w-full rounded mb-1" /><div className="skeleton h-3 w-2/3 rounded mb-4" />
-      <div className="flex justify-between pt-3 border-t border-stone-100 dark:border-[#1a3d2e]">
+      <div className="flex justify-between pt-3 border-t border-stone-100 dark:border-[#1e3a5f]">
         <div className="skeleton h-4 w-24 rounded" /><div className="skeleton h-8 w-20 rounded-lg" />
       </div>
     </div>
@@ -82,7 +82,7 @@ function FilterSelect({ label, value, onChange, options, icon }: {
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1a3d2e] bg-white dark:bg-[#0f2820] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
+        className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
       >
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -160,7 +160,7 @@ function JobsContent() {
       {/* Search */}
       <div className="mb-5">
         <div className="flex gap-2 flex-col sm:flex-row">
-          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 focus-within:shadow-glow transition-all shadow-sm">
+          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 focus-within:shadow-glow transition-all shadow-sm">
             <Search className="w-4 h-4 text-stone-400 shrink-0" />
             <input
               type="text"
@@ -186,7 +186,7 @@ function JobsContent() {
               className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
                 showFilters || activeFilterCount > 0
                   ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
-                  : 'bg-white dark:bg-[#0f2820] border-stone-200 dark:border-[#1a3d2e] text-stone-600 dark:text-stone-300 hover:border-brand-600 dark:hover:border-brand-500')}>
+                  : 'bg-white dark:bg-[#0a1628] border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:border-brand-600 dark:hover:border-brand-500')}>
               <SlidersHorizontal className="w-4 h-4" />
               Filters
               {activeFilterCount > 0 && (
@@ -206,7 +206,7 @@ function JobsContent() {
 
         {/* Advanced filters panel */}
         {showFilters && (
-          <div className="mt-3 p-5 bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-xl shadow-sm">
+          <div className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <FilterSelect label="Job Type"    value={type}     onChange={v=>setParam('type',v)}     options={TYPES}        icon={<Briefcase className="w-3 h-3"/>}   />
               <FilterSelect label="Level"       value={level}    onChange={v=>setParam('level',v)}    options={LEVELS}       icon={<TrendingUp className="w-3 h-3"/>}  />
@@ -264,7 +264,7 @@ function JobsContent() {
           {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : jobs.length === 0 ? (
-        <div className="bg-white dark:bg-[#0f2820] border border-stone-200 dark:border-[#1a3d2e] rounded-2xl p-16 text-center">
+        <div className="bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-2xl p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
           <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">No jobs found</h2>
           <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
@@ -282,7 +282,7 @@ function JobsContent() {
           {pages > 1 && (
             <div className="flex items-center justify-center gap-1.5">
               <button onClick={() => setPage(page-1)} disabled={page<=1}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1a3d2e] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] disabled:opacity-40 transition-colors">
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] disabled:opacity-40 transition-colors">
                 <ChevronLeft className="w-4 h-4"/>Previous
               </button>
               {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
@@ -290,13 +290,13 @@ function JobsContent() {
                 return (
                   <button key={p} onClick={()=>setPage(p)}
                     className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all',
-                      p===page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1a3d2e] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820]')}>
+                      p===page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628]')}>
                     {p}
                   </button>
                 );
               })}
               <button onClick={()=>setPage(page+1)} disabled={page>=pages}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1a3d2e] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] disabled:opacity-40 transition-colors">
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] disabled:opacity-40 transition-colors">
                 Next<ChevronRight className="w-4 h-4"/>
               </button>
             </div>

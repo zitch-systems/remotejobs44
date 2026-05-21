@@ -30,7 +30,7 @@ export default function CompaniesPage() {
 
       {/* Search + filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl focus-within:border-brand-600 transition-colors">
+        <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-xl focus-within:border-brand-600 transition-colors">
           <Search className="w-4 h-4 text-stone-400 shrink-0" />
           <input
             value={q} onChange={e => setQ(e.target.value)}
@@ -55,7 +55,7 @@ export default function CompaniesPage() {
             {MOCK_COMPANIES.filter(c => c.featured).map(company => (
               <Link key={company.id} href={`/jobs?q=${encodeURIComponent(company.name)}`}
                 className="card p-5 flex flex-col items-center text-center hover:border-brand-600 dark:hover:border-brand-500 hover:-translate-y-0.5 transition-all group">
-                <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400 mb-3">
+                <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400 mb-3">
                   {company.logo ?? company.name[0]}
                 </div>
                 <p className="font-bold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
@@ -84,7 +84,7 @@ export default function CompaniesPage() {
           {filtered.map(company => (
             <div key={company.id} className="card p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 shrink-0">
                   {company.logo ?? company.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -110,7 +110,7 @@ export default function CompaniesPage() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-stone-100 dark:border-[#234533]">
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-stone-100 dark:border-[#1e3a5f]">
                 <Link href={`/jobs?q=${encodeURIComponent(company.name)}`}
                   className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-400 hover:underline">
                   <Briefcase className="w-3.5 h-3.5" />

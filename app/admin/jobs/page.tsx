@@ -49,7 +49,7 @@ export default function AdminJobsPage() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-lg mb-5 w-full max-w-sm">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg mb-5 w-full max-w-sm">
         <Search className="w-4 h-4 text-stone-400 shrink-0" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search jobs…"
           className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400" />
@@ -59,9 +59,9 @@ export default function AdminJobsPage() {
         {loading ? (
           <div className="p-8 animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-14 rounded" />)}</div>
         ) : (
-          <div className="divide-y divide-stone-100 dark:divide-[#234533]">
+          <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#1C3829] text-xs font-bold uppercase tracking-wider text-stone-400">
+            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400">
               <div className="col-span-5">Job</div>
               <div className="col-span-2">Category</div>
               <div className="col-span-2">Posted</div>
@@ -70,9 +70,9 @@ export default function AdminJobsPage() {
             {filtered.map(job => {
               const cat = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
               return (
-                <div key={job.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+                <div key={job.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
+                    <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
                       {job.logo ?? job.company[0]}
                     </div>
                     <div className="min-w-0">
@@ -91,7 +91,7 @@ export default function AdminJobsPage() {
                   </div>
                   <div className="col-span-3 flex items-center gap-2">
                     <Link href={`/jobs/${job.id}`} target="_blank"
-                      className="p-1.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-colors">
+                      className="p-1.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors">
                       <Eye className="w-4 h-4" />
                     </Link>
                     <button onClick={() => toggleFeatured(job)}

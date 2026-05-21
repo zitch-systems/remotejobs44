@@ -78,7 +78,7 @@ export default function JobDetailPage() {
         <div className="lg:col-span-2 space-y-5">
           <div className="card p-6">
             <div className="flex items-start gap-4 mb-5">
-              <div className="w-16 h-16 shrink-0 rounded-xl bg-stone-100 dark:bg-[#1C3829] border border-stone-200 dark:border-[#234533] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400">
+              <div className="w-16 h-16 shrink-0 rounded-xl bg-stone-100 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400">
                 {job.logo}
               </div>
               <div className="flex-1 min-w-0">
@@ -165,12 +165,12 @@ export default function JobDetailPage() {
             <div className="flex gap-2 mt-3">
               <button onClick={() => { const s = toggleSave(job.id); toast(s ? '🔖 Saved!' : 'Removed', 'success', 2000); }}
                 className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors',
-                  saved ? 'border-amber-300 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : 'border-stone-200 dark:border-[#234533] text-stone-500 hover:bg-stone-50 dark:hover:bg-[#1C3829]')}>
+                  saved ? 'border-amber-300 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : 'border-stone-200 dark:border-[#1e3a5f] text-stone-500 hover:bg-stone-50 dark:hover:bg-[#162033]')}>
                 {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                 {saved ? 'Saved' : 'Save'}
               </button>
               <button onClick={() => { navigator.clipboard.writeText(window.location.href); toast('Link copied!', 'success', 2000); }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-stone-200 dark:border-[#234533] text-stone-500 text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-500 text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
                 <Share2 className="w-4 h-4" /> Share
               </button>
             </div>
@@ -183,7 +183,7 @@ export default function JobDetailPage() {
               <div className="flex flex-wrap gap-2">
                 {job.skills.map(s => (
                   <Link key={s} href={`/jobs?q=${encodeURIComponent(s)}`}
-                    className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-[#1C3829] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
+                    className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-[#162033] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
                     {s}
                   </Link>
                 ))}

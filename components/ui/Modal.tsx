@@ -65,7 +65,7 @@ export function ModalRoot() {
         className="fixed inset-0 z-[401] flex items-center justify-center p-4 pointer-events-none"
       >
         <div className={cn(
-          'relative bg-white dark:bg-[#152B20] rounded-2xl shadow-2xl w-full max-h-[90dvh] overflow-y-auto animate-modal-in pointer-events-auto',
+          'relative bg-white dark:bg-[#0d1a2e] rounded-2xl shadow-2xl w-full max-h-[90dvh] overflow-y-auto animate-modal-in pointer-events-auto',
           state.wide ? 'max-w-2xl' : 'max-w-lg'
         )}>
           {/* Visually hidden title for screen readers if no explicit title */}
@@ -80,7 +80,7 @@ export function ModalRoot() {
           <button
             onClick={close}
             aria-label="Close dialog"
-            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 dark:bg-[#234533] text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-[#2d5240] transition-colors"
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 dark:bg-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-[#2d5240] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

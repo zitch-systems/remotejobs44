@@ -120,7 +120,7 @@ export default function SourcesPage() {
           <p className="text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-2">Quick presets</p>
           <div className="flex flex-wrap gap-2">
             {PRESETS.map(p => (
-              <button key={p.url} onClick={() => { setUrlInput(p.url); setNameInput(p.name); urlRef.current?.focus(); }} className="px-3 py-1.5 text-xs font-medium border border-stone-200 dark:border-[#234533] rounded-lg text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
+              <button key={p.url} onClick={() => { setUrlInput(p.url); setNameInput(p.name); urlRef.current?.focus(); }} className="px-3 py-1.5 text-xs font-medium border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
                 + {p.name}
               </button>
             ))}
@@ -155,21 +155,21 @@ export default function SourcesPage() {
                     {source.lastSync && <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Synced {new Date(source.lastSync).toLocaleString()}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {source.jobs && source.jobs.length > 0 && <button onClick={() => persist(sources.map(s => s.id === source.id ? { ...s, expanded: !s.expanded } : s))} className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-colors"><Eye className="w-4 h-4" /></button>}
-                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-colors"><ExternalLink className="w-4 h-4" /></a>
-                    <button onClick={() => handleRefresh(source)} disabled={source.status === 'detecting'} className="p-1.5 rounded-md text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-stone-100 dark:hover:bg-[#1C3829] transition-colors disabled:opacity-40"><RefreshCw className={cn('w-4 h-4', source.status === 'detecting' && 'animate-spin')} /></button>
+                    {source.jobs && source.jobs.length > 0 && <button onClick={() => persist(sources.map(s => s.id === source.id ? { ...s, expanded: !s.expanded } : s))} className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors"><Eye className="w-4 h-4" /></button>}
+                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors"><ExternalLink className="w-4 h-4" /></a>
+                    <button onClick={() => handleRefresh(source)} disabled={source.status === 'detecting'} className="p-1.5 rounded-md text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors disabled:opacity-40"><RefreshCw className={cn('w-4 h-4', source.status === 'detecting' && 'animate-spin')} /></button>
                     {source.status === 'ok' && source.jobCount > 0 && <button onClick={() => handleImport(source)} className="px-3 py-1.5 text-xs font-bold bg-brand-700 dark:bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors">Import {source.jobCount}</button>}
                     <button onClick={() => persist(sources.filter(s => s.id !== source.id))} className="p-1.5 rounded-md text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
                 {source.expanded && source.jobs && source.jobs.length > 0 && (
-                  <div className="border-t border-stone-100 dark:border-[#234533]">
-                    <div className="px-4 py-2 bg-stone-50 dark:bg-[#1C3829] flex items-center justify-between">
+                  <div className="border-t border-stone-100 dark:border-[#1e3a5f]">
+                    <div className="px-4 py-2 bg-stone-50 dark:bg-[#162033] flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">Preview — {source.jobs.length} jobs</span>
                       <button onClick={() => persist(sources.map(s => s.id === source.id ? { ...s, expanded: false } : s))} className="text-xs text-stone-400 hover:text-stone-600">collapse</button>
                     </div>
                     {source.jobs.map((job, i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors border-b border-stone-50 dark:border-[#1C3829] last:border-0">
+                      <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors border-b border-stone-50 dark:border-[#162033] last:border-0">
                         <div className="w-7 h-7 shrink-0 rounded-md bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 flex items-center justify-center text-xs font-black">{job.company?.[0]?.toUpperCase() ?? '?'}</div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>

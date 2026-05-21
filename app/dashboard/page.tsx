@@ -103,7 +103,7 @@ function DashboardContent() {
             </Link>
           )}
           <button onClick={handleLogout}
-            className="px-4 py-2 text-sm font-medium border border-stone-200 dark:border-[#234533] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+            className="px-4 py-2 text-sm font-medium border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-stone-500 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
             Log out
           </button>
         </div>
@@ -134,7 +134,7 @@ function DashboardContent() {
       {/* Recent applications + saved jobs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#234533]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#1e3a5f]">
             <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <FileText className="w-4 h-4 text-stone-400" /> Recent Applications
             </h2>
@@ -149,8 +149,8 @@ function DashboardContent() {
               <Link href="/jobs" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline">Browse jobs →</Link>
             </div>
           ) : recentApps.map(app => (
-            <div key={app.id} className="flex items-center gap-3 px-5 py-3 border-b border-stone-50 dark:border-[#1C3829] last:border-0 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
-              <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
+            <div key={app.id} className="flex items-center gap-3 px-5 py-3 border-b border-stone-50 dark:border-[#162033] last:border-0 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
                 {app.company[0]}
               </div>
               <div className="flex-1 min-w-0">
@@ -168,7 +168,7 @@ function DashboardContent() {
         </div>
 
         <div className="card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#234533]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#1e3a5f]">
             <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <BookmarkCheck className="w-4 h-4 text-amber-500" /> Saved Jobs
             </h2>
@@ -184,8 +184,8 @@ function DashboardContent() {
             </div>
           ) : savedJobs.map(job => (
             <Link key={job.id} href={`/jobs/${job.id}`}
-              className="flex items-center gap-3 px-5 py-3 border-b border-stone-50 dark:border-[#1C3829] last:border-0 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
-              <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xs font-black text-brand-700">{job.logo}</div>
+              className="flex items-center gap-3 px-5 py-3 border-b border-stone-50 dark:border-[#162033] last:border-0 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700">{job.logo}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>
                 <p className="text-xs text-stone-400">{job.company} · {job.location}</p>
@@ -206,7 +206,7 @@ function DashboardContent() {
             <Link key={job.id} href={`/jobs/${job.id}`}
               className="card p-4 hover:border-brand-600 dark:hover:border-brand-500 hover:-translate-y-0.5 transition-all group">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#1C3829] flex items-center justify-center text-xs font-black text-brand-700">{job.logo}</div>
+                <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700">{job.logo}</div>
                 <p className="text-xs font-bold text-stone-500 truncate">{job.company}</p>
               </div>
               <p className="text-sm font-bold text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors line-clamp-2">{job.title}</p>

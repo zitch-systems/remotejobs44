@@ -88,7 +88,7 @@ export default function NewJobPage() {
   return (
     <div className="max-w-[800px] mx-auto px-5 py-8">
       <div className="flex items-center gap-3 mb-7">
-        <Link href="/admin/jobs" className="p-2 rounded-lg border border-stone-200 dark:border-[#1a3d2e] hover:bg-stone-50 dark:hover:bg-[#0f2820] transition-colors">
+        <Link href="/admin/jobs" className="p-2 rounded-lg border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
           <ArrowLeft className="w-4 h-4 text-stone-500" />
         </Link>
         <div>
@@ -226,7 +226,7 @@ export default function NewJobPage() {
             {saving ? 'Publishing…' : 'Publish Job'}
           </button>
           <Link href="/admin/jobs"
-            className="px-6 py-3 border border-stone-200 dark:border-[#1a3d2e] rounded-xl text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0f2820] transition-colors">
+            className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] rounded-xl text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
             Cancel
           </Link>
         </div>

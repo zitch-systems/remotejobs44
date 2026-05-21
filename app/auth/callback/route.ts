@@ -35,14 +35,20 @@ export async function GET(request: NextRequest) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!exchangeError) {
-      // Redirect to intended page after successful auth
-      // Send welcome email on first sign-in
       try {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser?.email) {
           const name = authUser.user_metadata?.name ?? authUser.email.split('@')[0];
           const { subject, html } = welcomeEmail(name);
           await sendEmail({ to: authUser.email, subject, html });
+        }
+        // Redirect admins to admin panel if no explicit next destination
+        if (next === '/dashboard' && authUser) {
+          const { data: profile } = await supabase
+            .from('profiles').select('role').eq('id', authUser.id).maybeSingle();
+          if (profile?.role === 'admin') {
+            return NextResponse.redirect(`${origin}/admin`);
+          }
         }
       } catch {}
       return NextResponse.redirect(`${origin}${next}`);

@@ -19,7 +19,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#152B20] border-t border-stone-200 dark:border-[#234533] grid grid-cols-4 pb-safe"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-4 pb-safe"
       aria-label="Mobile navigation"
     >
       {NAV.map(({ href, icon: Icon, label }) => {
