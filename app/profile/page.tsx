@@ -21,11 +21,11 @@ function ProfileContent() {
 
   useEffect(() => {
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace('/login?next=/profile'); return; }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) { router.replace('/login?next=/profile'); return; }
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
       if (profile) {
-        setUser({ id: session.user.id, email: session.user.email!, name: profile.name ?? '', plan: profile.plan ?? 'free', role: profile.role ?? 'user', joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
+        setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan: profile.plan ?? 'free', role: profile.role ?? 'user', joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
         setCvUrl((profile as any).cv_url ?? null);
       }

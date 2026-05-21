@@ -39,13 +39,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     async function checkAdmin() {
       try {
         const supabase = createClient();
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
 
         if (cancelled) return;
-        if (sessionError || !session) { router.replace('/login?next=/admin'); return; }
+        if (userError || !authUser) { router.replace('/login?next=/admin'); return; }
 
         const { data: profile, error: profileError } = await supabase
-          .from('profiles').select('role, name').eq('id', session.user.id).single();
+          .from('profiles').select('role, name').eq('id', authUser.id).single();
 
         if (cancelled) return;
 

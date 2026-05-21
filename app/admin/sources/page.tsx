@@ -229,7 +229,7 @@ export default function SourcesPage() {
       ) : (
         <div className="space-y-3">
           {sources.map(source => {
-            const mm = METHOD_META[source.method] ?? METHOD_META.unknown;
+            const mm = METHOD_META[source.method as SourceMethod] ?? METHOD_META.unknown;
             return (
               <div key={source.id} className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4">

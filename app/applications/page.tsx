@@ -23,8 +23,8 @@ function ApplicationsList() {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) { router.replace('/login?next=/applications'); return; }
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      if (!authUser) { router.replace('/login?next=/applications'); return; }
       setChecked(true);
     });
   }, []);
@@ -78,7 +78,7 @@ function ApplicationsList() {
               </h2>
               <div className="space-y-2">
                 {byStatus.active.map(app => {
-                  const cfg = STATUS_CONFIG[app.status];
+                  const cfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
                   return (
                     <div key={app.id} className="card p-4 flex items-center gap-4 hover:border-brand-600 dark:hover:border-brand-500 transition-colors">
                       <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-sm font-black text-brand-700 dark:text-brand-400 shrink-0">
@@ -138,7 +138,7 @@ function ApplicationsList() {
               </h2>
               <div className="space-y-2 opacity-60">
                 {byStatus.closed.map(app => {
-                  const cfg = STATUS_CONFIG[app.status];
+                  const cfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
                   return (
                     <div key={app.id} className="card p-4 flex items-center gap-4">
                       <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-sm font-black text-stone-400 shrink-0">

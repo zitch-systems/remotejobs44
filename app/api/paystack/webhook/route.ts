@@ -7,6 +7,13 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 
+function getPlanTier(plan: string): string {
+  if (plan === 'daily')      return 'daily';
+  if (plan === 'pro_annual') return 'pro';
+  if (plan === 'pro')        return 'pro';
+  return 'free';
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get('x-paystack-signature');
@@ -23,9 +30,9 @@ export async function POST(req: NextRequest) {
   switch (event.event) {
     case 'charge.success': {
       // One-time or first subscription payment succeeded
-      const { metadata, customer } = event.data;
+      const { metadata } = event.data;
       if (metadata?.user_id && metadata?.plan) {
-        await supabase.from('profiles').update({ plan: metadata.plan }).eq('id', metadata.user_id);
+        await supabase.from('profiles').update({ plan: getPlanTier(metadata.plan) }).eq('id', metadata.user_id);
       }
       break;
     }
