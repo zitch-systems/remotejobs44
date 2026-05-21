@@ -8,12 +8,12 @@ import { useAuthStore, useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
 
 const STATUS_CONFIG = {
-  applied:   { label: 'Applied',    color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',   icon: <Clock className="w-3 h-3" /> },
-  screening: { label: 'Screening',  color: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400', icon: <FileText className="w-3 h-3" /> },
-  interview: { label: 'Interview',  color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',   icon: <Clock className="w-3 h-3" /> },
-  offer:     { label: 'Offer! 🎉',  color: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',   icon: <CheckCircle className="w-3 h-3" /> },
-  rejected:  { label: 'Rejected',   color: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',          icon: <XCircle className="w-3 h-3" /> },
-  withdrawn: { label: 'Withdrawn',  color: 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',     icon: <XCircle className="w-3 h-3" /> },
+  applied:   { label: 'Applied',    color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',   icon: <Clock className="w-4 h-4" /> },
+  screening: { label: 'Screening',  color: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400', icon: <FileText className="w-4 h-4" /> },
+  interview: { label: 'Interview',  color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',   icon: <Clock className="w-4 h-4" /> },
+  offer:     { label: 'Offer! 🎉',  color: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400', icon: <CheckCircle className="w-4 h-4" /> },
+  rejected:  { label: 'Rejected',   color: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',          icon: <XCircle className="w-4 h-4" /> },
+  withdrawn: { label: 'Withdrawn',  color: 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',     icon: <XCircle className="w-4 h-4" /> },
 } as const;
 
 function ApplicationsList() {
@@ -108,15 +108,15 @@ function ApplicationsList() {
               </h2>
               <div className="space-y-2">
                 {byStatus.offers.map(app => (
-                  <div key={app.id} className="card p-4 flex items-center gap-4 border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-sm font-black text-green-700 dark:text-green-400 shrink-0">
+                  <div key={app.id} className="card p-4 flex items-center gap-4 border-orange-300 dark:border-orange-700/50 bg-orange-50/30 dark:bg-orange-900/10">
+                    <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-sm font-black text-orange-700 dark:text-orange-400 shrink-0">
                       {app.company[0]}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate">{app.jobTitle}</p>
                       <p className="text-xs text-stone-400">{app.company}</p>
                     </div>
-                    <span className="badge bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">🎉 Offer received</span>
+                    <span className="badge bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">🎉 Offer received</span>
                   </div>
                 ))}
               </div>

@@ -130,7 +130,7 @@ export default function JobDetailPage() {
               <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-4">Benefits</h2>
               <div className="flex flex-wrap gap-2">
                 {job.benefits.map((b, i) => (
-                  <span key={i} className="px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-semibold">
+                  <span key={i} className="px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-semibold">
                     ✓ {b}
                   </span>
                 ))}

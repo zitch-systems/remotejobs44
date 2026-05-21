@@ -80,7 +80,7 @@ export const SOURCE_META = {
   manual:        { label: 'Posted',       icon: '✍️',  color: 'text-brand-700 dark:text-brand-400' },
   'embedded-rss':{ label: 'Partner RSS',  icon: '🔗', color: 'text-blue-600 dark:text-blue-400' },
   'custom-rss':  { label: 'Custom RSS',   icon: '📻', color: 'text-orange-600 dark:text-orange-400' },
-  api:           { label: 'API',          icon: '⚡', color: 'text-green-600 dark:text-green-400' },
+  api:           { label: 'API',          icon: '⚡', color: 'text-brand-600 dark:text-brand-400' },
 };
 
 export function uid(): string {

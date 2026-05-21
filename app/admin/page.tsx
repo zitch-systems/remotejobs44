@@ -47,14 +47,14 @@ export default function AdminPage() {
     { label: 'Total Jobs',    value: formatNumber(stats.jobs),    icon: <Briefcase className="w-5 h-5" />,  color: 'brand', href: '/admin/jobs' },
     { label: 'Total Users',   value: formatNumber(stats.users),   icon: <Users className="w-5 h-5" />,      color: 'blue',  href: '/admin/users' },
     { label: 'Pro + Daily',   value: formatNumber(stats.pro + stats.daily), icon: <TrendingUp className="w-5 h-5" />, color: 'amber', href: '/admin/analytics' },
-    { label: 'Est. MRR (₦)', value: `₦${formatNumber(stats.mrr)}`, icon: <DollarSign className="w-5 h-5" />, color: 'green', href: '/admin/analytics' },
+    { label: 'Est. MRR (₦)', value: `₦${formatNumber(stats.mrr)}`, icon: <DollarSign className="w-5 h-5" />, color: 'amber', href: '/admin/analytics' },
   ] : [];
 
   const colorMap: Record<string, string> = {
     brand: 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400',
     blue:  'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
     amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-    green: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    green: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   };
 
   return (

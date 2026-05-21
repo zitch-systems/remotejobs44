@@ -150,7 +150,7 @@ export default function PricingPage() {
                 </div>
                 <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{plan.period}</p>
                 {plan.id === 'pro_annual' && (
-                  <p className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">= ₦7,500/mo</p>
+                  <p className="text-xs text-accent font-semibold mt-1">= ₦7,500/mo</p>
                 )}
               </div>
 

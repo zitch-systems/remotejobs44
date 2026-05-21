@@ -12,7 +12,7 @@ interface Sub {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  active:    'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+  active:    'bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400',
   cancelled: 'bg-stone-100 text-stone-500 dark:bg-stone-800',
   expired:   'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
   past_due:  'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
@@ -56,14 +56,14 @@ export default function SubscriptionsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-7">
         {[
           { label: 'Active Subs',  value: active.length,            icon: <TrendingUp className="w-5 h-5" />, color: 'brand' },
-          { label: 'Est. MRR',     value: `₦${formatNumber(mrr)}`,  icon: <DollarSign className="w-5 h-5" />, color: 'green' },
+          { label: 'Est. MRR',     value: `₦${formatNumber(mrr)}`,  icon: <DollarSign className="w-5 h-5" />, color: 'amber' },
           { label: 'Est. ARR',     value: `₦${formatNumber(arr)}`,  icon: <Calendar className="w-5 h-5" />,   color: 'blue'  },
           { label: 'Day / Mo / Yr',value: `${daily}/${monthly}/${annual}`, icon: <TrendingUp className="w-5 h-5" />, color: 'amber' },
         ].map(c => (
           <div key={c.label} className="card p-4">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${
               c.color === 'brand' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400' :
-              c.color === 'green' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' :
+              c.color === 'green' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' :
               c.color === 'blue'  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' :
                                     'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
             }`}>{c.icon}</div>

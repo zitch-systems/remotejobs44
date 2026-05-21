@@ -114,14 +114,14 @@ function DashboardContent() {
         {[
           { label: 'Saved Jobs',    value: savedJobIds.length,    icon: <BookmarkCheck className="w-5 h-5" />, color: 'amber', href: '/jobs' },
           { label: 'Applications', value: applications.length,    icon: <FileText className="w-5 h-5" />,      color: 'blue',  href: '/applications' },
-          { label: 'Profile',      value: `${user.profileCompletion ?? 20}%`, icon: <TrendingUp className="w-5 h-5" />, color: 'green', href: '/profile' },
+          { label: 'Profile',      value: `${user.profileCompletion ?? 20}%`, icon: <TrendingUp className="w-5 h-5" />, color: 'brand', href: '/profile' },
         ].map(s => (
           <Link key={s.label} href={s.href}
             className="card p-4 hover:border-brand-600 dark:hover:border-brand-500 transition-all group">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${
               s.color === 'amber' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400' :
               s.color === 'blue'  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' :
-                                    'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                                    'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400'
             }`}>{s.icon}</div>
             <p className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100">{s.value}</p>
             <p className="text-xs font-semibold text-stone-400 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors mt-0.5">
@@ -160,7 +160,7 @@ function DashboardContent() {
               <span className={`badge ${
                 app.status === 'applied'   ? 'bg-blue-50 text-blue-600' :
                 app.status === 'interview' ? 'bg-amber-50 text-amber-600' :
-                app.status === 'offer'     ? 'bg-green-50 text-green-600' :
+                app.status === 'offer'     ? 'bg-orange-50 text-orange-600' :
                                              'bg-stone-100 text-stone-500'
               }`}>{app.status}</span>
             </div>
