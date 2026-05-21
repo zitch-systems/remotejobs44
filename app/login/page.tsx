@@ -30,7 +30,6 @@ function LoginForm() {
     setLoading(true);
     setErrorMsg('');
 
-    // Create a fresh client each time to avoid stale state
     const supabase = createClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -39,45 +38,58 @@ function LoginForm() {
     });
 
     if (error) {
-      if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
-        setErrorMsg('Incorrect email or password. New users must confirm their email before logging in.');
+      setLoading(false);
+      if (
+        error.message.includes('Invalid login credentials') ||
+        error.message.includes('invalid_credentials')
+      ) {
+        setErrorMsg(
+          'Wrong email or password. If you just registered, check your email for a confirmation link first.'
+        );
       } else if (error.message.includes('Email not confirmed')) {
-        setErrorMsg('Please check your inbox and click the confirmation link first.');
+        setErrorMsg(
+          'Please check your inbox and click the confirmation link before logging in.'
+        );
       } else {
         setErrorMsg(error.message);
       }
-      setLoading(false);
       return;
     }
 
-    if (data.user) {
-      // Fetch profile — but don't block login if it fails
-      let profile: any = null;
-      try {
-        const { data: p } = await supabase
-          .from('profiles')
-          .select('name, plan, role, created_at, profile_completion')
-          .eq('id', data.user.id)
-          .single();
-        profile = p;
-      } catch {
-        // Profile fetch failed — use defaults, login still works
-      }
-
-      setUser({
-        id:    data.user.id,
-        email: data.user.email!,
-        name:  profile?.name ?? data.user.email!.split('@')[0],
-        plan:  profile?.plan ?? 'free',
-        role:  profile?.role ?? 'user',
-        joinedAt: profile?.created_at ?? new Date().toISOString(),
-        profileCompletion: profile?.profile_completion ?? 20,
-      });
-
-      toast('Welcome back! 👋', 'success');
-      const next = searchParams.get('next') ?? '/dashboard';
-      router.push(next);
+    if (!data.user) {
+      setLoading(false);
+      setErrorMsg('Login failed — please try again.');
+      return;
     }
+
+    // Fetch profile — non-blocking, use defaults if fails
+    let profile: any = null;
+    try {
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('name, plan, role, created_at, profile_completion')
+        .eq('id', data.user.id)
+        .maybeSingle();   // maybeSingle() returns null instead of error if no row
+      profile = p;
+    } catch { /* use defaults */ }
+
+    // Set user in Zustand store immediately
+    setUser({
+      id:    data.user.id,
+      email: data.user.email!,
+      name:  profile?.name  ?? data.user.email!.split('@')[0],
+      plan:  profile?.plan  ?? 'free',
+      role:  profile?.role  ?? 'user',
+      joinedAt: profile?.created_at ?? new Date().toISOString(),
+      profileCompletion: profile?.profile_completion ?? 20,
+    });
+
+    toast('Welcome back! 👋', 'success');
+
+    // Use window.location instead of router.push — avoids React hydration
+    // mismatch that causes infinite loading when Zustand store updates mid-nav
+    const next = searchParams.get('next') ?? '/dashboard';
+    window.location.href = next;
   }
 
   return (
@@ -104,8 +116,11 @@ function LoginForm() {
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">Password</label>
-            <Link href="/forgot-password" className="text-xs text-brand-700 dark:text-brand-400 hover:underline">
+            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+              Password
+            </label>
+            <Link href="/forgot-password"
+              className="text-xs text-brand-700 dark:text-brand-400 hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -116,9 +131,10 @@ function LoginForm() {
               placeholder="••••••••" className="input pr-10"
               autoComplete="current-password"
             />
-            <button type="button" onClick={() => setShowPass(!showPass)}
+            <button
+              type="button" onClick={() => setShowPass(!showPass)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-              aria-label={showPass ? 'Hide password' : 'Show password'}>
+              aria-label={showPass ? 'Hide' : 'Show'}>
               {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
@@ -137,8 +153,9 @@ function LoginForm() {
 
       <div className="mt-4 p-3 rounded-lg bg-stone-50 dark:bg-[#1C3829] border border-stone-100 dark:border-[#234533]">
         <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-          <strong>First time?</strong> After registering, check your email for a confirmation link.
-          Click it, then come back to log in. Or disable email confirmation in your Supabase dashboard.
+          <strong>New user?</strong> Check your email for a confirmation link after
+          registering. Or go to Supabase → Authentication → Providers → Email and
+          turn off <em>Confirm email</em> for instant login.
         </p>
       </div>
     </div>
@@ -150,7 +167,8 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-5 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 font-display font-bold text-xl text-stone-900 dark:text-stone-100">
+          <Link href="/"
+            className="inline-flex items-center gap-2 font-display font-bold text-xl text-stone-900 dark:text-stone-100">
             <svg viewBox="0 0 32 32" className="w-8 h-8 text-brand-700 dark:text-brand-400" fill="none">
               <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.12"/>
               <path d="M8 20 Q12 10 16 16 Q20 22 24 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
@@ -178,7 +196,8 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-stone-400 dark:text-stone-500 mt-5">
           Don't have an account?{' '}
-          <Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">
+          <Link href="/register"
+            className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">
             Create free account
           </Link>
         </p>

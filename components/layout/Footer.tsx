@@ -13,6 +13,7 @@ const FOOTER_LINKS = {
     { label: 'About',     href: '/about' },
     { label: 'Companies', href: '/companies' },
     { label: 'Pricing',   href: '/pricing' },
+    { label: 'Blog',      href: '/blog' },
     { label: 'Contact',   href: '/contact' },
   ],
   Legal: [

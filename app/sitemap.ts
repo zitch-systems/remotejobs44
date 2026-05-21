@@ -25,5 +25,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...static_pages, ...category_pages];
+  const blog_pages = [
+    'how-to-find-remote-jobs-in-nigeria',
+    'remote-job-interview-tips',
+    'best-remote-jobs-for-beginners',
+  ].map(slug => ({
+    url: `${BASE}/blog/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }));
+
+  return [...static_pages, ...category_pages, ...blog_pages];
 }
