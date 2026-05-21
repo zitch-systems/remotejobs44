@@ -9,9 +9,8 @@ import { useAuthStore, useUIStore } from '@/lib/store';
 function LoginForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const supabase     = createClient();
-  const { setUser }  = useAuthStore();
   const { toast }    = useUIStore();
+  const { setUser }  = useAuthStore();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +22,7 @@ function LoginForm() {
     const err = searchParams.get('error');
     if (err) setErrorMsg(decodeURIComponent(err).replace(/_/g, ' '));
     if (searchParams.get('registered') === '1')
-      toast('Account created! Check your email to confirm, then log in.', 'success', 8000);
+      toast('Account created! You can now log in.', 'success', 6000);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -31,14 +30,19 @@ function LoginForm() {
     setLoading(true);
     setErrorMsg('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Create a fresh client each time to avoid stale state
+    const supabase = createClient();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
     if (error) {
-      // Give user-friendly messages
       if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
-        setErrorMsg('Wrong email or password. If you just registered, check your email to confirm your account first.');
+        setErrorMsg('Incorrect email or password. New users must confirm their email before logging in.');
       } else if (error.message.includes('Email not confirmed')) {
-        setErrorMsg('Please check your email and click the confirmation link before logging in.');
+        setErrorMsg('Please check your inbox and click the confirmation link first.');
       } else {
         setErrorMsg(error.message);
       }
@@ -47,21 +51,32 @@ function LoginForm() {
     }
 
     if (data.user) {
-      const { data: profile } = await supabase
-        .from('profiles').select('*').eq('id', data.user.id).single();
+      // Fetch profile — but don't block login if it fails
+      let profile: any = null;
+      try {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('name, plan, role, created_at, profile_completion')
+          .eq('id', data.user.id)
+          .single();
+        profile = p;
+      } catch {
+        // Profile fetch failed — use defaults, login still works
+      }
 
       setUser({
         id:    data.user.id,
         email: data.user.email!,
         name:  profile?.name ?? data.user.email!.split('@')[0],
-        plan:  profile?.plan  ?? 'free',
-        role:  profile?.role  ?? 'user',
+        plan:  profile?.plan ?? 'free',
+        role:  profile?.role ?? 'user',
         joinedAt: profile?.created_at ?? new Date().toISOString(),
         profileCompletion: profile?.profile_completion ?? 20,
       });
 
       toast('Welcome back! 👋', 'success');
-      router.push(searchParams.get('next') ?? '/dashboard');
+      const next = searchParams.get('next') ?? '/dashboard';
+      router.push(next);
     }
   }
 
@@ -76,10 +91,14 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Email address</label>
+          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+            Email address
+          </label>
           <input
-            type="email" required value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com" className="input" autoComplete="email"
+            type="email" required value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="input" autoComplete="email"
           />
         </div>
 
@@ -94,18 +113,21 @@ function LoginForm() {
             <input
               type={showPass ? 'text' : 'password'} required value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••" className="input pr-10" autoComplete="current-password"
+              placeholder="••••••••" className="input pr-10"
+              autoComplete="current-password"
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-              aria-label={showPass ? 'Hide' : 'Show'}>
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              aria-label={showPass ? 'Hide password' : 'Show password'}>
               {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
-        <button type="submit" disabled={loading || !email || !password}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-60 transition-colors">
+        <button
+          type="submit" disabled={loading || !email || !password}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-60 transition-colors"
+        >
           {loading
             ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             : <LogIn className="w-4 h-4" />}
@@ -113,10 +135,10 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Help text */}
       <div className="mt-4 p-3 rounded-lg bg-stone-50 dark:bg-[#1C3829] border border-stone-100 dark:border-[#234533]">
         <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-          <strong>New user?</strong> After registering, check your email for a confirmation link. Click it, then come back to log in.
+          <strong>First time?</strong> After registering, check your email for a confirmation link.
+          Click it, then come back to log in. Or disable email confirmation in your Supabase dashboard.
         </p>
       </div>
     </div>
@@ -136,17 +158,29 @@ export default function LoginPage() {
             </svg>
             RemoteJobs44
           </Link>
-          <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mt-6 mb-1">Welcome back</h1>
-          <p className="text-sm text-stone-400 dark:text-stone-500">Sign in to continue your remote job search</p>
+          <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mt-6 mb-1">
+            Welcome back
+          </h1>
+          <p className="text-sm text-stone-400 dark:text-stone-500">
+            Sign in to continue your remote job search
+          </p>
         </div>
 
-        <Suspense fallback={<div className="card p-6 animate-pulse"><div className="skeleton h-10 rounded mb-3" /><div className="skeleton h-10 rounded mb-3" /><div className="skeleton h-12 rounded" /></div>}>
+        <Suspense fallback={
+          <div className="card p-6 animate-pulse space-y-4">
+            <div className="skeleton h-10 rounded-md" />
+            <div className="skeleton h-10 rounded-md" />
+            <div className="skeleton h-12 rounded-lg" />
+          </div>
+        }>
           <LoginForm />
         </Suspense>
 
         <p className="text-center text-sm text-stone-400 dark:text-stone-500 mt-5">
           Don't have an account?{' '}
-          <Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Create free account</Link>
+          <Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">
+            Create free account
+          </Link>
         </p>
       </div>
     </div>

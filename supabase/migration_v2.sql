@@ -128,3 +128,20 @@ WHERE  table_schema = 'public'
   AND  table_name   = 'profiles'
   AND  column_name  IN ('plan','cv_url','paystack_customer_code')
 ORDER BY column_name;
+
+-- ── Job Alerts table ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.job_alerts (
+  id         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  category   text,
+  keywords   text,
+  frequency  text        DEFAULT 'daily' CHECK (frequency IN ('daily','instant')),
+  active     boolean     DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.job_alerts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "alerts_select" ON public.job_alerts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "alerts_insert" ON public.job_alerts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "alerts_delete" ON public.job_alerts FOR DELETE USING (auth.uid() = user_id);
