@@ -70,13 +70,14 @@ export function Header() {
 
     async function syncAuth() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) { setUser(null); return; }
-        const profile = await fetchProfile(session.user.id, session.user.email!);
+        // getUser() validates with Supabase server — always returns the live auth state
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) { setUser(null); return; }
+        const profile = await fetchProfile(authUser.id, authUser.email!);
         setUser({
-          id:    session.user.id,
-          email: session.user.email!,
-          name:  profile?.name ?? session.user.email!.split('@')[0],
+          id:    authUser.id,
+          email: authUser.email!,
+          name:  profile?.name ?? authUser.email!.split('@')[0],
           plan:  profile?.plan ?? 'free',
           role:  profile?.role ?? 'user',
           joinedAt: profile?.created_at ?? new Date().toISOString(),
@@ -107,11 +108,12 @@ export function Header() {
   }, []);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    // Clear local state first so UI responds instantly
     setUser(null);
     setUserOpen(false);
     try { localStorage.removeItem('rj44-auth'); localStorage.removeItem('rj44-jobs'); } catch {}
+    // Sign out from Supabase — wrapped so navigation always happens even if request fails
+    try { await createClient().auth.signOut(); } catch {}
     window.location.replace('/');
   }
 

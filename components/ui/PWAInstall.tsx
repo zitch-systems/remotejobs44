@@ -79,7 +79,7 @@ export function PWAInstall() {
             <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
               <rect width="32" height="32" rx="8" fill="#2563eb"/>
               <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              <circle cx="23" cy="12" r="2.5" fill="#f59e0b"/>
+              <circle cx="23" cy="12" r="2.5" fill="#f97316"/>
             </svg>
           </div>
           <div className="flex-1">

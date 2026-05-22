@@ -23,8 +23,7 @@ function getPlanTier(plan: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  // Use the request's own origin so it works on any deployment
-  const APP_URL = new URL(req.url).origin;
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
   const reference = req.nextUrl.searchParams.get('reference') ?? req.nextUrl.searchParams.get('trxref');
   if (!reference) return NextResponse.redirect(`${APP_URL}/pricing?error=no_reference`);
 
@@ -50,7 +49,8 @@ export async function GET(req: NextRequest) {
     const expiresAt = getPlanExpiry(plan);
 
     // Upgrade user plan
-    await supabase.from('profiles').update({ plan: planTier }).eq('id', user_id);
+    const { error: profileUpdateError } = await supabase.from('profiles').update({ plan: planTier }).eq('id', user_id);
+    if (profileUpdateError) console.error('Profile update failed:', profileUpdateError);
 
     // Upsert subscription record
     await supabase.from('subscriptions').upsert({
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
-    return NextResponse.redirect(`${APP_URL}/dashboard?subscribed=1&plan=${plan}`);
+    return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${plan}`);
   } catch (err: any) {
     console.error('Verify error:', err);
     return NextResponse.redirect(`${APP_URL}/pricing?error=server_error`);

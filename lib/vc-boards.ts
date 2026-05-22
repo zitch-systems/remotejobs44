@@ -454,16 +454,16 @@ export const VC_BOARDS: VCBoard[] = [
 export const PLATFORM_META: Record<Platform, { label: string; color: string; apiAvailable: boolean; apiNote: string }> = {
   getro:      { label: 'Getro',      color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20', apiAvailable: false, apiNote: 'JS-rendered, paid API' },
   yc:         { label: 'YC Public API',   color: 'text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20',   apiAvailable: true,  apiNote: 'Free — no key needed (yc-oss.github.io)' },
-  greenhouse: { label: 'Greenhouse ATS',  color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company board' },
-  lever:      { label: 'Lever ATS',       color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },
-  ashby:      { label: 'Ashby ATS',       color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },
+  greenhouse: { label: 'Greenhouse ATS',  color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company board' },
+  lever:      { label: 'Lever ATS',       color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },
+  ashby:      { label: 'Ashby ATS',       color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20',       apiAvailable: true,  apiNote: 'Free public JSON API per company' },
   workable:   { label: 'Workable ATS',    color: 'text-cyan-700 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20',           apiAvailable: true,  apiNote: 'Free public JSON API per company' },
   custom:     { label: 'Custom Site',     color: 'text-stone-600 bg-stone-100 dark:text-stone-400 dark:bg-stone-800',         apiAvailable: false, apiNote: 'No public API — JS-rendered' },
   'js-spa':   { label: 'JS SPA',          color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',       apiAvailable: false, apiNote: 'No public API — needs headless browser' },
 };
 
 export const INGESTION_STATUS_META = {
-  'free-api': { label: '✅ Free API',      color: 'text-green-700 dark:text-green-400' },
+  'free-api': { label: '✅ Free API',      color: 'text-brand-700 dark:text-brand-400' },
   'key-needed': { label: '🔑 Key needed',  color: 'text-purple-700 dark:text-purple-400' },
   'js-only':  { label: '⚡ JS only',       color: 'text-amber-700 dark:text-amber-400' },
   'rss':      { label: '📡 RSS feed',      color: 'text-blue-700 dark:text-blue-400' },

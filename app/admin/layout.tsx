@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userError || !authUser) { router.replace('/login?next=/admin'); return; }
 
         const { data: profile, error: profileError } = await supabase
-          .from('profiles').select('role, name').eq('id', authUser.id).single();
+          .from('profiles').select('role, name').eq('id', authUser.id).maybeSingle();
 
         if (cancelled) return;
 
