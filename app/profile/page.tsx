@@ -23,7 +23,7 @@ function ProfileContent() {
     async function load() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) { router.replace('/login?next=/profile'); return; }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
       if (profile) {
         setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan: profile.plan ?? 'free', role: profile.role ?? 'user', joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
@@ -58,15 +58,16 @@ function ProfileContent() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
     setUser(null);
-    router.push('/');
+    try { localStorage.removeItem('rj44-auth'); localStorage.removeItem('rj44-jobs'); } catch {}
+    try { await supabase.auth.signOut(); } catch {}
+    window.location.replace('/');
   }
 
   if (loading) return <div className="max-w-[600px] mx-auto px-5 py-10 animate-pulse"><div className="skeleton h-8 w-48 rounded mb-6" /><div className="skeleton h-64 rounded-lg" /></div>;
 
   const planLabel = user?.plan === 'daily' ? 'Day Pass ☀️' : user?.plan === 'pro' ? 'Pro ⭐' : user?.plan === 'admin' ? 'Admin 🔧' : 'Free';
-  const planColor = user?.plan === 'free' ? 'bg-stone-100 dark:bg-stone-800 text-stone-500' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400';
+  const planColor = user?.plan === 'free' ? 'bg-stone-100 dark:bg-stone-800 text-stone-500' : 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400';
 
   return (
     <div className="max-w-[600px] mx-auto px-5 py-10">

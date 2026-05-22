@@ -1,10 +1,12 @@
 'use client';
 // app/pricing/page.tsx
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { Check, X, Zap, Clock, Calendar } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Check, X, Zap, Clock, Calendar, PartyPopper } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import { usePaystack } from '@/hooks/usePaystack';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 const PLANS = [
@@ -91,10 +93,38 @@ const PLANS = [
   },
 ];
 
-export default function PricingPage() {
-  const { user, isPro, isLoggedIn } = useAuthStore();
+function PricingContent() {
+  const searchParams = useSearchParams();
+  const { user, isPro, isLoggedIn, setUser } = useAuthStore();
   const { pay, loading } = usePaystack();
   const [activePlan, setActivePlan] = useState<string | null>(null);
+  const [successPlan, setSuccessPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const plan    = searchParams.get('plan');
+    if (success === '1' && plan) {
+      setSuccessPlan(plan);
+      // Re-sync auth so plan badge reflects new subscription immediately
+      (async () => {
+        try {
+          const supabase = createClient();
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (!authUser) return;
+          const { data: profile } = await supabase.from('profiles').select('name,plan,role,created_at,profile_completion').eq('id', authUser.id).maybeSingle();
+          setUser({
+            id:    authUser.id,
+            email: authUser.email!,
+            name:  profile?.name ?? authUser.email!.split('@')[0],
+            plan:  profile?.plan ?? 'free',
+            role:  profile?.role ?? 'user',
+            joinedAt: profile?.created_at ?? new Date().toISOString(),
+            profileCompletion: profile?.profile_completion ?? 20,
+          });
+        } catch {}
+      })();
+    }
+  }, []);
 
   const currentPlan = user?.plan ?? 'free';
 
@@ -117,6 +147,17 @@ export default function PricingPage() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-16">
+      {/* Payment success banner */}
+      {successPlan && (
+        <div className="mb-10 flex items-center gap-3 p-5 rounded-2xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 text-brand-800 dark:text-brand-300">
+          <PartyPopper className="w-6 h-6 shrink-0 text-brand-600 dark:text-brand-400" />
+          <div>
+            <p className="font-bold text-base">Payment successful — welcome to {successPlan === 'daily' ? 'Day Pass' : successPlan === 'pro_annual' ? 'Pro Annual' : 'Pro'}!</p>
+            <p className="text-sm opacity-80 mt-0.5">Your account has been upgraded. <Link href="/dashboard" className="underline font-semibold">Go to dashboard →</Link></p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="text-center mb-14">
         <h1 className="font-display font-extrabold text-4xl md:text-5xl text-stone-900 dark:text-stone-100 tracking-tight mb-4">
@@ -218,5 +259,13 @@ export default function PricingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={<div className="max-w-[1200px] mx-auto px-5 py-16 animate-pulse"><div className="skeleton h-12 w-64 rounded mx-auto mb-6" /><div className="grid grid-cols-4 gap-5"><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /></div></div>}>
+      <PricingContent />
+    </Suspense>
   );
 }

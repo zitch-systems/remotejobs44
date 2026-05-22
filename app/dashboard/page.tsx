@@ -50,9 +50,10 @@ function DashboardContent() {
     loadSession();
   }, []);
 
-  // Post-payment toast
+  // Post-payment toast (handles both legacy ?subscribed=1 and new ?success=1 params)
   useEffect(() => {
-    if (searchParams.get('subscribed') === '1') {
+    const subscribed = searchParams.get('subscribed') === '1' || searchParams.get('success') === '1';
+    if (subscribed) {
       const plan = searchParams.get('plan') ?? 'pro';
       const label = plan === 'daily' ? 'Day Pass' : plan === 'pro_annual' ? 'Pro Annual' : 'Pro Monthly';
       toast(`🎉 Welcome to ${label}! Full access unlocked.`, 'success', 7000);
@@ -60,9 +61,10 @@ function DashboardContent() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
     setUser(null);
-    router.push('/');
+    try { localStorage.removeItem('rj44-auth'); localStorage.removeItem('rj44-jobs'); } catch {}
+    try { await supabase.auth.signOut(); } catch {}
+    window.location.replace('/');
   }
 
   if (loading) {
@@ -88,7 +90,7 @@ function DashboardContent() {
   const planLabel  = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';
   const planColor  = user.plan === 'free'
     ? 'text-stone-500 bg-stone-100 dark:bg-stone-800'
-    : 'text-amber-700 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400';
+    : 'text-brand-700 bg-brand-50 dark:bg-brand-900/30 dark:text-brand-400';
 
   return (
     <>
