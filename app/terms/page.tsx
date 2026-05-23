@@ -18,7 +18,4 @@ export default function TermsPage() {
           <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">{s.title}</h2>
           <p className="text-stone-500 dark:text-stone-400 leading-relaxed">{s.body}</p>
         </div>
-      ))}
-    </div>
-  );
-}
+      ))

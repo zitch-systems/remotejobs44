@@ -164,8 +164,4 @@ function ApplicationsList() {
 
 export default function ApplicationsPage() {
   return (
-    <Suspense fallback={<div className="max-w-[900px] mx-auto px-5 py-8 animate-pulse"><div className="skeleton h-8 w-48 rounded mb-6" /><div className="space-y-3">{[1,2,3].map(i=><div key={i} className="skeleton h-16 rounded-lg"/>)}</div></div>}>
-      <ApplicationsList />
-    </Suspense>
-  );
-}
+    <Suspense fallback={<div className="max-w-[900px] mx-auto px-5 py-8 animate-pulse"><div className="skeleton h-8 w-48 rounded mb-

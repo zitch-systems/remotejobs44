@@ -93,9 +93,4 @@ test.describe('Job Detail Page', () => {
       await firstJobLink.click();
       await page.waitForTimeout(1500);
       const applyBtn = page.getByRole('button', { name: /apply|subscribe/i }).first();
-      if (await applyBtn.isVisible()) {
-        await expect(applyBtn).toBeVisible();
-      }
-    }
-  });
-});
+      if (await

@@ -11,3 +11,5 @@
     "app/api/cv/route.ts":               { "maxDuration": 30 }
   }
 }
+0 },
+    "app/api/scrape/route.ts":           { "maxDuration"

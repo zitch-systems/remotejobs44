@@ -260,7 +260,5 @@ const SKILL_KEYWORDS = [
 ];
 
 function extractSkills(text: string): string[] {
-  return SKILL_KEYWORDS.filter((s) =>
-    new RegExp(`\\b${s.replace('.', '\\.')}\\b`, 'i').test(text)
-  ).slice(0, 10);
+  return SKILL_KEYWORDS.filter(k => lower.includes(k.toLowerCase()));
 }

@@ -145,5 +145,3 @@ export default function VCBoardsPage() {
         </div>
       </div>
     </div>
-  );
-}

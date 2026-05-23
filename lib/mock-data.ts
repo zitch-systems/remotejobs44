@@ -243,7 +243,5 @@ export const EMBEDDED_RSS_COMPANIES: Array<{name:string; country:string; rssUrl:
   { name:'GitHub Jobs', country:'US', rssUrl:'https://jobs.github.com/positions.json?utf8=✓&description=remote', category:'Engineering' },
   { name:'Dribbble Jobs', country:'US', rssUrl:'https://dribbble.com/jobs.rss?location=anywhere', category:'Design' },
   { name:'HN Who is Hiring', country:'US', rssUrl:'https://hnhiring.com/feed.xml', category:'Engineering' },
-  { name:'Europe Remotely', country:'EU', rssUrl:'https://europeremotely.com/feed.xml', category:'All' },
-  { name:'Remote.co', country:'US', rssUrl:'https://remote.co/remote-jobs/feed/', category:'All' },
-  { name:'JustRemote', country:'EU', rssUrl:'https://justremote.co/feed.xml', category:'All' },
+  { name:'Europe Remotely', country:'EU', rssUrl:'https://europere motely.com/feed.xml', category:'All' },
 ];

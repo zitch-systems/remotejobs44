@@ -271,16 +271,4 @@ export default function SourcesPage() {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function extractName(url: string): string {
-  try { return new URL(url).hostname.replace('www.', '').replace('jobs.', '').split('.')[0]; } catch { return url.slice(0, 30); }
-}
+               

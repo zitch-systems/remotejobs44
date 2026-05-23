@@ -172,7 +172,3 @@ export interface Toast {
   type: 'success' | 'error' | 'info' | 'warning';
   duration?: number;
 }
-
-export interface I18nMessages {
-  [key: string]: string;
-}

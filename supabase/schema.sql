@@ -189,5 +189,4 @@ $$;
 
 create trigger profiles_updated_at before update on public.profiles for each row execute function public.set_updated_at();
 create trigger jobs_updated_at before update on public.jobs for each row execute function public.set_updated_at();
-create trigger applications_updated_at before update on public.applications for each row execute function public.set_updated_at();
-create trigger subscriptions_updated_at before update on public.subscriptions for each row execute function public.set_updated_at();
+create trigger applications_updated_at before update on public.applicatio

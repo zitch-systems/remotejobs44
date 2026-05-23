@@ -96,7 +96,5 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
     <p style="margin:0;color:#a8a29e;font-size:12px">You're receiving this because you have job alerts enabled. <a href="${process.env.NEXT_PUBLIC_APP_URL}/profile" style="color:#2563eb">Manage alerts</a></p>
   </div>
-</div>
-</body></html>`,
-  };
+`;
 }

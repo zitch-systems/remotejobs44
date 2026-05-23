@@ -73,10 +73,4 @@ export default function ResetPasswordPage() {
           <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mt-6 mb-1">Set new password</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500">Choose a strong password for your account</p>
         </div>
-        <Suspense fallback={<div className="card p-6 animate-pulse"><div className="skeleton h-10 rounded mb-3"/><div className="skeleton h-10 rounded mb-3"/><div className="skeleton h-12 rounded"/></div>}>
-          <ResetForm />
-        </Suspense>
-      </div>
-    </div>
-  );
-}
+        <Suspense fallback={<div className="card p-6 animate-pulse"><div className="skeleton h-10 rounded mb-3"/><div className="skeleton h-10 rounded mb-3"/><div className="skeleton h-12 rounded"/></div>}>

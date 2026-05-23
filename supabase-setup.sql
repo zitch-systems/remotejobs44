@@ -150,10 +150,4 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   contact_email TEXT        DEFAULT 'hello@remotejobs44.com',
   settings_json JSONB       DEFAULT '{}',
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT single_row CHECK (id = 1)
-);
-
-INSERT INTO public.site_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
-
--- Done!
-SELECT 'Setup complete ✓' AS status;
+  CONSTRAINT singl

@@ -33,5 +33,5 @@ export async function GET(req: NextRequest) {
   await supabase.from('subscriptions').update({ status: 'expired' })
     .in('user_id', expiredIds).eq('billing', 'daily');
 
-  return NextResponse.json({ expired: expiredIds.length, ids: expiredIds });
+  return NextResponse.json({ expired: expiredIds.length });
 }

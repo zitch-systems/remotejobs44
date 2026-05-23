@@ -109,6 +109,4 @@ export function PaywallModal({ mode }: PaywallModalProps) {
           <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">✅ Cancel anytime · 🔒 Secure via Paystack</p>
         </>
       )}
-    </div>
-  );
-}
+   

@@ -470,4 +470,4 @@ export const INGESTION_STATUS_META = {
 };
 
 // Get total approx job count across all boards
-export const TOTAL_APPROX_JOBS = VC_BOARDS.reduce((s, b) => s + (b.approxJobs ?? 0), 0);
+export const TOTAL_APPROX_JOBS = VC_BOARDS.reduce((s, b) => s + (b.activeJobs ?? 0), 0);

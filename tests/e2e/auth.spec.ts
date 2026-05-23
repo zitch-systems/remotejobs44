@@ -96,7 +96,4 @@ test.describe('Authentication', () => {
 
   test('forgot password page has email field', async ({ page }) => {
     await page.goto('/forgot-password');
-    await expect(emailInput(page)).toBeVisible();
-    await expect(page.getByRole('button', { name: /reset|send/i })).toBeVisible();
-  });
-});
+    await expect(emailInput(page)).toBeVisibl

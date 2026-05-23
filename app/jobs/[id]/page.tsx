@@ -294,14 +294,4 @@ export default function JobDetailPage() {
                       : <Copy className="w-3.5 h-3.5 text-stone-300 group-hover:text-brand-500 shrink-0 transition-colors" />}
                   </button>
                 ) : null)}
-              </div>
-              <Link href="/profile" className="mt-3 block text-xs text-brand-700 dark:text-brand-400 hover:underline text-center">
-                Edit profile & upload CV →
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+ 

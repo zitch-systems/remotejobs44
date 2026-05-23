@@ -171,8 +171,4 @@ function mapCat(raw: string): string {
 function mapLevel(title: string): string {
   const t = title.toLowerCase();
   if (/junior|entry|associate|grad/.test(t)) return 'entry';
-  if (/senior|sr\./.test(t))                 return 'senior';
-  if (/lead|principal|staff/.test(t))        return 'lead';
-  if (/vp|director|head|chief/.test(t))      return 'executive';
-  return 'mid';
-}
+  if (/senior|sr\./.test(t))    

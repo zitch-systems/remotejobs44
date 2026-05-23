@@ -110,12 +110,4 @@ export default function AdminUsersPage() {
                     <option value="pro">Pro</option>
                     <option value="admin">Admin</option>
                   </select>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+       

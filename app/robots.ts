@@ -24,4 +24,3 @@ export default function robots(): MetadataRoute.Robots {
     sitemap: 'https://remotejobs44.com/sitemap.xml',
     host: 'https://remotejobs44.com',
   };
-}

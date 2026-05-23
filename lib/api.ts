@@ -176,3 +176,14 @@ export const subscriptionApi = {
     return { success: true, url: `/pricing` };
   },
 };
+ionsApi = {
+  async initialize(plan: string, userId: string, email: string) {
+    const res = await fetch('/api/paystack/initialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, userId, email }),
+    });
+    if (!res.ok) throw new Error('Failed to initialize payment');
+    return res.json();
+  },
+};

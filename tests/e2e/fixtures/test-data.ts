@@ -17,5 +17,4 @@ export const SELECTORS = {
 };
 
 export async function waitForJobs(page: any, timeout = 5000) {
-  await page.waitForTimeout(2000);
-}
+  await page.waitF

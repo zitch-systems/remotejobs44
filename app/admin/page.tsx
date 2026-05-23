@@ -222,13 +222,4 @@ export default function AdminPage() {
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
-          );
-        })}
-        {filteredJobs.length === 0 && (
-          <div className="px-5 py-8 text-center text-sm text-stone-400">No jobs match your search.</div>
-        )}
-      </div>
-    </div>
-  );
-}
+       

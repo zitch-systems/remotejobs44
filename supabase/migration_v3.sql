@@ -97,6 +97,4 @@ CREATE POLICY "alerts_all" ON public.job_alerts
 
 -- ── Verify ────────────────────────────────────────────────────────────────
 SELECT tablename, policyname, cmd
-FROM pg_policies
-WHERE tablename IN ('profiles', 'jobs', 'subscriptions')
-ORDER BY tablename, policyname;
+FROM pg

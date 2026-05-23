@@ -62,35 +62,3 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
 }
-
-// PATCH /api/profile — Update current user's profile fields
-export async function PATCH(req: NextRequest) {
-  try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const allowed = ['name', 'avatar', 'cv_url', 'profile_completion'];
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    for (const key of allowed) {
-      if (body[key] !== undefined) updates[key] = body[key];
-    }
-
-    const admin = createAdminSupabaseClient();
-    const { data: profile, error } = await admin
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ profile });
-  } catch (err: any) {
-    console.error('[PATCH /api/profile]', err);
-    return NextResponse.json({ error: err.message ?? 'Failed to update profile' }, { status: 500 });
-  }
-}

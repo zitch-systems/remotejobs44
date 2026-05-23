@@ -87,10 +87,4 @@ export default function AboutPage() {
           </Link>
           <Link href="/register"
             className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
-            Create Free Account
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+       

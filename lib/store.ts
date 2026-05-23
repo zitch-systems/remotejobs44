@@ -18,7 +18,7 @@ interface AuthState {
   // Actions
   login:      (user: User, token: string) => void;
   logout:     () => void;
-  setUser:    (user: User | null) => void;          // ← alias used by some components
+  setUser:    (user: User | null) => void;
   updateUser: (patch: Partial<User>) => void;
   incrementDailyApp: () => void;
   // Selectors (functions so they always read latest state)
@@ -140,7 +140,10 @@ interface LangState {
 
 export const useLangStore = create<LangState>()(
   persist(
-    (set) => ({ locale: 'en' as Locale, setLocale: (locale) => set({ locale }) }),
-    { name: 'rj44-lang', storage: createJSONStorage(storage) }
+    (set) => ({
+      locale: 'en' as Locale,
+      setLocale: (locale) => set({ locale }),
+    }),
+    { name: 'rj44-lang' }
   )
 );

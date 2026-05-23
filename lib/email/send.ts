@@ -39,5 +39,4 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailOptions
   } catch (err) {
     console.error('Email send failed:', err);
     return false;
-  }
-}
+  }

@@ -230,3 +230,5 @@ export default function RegisterPage() {
     </div>
   );
 }
+-stone-500 mt-5">
+          

@@ -381,7 +381,4 @@ function guessCategory(title: string, desc: string): string {
   return 'other';
 }
 
-const SKILLS = ['React','Vue','Angular','Next.js','TypeScript','JavaScript','Python','Go','Rust','Java','Kotlin','Swift','Node.js','Django','Rails','Docker','Kubernetes','AWS','GCP','Azure','Terraform','PostgreSQL','MySQL','MongoDB','Redis','GraphQL','REST','Figma','SQL','Spark','Airflow','dbt','Salesforce','HubSpot','Git','CI/CD','PyTorch','TensorFlow','NLP','Tableau','Power BI','Excel','Stripe','Twilio'];
-function extractSkills(text: string): string[] {
-  return SKILLS.filter(s => new RegExp(`\\b${s.replace('.','\\.')}\\b`, 'i').test(text)).slice(0, 8);
-}
+const SKILLS = ['React','Vue','Angular','Next.js','TypeScript','JavaScript','Python','Go','Rust','Java','Kotlin','Swift','Node.js','Django','Rails','Docker','Kubernetes','AWS','GCP'

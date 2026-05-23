@@ -84,3 +84,5 @@ function normalizeYCCompany(c: any) {
     source: 'yc',
   };
 }
+l: `https://www.workatastartup.com/companies/${c.slug}`,
+  }));

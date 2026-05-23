@@ -117,13 +117,4 @@ export default function SubscriptionsPage() {
                   </span>
                 </div>
                 <div className="col-span-2 text-xs text-stone-400">
-                  {sub.current_period_end ? formatRelativeDate(sub.current_period_end) : '—'}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+                  {sub.current_period_end ? formatRelativeDate(sub.current_period_end) : '—'}

@@ -139,6 +139,6 @@ export function PWAInstall() {
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

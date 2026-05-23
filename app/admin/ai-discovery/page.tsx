@@ -835,25 +835,4 @@ export default function AIDiscoveryPage() {
 
       {/* ── LOGS TAB ───────────────────────────────────────────────────────── */}
       {activeTab === 'logs' && (
-        <div className="bg-[#0a1628] rounded-xl border border-[#1e3a5f] p-4 font-mono text-xs overflow-auto max-h-[600px]">
-          {logs.length === 0 ? (
-            <p className="text-stone-500 text-center py-8">No logs yet. Run a discovery to see activity here.</p>
-          ) : (
-            <div className="space-y-1">
-              {logs.map((log, i) => (
-                <div key={i} className={cn('flex gap-3',
-                  log.type === 'error'   ? 'text-red-400'
-                  : log.type === 'success' ? 'text-green-400'
-                  : log.type === 'warn'    ? 'text-amber-400'
-                  : 'text-stone-400')}>
-                  <span className="text-stone-600 shrink-0">{log.time}</span>
-                  <span>{log.msg}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+        <div className="bg-[#0a1628] roun

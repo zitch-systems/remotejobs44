@@ -143,5 +143,4 @@ CREATE TABLE IF NOT EXISTS public.job_alerts (
 ALTER TABLE public.job_alerts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "alerts_select" ON public.job_alerts FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "alerts_insert" ON public.job_alerts FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "alerts_delete" ON public.job_alerts FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "alerts_insert" ON public.job_

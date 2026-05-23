@@ -173,4 +173,3 @@ function transformApplication(row: Record<string, unknown>) {
     steps:        row.steps ?? [],
     notes:        row.notes ?? '',
   };
-}

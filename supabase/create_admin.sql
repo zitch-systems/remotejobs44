@@ -29,5 +29,4 @@ UPDATE public.profiles
   WHERE email = 'admin@remotejobs44.com';
 
 -- Verify
-SELECT id, email, name, plan, role FROM public.profiles
-  WHERE role = 'admin';
+SELECT id, email, name, plan, role FROM public.pr

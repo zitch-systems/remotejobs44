@@ -37,8 +37,3 @@ export function BottomNav() {
             </div>
             <span className="text-[10px] font-medium">{label}</span>
           </Link>
-        );
-      })}
-    </nav>
-  );
-}

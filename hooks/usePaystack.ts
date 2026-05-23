@@ -32,8 +32,4 @@ export function usePaystack() {
     } catch (err: any) {
       toast(err.message, 'error');
       setLoading(false);
-    }
-  }
-
-  return { pay, loading };
-}
+    }

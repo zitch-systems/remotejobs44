@@ -108,4 +108,4 @@ export const LANG_META: Record<string, { flag: string; name: string; dir: 'ltr' 
   ar: { flag: '🇦🇪', name: 'العربية', dir: 'rtl' },
   zh: { flag: '🇨🇳', name: '中文', dir: 'ltr' },
   ja: { flag: '🇯🇵', name: '日本語', dir: 'ltr' },
-};
+}

@@ -179,4 +179,4 @@
 .dark .group-hover\:dark\:text-brand-400 { color: #60a5fa !important; }
 /* Group hover */
 .group:hover .group-hover\:text-brand-700 { color: #1d4ed8 !important; }
-/* ========================================= */
+.dark .group:hover .dark\:group-hover\:text-brand-400 { color: #60a5fa !important; }

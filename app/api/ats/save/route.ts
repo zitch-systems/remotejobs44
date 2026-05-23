@@ -108,7 +108,4 @@ export async function POST(req: NextRequest) {
       total: jobs.length,
     });
   } catch (err: any) {
-    console.error('[ats/save]', err);
-    return NextResponse.json({ error: err.message ?? 'Failed to save jobs' }, { status: 500 });
-  }
-}
+    console.error('[ats/save]'

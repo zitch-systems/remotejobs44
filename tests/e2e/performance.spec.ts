@@ -63,7 +63,4 @@ test.describe('Performance', () => {
     const start = Date.now();
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(8000);
-  });
-});
+    const elapsed = Date.

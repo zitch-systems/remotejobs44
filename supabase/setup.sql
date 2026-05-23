@@ -309,7 +309,4 @@ where email = 'mallamplacid@gmail.com';
 -- ────────────────────────────────────────────────────────────
 -- DONE ✓
 -- After running this script:
--- 1. Go to Authentication → Providers → Email
---    → Disable "Confirm email" for instant login
--- 2. Log in at /login — you'll land on /admin automatically
--- ────────────────────────────────────────────────────────────
+-- 1. Go to Authentication → Provider

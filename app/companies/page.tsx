@@ -185,3 +185,21 @@ export default function CompaniesPage() {
     </div>
   );
 }
+ 'roles'}
+                    </Link>
+                    {company.website && (
+                      <a href={company.website} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" /> Website
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

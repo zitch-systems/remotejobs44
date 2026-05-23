@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { BookmarkPlus, BookmarkCheck, MapPin, Timer, ArrowUpRight, Banknote, Sparkles, Star, Lock } from 'lucide-react';
+import { BookmarkPlus, BookmarkCheck, MapPin, Timer, ArrowUpRight, Banknote, Sparkles, Star, Lock, Zap } from 'lucide-react';
 import { cn, formatRelativeDate, formatSalary, capitalize, CATEGORY_META, SOURCE_META } from '@/lib/utils';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { applicationsApi } from '@/lib/api';

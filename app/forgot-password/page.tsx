@@ -54,5 +54,4 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
     </div>
-  );
-}
+  )

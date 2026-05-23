@@ -82,8 +82,4 @@ test.describe('Jobs Page', () => {
   test('URL params are reflected in filters', async ({ page }) => {
     await page.goto('/jobs?q=react+developer&type=full-time');
     await page.waitForTimeout(1000);
-    const url = page.url();
-    expect(url).toContain('q=');
-    expect(url).toContain('type=');
-  });
-});
+    const url = page.ur

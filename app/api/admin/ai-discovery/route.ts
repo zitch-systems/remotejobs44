@@ -241,3 +241,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ jobs: sanitised });
 }
+ing(j.applyUrl    ?? ''),
+      salaryMin:   Number(j.salaryMin   ?? 0) || null,
+      salaryMax:   Number(j.salaryMax   ?? 0) || null,
+      currency:    String(j.currency    ?? 'USD'),
+      skills:   
