@@ -282,3 +282,18 @@ function PricingContent() {
     </div>
   );
 }
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-6xl mx-auto px-5 py-12 animate-pulse">
+        <div className="skeleton h-10 w-64 rounded mx-auto mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-96 rounded-2xl" />)}
+        </div>
+      </div>
+    }>
+      <PricingContent />
+    </Suspense>
+  );
+}

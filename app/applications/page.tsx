@@ -16,7 +16,7 @@ const STATUS_CONFIG = {
   withdrawn: { label: 'Withdrawn',  color: 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400',     icon: <XCircle className="w-4 h-4" /> },
 } as const;
 
-function ApplicationsList() {
+function ApplicationsContent() {
   const router   = useRouter();
   const supabase = createClient();
   const { applications } = useJobsStore();

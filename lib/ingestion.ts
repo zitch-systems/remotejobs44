@@ -260,5 +260,6 @@ const SKILL_KEYWORDS = [
 ];
 
 function extractSkills(text: string): string[] {
+  const lower = text.toLowerCase();
   return SKILL_KEYWORDS.filter(k => lower.includes(k.toLowerCase()));
 }

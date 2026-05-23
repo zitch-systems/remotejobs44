@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email/send';
-import { rateLimit, getClientIP } from '@/lib/rate-limit';
+import { rateLimit, getIP } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
-  const ip = getClientIP(req);
+  const ip = getIP(req);
   const rl = rateLimit(`contact:${ip}`, 5, 60 * 60 * 1000);
-  if (!rl.ok) {
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
     return NextResponse.json(
-      { error: `Too many requests. Try again in ${rl.retryAfter} seconds.` },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      { error: `Too many requests. Try again in ${retryAfter} seconds.` },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
     );
   }
 

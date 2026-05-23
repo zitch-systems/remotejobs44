@@ -646,3 +646,17 @@ function JobsContent() {
     </div>
   );
 }
+
+export default function JobsPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-5 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      </div>
+    }>
+      <JobsContent />
+    </Suspense>
+  );
+}

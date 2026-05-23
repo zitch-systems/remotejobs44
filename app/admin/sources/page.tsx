@@ -57,6 +57,15 @@ export default function SourcesPage() {
     localStorage.setItem('rj44_sources_v2', JSON.stringify(updated.map(s => ({ ...s, jobs: undefined }))));
   }
 
+  function extractName(url: string): string {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      return host.split('.')[0] || host;
+    } catch {
+      return url;
+    }
+  }
+
   async function detectAndFetch(url: string): Promise<Partial<Source>> {
     const rssRes = await fetch(`/api/rss?url=${encodeURIComponent(url)}`);
     const rssData = await rssRes.json();
