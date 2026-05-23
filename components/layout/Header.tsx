@@ -7,6 +7,7 @@ import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, Brie
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 const NAV_LINKS = [
   { href: '/jobs',      label: 'Jobs'      },
@@ -55,19 +56,21 @@ export function Header() {
   // Sync auth from Supabase on mount — stable session, no random logouts
   useEffect(() => {
     const supabase = createClient();
-    let ignoreNextSignedOut = false; // guard against TOKEN_REFRESHED → brief SIGNED_OUT flash
+    let ignoreNextSignedOut = false;
 
     async function fetchProfile(userId: string) {
       try {
-        const { data } = await supabase
+        const queryPromise = supabase
           .from('profiles').select('name,plan,role,created_at,profile_completion')
-          .eq('id', userId).maybeSingle();
-        return data ?? null;
+          .eq('id', userId).maybeSingle()
+          .then(({ data }: { data: any }) => data);
+        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+        return await Promise.race([queryPromise, timeoutPromise]);
       } catch { return null; }
     }
 
     function buildUser(authUser: { id: string; email?: string | null }, profile: any) {
-      const role = profile?.role ?? 'user';
+      const role: 'admin' | 'user' = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
       const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
       return {
         id:    authUser.id,
@@ -83,9 +86,8 @@ export function Header() {
     async function syncAuth() {
       try {
         const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        // Only clear user on definitive auth failure — NOT on network errors
         if (error?.status === 401 || error?.status === 403) { setUser(null); return; }
-        if (error) return; // network blip — keep existing session, don't log out
+        if (error) return; // network blip — keep existing session
         if (!authUser) { setUser(null); return; }
         const profile = await fetchProfile(authUser.id);
         setUser(buildUser(authUser, profile));
@@ -97,14 +99,23 @@ export function Header() {
     syncAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'TOKEN_REFRESHED') {
-        // Token just refreshed — ignore the SIGNED_OUT that sometimes follows
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         ignoreNextSignedOut = true;
-        setTimeout(() => { ignoreNextSignedOut = false; }, 2000);
+        setTimeout(() => { ignoreNextSignedOut = false; }, 3000);
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          setUser(buildUser(session.user, profile));
+        }
         return;
       }
       if (event === 'SIGNED_OUT') {
         if (ignoreNextSignedOut) return; // spurious event during token refresh
+        // Double-check: if getUser still returns a valid user, the SIGNED_OUT was spurious.
+        // This guards against transient cookie/session blips logging the user out.
+        try {
+          const { data: { user: stillAuthed } } = await supabase.auth.getUser();
+          if (stillAuthed) return;
+        } catch {}
         setUser(null);
         return;
       }

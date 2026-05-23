@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 // Admin access is determined solely by the 'role' column in the profiles table.
 // To grant admin access, set role = 'admin' directly in the Supabase dashboard.
@@ -34,7 +35,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     let cancelled = false;
-    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
 
     async function check() {
       const supabase = createClient();
@@ -61,8 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       if (cancelled) return;
 
-      const isHardcodedAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '');
-      const isAdmin = profile?.role === 'admin' || isHardcodedAdmin;
+      const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
 
       if (!isAdmin) {
         router.replace('/dashboard');

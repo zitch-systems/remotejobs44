@@ -1,31 +1,35 @@
 // middleware.ts — Supabase session refresh on every request
+// Uses the @supabase/ssr getAll/setAll pattern recommended by Supabase to avoid
+// random logouts caused by inconsistent cookie propagation.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: { headers: request.headers },
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: any) => {
-          request.cookies.set({ name, value, ...options });
-          response.cookies.set({ name, value, ...options });
+        getAll() {
+          return request.cookies.getAll();
         },
-        remove: (name: string, options: any) => {
-          request.cookies.set({ name, value: '', ...options });
-          response.cookies.set({ name, value: '', ...options });
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({ request: { headers: request.headers } });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
         },
       },
     }
   );
 
-  // Refresh session — never log out on network errors
+  // IMPORTANT: do not run code between createServerClient and supabase.auth.getUser()
+  // — doing so can cause users to be randomly logged out (per Supabase docs).
   try { await supabase.auth.getUser(); } catch {}
 
   return response;

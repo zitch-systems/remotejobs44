@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { MOCK_JOBS } from '@/lib/mock-data';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 export const revalidate = 60;
 
@@ -88,7 +89,7 @@ async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResp
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
       return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
     }
     return { ok: true };

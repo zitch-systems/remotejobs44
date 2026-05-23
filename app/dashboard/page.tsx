@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Briefcase, BookmarkCheck, FileText, TrendingUp, ArrowRight, Star, Zap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { formatRelativeDate } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -44,12 +45,15 @@ function DashboardContent() {
           profile = await Promise.race([queryPromise, timeoutPromise]);
         } catch {}
 
+        const role = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
+        const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+
         setUser({
           id:    authUser.id,
           email: authUser.email!,
           name:  profile?.name ?? authUser.email!.split('@')[0],
-          plan:  profile?.plan  ?? 'free',
-          role:  profile?.role  ?? 'user',
+          plan,
+          role,
           joinedAt: profile?.created_at ?? new Date().toISOString(),
           profileCompletion: profile?.profile_completion ?? 20,
         });

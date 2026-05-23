@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -110,9 +111,7 @@ function LoginForm() {
         }
       } catch {}
 
-      const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
-      const isHardcodedAdmin = ADMIN_EMAILS.includes(data.user.email?.toLowerCase() ?? '');
-      const resolvedRole = profile?.role === 'admin' || isHardcodedAdmin ? 'admin' : 'user';
+      const resolvedRole = (profile?.role === 'admin' || isHardcodedAdmin(data.user.email)) ? 'admin' : 'user';
       const resolvedPlan = resolvedRole === 'admin' ? 'admin' : (profile?.plan ?? 'free');
 
       setUser({

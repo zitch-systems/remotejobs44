@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 function ProfileContent() {
   const router   = useRouter();
@@ -43,13 +44,16 @@ function ProfileContent() {
       } catch {}
       if (cancelled) return;
 
+      const role = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
+      const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+
       if (profile) {
-        setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan: profile.plan ?? 'free', role: profile.role ?? 'user', joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
+        setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan, role, joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
         setCvUrl(profile.cv_url ?? null);
       } else {
-        // Profile fetch failed/timed out — still render the page with what we have from auth
-        setUser({ id: authUser.id, email: authUser.email!, name: authUser.email!.split('@')[0], plan: 'free', role: 'user', joinedAt: new Date().toISOString(), profileCompletion: 20 });
+        // Profile fetch failed/timed out — still render the page with safe defaults
+        setUser({ id: authUser.id, email: authUser.email!, name: authUser.email!.split('@')[0], plan, role, joinedAt: new Date().toISOString(), profileCompletion: 20 });
         setName(authUser.email!.split('@')[0]);
       }
       setLoading(false);

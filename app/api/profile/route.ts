@@ -2,6 +2,7 @@
 // Called on login to ensure the profile row always exists
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 // GET /api/profile — Fetch current user's profile (creates if missing)
 export async function GET() {
@@ -22,13 +23,16 @@ export async function GET() {
       .maybeSingle();
 
     if (profile) {
+      // If user is a hardcoded admin but their DB row says 'user', upgrade the response (does not write to DB)
+      if (profile.role !== 'admin' && isHardcodedAdmin(user.email)) {
+        return NextResponse.json({ profile: { ...profile, role: 'admin', plan: 'admin' } });
+      }
       return NextResponse.json({ profile });
     }
 
     // Profile missing — create it now (handles users who signed up before trigger was added)
     const name = user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User';
-    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
-    const isAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '');
+    const isAdmin = isHardcodedAdmin(user.email);
 
     const { data: newProfile, error: insertError } = await admin
       .from('profiles')

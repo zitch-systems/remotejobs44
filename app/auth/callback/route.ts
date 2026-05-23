@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 import { cookies } from 'next/headers';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -66,9 +67,7 @@ export async function GET(request: NextRequest) {
 
         // Redirect admins to admin panel if no explicit next destination
         if (next === '/dashboard' && authUser) {
-          const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
-          const isHardcodedAdmin = ADMIN_EMAILS.includes(authUser.email?.toLowerCase() ?? '');
-          let isAdmin = isHardcodedAdmin;
+          let isAdmin = isHardcodedAdmin(authUser.email);
           if (!isAdmin) {
             const { data: profile } = await supabase
               .from('profiles').select('role').eq('id', authUser.id).maybeSingle();

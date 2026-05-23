@@ -1,6 +1,7 @@
 // app/api/admin/stats/route.ts — Real admin stats from Supabase
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 export const revalidate = 30;
 
@@ -12,8 +13,7 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
-    if (profile?.role !== 'admin' && !ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '')) {
+    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
