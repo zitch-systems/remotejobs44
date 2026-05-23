@@ -42,3 +42,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Non-fatal: return static routes only if DB is unavailable
   }
 
+  return [...staticRoutes, ...jobRoutes];
+}

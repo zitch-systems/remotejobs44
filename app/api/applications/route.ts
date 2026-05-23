@@ -173,3 +173,11 @@ function transformApplication(row: Record<string, unknown>) {
     steps:        row.steps ?? [],
     notes:        row.notes ?? '',
   };
+}
+.applied_at,
+    updatedAt:    row.updated_at,
+    steps:        row.steps ?? [],
+    notes:        row.notes ?? null,
+    autoApplied:  row.auto_applied ?? false,
+  };
+}

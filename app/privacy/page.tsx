@@ -18,3 +18,6 @@ export default function PrivacyPage() {
           <p className="text-stone-500 dark:text-stone-400 leading-relaxed">{s.body}</p>
         </div>
       ))}
+    </div>
+  );
+}

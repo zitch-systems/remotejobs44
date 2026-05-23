@@ -72,4 +72,7 @@ test.describe('Accessibility', () => {
   test('focus indicator is visible after tabbing', async ({ page }) => {
     await page.goto('/login');
     await page.keyboard.press('Tab');
-    const focused = p
+    const focused = page.locator(':focus');
+    await expect(focused).toBeVisible();
+  });
+});

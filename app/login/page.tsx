@@ -278,3 +278,16 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+late-500 mt-5">
+          Don't have an account?{' '}
+          <Link href="/register"
+            className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">
+            Create free account
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

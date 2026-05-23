@@ -57,4 +57,9 @@ export function getClientIP(req: Request): string {
     headers.get?.('x-forwarded-for')?.split(',')[0]?.trim() ??
     headers.get?.('x-real-ip') ??
     'unknown'
-  )
+  );
+}
+    headers.get?.('x-real-ip') ??
+    'unknown'
+  );
+}

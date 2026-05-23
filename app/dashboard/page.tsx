@@ -287,4 +287,14 @@ export default function DashboardPage() {
     <div className="max-w-[1000px] mx-auto px-5 py-8">
       <Suspense fallback={
         <div className="animate-pulse space-y-4">
-        
+          <div className="skeleton h-8 w-48 rounded" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => <div key={i} className="skeleton h-28 rounded-lg" />)}
+          </div>
+        </div>
+      }>
+        <DashboardContent />
+      </Suspense>
+    </div>
+  );
+}

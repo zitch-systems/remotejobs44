@@ -641,8 +641,8 @@ function JobsContent() {
               </button>
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

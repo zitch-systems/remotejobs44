@@ -245,4 +245,10 @@ ing(j.applyUrl    ?? ''),
       salaryMin:   Number(j.salaryMin   ?? 0) || null,
       salaryMax:   Number(j.salaryMax   ?? 0) || null,
       currency:    String(j.currency    ?? 'USD'),
-      skills:   
+      skills:      Array.isArray(j.skills) ? j.skills.map(String) : [],
+      featured:    Boolean(j.featured   ?? false),
+      remote:      Boolean(j.remote     ?? true),
+    }));
+
+  return NextResponse.json({ jobs: sanitised, total: sanitised.length });
+}

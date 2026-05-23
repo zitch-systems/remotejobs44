@@ -82,4 +82,8 @@ test.describe('Navigation & Layout', () => {
       !e.includes('favicon') &&
       !e.includes('google') &&
       !e.includes('fonts') &&
-      !
+      !e.includes('analytics')
+    );
+    expect(criticalErrors.length).toBe(0);
+  });
+});

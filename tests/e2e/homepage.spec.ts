@@ -72,4 +72,7 @@ test.describe('Homepage', () => {
 
   test('skip to content link exists for accessibility', async ({ page }) => {
     await page.goto('/');
-    const skipLink = page.getByRole('link',
+    const skipLink = page.getByRole('link', { name: /skip/i });
+    await expect(skipLink).toBeAttached();
+  });
+});

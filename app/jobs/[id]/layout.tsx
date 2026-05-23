@@ -42,3 +42,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 export default function JobLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
+}
+eactNode }) {
+  return <>{children}</>;
+}

@@ -231,4 +231,13 @@ export default function RegisterPage() {
   );
 }
 -stone-500 mt-5">
-          
+          Already have an account?{' '}
+          <Link href="/login"
+            className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

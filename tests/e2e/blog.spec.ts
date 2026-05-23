@@ -27,4 +27,6 @@ test.describe('Blog', () => {
 
   test('beginners blog post loads', async ({ page }) => {
     await page.goto('/blog/best-remote-jobs-for-beginners');
-    await expect(page.locator('h1
+    await expect(page.locator('h1')).toBeVisible();
+  });
+});

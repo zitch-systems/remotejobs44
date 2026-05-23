@@ -86,3 +86,6 @@ function normalizeYCCompany(c: any) {
 }
 l: `https://www.workatastartup.com/companies/${c.slug}`,
   }));
+
+  return NextResponse.json({ companies: transformed, total: transformed.length });
+}

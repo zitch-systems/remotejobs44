@@ -47,3 +47,5 @@ export async function DELETE(req: NextRequest) {
 
   const { id } = await req.json();
   await supabase.from('job_alerts').delete().eq('id', id).eq('user_id', user.id);
+  return NextResponse.json({ success: true });
+}

@@ -54,4 +54,9 @@ export function HowItWorks() {
                 <p className="text-sm text-stone-400 dark:text-stone-500 leading-relaxed max-w-xs">{s.desc}</p>
               </div>
             );
-        
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}

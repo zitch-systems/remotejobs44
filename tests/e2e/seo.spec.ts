@@ -105,4 +105,8 @@ test.describe('SEO & Technical', () => {
   test('page loads in under 5 seconds', async ({ page }) => {
     const start = Date.now();
     await page.goto('/');
-    await page.waitForLoadState('domco
+    await page.waitForLoadState('domcontentloaded');
+    const duration = Date.now() - start;
+    expect(duration).toBeLessThan(5000);
+  });
+});

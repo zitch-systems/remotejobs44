@@ -85,4 +85,9 @@ export function ModalRoot() {
             <X className="w-4 h-4" />
           </button>
 
-   
+          {state.content}
+        </div>
+      </div>
+    </ModalContext.Provider>
+  );
+}

@@ -126,4 +126,7 @@ function extractAttr(xml: string, tag: string, attr: string): string | undefined
   const m = xml.match(new RegExp(`<${tag}[^>]*${attr}="([^"]+)"`, 'i'));
   return m ? m[1] : undefined;
 }
-
+
+function stripHTML(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000);
+}

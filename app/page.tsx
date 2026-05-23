@@ -23,4 +23,9 @@ export default function HomePage() {
       <PricingPreview />
       <CTASection />
     </>
-  );
+  );
+}
+tion />
+    </>
+  );
+}

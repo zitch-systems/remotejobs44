@@ -62,4 +62,7 @@ export async function GET() {
 
     if (error || !data) return NextResponse.json({ settings: null });
     return NextResponse.json({ settings: data });
-  } 
+  } catch {
+    return NextResponse.json({ settings: null });
+  }
+}

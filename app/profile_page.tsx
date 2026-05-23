@@ -173,4 +173,8 @@ function ProfileContent() {
 
 export default function ProfilePage() {
   return (
-    <Suspense 
+    <Suspense fallback={<div className="max-w-[600px] mx-auto px-5 py-10 animate-pulse"><div className="skeleton h-64 rounded-lg" /></div>}>
+      <ProfileContent />
+    </Suspense>
+  );
+}

@@ -28,4 +28,9 @@ export function CTASection() {
         </div>
       </div>
     </section>
-  );
+  );
+}
+/div>
+    </section>
+  );
+}

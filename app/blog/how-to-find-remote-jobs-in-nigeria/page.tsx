@@ -48,4 +48,11 @@ export default function Post() {
         </Link>
       </div>
     </div>
-  );
+  );
+}
+
+        </Link>
+      </div>
+    </div>
+  );
+}

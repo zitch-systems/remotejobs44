@@ -43,4 +43,6 @@ test.describe('Pricing Page', () => {
     await expect(page.locator('main')).toBeVisible();
     const content = await page.locator('main').textContent();
     expect(content).toContain('Free');
-   
+    expect(content).toContain('Pro');
+  });
+});

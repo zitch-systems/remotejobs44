@@ -56,4 +56,5 @@ Payment processed via Paystack (supports Nigerian bank cards, USSD, bank transfe
 - About: https://remotejobs44.com/about
 - Blog: https://remotejobs44.com/blog
 - Contact: https://remotejobs44.com/contact
-- Login: https://remotejobs4
+- Login: https://remotejobs44.com/login
+- Register: https://remotejobs44.com/register

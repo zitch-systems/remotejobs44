@@ -117,4 +117,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </ThemeProvider>
       </body>
     </html>
- 
+  );
+}
+er />
+          <ModalRoot />
+          <PWAInstall />
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

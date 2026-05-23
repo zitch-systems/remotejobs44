@@ -1,3 +1,3 @@
 'use client';
 // components/providers/ThemeProvider.tsx
-export { ThemeProvider } from 'next-themes'
+export { ThemeProvider } from 'next-themes';

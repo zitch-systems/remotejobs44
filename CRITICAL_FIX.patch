@@ -863,4 +863,28 @@ index 07b5e71..0000000
 -            <button
 -              type="submit"
 -              disabled={loading || !email || !password}
--              className="w-full flex 
+-              className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-60 transition-colors"
+-            >
+-              {loading ? (
+-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+-              ) : (
+-                <LogIn className="w-4 h-4" />
+-              )}
+-              {loading ? 'Signing in…' : 'Sign In'}
+-            </button>
+-          </form>
+-        </div>
+-
+-        <p className="text-center text-sm text-stone-400 dark:text-stone-500 mt-5">
+-          Don't have an account?{' '}
+-          <Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">
+-            Create free account
+-          </Link>
+-        </p>
+-      </div>
+-    </div>
+-  );
+-}
+-- 
+2.43.0
+

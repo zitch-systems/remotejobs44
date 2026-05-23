@@ -65,4 +65,9 @@ export async function GET(req: NextRequest) {
         {/* Footer */}
         <div style={{ color: '#475569', fontSize: 18 }}>
           {sub}
-        
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630 }
+  );
+}

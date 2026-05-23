@@ -26,4 +26,7 @@ export default function NotFound() {
             Browse Jobs
           </Link>
         </div>
-   
+      </div>
+    </div>
+  );
+}
