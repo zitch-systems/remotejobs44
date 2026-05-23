@@ -203,4 +203,13 @@ export function HeroSection() {
         <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap pt-6 border-t border-stone-200 dark:border-[#1e3a5f] w-full max-w-lg">
           {STATS.map(s => (
             <div key={s.label} className="text-center">
-              <div className="fon
+              <div className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100">{s.value}</div>
+              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </section>
+  );
+}

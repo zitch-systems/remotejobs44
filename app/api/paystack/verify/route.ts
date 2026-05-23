@@ -95,3 +95,5 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error('Verify error:', err);
     return NextResponse.redirect(`${APP_URL}/pricing?error=server_error`);
+  }
+}
