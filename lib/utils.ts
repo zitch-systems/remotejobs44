@@ -109,6 +109,3 @@ export const LANG_META: Record<string, { flag: string; name: string; dir: 'ltr' 
   zh: { flag: '🇨🇳', name: '中文', dir: 'ltr' },
   ja: { flag: '🇯🇵', name: '日本語', dir: 'ltr' },
 };
-ag: '🇨🇳', name: '中文', dir: 'ltr' },
-  ja: { flag: '🇯🇵', name: '日本語', dir: 'ltr' },
-};

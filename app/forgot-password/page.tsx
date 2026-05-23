@@ -56,9 +56,3 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-</Link>
-        </p>
-      </div>
-    </div>
-  );
-}

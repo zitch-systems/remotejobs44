@@ -112,9 +112,3 @@ export function PaywallModal({ mode }: PaywallModalProps) {
     </div>
   );
 }
-t-stone-500 mt-1">Secure payment via Paystack</p>
-        </div>
-      </div>
-    </div>
-  );
-}

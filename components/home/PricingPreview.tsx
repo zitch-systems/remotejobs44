@@ -149,10 +149,3 @@ export function PricingPreview() {
     </section>
   );
 }
-text-stone-500 mt-6">
-          Secure payments via Paystack · Cancel anytime · All prices in NGN
-        </p>
-      </div>
-    </section>
-  );
-}

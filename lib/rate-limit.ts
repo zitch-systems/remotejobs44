@@ -18,48 +18,46 @@ function maybePrune() {
   }
 }
 
+export interface RateLimitResult {
+  success:   boolean;
+  remaining: number;
+  resetAt:   number;
+}
+
 /**
- * Check if a request is within rate limit.
- *
- * @param key      Unique identifier — e.g. IP address or user ID
- * @param limit    Max requests allowed in the window
- * @param windowMs Window duration in milliseconds
- * @returns        { ok: true } if allowed, { ok: false, retryAfter: number } if limited
+ * Check rate limit for a given key.
+ * @param key      Unique identifier (e.g. IP + route)
+ * @param limit    Max requests per window
+ * @param windowMs Window size in milliseconds
  */
 export function rateLimit(
   key: string,
   limit: number,
-  windowMs: number
-): { ok: true } | { ok: false; retryAfter: number } {
+  windowMs: number,
+): RateLimitResult {
   maybePrune();
-  const now = Date.now();
+  const now  = Date.now();
   const entry = store.get(key);
 
   if (!entry || entry.resetAt < now) {
     store.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true };
+    return { success: true, remaining: limit - 1, resetAt: now + windowMs };
   }
 
   if (entry.count >= limit) {
-    return { ok: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+    return { success: false, remaining: 0, resetAt: entry.resetAt };
   }
 
-  entry.count++;
-  return { ok: true };
+  entry.count += 1;
+  return { success: true, remaining: limit - entry.count, resetAt: entry.resetAt };
 }
 
-/**
- * Get the client IP from a Next.js request, falling back gracefully.
- */
-export function getClientIP(req: Request): string {
-  const headers = req instanceof Request ? req.headers : (req as any).headers;
+/** Extract the best available IP from a Next.js request */
+export function getIP(req: Request): string {
+  const headers = new Headers((req as Request).headers);
   return (
-    headers.get?.('x-forwarded-for')?.split(',')[0]?.trim() ??
-    headers.get?.('x-real-ip') ??
-    'unknown'
-  );
-}
-    headers.get?.('x-real-ip') ??
+    headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    headers.get('x-real-ip') ??
     'unknown'
   );
 }

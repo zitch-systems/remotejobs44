@@ -119,11 +119,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-er />
-          <ModalRoot />
-          <PWAInstall />
-        </ThemeProvider>
-      </body>
-    </html>
-  );
-}

@@ -87,6 +87,3 @@ function mapLevel(title: string): string {
   if (/vp|director|head|chief/.test(t))             return 'executive';
   return 'mid';
 }
- (/director|vp|chief|executive/.test(t))            return 'executive';
-  return 'mid';
-}

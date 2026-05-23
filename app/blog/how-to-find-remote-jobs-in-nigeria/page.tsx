@@ -50,9 +50,3 @@ export default function Post() {
     </div>
   );
 }
-
-        </Link>
-      </div>
-    </div>
-  );
-}

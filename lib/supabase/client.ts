@@ -6,5 +6,3 @@ export function createClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key';
   return createBrowserClient(url, key);
 }
-y);
-}

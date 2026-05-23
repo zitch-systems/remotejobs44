@@ -102,11 +102,3 @@ export default function AdminAnalyticsPage() {
     </div>
   );
 }
-try average is 2–5%. Keep improving your value proposition.`}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

@@ -282,16 +282,3 @@ function PricingContent() {
     </div>
   );
 }
-
-export default function PricingPage() {
-  return (
-    <Suspense fallback={<div className="max-w-[1200px] mx-auto px-5 py-16 animate-pulse"><div className="skeleton h-12 w-64 rounded mx-auto mb-6" /><div className="grid grid-cols-4 gap-5"><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /></div></div>}>
-      <PricingContent />
-    </Suspense>
-  );
-}
-mb-8" /><div className="grid grid-cols-3 gap-6"><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /><div className="skeleton h-96 rounded-xl" /></div></div>}>
-      <PricingContent />
-    </Suspense>
-  );
-}

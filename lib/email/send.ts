@@ -11,37 +11,34 @@ interface SendEmailOptions {
   replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html, replyTo }: SendEmailOptions): Promise<boolean> {
+export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
   if (!RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY not set — email not sent to', to);
+    console.warn('RESEND_API_KEY not set — email not sent');
     return false;
   }
-
   try {
-    const body: Record<string, unknown> = { from: FROM_EMAIL, to, subject, html };
-    if (replyTo) body.reply_to = replyTo;
-
     const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
+      method:  'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
+        'Content-Type':  'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        from:     FROM_EMAIL,
+        to:       [opts.to],
+        subject:  opts.subject,
+        html:     opts.html,
+        reply_to: opts.replyTo,
+      }),
     });
-
     if (!res.ok) {
-      const err = await res.text();
-      console.error('Resend error:', err);
+      const body = await res.text();
+      console.error('Resend error:', res.status, body);
       return false;
     }
     return true;
   } catch (err) {
     console.error('Email send failed:', err);
-    return false;
-  }
-}
-ailed:', err);
     return false;
   }
 }

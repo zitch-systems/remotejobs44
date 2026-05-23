@@ -147,9 +147,3 @@ export default function VCBoardsPage() {
     </div>
   );
 }
- Sequoia, etc. Export portfolio from their sites, then use Bulk Import to add them.</p></div>
-        </div>
-      </div>
-    </div>
-  );
-}

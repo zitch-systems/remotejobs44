@@ -30,7 +30,3 @@ export function CTASection() {
     </section>
   );
 }
-/div>
-    </section>
-  );
-}
