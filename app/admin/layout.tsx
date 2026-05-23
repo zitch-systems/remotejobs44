@@ -34,27 +34,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     let cancelled = false;
+    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
+
     async function check() {
       const supabase = createClient();
       const { data: { user }, error } = await supabase.auth.getUser();
 
-      // Only redirect on a real auth failure — not on network errors
       if (error && (error.status === 401 || error.status === 403)) {
         router.replace('/login?next=/admin'); return;
       }
       if (error) return; // network blip — retry will happen on next render
       if (!user) { router.replace('/login?next=/admin'); return; }
 
-      // Check DB role only — no hardcoded email list
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, name, plan')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const isAdmin = profile?.role === 'admin';
+      // Profile lookup is best-effort (5s cap). On failure, fall back to hardcoded admin list.
+      let profile: { role?: string; name?: string; plan?: string } | null = null;
+      try {
+        const queryPromise = supabase
+          .from('profiles')
+          .select('role, name, plan')
+          .eq('id', user.id)
+          .maybeSingle()
+          .then(({ data }) => data);
+        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+        profile = await Promise.race([queryPromise, timeoutPromise]);
+      } catch {}
 
       if (cancelled) return;
+
+      const isHardcodedAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '');
+      const isAdmin = profile?.role === 'admin' || isHardcodedAdmin;
 
       if (!isAdmin) {
         router.replace('/dashboard');

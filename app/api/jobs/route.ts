@@ -43,7 +43,12 @@ export async function GET(req: NextRequest) {
     }
 
     let query = supabase.from('jobs').select('*', { count: 'exact' }).eq('is_active', true);
-    if (q)        query = query.or(`title.ilike.%${q}%,company.ilike.%${q}%,description.ilike.%${q}%`);
+    if (q) {
+      // Escape characters that have meaning in a PostgREST or() filter list:
+      // commas separate clauses, parentheses group, percent is the ilike wildcard.
+      const safe = q.replace(/[,()%*]/g, ' ').trim().slice(0, 100);
+      if (safe) query = query.or(`title.ilike.%${safe}%,company.ilike.%${safe}%,description.ilike.%${safe}%`);
+    }
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);

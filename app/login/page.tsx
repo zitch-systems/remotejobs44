@@ -55,10 +55,13 @@ function LoginForm() {
     setErrorMsg('');
     setSuccess(false);
 
+    // 15s timer ONLY covers the auth call — profile fetch is best-effort with its own timeout
+    let timedOut = false;
     const timer = setTimeout(() => {
+      timedOut = true;
       setLoading(false);
       setErrorMsg('Request timed out. Check your connection and try again.');
-    }, 10000);
+    }, 15000);
 
     try {
       const supabase = createClient();
@@ -68,8 +71,11 @@ function LoginForm() {
         password,
       });
 
+      // Auth call returned — clear the timer regardless of outcome
+      clearTimeout(timer);
+      if (timedOut) return; // user already saw the timeout message; bail out
+
       if (error) {
-        clearTimeout(timer);
         setLoading(false);
         if (error.message.toLowerCase().includes('email not confirmed')) {
           setErrorMsg('Please confirm your email first — check your inbox.');
@@ -86,24 +92,24 @@ function LoginForm() {
       }
 
       if (!data?.user) {
-        clearTimeout(timer);
         setLoading(false);
         setErrorMsg('Login failed. Please try again.');
         return;
       }
 
-      // Fetch or auto-create profile via API (handles missing profiles gracefully)
+      // Best-effort profile fetch — never blocks login on failure
       let profile: any = null;
       try {
-        const profilePromise = fetch('/api/profile').then(r => r.ok ? r.json() : null);
-        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
-        const result = await Promise.race([profilePromise, timeoutPromise]);
-        if (result?.profile) profile = result.profile;
+        const ctrl = new AbortController();
+        const abortTimer = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch('/api/profile', { signal: ctrl.signal });
+        clearTimeout(abortTimer);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.profile) profile = json.profile;
+        }
       } catch {}
 
-      clearTimeout(timer);
-
-      // Admins always get plan: 'admin' in store
       const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
       const isHardcodedAdmin = ADMIN_EMAILS.includes(data.user.email?.toLowerCase() ?? '');
       const resolvedRole = profile?.role === 'admin' || isHardcodedAdmin ? 'admin' : 'user';
@@ -119,13 +125,12 @@ function LoginForm() {
         profileCompletion: profile?.profile_completion ?? 20,
       });
 
-      setLoading(false);
-      const isAdmin = profile?.role === 'admin';
-      const next = searchParams.get('next') ?? (isAdmin ? '/admin' : '/dashboard');
+      const next = searchParams.get('next') ?? (resolvedRole === 'admin' ? '/admin' : '/dashboard');
       window.location.replace(next);
 
     } catch (err: any) {
       clearTimeout(timer);
+      if (timedOut) return;
       setLoading(false);
       setErrorMsg(err?.message ?? 'An error occurred. Please try again.');
     }
