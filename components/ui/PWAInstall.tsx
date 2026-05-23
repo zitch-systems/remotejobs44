@@ -113,7 +113,7 @@ export function PWAInstall() {
               {[
                 <>Tap the <strong>Share</strong> icon in Safari <span className="opacity-60">(box with ↑)</span></>,
                 <>Scroll down and tap <strong>Add to Home Screen</strong></>,
-                <>Tap <strong>Add</strong> — you're done!</>,
+                <>Tap <strong>Add</strong> — you&apos;re done!</>,
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-stone-600 dark:text-stone-300">
                   <span className="w-5 h-5 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-px">

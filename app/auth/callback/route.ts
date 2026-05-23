@@ -1,19 +1,20 @@
 // app/auth/callback/route.ts
-// Supabase Auth callback handler — required for magic link + OAuth flows
+// Supabase Auth callback handler — required for magic link + OAuth flows.
+// Resolves role server-side and uses the shared destinationForRole() helper so
+// admins always land on /admin and members on /dashboard regardless of `next`.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 import { cookies } from 'next/headers';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code  = searchParams.get('code');
-  const next  = searchParams.get('next') ?? '/dashboard';
+  const next  = searchParams.get('next');
   const error = searchParams.get('error');
 
-  // Handle OAuth/magic-link errors from Supabase
   if (error) {
     console.error('Auth callback error:', error, searchParams.get('error_description'));
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
@@ -33,26 +34,23 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!exchangeError) {
       try {
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (authUser?.email) {
-          // Only send welcome email on first-ever sign-in (not every OAuth login)
-          // Detect first login: created_at and last_sign_in_at are within 30s of each other
-          const createdAt = authUser.created_at ? new Date(authUser.created_at).getTime() : 0;
+          // First-login detection: created_at within 30s of last_sign_in_at
+          const createdAt  = authUser.created_at      ? new Date(authUser.created_at).getTime()      : 0;
           const lastSignIn = authUser.last_sign_in_at ? new Date(authUser.last_sign_in_at).getTime() : 0;
           const isFirstLogin = Math.abs(createdAt - lastSignIn) < 30_000;
 
           if (isFirstLogin) {
             const name = authUser.user_metadata?.name ?? authUser.email.split('@')[0];
             const { subject, html } = welcomeEmail(name);
-            // Fire and forget — don't block redirect
             sendEmail({ to: authUser.email, subject, html }).catch(() => {});
 
-            // Auto-create profile row if it doesn't exist yet (handles missing DB trigger)
             try {
               await supabase.from('profiles').upsert({
                 id:   authUser.id,
@@ -63,27 +61,21 @@ export async function GET(request: NextRequest) {
               }, { onConflict: 'id', ignoreDuplicates: true });
             } catch {}
           }
-        }
 
-        // Redirect admins to admin panel if no explicit next destination
-        if (next === '/dashboard' && authUser) {
-          let isAdmin = isHardcodedAdmin(authUser.email);
-          if (!isAdmin) {
-            const { data: profile } = await supabase
-              .from('profiles').select('role').eq('id', authUser.id).maybeSingle();
-            isAdmin = profile?.role === 'admin';
-          }
-          if (isAdmin) {
-            return NextResponse.redirect(`${origin}/admin`);
-          }
+          const { data: profile } = await supabase
+            .from('profiles').select('role').eq('id', authUser.id).maybeSingle();
+          const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
+          const dest = destinationForRole(role, next);
+          return NextResponse.redirect(`${origin}${dest}`);
         }
       } catch {}
-      return NextResponse.redirect(`${origin}${next}`);
+
+      // Auth succeeded but we couldn't resolve role — fall through to safe default
+      return NextResponse.redirect(`${origin}${destinationForRole('user', next)}`);
     }
 
     console.error('Code exchange error:', exchangeError.message);
   }
 
-  // Fallback — something went wrong
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 }

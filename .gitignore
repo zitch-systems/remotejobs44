@@ -19,6 +19,9 @@ tsconfig.tsbuildinfo
 playwright-report/
 test-results/
 
+# Lighthouse reports
+lighthouse-report.json
+
 # OS files
 .DS_Store
 Thumbs.db

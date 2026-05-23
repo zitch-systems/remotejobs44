@@ -22,6 +22,24 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- Admin check helper — SECURITY DEFINER so it bypasses RLS and avoids
+-- the recursive "policy on profiles queries profiles" trap.
+create or replace function public.is_admin(uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = uid and p.role = 'admin'
+  );
+$$;
+
+revoke all on function public.is_admin(uuid) from public;
+grant execute on function public.is_admin(uuid) to authenticated, service_role;
+
 -- Policies
 drop policy if exists "Users can view own profile"                on public.profiles;
 drop policy if exists "Users can update own profile"              on public.profiles;
@@ -39,21 +57,11 @@ create policy "Users can update own profile"
 
 create policy "Admins can view all profiles"
   on public.profiles for select
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using ( public.is_admin(auth.uid()) );
 
 create policy "Admins can update all profiles"
   on public.profiles for update
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using ( public.is_admin(auth.uid()) );
 
 -- Service role bypass (for API routes using service key)
 create policy "Service role full access to profiles"
@@ -143,12 +151,7 @@ create policy "Jobs are publicly readable"
 
 create policy "Admins can manage jobs"
   on public.jobs for all
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using ( public.is_admin(auth.uid()) );
 
 create policy "Service role full access to jobs"
   on public.jobs for all
@@ -195,12 +198,7 @@ create policy "Users can view own subscription"
 
 create policy "Admins can view all subscriptions"
   on public.subscriptions for select
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using ( public.is_admin(auth.uid()) );
 
 create policy "Service role full access to subscriptions"
   on public.subscriptions for all
@@ -262,16 +260,41 @@ drop policy if exists "Service role full access to job_sources" on public.job_so
 
 create policy "Admins can manage job_sources"
   on public.job_sources for all
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using ( public.is_admin(auth.uid()) );
 
 create policy "Service role full access to job_sources"
   on public.job_sources for all
   using (auth.role() = 'service_role');
+
+
+-- ────────────────────────────────────────────────────────────
+-- 5b. AI PROVIDER CONFIGS — persists API keys/models entered in admin UI
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.ai_provider_configs (
+  provider_id  text primary key,
+  api_key      text,
+  model        text,
+  enabled      boolean not null default false,
+  updated_at   timestamptz not null default now()
+);
+
+alter table public.ai_provider_configs enable row level security;
+
+drop policy if exists "Admins can manage ai_provider_configs"     on public.ai_provider_configs;
+drop policy if exists "Service role full access to ai_provider_configs" on public.ai_provider_configs;
+
+create policy "Admins can manage ai_provider_configs"
+  on public.ai_provider_configs for all
+  using ( public.is_admin(auth.uid()) );
+
+create policy "Service role full access to ai_provider_configs"
+  on public.ai_provider_configs for all
+  using (auth.role() = 'service_role');
+
+drop trigger if exists ai_provider_configs_updated_at on public.ai_provider_configs;
+create trigger ai_provider_configs_updated_at
+  before update on public.ai_provider_configs
+  for each row execute procedure public.set_updated_at();
 
 
 -- ────────────────────────────────────────────────────────────

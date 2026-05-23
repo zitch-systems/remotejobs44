@@ -63,7 +63,7 @@ export function PricingPreview() {
             Flexible plans for everyone
           </h2>
           <p className="text-stone-400 dark:text-stone-500 max-w-md mx-auto text-sm">
-            Start free, upgrade when you're ready. Access from just ₦1,000.
+            Start free, upgrade when you&apos;re ready. Access from just ₦1,000.
           </p>
         </div>
 

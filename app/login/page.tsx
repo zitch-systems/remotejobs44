@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -111,8 +111,15 @@ function LoginForm() {
         }
       } catch {}
 
-      const resolvedRole = (profile?.role === 'admin' || isHardcodedAdmin(data.user.email)) ? 'admin' : 'user';
+      const resolvedRole = resolveRole({ profileRole: profile?.role, email: data.user.email });
       const resolvedPlan = resolvedRole === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+
+      // Wipe persisted client store from any previous user before writing the new one,
+      // so stale role/plan from a different account can't leak through.
+      try {
+        localStorage.removeItem('rj44-auth');
+        localStorage.removeItem('rj44-jobs');
+      } catch {}
 
       setUser({
         id:    data.user.id,
@@ -124,8 +131,8 @@ function LoginForm() {
         profileCompletion: profile?.profile_completion ?? 20,
       });
 
-      const next = searchParams.get('next') ?? (resolvedRole === 'admin' ? '/admin' : '/dashboard');
-      window.location.replace(next);
+      const dest = destinationForRole(resolvedRole, searchParams.get('next'));
+      window.location.replace(dest);
 
     } catch (err: any) {
       clearTimeout(timer);

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Briefcase, BookmarkCheck, FileText, TrendingUp, ArrowRight, Star, Zap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { resolveRole } from '@/lib/auth/redirect';
 import { formatRelativeDate } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -45,8 +45,13 @@ function DashboardContent() {
           profile = await Promise.race([queryPromise, timeoutPromise]);
         } catch {}
 
-        const role = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
-        const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+        const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
+        // Admins shouldn't be on /dashboard — send them to /admin
+        if (role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        const plan = profile?.plan ?? 'free';
 
         setUser({
           id:    authUser.id,

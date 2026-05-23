@@ -174,7 +174,7 @@ export function HeroSection() {
                   <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-white dark:bg-[#0a1628] border-r border-b border-stone-200 dark:border-[#1e3a5f] rotate-45" />
                   <p className="text-xs font-bold text-stone-900 dark:text-stone-100 mb-1">📲 Add to Home Screen</p>
                   <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-                    Tap the <span className="font-bold text-brand-700 dark:text-brand-400">Share</span> button in Safari, then choose <span className="font-bold text-brand-700 dark:text-brand-400">"Add to Home Screen"</span> to install this app.
+                    Tap the <span className="font-bold text-brand-700 dark:text-brand-400">Share</span> button in Safari, then choose <span className="font-bold text-brand-700 dark:text-brand-400">&quot;Add to Home Screen&quot;</span> to install this app.
                   </p>
                 </div>
               )}

@@ -1,69 +1,117 @@
 // app/api/admin/ai-discovery/route.ts
-// Server-side proxy for AI provider calls — keeps API keys off the client
+// Server-side proxy for AI provider calls — keeps API keys off the client and
+// falls back to a server-stored key (ai_provider_configs table) when the
+// client doesn't ship one. Admin-only.
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
-const SYSTEM_PROMPT = `You are a remote job discovery agent. Given a search query, generate a list of realistic, currently-available remote job listings.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-For each job, provide:
-- title: exact job title
-- company: company name (use real companies when possible)
-- location: "Remote" or "Remote - [Region]" or specific city/country
-- type: "full-time" | "part-time" | "contract" | "freelance"
-- category: one of: engineering, design, marketing, finance, sales, data, hr, product, legal, operations, other
-- level: "entry" | "mid" | "senior" | "lead" | "executive"
-- description: 2-3 sentences describing the role
-- applyUrl: realistic job URL (e.g. https://boards.greenhouse.io/company/jobs/12345)
-- salary: optional salary range (e.g. "$80,000 - $120,000/yr")
-- remote: true (MUST be true - only include remote jobs)
+const SYSTEM_PROMPT = `You are a remote job discovery assistant. Given a search query, return a JSON list of plausible currently-open remote job listings that would match the query.
 
-Return ONLY a valid JSON array. No markdown, no explanation. Example:
-[{"title":"Senior React Engineer","company":"Stripe","location":"Remote - Worldwide","type":"full-time","category":"engineering","level":"senior","description":"...","applyUrl":"https://stripe.com/jobs/...","salary":"$160,000-$200,000/yr","remote":true}]
+IMPORTANT: You are generating listings from your knowledge of the job market. Be realistic — use real company names (Stripe, GitLab, Vercel, Cloudflare, HubSpot, Shopify, Zapier, Buffer, Automattic, Doist, Toptal, Linear, Notion, Hashicorp, Datadog, Snowflake, Databricks, Anthropic, OpenAI, etc.) and realistic role titles, salary ranges, and locations. Never invent fictional companies.
 
-CRITICAL: Only include REMOTE jobs. Reject any in-office or hybrid-only positions.`;
+For each job, return:
+- title:       exact role title (e.g. "Senior React Engineer", "Staff Product Designer")
+- company:     real company name
+- location:    "Remote" | "Remote - <Region>" | "<City>, <Country> (Remote)"
+- type:        "full-time" | "part-time" | "contract" | "freelance"
+- category:    one of: engineering, design, marketing, finance, sales, data, hr, product, legal, operations, other
+- level:       "entry" | "mid" | "senior" | "lead" | "executive"
+- description: 2-3 sentences describing the role and required skills
+- applyUrl:    a careers/job-board URL on the company domain (https://...). If unsure of the exact URL, use the company's careers page (https://<company>.com/careers).
+- salary:      optional salary range as a string (e.g. "$120,000 - $160,000/yr" or "Competitive")
+- remote:      always true
+
+CRITICAL RULES:
+1. Only include REMOTE roles. Reject in-office and hybrid-only positions.
+2. Return ONLY valid JSON in this exact shape: {"jobs":[ ... ]}
+3. No markdown fences, no commentary, no explanation — just the JSON object.
+4. Diversify companies and roles within each response (don't return 10 listings from one company).`;
 
 type ProviderRequest = {
   providerId: string;
-  apiKey: string;
-  model: string;
+  apiKey?: string;
+  model?: string;
   query: string;
-  maxJobs: number;
+  maxJobs?: number;
 };
 
-// ─── Provider base URLs ───────────────────────────────────────────────────────
-const PROVIDER_CONFIGS: Record<string, { baseUrl: string; defaultModel: string }> = {
-  claude:   { baseUrl: 'https://api.anthropic.com/v1',                      defaultModel: 'claude-opus-4-6' },
-  openai:   { baseUrl: 'https://api.openai.com/v1',                         defaultModel: 'gpt-4o' },
-  gemini:   { baseUrl: 'https://generativelanguage.googleapis.com/v1beta',   defaultModel: 'gemini-2.0-flash-exp' },
-  groq:     { baseUrl: 'https://api.groq.com/openai/v1',                    defaultModel: 'llama-3.3-70b-versatile' },
-  kimi:     { baseUrl: 'https://api.moonshot.cn/v1',                        defaultModel: 'moonshot-v1-32k' },
-  mistral:  { baseUrl: 'https://api.mistral.ai/v1',                         defaultModel: 'mistral-large-latest' },
-  cohere:   { baseUrl: 'https://api.cohere.ai/v1',                          defaultModel: 'command-r-plus' },
-  together: { baseUrl: 'https://api.together.xyz/v1',                       defaultModel: 'meta-llama/Llama-3-70b-chat-hf' },
+const PROVIDER_CONFIGS: Record<string, { defaultModel: string; baseUrl?: string }> = {
+  claude:   { defaultModel: 'claude-sonnet-4-6' },
+  openai:   { defaultModel: 'gpt-4o-mini',                          baseUrl: 'https://api.openai.com/v1' },
+  gemini:   { defaultModel: 'gemini-1.5-flash' },
+  groq:     { defaultModel: 'llama-3.3-70b-versatile',              baseUrl: 'https://api.groq.com/openai/v1' },
+  kimi:     { defaultModel: 'moonshot-v1-32k',                      baseUrl: 'https://api.moonshot.cn/v1' },
+  mistral:  { defaultModel: 'mistral-large-latest',                 baseUrl: 'https://api.mistral.ai/v1' },
+  cohere:   { defaultModel: 'command-r-plus' },
+  together: { defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', baseUrl: 'https://api.together.xyz/v1' },
 };
 
-// ─── Parse raw text → JSON array ─────────────────────────────────────────────
+async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
+      return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+}
+
+// Look up a saved API key + model for a provider, if any
+async function lookupStoredConfig(providerId: string): Promise<{ apiKey: string | null; model: string | null }> {
+  try {
+    const admin = createAdminSupabaseClient();
+    const { data } = await admin
+      .from('ai_provider_configs')
+      .select('api_key, model')
+      .eq('provider_id', providerId)
+      .maybeSingle();
+    return { apiKey: data?.api_key ?? null, model: data?.model ?? null };
+  } catch {
+    return { apiKey: null, model: null };
+  }
+}
+
+// Parse arbitrary AI text into an array of job objects.
 function extractJSONArray(raw: string): any[] {
-  // Strip markdown code fences if present
-  let text = raw.trim();
+  let text = (raw ?? '').trim();
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
-  // Try direct parse first
+  // Try direct parse
   try {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) return parsed;
-    // Some providers wrap in { jobs: [] }
     if (parsed?.jobs && Array.isArray(parsed.jobs)) return parsed.jobs;
     if (parsed?.results && Array.isArray(parsed.results)) return parsed.results;
+    if (parsed?.data && Array.isArray(parsed.data)) return parsed.data;
   } catch { /* fall through */ }
 
-  // Find first [ ... ] block
+  // Fallback: largest [...] block
   const start = text.indexOf('[');
   const end   = text.lastIndexOf(']');
   if (start !== -1 && end > start) {
     try {
       const arr = JSON.parse(text.slice(start, end + 1));
       if (Array.isArray(arr)) return arr;
-    } catch { /* fall through */ }
+    } catch { /* ignore */ }
+  }
+
+  // Fallback: largest {...} block containing a "jobs" array
+  const oStart = text.indexOf('{');
+  const oEnd   = text.lastIndexOf('}');
+  if (oStart !== -1 && oEnd > oStart) {
+    try {
+      const obj = JSON.parse(text.slice(oStart, oEnd + 1));
+      if (obj?.jobs && Array.isArray(obj.jobs)) return obj.jobs;
+    } catch { /* ignore */ }
   }
 
   return [];
@@ -80,7 +128,7 @@ async function callClaude(apiKey: string, model: string, userMessage: string): P
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -93,25 +141,29 @@ async function callClaude(apiKey: string, model: string, userMessage: string): P
   return data?.content?.[0]?.text ?? '';
 }
 
-// ─── OpenAI-compatible (OpenAI, Groq, Together, Kimi, Mistral) ───────────────
+// ─── OpenAI-compatible (OpenAI, Groq, Together, Kimi, Mistral) ────────────────
 async function callOpenAICompat(
-  baseUrl: string, apiKey: string, model: string, userMessage: string
+  baseUrl: string, apiKey: string, model: string, userMessage: string,
+  supportsJsonMode: boolean,
 ): Promise<string> {
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: 8192,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user',   content: userMessage },
+    ],
+    temperature: 0.6,
+  };
+  if (supportsJsonMode) body.response_format = { type: 'json_object' };
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user',   content: userMessage },
-      ],
-      temperature: 0.7,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -130,7 +182,11 @@ async function callGemini(apiKey: string, model: string, userMessage: string): P
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-      generationConfig: { maxOutputTokens: 4096, temperature: 0.7 },
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.6,
+        responseMimeType: 'application/json',
+      },
     }),
   });
   if (!res.ok) {
@@ -154,7 +210,8 @@ async function callCohere(apiKey: string, model: string, userMessage: string): P
       message: userMessage,
       preamble: SYSTEM_PROMPT,
       max_tokens: 4096,
-      temperature: 0.7,
+      temperature: 0.6,
+      response_format: { type: 'json_object' },
     }),
   });
   if (!res.ok) {
@@ -165,8 +222,15 @@ async function callCohere(apiKey: string, model: string, userMessage: string): P
   return data?.text ?? '';
 }
 
+const VALID_CATEGORIES = new Set(['engineering','design','marketing','finance','sales','data','hr','product','legal','operations','other']);
+const VALID_TYPES      = new Set(['full-time','part-time','contract','freelance','internship']);
+const VALID_LEVELS     = new Set(['entry','mid','senior','lead','executive']);
+
 // ─── Main route handler ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+
   let body: ProviderRequest;
   try {
     body = await req.json();
@@ -174,8 +238,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { providerId, apiKey, model, query, maxJobs = 10 } = body;
-
+  const { providerId, query, maxJobs = 10 } = body;
   if (!providerId || !query) {
     return NextResponse.json({ error: 'providerId and query are required' }, { status: 400 });
   }
@@ -185,34 +248,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Unknown provider: ${providerId}` }, { status: 400 });
   }
 
-  const resolvedModel = model?.trim() || config.defaultModel;
-  const userMessage   = `Search query: "${query}"\n\nGenerate ${maxJobs} remote job listings matching this query. Return only valid JSON array.`;
+  // Resolve API key + model: prefer request body, fall back to stored config
+  const stored = (!body.apiKey || !body.model) ? await lookupStoredConfig(providerId) : { apiKey: null, model: null };
+  const apiKey = body.apiKey?.trim() || stored.apiKey || '';
+  const model  = body.model?.trim()  || stored.model  || config.defaultModel;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: `No API key for ${providerId}. Save one in the Admin → AI Discovery settings.` },
+      { status: 400 }
+    );
+  }
+
+  const capped = Math.min(Math.max(1, Math.floor(maxJobs)), 30);
+  const userMessage =
+    `Search query: "${query}"\n\n` +
+    `Generate ${capped} diverse remote job listings matching this query. ` +
+    `Use REAL company names from your knowledge. ` +
+    `Return ONLY a JSON object of the shape {"jobs": [ ... ]} — no markdown.`;
 
   let rawText = '';
-
   try {
     switch (providerId) {
       case 'claude':
-        rawText = await callClaude(apiKey, resolvedModel, userMessage);
+        rawText = await callClaude(apiKey, model, userMessage);
         break;
-
       case 'gemini':
-        rawText = await callGemini(apiKey, resolvedModel, userMessage);
+        rawText = await callGemini(apiKey, model, userMessage);
         break;
-
       case 'cohere':
-        rawText = await callCohere(apiKey, resolvedModel, userMessage);
+        rawText = await callCohere(apiKey, model, userMessage);
         break;
-
-      // OpenAI-compatible: openai, groq, kimi, mistral, together
       case 'openai':
       case 'groq':
-      case 'kimi':
       case 'mistral':
       case 'together':
-        rawText = await callOpenAICompat(config.baseUrl, apiKey, resolvedModel, userMessage);
+        rawText = await callOpenAICompat(config.baseUrl!, apiKey, model, userMessage, /* json mode */ true);
         break;
-
+      case 'kimi':
+        // Moonshot's OpenAI-compatible endpoint historically lacked response_format support.
+        rawText = await callOpenAICompat(config.baseUrl!, apiKey, model, userMessage, /* json mode */ false);
+        break;
       default:
         return NextResponse.json({ error: `No handler for provider: ${providerId}` }, { status: 400 });
     }
@@ -220,24 +296,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err?.message ?? 'Provider call failed' }, { status: 502 });
   }
 
-  const jobs = extractJSONArray(rawText);
+  const raw = extractJSONArray(rawText);
 
-  // Sanitise & enforce remote flag
-  const sanitised = jobs
-    .filter((j: any) => j && typeof j === 'object')
-    .map((j: any) => ({
-      title:       String(j.title       ?? 'Untitled'),
-      company:     String(j.company     ?? 'Unknown'),
-      location:    String(j.location    ?? 'Remote'),
-      type:        String(j.type        ?? 'full-time'),
-      category:    String(j.category    ?? 'other'),
-      level:       String(j.level       ?? 'mid'),
-      description: String(j.description ?? ''),
-      applyUrl:    String(j.applyUrl    ?? ''),
-      salary:      j.salary ? String(j.salary) : undefined,
-      remote:      true,  // always true — we only want remote
-    }))
-    .slice(0, maxJobs);
+  // Sanitise & validate. Drop entries missing required fields.
+  const sanitised = raw
+    .filter((j: any) => j && typeof j === 'object' && j.title && j.company)
+    .map((j: any) => {
+      const type     = String(j.type     ?? 'full-time').toLowerCase();
+      const category = String(j.category ?? 'other').toLowerCase();
+      const level    = String(j.level    ?? 'mid').toLowerCase();
+      return {
+        title:       String(j.title).slice(0, 200),
+        company:     String(j.company).slice(0, 200),
+        location:    String(j.location ?? 'Remote').slice(0, 200),
+        type:        VALID_TYPES.has(type) ? type : 'full-time',
+        category:    VALID_CATEGORIES.has(category) ? category : 'other',
+        level:       VALID_LEVELS.has(level) ? level : 'mid',
+        description: String(j.description ?? '').slice(0, 4000),
+        applyUrl:    String(j.applyUrl ?? j.url ?? '').slice(0, 500),
+        salary:      j.salary ? String(j.salary).slice(0, 100) : undefined,
+        remote:      true,
+      };
+    })
+    .slice(0, capped);
+
+  if (sanitised.length === 0) {
+    return NextResponse.json({
+      jobs: [],
+      warning: 'Provider returned no valid jobs. The model may have replied in an unexpected format.',
+    });
+  }
 
   return NextResponse.json({ jobs: sanitised });
 }

@@ -1,7 +1,7 @@
 'use client';
 // app/admin/ai-discovery/page.tsx
 // AI-powered remote job discovery — uses 8 AI providers to search, scrape & save
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Brain, Sparkles, Search, Play, Square, RefreshCw, Save, Trash2,
   ChevronDown, ChevronRight, CheckCircle, XCircle, AlertCircle,
@@ -64,14 +64,14 @@ type RunStatus = 'idle' | 'running' | 'paused' | 'done' | 'error';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROVIDERS: AIProvider[] = [
-  { id: 'claude',   name: 'Claude (Anthropic)', logo: '🤖', color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800',   baseUrl: 'https://api.anthropic.com/v1',          model: 'claude-opus-4-6',        free: false, docs: 'https://docs.anthropic.com' },
-  { id: 'openai',   name: 'ChatGPT (OpenAI)',   logo: '💬', color: 'text-green-600 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800',       baseUrl: 'https://api.openai.com/v1',             model: 'gpt-4o',                 free: false, docs: 'https://platform.openai.com' },
-  { id: 'gemini',   name: 'Gemini (Google)',    logo: '✨', color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800',           baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash-exp', free: true,  docs: 'https://ai.google.dev' },
-  { id: 'groq',     name: 'Groq (LPU)',         logo: '⚡', color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800', baseUrl: 'https://api.groq.com/openai/v1',        model: 'llama-3.3-70b-versatile',free: true,  docs: 'https://console.groq.com' },
-  { id: 'kimi',     name: 'Kimi (Moonshot)',    logo: '🌙', color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800', baseUrl: 'https://api.moonshot.cn/v1',            model: 'moonshot-v1-32k',        free: false, docs: 'https://platform.moonshot.cn' },
-  { id: 'mistral',  name: 'Mistral AI',         logo: '🌊', color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800',           baseUrl: 'https://api.mistral.ai/v1',             model: 'mistral-large-latest',   free: false, docs: 'https://docs.mistral.ai' },
-  { id: 'cohere',   name: 'Cohere',             logo: '🔗', color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800',           baseUrl: 'https://api.cohere.ai/v1',              model: 'command-r-plus',         free: true,  docs: 'https://docs.cohere.com' },
-  { id: 'together', name: 'Together AI',        logo: '🤝', color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800',           baseUrl: 'https://api.together.xyz/v1',           model: 'meta-llama/Llama-3-70b-chat-hf', free: true, docs: 'https://api.together.ai' },
+  { id: 'claude',   name: 'Claude (Anthropic)', logo: '🤖', color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800',   baseUrl: 'https://api.anthropic.com/v1',          model: 'claude-sonnet-4-6',                  free: false, docs: 'https://docs.anthropic.com' },
+  { id: 'openai',   name: 'ChatGPT (OpenAI)',   logo: '💬', color: 'text-green-600 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800',       baseUrl: 'https://api.openai.com/v1',             model: 'gpt-4o-mini',                        free: false, docs: 'https://platform.openai.com' },
+  { id: 'gemini',   name: 'Gemini (Google)',    logo: '✨', color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800',           baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-1.5-flash',         free: true,  docs: 'https://ai.google.dev' },
+  { id: 'groq',     name: 'Groq (LPU)',         logo: '⚡', color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800', baseUrl: 'https://api.groq.com/openai/v1',        model: 'llama-3.3-70b-versatile',            free: true,  docs: 'https://console.groq.com' },
+  { id: 'kimi',     name: 'Kimi (Moonshot)',    logo: '🌙', color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800', baseUrl: 'https://api.moonshot.cn/v1',            model: 'moonshot-v1-32k',                    free: false, docs: 'https://platform.moonshot.cn' },
+  { id: 'mistral',  name: 'Mistral AI',         logo: '🌊', color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800',           baseUrl: 'https://api.mistral.ai/v1',             model: 'mistral-large-latest',               free: false, docs: 'https://docs.mistral.ai' },
+  { id: 'cohere',   name: 'Cohere',             logo: '🔗', color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800',           baseUrl: 'https://api.cohere.ai/v1',              model: 'command-r-plus',                     free: true,  docs: 'https://docs.cohere.com' },
+  { id: 'together', name: 'Together AI',        logo: '🤝', color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800',           baseUrl: 'https://api.together.xyz/v1',           model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', free: true, docs: 'https://api.together.ai' },
 ];
 
 const JOB_CATEGORIES = ['engineering','design','marketing','finance','sales','data','hr','product','legal','operations','other'];
@@ -156,6 +156,62 @@ export default function AIDiscoveryPage() {
     Object.fromEntries(PROVIDERS.map(p => [p.id, { apiKey: '', enabled: false, model: p.model }]))
   );
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [configsLoaded, setConfigsLoaded] = useState(false);
+  const [savedStatus, setSavedStatus] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
+
+  // Load saved configs on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/ai-discovery/settings');
+        if (!res.ok) { setConfigsLoaded(true); return; }
+        const data = await res.json();
+        if (cancelled) return;
+        if (Array.isArray(data.configs) && data.configs.length > 0) {
+          setConfigs(prev => {
+            const next = { ...prev };
+            for (const row of data.configs) {
+              const id = row.provider_id;
+              if (!next[id]) continue;
+              next[id] = {
+                apiKey:  row.api_key ?? '',
+                enabled: !!row.enabled && !!row.api_key,
+                model:   row.model ?? next[id].model,
+              };
+            }
+            return next;
+          });
+        }
+      } catch {} finally {
+        if (!cancelled) setConfigsLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Debounced server save when a provider's config changes
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  function persistConfig(providerId: string, partial: Partial<ProviderConfig>) {
+    if (!configsLoaded) return; // don't write during initial hydrate
+    if (saveTimers.current[providerId]) clearTimeout(saveTimers.current[providerId]);
+    setSavedStatus(prev => ({ ...prev, [providerId]: 'saving' }));
+    saveTimers.current[providerId] = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/admin/ai-discovery/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerId, ...partial }),
+        });
+        setSavedStatus(prev => ({ ...prev, [providerId]: res.ok ? 'saved' : 'error' }));
+        if (res.ok) {
+          setTimeout(() => setSavedStatus(prev => ({ ...prev, [providerId]: 'idle' })), 1500);
+        }
+      } catch {
+        setSavedStatus(prev => ({ ...prev, [providerId]: 'error' }));
+      }
+    }, 600);
+  }
 
   // Search config
   const [searchConfig, setSearchConfig] = useState<SearchConfig>({
@@ -190,6 +246,7 @@ export default function AIDiscoveryPage() {
 
   function updateConfig(id: string, patch: Partial<ProviderConfig>) {
     setConfigs(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+    persistConfig(id, patch);
   }
 
   function toggleKey(id: string) {
@@ -494,7 +551,16 @@ export default function AIDiscoveryPage() {
                       </div>
                       <p className="text-xs text-stone-400 font-mono">{cfg.model || provider.model}</p>
                     </div>
-                    {/* Enable toggle */}
+                    {/* Save indicator + Enable toggle */}
+                    {savedStatus[provider.id] === 'saving' && (
+                      <Loader2 className="w-3.5 h-3.5 text-stone-400 animate-spin shrink-0" aria-label="Saving" />
+                    )}
+                    {savedStatus[provider.id] === 'saved' && (
+                      <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" aria-label="Saved" />
+                    )}
+                    {savedStatus[provider.id] === 'error' && (
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" aria-label="Save failed" />
+                    )}
                     <button
                       onClick={() => updateConfig(provider.id, { enabled: !cfg.enabled })}
                       disabled={!cfg.apiKey}

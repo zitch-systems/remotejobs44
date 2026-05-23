@@ -6,12 +6,13 @@ test.describe('Navigation & Layout', () => {
     await expect(page.locator('header')).toBeVisible();
   });
 
-  test('logo links to homepage', async ({ page }) => {
+  test('logo links to homepage', async ({ page, baseURL }) => {
     await page.goto('/jobs');
     const logo = page.locator('header').getByRole('link', { name: /RemoteJobs44/i }).first();
     if (await logo.isVisible()) {
       await logo.click();
-      await expect(page).toHaveURL(/^https:\/\/remotejobs44\.com\/?$/);
+      // Match the base URL the test is running against, not just production
+      await expect(page).toHaveURL(new RegExp(`^${baseURL?.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}/?$`));
     }
   });
 
@@ -43,7 +44,8 @@ test.describe('Navigation & Layout', () => {
 
   test('footer links navigate correctly', async ({ page }) => {
     await page.goto('/');
-    const privacyLink = page.locator('footer').getByRole('link', { name: /privacy/i });
+    // Footer may render multiple privacy links (e.g. "Privacy Policy" + "Privacy"); take the first.
+    const privacyLink = page.locator('footer a[href="/privacy"]').first();
     if (await privacyLink.isVisible()) {
       await privacyLink.click();
       await expect(page).toHaveURL(/privacy/);

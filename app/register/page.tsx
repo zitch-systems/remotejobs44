@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, UserPlus, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { useUIStore } from '@/lib/store';
+import { useUIStore, useAuthStore } from '@/lib/store';
+import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 
 function StrengthBar({ password }: { password: string }) {
   const checks = [
@@ -37,6 +38,7 @@ export default function RegisterPage() {
   const router   = useRouter();
   const supabase = createClient();
   const { toast } = useUIStore();
+  const { setUser } = useAuthStore();
 
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
@@ -51,8 +53,8 @@ export default function RegisterPage() {
     if (password.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
       password,
       options: {
         data: { name },
@@ -66,6 +68,40 @@ export default function RegisterPage() {
       return;
     }
 
+    // Auto-confirm path: Supabase returns a session immediately. We need to
+    // hit /api/profile so the profile row + welcome email get created, then
+    // route to /admin or /dashboard based on role.
+    if (data.session && data.user) {
+      let profile: any = null;
+      try {
+        const res = await fetch('/api/profile');
+        if (res.ok) profile = (await res.json())?.profile ?? null;
+      } catch {}
+
+      const role = resolveRole({ profileRole: profile?.role, email: data.user.email });
+
+      // Wipe any leftover persisted store from a different account
+      try {
+        localStorage.removeItem('rj44-auth');
+        localStorage.removeItem('rj44-jobs');
+      } catch {}
+
+      setUser({
+        id:    data.user.id,
+        email: data.user.email!,
+        name:  profile?.name ?? name,
+        plan:  role === 'admin' ? 'admin' : (profile?.plan ?? 'free'),
+        role,
+        joinedAt: profile?.created_at ?? new Date().toISOString(),
+        profileCompletion: profile?.profile_completion ?? 20,
+      });
+
+      toast('Welcome to RemoteJobs44! 🎉', 'success', 4000);
+      window.location.replace(destinationForRole(role, null));
+      return;
+    }
+
+    // Confirmation-required path: Supabase will send its own confirmation link.
     toast('Account created! Check your email to confirm.', 'success', 6000);
     router.push('/login?registered=1');
   }

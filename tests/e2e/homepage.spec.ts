@@ -43,8 +43,8 @@ test.describe('Homepage', () => {
     await page.goto('/');
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
-    await expect(footer.getByRole('link', { name: /privacy/i })).toBeVisible();
-    await expect(footer.getByRole('link', { name: /terms/i })).toBeVisible();
+    await expect(footer.locator('a[href="/privacy"]').first()).toBeVisible();
+    await expect(footer.locator('a[href="/terms"]').first()).toBeVisible();
   });
 
   test('dark mode toggle works', async ({ page }) => {

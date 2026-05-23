@@ -1,8 +1,12 @@
 // app/api/profile/route.ts — Get and upsert the current user's profile
-// Called on login to ensure the profile row always exists
+// Called on login to ensure the profile row always exists.
+// Also sends the welcome email on first profile creation, since Supabase's
+// "auto-confirm signups" setting bypasses our /auth/callback handler.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { sendEmail } from '@/lib/email/send';
+import { welcomeEmail } from '@/lib/email/templates';
 
 // GET /api/profile — Fetch current user's profile (creates if missing)
 export async function GET() {
@@ -39,12 +43,24 @@ export async function GET() {
       .upsert({
         id:                 user.id,
         name:               name,
+        email:              user.email,
         plan:               isAdmin ? 'admin' : 'free',
         role:               isAdmin ? 'admin' : 'user',
         profile_completion: 20,
       }, { onConflict: 'id' })
       .select()
       .single();
+
+    // First profile creation — fire-and-forget welcome email.
+    // We hit this path on first login regardless of whether Supabase email
+    // confirmation is on or off, so it covers the auto-confirm signup flow
+    // where /auth/callback is never reached.
+    if (!insertError && user.email) {
+      const { subject, html } = welcomeEmail(name);
+      sendEmail({ to: user.email, subject, html }).catch(err =>
+        console.error('[welcome email]', err)
+      );
+    }
 
     if (insertError) {
       console.error('[GET /api/profile] insert error:', insertError.message);
