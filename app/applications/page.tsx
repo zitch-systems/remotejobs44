@@ -23,10 +23,18 @@ function ApplicationsContent() {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+    let cancelled = false;
+    Promise.race([
+      supabase.auth.getUser(),
+      new Promise<null>(res => setTimeout(() => res(null), 6000)),
+    ]).then(result => {
+      if (cancelled) return;
+      if (!result) { setChecked(true); return; } // timeout — show page (UI uses zustand-backed applications)
+      const authUser = result.data?.user;
       if (!authUser) { router.replace('/login?next=/applications'); return; }
       setChecked(true);
     });
+    return () => { cancelled = true; };
   }, []);
 
   if (!checked) return (

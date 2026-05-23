@@ -23,8 +23,12 @@ function DashboardContent() {
   useEffect(() => {
     async function loadSession() {
       try {
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        // Only redirect on a real 401 — not on network errors or timeouts
+        const userRace = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<null>(res => setTimeout(() => res(null), 6000)),
+        ]);
+        if (!userRace) { setLoading(false); return; }
+        const { data: { user: authUser }, error } = userRace;
         if (error?.status === 401 || error?.status === 403) {
           router.replace('/login?next=/dashboard'); return;
         }
@@ -33,9 +37,11 @@ function DashboardContent() {
 
         let profile: any = null;
         try {
-          const { data } = await supabase
-            .from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-          profile = data;
+          const queryPromise = supabase
+            .from('profiles').select('*').eq('id', authUser.id).maybeSingle()
+            .then(({ data }) => data);
+          const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+          profile = await Promise.race([queryPromise, timeoutPromise]);
         } catch {}
 
         setUser({

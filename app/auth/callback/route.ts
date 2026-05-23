@@ -66,9 +66,15 @@ export async function GET(request: NextRequest) {
 
         // Redirect admins to admin panel if no explicit next destination
         if (next === '/dashboard' && authUser) {
-          const { data: profile } = await supabase
-            .from('profiles').select('role').eq('id', authUser.id).maybeSingle();
-          if (profile?.role === 'admin') {
+          const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
+          const isHardcodedAdmin = ADMIN_EMAILS.includes(authUser.email?.toLowerCase() ?? '');
+          let isAdmin = isHardcodedAdmin;
+          if (!isAdmin) {
+            const { data: profile } = await supabase
+              .from('profiles').select('role').eq('id', authUser.id).maybeSingle();
+            isAdmin = profile?.role === 'admin';
+          }
+          if (isAdmin) {
             return NextResponse.redirect(`${origin}/admin`);
           }
         }

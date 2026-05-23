@@ -20,20 +20,42 @@ function ProfileContent() {
   const [cvUrl,      setCvUrl]      = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
-      const { data: { user: authUser }, error } = await supabase.auth.getUser();
+      const userRace = await Promise.race([
+        supabase.auth.getUser(),
+        new Promise<null>(res => setTimeout(() => res(null), 6000)),
+      ]);
+      if (cancelled) return;
+      if (!userRace) { setLoading(false); return; } // network timeout — stay on page
+      const { data: { user: authUser }, error } = userRace;
       if (error?.status === 401 || error?.status === 403) { router.replace('/login?next=/profile'); return; }
       if (error) { setLoading(false); return; } // network blip — stay on page
       if (!authUser) { router.replace('/login?next=/profile'); return; }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+
+      let profile: any = null;
+      try {
+        const queryPromise = supabase
+          .from('profiles').select('*').eq('id', authUser.id).maybeSingle()
+          .then(({ data }) => data);
+        const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
+        profile = await Promise.race([queryPromise, timeoutPromise]);
+      } catch {}
+      if (cancelled) return;
+
       if (profile) {
         setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan: profile.plan ?? 'free', role: profile.role ?? 'user', joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
-        setCvUrl((profile as any).cv_url ?? null);
+        setCvUrl(profile.cv_url ?? null);
+      } else {
+        // Profile fetch failed/timed out — still render the page with what we have from auth
+        setUser({ id: authUser.id, email: authUser.email!, name: authUser.email!.split('@')[0], plan: 'free', role: 'user', joinedAt: new Date().toISOString(), profileCompletion: 20 });
+        setName(authUser.email!.split('@')[0]);
       }
       setLoading(false);
     }
     load();
+    return () => { cancelled = true; };
   }, []);
 
   async function handleSave(e: React.FormEvent) {
