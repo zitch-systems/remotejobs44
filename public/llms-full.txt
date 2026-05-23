@@ -1,0 +1,60 @@
+# RemoteJobs44 — Full Reference
+
+## Company overview
+
+RemoteJobs44 is a remote job board built specifically for African job seekers, with particular focus on Nigeria. Founded to bridge the gap between global companies posting remote roles and African talent seeking legitimate remote work.
+
+URL: https://remotejobs44.com
+Contact: hello@remotejobs44.com
+
+## Product description
+
+The platform aggregates remote job listings from major Applicant Tracking Systems (ATS) including Greenhouse, Lever, Ashby, Workable, and Recruitee. Jobs span all categories relevant to remote work.
+
+## Job categories available
+
+- Engineering & Development (software, mobile, backend, frontend, full-stack, DevOps, QA)
+- Design & Creative (UI/UX, graphic design, product design, motion)
+- Marketing (digital marketing, SEO, content, social media, growth)
+- Finance & Accounting (accounting, bookkeeping, financial analysis, CFO roles)
+- Sales & Business Development
+- Customer Support & Success
+- Writing & Content
+- Data & Analytics
+- Product Management
+- Operations & HR
+- Education & Tutoring
+- Legal & Compliance
+
+## Geographic coverage
+
+Jobs are remote-friendly worldwide but the platform specifically highlights opportunities open to African applicants. Region filter options include: Nigeria, Ghana, Kenya, South Africa, Africa-wide, Europe, UK, US, Canada, LATAM, Asia, Worldwide.
+
+## Pricing (as of 2025)
+
+All prices in Nigerian Naira (₦):
+- Free plan: Browse all jobs, save favourites — ₦0
+- Pro Monthly: Unlimited applications, application tracker — ₦1,000/month
+- Pro Annual: Same as monthly, billed yearly — ₦8,000/year (save 33%)
+- Day Pass: 10 applications valid 24 hours — ₦500
+
+Payment processed via Paystack (supports Nigerian bank cards, USSD, bank transfer).
+
+## Technical stack
+
+- Next.js 14 (App Router)
+- Supabase (PostgreSQL database + Auth)
+- Tailwind CSS
+- Deployed on Vercel
+- Domain: remotejobs44.com
+
+## Sitemap
+
+- Homepage: https://remotejobs44.com
+- All Jobs: https://remotejobs44.com/jobs
+- Pricing: https://remotejobs44.com/pricing
+- About: https://remotejobs44.com/about
+- Blog: https://remotejobs44.com/blog
+- Contact: https://remotejobs44.com/contact
+- Login: https://remotejobs44.com/login
+- Register: https://remotejobs44.com/register

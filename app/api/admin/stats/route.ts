@@ -1,0 +1,49 @@
+// app/api/admin/stats/route.ts — Real admin stats from Supabase
+import { NextResponse } from 'next/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+
+export const revalidate = 30;
+
+export async function GET() {
+  try {
+    // Verify admin
+    const supabase = createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
+    if (profile?.role !== 'admin' && !ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const admin = createAdminSupabaseClient();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const [
+      { count: totalJobs },
+      { count: newToday },
+      { count: activeUsers },
+      { count: subscriptions },
+      { count: sources },
+    ] = await Promise.all([
+      admin.from('jobs').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      admin.from('jobs').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+      admin.from('profiles').select('*', { count: 'exact', head: true }),
+      admin.from('profiles').select('*', { count: 'exact', head: true }).in('plan', ['pro', 'daily', 'admin']),
+      admin.from('job_sources').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    ]);
+
+    return NextResponse.json({
+      totalJobs:     totalJobs ?? 0,
+      newToday:      newToday  ?? 0,
+      activeUsers:   activeUsers ?? 0,
+      subscriptions: subscriptions ?? 0,
+      sources:       sources ?? 0,
+      revenue:       0, // Revenue data comes from Paystack webhooks
+    });
+  } catch (err: any) {
+    console.error('[admin/stats]', err);
+    return NextResponse.json({ totalJobs: 0, newToday: 0, activeUsers: 0, subscriptions: 0, sources: 0, revenue: 0 });
+  }
+}

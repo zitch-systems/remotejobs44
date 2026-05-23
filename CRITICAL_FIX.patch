@@ -1,0 +1,890 @@
+From ec05f7d63522dd789abbd36d1db10ddd50e0b703 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Fri, 22 May 2026 19:43:19 +0000
+Subject: [PATCH] fix: remove misplaced root tsx files causing build failures
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Deleted files that Claude Code placed in wrong locations:
+- CTASection.tsx (root) → should be components/home/
+- HeroSection.tsx (root) → should be components/home/
+- HowItWorks.tsx (root) → should be components/home/
+- PricingPreview.tsx (root) → should be components/home/
+- page.tsx (root) → was duplicate of app/login/page.tsx
+- components/Header.tsx → duplicate of components/layout/Header.tsx
+- components/ThemeProvider.tsx → duplicate of components/providers/
+- app/auth/callback/middleware.ts → wrong location
+
+These files caused TypeScript to fail silently, preventing Vercel from
+deploying the fixed admin/login/paystack/logout code.
+---
+ CTASection.tsx                  |  32 -----
+ HeroSection.tsx                 | 114 ---------------
+ HowItWorks.tsx                  |  51 -------
+ PricingPreview.tsx              | 151 -------------------
+ app/auth/callback/middleware.ts |  40 ------
+ components/Header.tsx           | 248 --------------------------------
+ components/ThemeProvider.tsx    |   3 -
+ page.tsx                        | 161 ---------------------
+ 8 files changed, 800 deletions(-)
+ delete mode 100644 CTASection.tsx
+ delete mode 100644 HeroSection.tsx
+ delete mode 100644 HowItWorks.tsx
+ delete mode 100644 PricingPreview.tsx
+ delete mode 100644 app/auth/callback/middleware.ts
+ delete mode 100644 components/Header.tsx
+ delete mode 100644 components/ThemeProvider.tsx
+ delete mode 100644 page.tsx
+
+diff --git a/CTASection.tsx b/CTASection.tsx
+deleted file mode 100644
+index 0186d13..0000000
+--- a/CTASection.tsx
++++ /dev/null
+@@ -1,32 +0,0 @@
+-// components/home/CTASection.tsx — pure server component
+-import Link from 'next/link';
+-
+-export function CTASection() {
+-  return (
+-    <section className="py-24 bg-brand-700 dark:bg-[#042314] relative overflow-hidden">
+-      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,255,255,0.05), transparent)' }} />
+-      <div className="max-w-[700px] mx-auto px-5 text-center relative">
+-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-xs font-bold uppercase tracking-widest text-white/80 mb-6">
+-          🚀 Join 5,000+ job seekers
+-        </div>
+-        <h2 className="font-display font-extrabold text-white tracking-tight mb-4 leading-tight"
+-          style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)' }}>
+-          Your remote career<br />is one click away
+-        </h2>
+-        <p className="text-brand-200 mb-10 text-base max-w-md mx-auto leading-relaxed">
+-          Browse free. Get full access from ₦1,000. Work from anywhere in the world.
+-        </p>
+-        <div className="flex gap-4 justify-center flex-wrap">
+-          <Link href="/jobs"
+-            className="px-8 py-4 bg-white text-brand-700 font-bold rounded-xl hover:bg-brand-50 transition-colors text-base shadow-sm">
+-            Browse Jobs
+-          </Link>
+-          <Link href="/register"
+-            className="px-8 py-4 border-2 border-white/40 text-white font-bold rounded-xl hover:border-white/70 hover:bg-white/5 transition-colors text-base">
+-            Get Started Free
+-          </Link>
+-        </div>
+-      </div>
+-    </section>
+-  );
+-}
+diff --git a/HeroSection.tsx b/HeroSection.tsx
+deleted file mode 100644
+index 161400b..0000000
+--- a/HeroSection.tsx
++++ /dev/null
+@@ -1,114 +0,0 @@
+-'use client';
+-// components/home/HeroSection.tsx
+-import Link from 'next/link';
+-import { Search } from 'lucide-react';
+-import { useState } from 'react';
+-import { useRouter } from 'next/navigation';
+-
+-const STATS = [
+-  { value: '50,000+', label: 'Active Jobs'  },
+-  { value: '8,000+',  label: 'Companies'    },
+-  { value: '190+',    label: 'Countries'    },
+-];
+-
+-const POPULAR_SEARCHES = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps'];
+-
+-export function HeroSection() {
+-  const router  = useRouter();
+-  const [q, setQ] = useState('');
+-
+-  function search(term?: string) {
+-    const val = (term ?? q).trim();
+-    router.push(val ? `/jobs?q=${encodeURIComponent(val)}` : '/jobs');
+-  }
+-
+-  return (
+-    <section className="relative overflow-hidden pt-20 pb-16" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(10,92,54,0.09), transparent 70%)' }}>
+-      <div className="max-w-[1240px] mx-auto px-5 flex flex-col items-center text-center gap-7">
+-
+-        {/* Eyebrow */}
+-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest"
+-          style={{ background: 'rgba(10,92,54,0.06)', borderColor: 'rgba(10,92,54,0.2)', color: '#0a5c36' }}>
+-          🌍 50,000+ remote jobs worldwide
+-        </div>
+-
+-        {/* Headline */}
+-        <h1 className="font-display font-extrabold tracking-tight text-stone-900 dark:text-stone-100"
+-          style={{ fontSize: 'clamp(2rem, 6.5vw, 3.75rem)', lineHeight: 1.08, maxWidth: '900px' }}>
+-          Your next remote job<br />
+-          <span className="relative inline-block text-brand-700 dark:text-brand-400">
+-            starts here
+-            <span className="absolute bottom-0 left-0 right-0 rounded-full" style={{ height: 3, background: 'currentColor', opacity: 0.3 }} />
+-          </span>
+-        </h1>
+-
+-        <p className="text-stone-500 dark:text-stone-400 max-w-lg leading-relaxed"
+-          style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)' }}>
+-          Connect with top companies hiring remotely. Apply from anywhere in the world.
+-          Full access from just{' '}
+-          <span className="font-semibold text-brand-700 dark:text-brand-400">₦1,000</span>.
+-        </p>
+-
+-        {/* Search */}
+-        <div className="w-full max-w-2xl">
+-          <div className="flex flex-col gap-2 p-2 bg-white dark:bg-[#152B20] rounded-2xl border border-stone-200 dark:border-[#234533]"
+-            style={{ boxShadow: '0 4px 16px rgba(10,92,54,0.10)' }}>
+-            <div className="flex items-center gap-3 px-3">
+-              <Search className="w-4 h-4 text-stone-400 shrink-0" />
+-              <input
+-                type="text"
+-                value={q}
+-                onChange={(e) => setQ(e.target.value)}
+-                onKeyDown={(e) => e.key === 'Enter' && search()}
+-                placeholder="Job title, skill, or company…"
+-                className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 py-2"
+-              />
+-            </div>
+-            <button
+-              onClick={() => search()}
+-              className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-xl hover:bg-brand-600 dark:hover:bg-brand-400 transition-colors"
+-            >
+-              <Search className="w-4 h-4" /> Search Jobs
+-            </button>
+-          </div>
+-
+-          {/* Popular */}
+-          <div className="flex items-center gap-2 mt-3 flex-wrap justify-center">
+-            <span className="text-xs text-stone-400 dark:text-stone-500">Popular:</span>
+-            {POPULAR_SEARCHES.map((term) => (
+-              <button
+-                key={term}
+-                onClick={() => search(term)}
+-                className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-[#1C3829] text-stone-500 dark:text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+-              >
+-                {term}
+-              </button>
+-            ))}
+-          </div>
+-        </div>
+-
+-        {/* CTA row */}
+-        <div className="flex gap-3 flex-wrap justify-center">
+-          <Link href="/jobs"
+-            className="px-8 py-4 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 dark:hover:bg-brand-400 transition-colors text-base">
+-            Browse Jobs
+-          </Link>
+-          <Link href="/pricing"
+-            className="px-8 py-4 border border-stone-200 dark:border-[#234533] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors text-base">
+-            See Plans
+-          </Link>
+-        </div>
+-
+-        {/* Stats */}
+-        <div className="flex items-center justify-center gap-10 flex-wrap pt-6 border-t border-stone-200 dark:border-[#234533] w-full max-w-lg">
+-          {STATS.map((s) => (
+-            <div key={s.label} className="text-center">
+-              <div className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">{s.value}</div>
+-              <div className="text-xs font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-500 mt-1">{s.label}</div>
+-            </div>
+-          ))}
+-        </div>
+-      </div>
+-    </section>
+-  );
+-}
+diff --git a/HowItWorks.tsx b/HowItWorks.tsx
+deleted file mode 100644
+index ad9e788..0000000
+--- a/HowItWorks.tsx
++++ /dev/null
+@@ -1,51 +0,0 @@
+-// components/home/HowItWorks.tsx — pure server component, zero deps
+-export function HowItWorks() {
+-  const steps = [
+-    {
+-      num: '01',
+-      emoji: '🔍',
+-      title: 'Browse jobs',
+-      desc: 'Search 50,000+ remote jobs. Filter by role, level, salary, and location. Free forever.',
+-    },
+-    {
+-      num: '02',
+-      emoji: '💳',
+-      title: 'Unlock access',
+-      desc: 'Start with a ₦1,000 Day Pass or go Pro at ₦8,999/month. Instantly unlock every apply link and email.',
+-    },
+-    {
+-      num: '03',
+-      emoji: '⚡',
+-      title: 'Apply & track',
+-      desc: 'One-click apply with your saved CV. Track every application from sent to offer in your dashboard.',
+-    },
+-  ];
+-
+-  return (
+-    <section className="py-20 bg-white dark:bg-[#0D1F18]">
+-      <div className="max-w-[1240px] mx-auto px-5">
+-        <div className="text-center mb-14">
+-          <h2 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">
+-            How it works
+-          </h2>
+-          <p className="text-stone-400 dark:text-stone-500 max-w-sm mx-auto text-sm">
+-            From browsing to offer letter in three simple steps
+-          </p>
+-        </div>
+-
+-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+-          {steps.map((s) => (
+-            <div key={s.num} className="flex flex-col items-center text-center">
+-              <div className="w-20 h-20 rounded-2xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 flex flex-col items-center justify-center mb-5">
+-                <span className="text-2xl">{s.emoji}</span>
+-                <span className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-1">{s.num}</span>
+-              </div>
+-              <h3 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">{s.title}</h3>
+-              <p className="text-sm text-stone-400 dark:text-stone-500 leading-relaxed max-w-xs">{s.desc}</p>
+-            </div>
+-          ))}
+-        </div>
+-      </div>
+-    </section>
+-  );
+-}
+diff --git a/PricingPreview.tsx b/PricingPreview.tsx
+deleted file mode 100644
+index a0753d9..0000000
+--- a/PricingPreview.tsx
++++ /dev/null
+@@ -1,151 +0,0 @@
+-'use client';
+-// components/home/PricingPreview.tsx
+-import Link from 'next/link';
+-import { Check } from 'lucide-react';
+-import { usePaystack } from '@/hooks/usePaystack';
+-import { useAuthStore } from '@/lib/store';
+-
+-const PLANS = [
+-  {
+-    id:        'daily'      as const,
+-    name:      'Day Pass',
+-    price:     '₦1,000',
+-    period:    '/ 24 hours',
+-    desc:      'Full access for a day. Great for an active job hunt.',
+-    features:  ['All apply links & emails', 'CV auto-apply', 'Application tracker', '24-hour access'],
+-    cta:       'Get Day Pass',
+-    highlight: false,
+-    badge:     null as string | null,
+-  },
+-  {
+-    id:        'pro'        as const,
+-    name:      'Pro Monthly',
+-    price:     '₦8,999',
+-    period:    '/ month',
+-    desc:      'Unlimited access, ongoing alerts, and priority support.',
+-    features:  ['Everything in Day Pass', 'Ongoing job alerts', 'Priority support', 'Cancel anytime'],
+-    cta:       'Get Pro',
+-    highlight: true,
+-    badge:     'Most Popular' as string | null,
+-  },
+-  {
+-    id:        'pro_annual' as const,
+-    name:      'Pro Annual',
+-    price:     '₦89,999',
+-    period:    '/ year',
+-    desc:      'Best value — save ₦17,989 vs monthly.',
+-    features:  ['Everything in Pro Monthly', 'Save ₦17,989/yr', 'Early feature access', 'Priority support'],
+-    cta:       'Get Annual',
+-    highlight: false,
+-    badge:     'Best Value' as string | null,
+-  },
+-];
+-
+-export function PricingPreview() {
+-  const { pay, loading } = usePaystack();
+-  const { isLoggedIn }   = useAuthStore();
+-
+-  async function handlePay(planId: 'daily' | 'pro' | 'pro_annual') {
+-    if (!isLoggedIn()) {
+-      window.location.href = '/register';
+-      return;
+-    }
+-    await pay({ plan: planId });
+-  }
+-
+-  return (
+-    <section className="py-20 bg-stone-50 dark:bg-[#0D1F18]">
+-      <div className="max-w-[1240px] mx-auto px-5">
+-
+-        {/* Heading */}
+-        <div className="text-center mb-10">
+-          <h2 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">
+-            Flexible plans for everyone
+-          </h2>
+-          <p className="text-stone-400 dark:text-stone-500 max-w-md mx-auto text-sm">
+-            Start free, upgrade when you're ready. Access from just ₦1,000.
+-          </p>
+-        </div>
+-
+-        {/* Free strip */}
+-        <div className="bg-white dark:bg-[#152B20] border border-stone-200 dark:border-[#234533] rounded-xl p-4 flex items-center justify-between flex-wrap gap-4 mb-6">
+-          <div>
+-            <p className="font-bold text-sm text-stone-900 dark:text-stone-100">Free Plan</p>
+-            <p className="text-xs text-stone-400 dark:text-stone-500">Browse all jobs, save favourites, explore companies — no card needed.</p>
+-          </div>
+-          <Link href="/register"
+-            className="px-5 py-2.5 border border-stone-200 dark:border-[#234533] rounded-xl text-sm font-bold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#1C3829] transition-colors">
+-            Start for Free →
+-          </Link>
+-        </div>
+-
+-        {/* Paid plan cards */}
+-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+-          {PLANS.map((plan) => (
+-            <div
+-              key={plan.id}
+-              className={`bg-white dark:bg-[#152B20] border rounded-xl flex flex-col p-6 transition-all duration-200 ${
+-                plan.highlight
+-                  ? 'border-brand-600 dark:border-brand-500'
+-                  : 'border-stone-200 dark:border-[#234533]'
+-              }`}
+-            >
+-              <div className="flex items-start justify-between mb-4">
+-                <div>
+-                  <p className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">{plan.name}</p>
+-                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{plan.desc}</p>
+-                </div>
+-                {plan.badge && (
+-                  <span
+-                    className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ml-2 ${
+-                      plan.highlight
+-                        ? 'bg-brand-700 dark:bg-brand-500 text-white'
+-                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+-                    }`}
+-                  >
+-                    {plan.badge}
+-                  </span>
+-                )}
+-              </div>
+-
+-              <div className="mb-5">
+-                <span className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100">{plan.price}</span>
+-                <span className="text-stone-400 dark:text-stone-500 text-sm ml-1">{plan.period}</span>
+-              </div>
+-
+-              <ul className="space-y-2 mb-6 flex-1">
+-                {plan.features.map((f) => (
+-                  <li key={f} className="flex items-center gap-2.5 text-sm text-stone-600 dark:text-stone-300">
+-                    <Check className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
+-                    {f}
+-                  </li>
+-                ))}
+-              </ul>
+-
+-              <button
+-                onClick={() => handlePay(plan.id)}
+-                disabled={loading}
+-                className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-150 disabled:opacity-60 ${
+-                  plan.highlight
+-                    ? 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 dark:hover:bg-brand-400'
+-                    : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'
+-                }`}
+-              >
+-                {loading ? (
+-                  <span className="inline-flex items-center justify-center gap-2">
+-                    <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+-                    Processing…
+-                  </span>
+-                ) : plan.cta}
+-              </button>
+-            </div>
+-          ))}
+-        </div>
+-
+-        <p className="text-center text-xs text-stone-400 dark:text-stone-500 mt-6">
+-          Secure payment via Paystack · Cancel anytime · No hidden fees
+-        </p>
+-      </div>
+-    </section>
+-  );
+-}
+diff --git a/app/auth/callback/middleware.ts b/app/auth/callback/middleware.ts
+deleted file mode 100644
+index 6c64a57..0000000
+--- a/app/auth/callback/middleware.ts
++++ /dev/null
+@@ -1,40 +0,0 @@
+-// middleware.ts — Supabase session refresh on every request
+-// Must be at the root of the project (next to package.json)
+-import { NextRequest, NextResponse } from 'next/server';
+-import { createServerClient } from '@supabase/ssr';
+-
+-export async function middleware(request: NextRequest) {
+-  let response = NextResponse.next({ request: { headers: request.headers } });
+-
+-  const supabase = createServerClient(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+-    {
+-      cookies: {
+-        get: (name: string)                 => request.cookies.get(name)?.value,
+-        set: (name: string, value: string, options?: any) => {
+-          request.cookies.set({ name, value, ...options });
+-          response = NextResponse.next({ request: { headers: request.headers } });
+-          response.cookies.set({ name, value, ...options });
+-        },
+-        remove: (name: string, options?: any) => {
+-          request.cookies.set({ name, value: '', ...options });
+-          response = NextResponse.next({ request: { headers: request.headers } });
+-          response.cookies.set({ name, value: '', ...options });
+-        },
+-      },
+-    }
+-  );
+-
+-  // Refresh session so it doesn't expire mid-visit
+-  await supabase.auth.getUser();
+-
+-  return response;
+-}
+-
+-export const config = {
+-  matcher: [
+-    // Run on all routes except static files and _next internals
+-    '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|og-image.png).*)',
+-  ],
+-};
+diff --git a/components/Header.tsx b/components/Header.tsx
+deleted file mode 100644
+index ca537b8..0000000
+--- a/components/Header.tsx
++++ /dev/null
+@@ -1,248 +0,0 @@
+-'use client';
+-// components/layout/Header.tsx
+-import Link from 'next/link';
+-import { usePathname, useRouter } from 'next/navigation';
+-import { useEffect, useState } from 'react';
+-import { useTheme } from 'next-themes';
+-import { Sun, Moon, Menu, X, Briefcase, LogOut, User, LayoutDashboard, ClipboardList, Settings } from 'lucide-react';
+-import { createClient } from '@/lib/supabase/client';
+-import { useAuthStore, useUIStore } from '@/lib/store';
+-import { cn } from '@/lib/utils';
+-
+-const NAV_LINKS = [
+-  { href: '/jobs',    label: 'Jobs'    },
+-  { href: '/pricing', label: 'Pricing' },
+-];
+-
+-function getInitials(name: string): string {
+-  const words = name.trim().split(/\s+/);
+-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+-  return name.slice(0, 2).toUpperCase();
+-}
+-
+-export function Header() {
+-  const pathname  = usePathname();
+-  const router    = useRouter();
+-  const supabase  = createClient();
+-  const { theme, setTheme } = useTheme();
+-  const [mounted,   setMounted]   = useState(false);
+-  const [scrolled,  setScrolled]  = useState(false);
+-  const [userOpen,  setUserOpen]  = useState(false);
+-  const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
+-  const { user, isLoggedIn, isAdmin, setUser } = useAuthStore();
+-
+-  useEffect(() => { setMounted(true); }, []);
+-
+-  useEffect(() => {
+-    const fn = () => setScrolled(window.scrollY > 8);
+-    window.addEventListener('scroll', fn, { passive: true });
+-    return () => window.removeEventListener('scroll', fn);
+-  }, []);
+-
+-  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
+-
+-  // Sync Supabase session → store on mount
+-  useEffect(() => {
+-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+-      if (session?.user) {
+-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+-        setUser({
+-          id:    session.user.id,
+-          email: session.user.email!,
+-          name:  profile?.name ?? session.user.email!.split('@')[0],
+-          plan:  profile?.plan  ?? 'free',
+-          role:  profile?.role  ?? 'user',
+-          joinedAt: profile?.created_at ?? new Date().toISOString(),
+-          profileCompletion: profile?.profile_completion ?? 20,
+-        });
+-      }
+-    });
+-
+-    // Listen for auth changes (login/logout in other tabs)
+-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+-      if (event === 'SIGNED_IN' && session?.user) {
+-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+-        setUser({
+-          id:    session.user.id,
+-          email: session.user.email!,
+-          name:  profile?.name ?? session.user.email!.split('@')[0],
+-          plan:  profile?.plan  ?? 'free',
+-          role:  profile?.role  ?? 'user',
+-          joinedAt: profile?.created_at ?? new Date().toISOString(),
+-          profileCompletion: profile?.profile_completion ?? 20,
+-        });
+-      } else if (event === 'SIGNED_OUT') {
+-        setUser(null);
+-      }
+-    });
+-
+-    return () => subscription.unsubscribe();
+-  }, []);
+-
+-  async function handleLogout() {
+-    await supabase.auth.signOut();
+-    setUser(null);
+-    setUserOpen(false);
+-    router.push('/');
+-  }
+-
+-  const planLabel = user?.plan === 'daily' ? 'Day Pass ☀️' : user?.plan === 'pro' ? 'Pro ⭐' : user?.plan === 'admin' ? 'Admin 🔧' : 'Free';
+-  const planColor = user?.plan === 'free' ? 'bg-stone-100 dark:bg-stone-800 text-stone-500' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400';
+-
+-  return (
+-    <header className={cn(
+-      'fixed top-0 left-0 right-0 z-50 h-[68px] glass-nav border-b transition-shadow duration-200',
+-      'border-stone-200/70 dark:border-[#1e3a5f]/70',
+-      scrolled && 'shadow-sm shadow-black/5'
+-    )}>
+-      <div className="max-w-[1240px] mx-auto px-5 h-full flex items-center gap-6">
+-
+-        {/* Logo */}
+-        <Link href="/" className="flex items-center gap-2 font-display font-bold text-[17px] tracking-tight text-stone-900 dark:text-stone-100 hover:opacity-80 transition-opacity shrink-0">
+-          <svg viewBox="0 0 32 32" className="w-7 h-7 text-brand-700 dark:text-brand-400" fill="none">
+-            <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.12"/>
+-            <path d="M8 20 Q12 10 16 16 Q20 22 24 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+-            <circle cx="24" cy="12" r="3" fill="currentColor"/>
+-          </svg>
+-          RemoteJobs44
+-        </Link>
+-
+-        {/* Nav */}
+-        <nav className="hidden md:flex items-center gap-0.5 ml-4">
+-          {NAV_LINKS.map(link => (
+-            <Link key={link.href} href={link.href} className={cn(
+-              'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+-              pathname.startsWith(link.href)
+-                ? 'text-brand-700 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20'
+-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-[#162033]'
+-            )}>
+-              {link.label}
+-            </Link>
+-          ))}
+-        </nav>
+-
+-        {/* Right actions */}
+-        <div className="flex items-center gap-2 ml-auto">
+-
+-          {/* Theme toggle */}
+-          {mounted && (
+-            <button
+-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+-              aria-label="Toggle theme"
+-              className="w-9 h-9 flex items-center justify-center rounded-md border border-stone-200 dark:border-[#1e3a5f] text-stone-500 hover:bg-stone-100 dark:hover:bg-[#162033] transition-all"
+-            >
+-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+-            </button>
+-          )}
+-
+-          {/* User menu / Auth buttons */}
+-          {isLoggedIn() ? (
+-            <div className="relative hidden md:block">
+-              <button
+-                onClick={() => setUserOpen(o => !o)}
+-                className="w-9 h-9 rounded-full bg-brand-700 dark:bg-brand-500 text-white text-xs font-bold flex items-center justify-center hover:scale-105 transition-transform ring-0 hover:ring-2 ring-brand-200"
+-              >
+-                {getInitials(user?.name ?? user?.email ?? 'U')}
+-              </button>
+-
+-              {userOpen && (
+-                <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-xl overflow-hidden z-50">
+-                  {/* Profile header */}
+-                  <div className="flex items-center gap-3 p-4 bg-stone-50 dark:bg-[#162033] border-b border-stone-100 dark:border-[#1e3a5f]">
+-                    <div className="w-10 h-10 rounded-full bg-brand-700 text-white text-sm font-bold flex items-center justify-center shrink-0">
+-                      {getInitials(user?.name ?? user?.email ?? 'U')}
+-                    </div>
+-                    <div className="min-w-0">
+-                      <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{user?.name}</p>
+-                      <p className="text-xs text-stone-400 truncate">{user?.email}</p>
+-                      <span className={cn('inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', planColor)}>
+-                        {planLabel}
+-                      </span>
+-                    </div>
+-                  </div>
+-
+-                  {/* Links */}
+-                  <ul className="py-1.5">
+-                    {[
+-                      { href: '/dashboard',    icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard' },
+-                      { href: '/applications', icon: <ClipboardList className="w-4 h-4" />,  label: 'My Applications' },
+-                      { href: '/profile',      icon: <User className="w-4 h-4" />,            label: 'Profile' },
+-                      { href: '/pricing',      icon: <Briefcase className="w-4 h-4" />,       label: 'Upgrade Plan' },
+-                      ...(isAdmin() ? [{ href: '/admin', icon: <Settings className="w-4 h-4" />, label: 'Admin Panel' }] : []),
+-                    ].map(item => (
+-                      <li key={item.href}>
+-                        <Link href={item.href} onClick={() => setUserOpen(false)}
+-                          className="flex items-center gap-3 px-4 py-2 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
+-                          <span className="text-stone-400">{item.icon}</span>
+-                          {item.label}
+-                        </Link>
+-                      </li>
+-                    ))}
+-                    <li className="border-t border-stone-100 dark:border-[#1e3a5f] mt-1 pt-1">
+-                      <button onClick={handleLogout}
+-                        className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+-                        <LogOut className="w-4 h-4" /> Log Out
+-                      </button>
+-                    </li>
+-                  </ul>
+-                </div>
+-              )}
+-            </div>
+-          ) : (
+-            <div className="hidden md:flex items-center gap-2">
+-              <Link href="/login"
+-                className="px-4 py-2 text-sm font-semibold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-[#1e3a5f] rounded-md hover:bg-stone-50 dark:hover:bg-[#162033] transition-all">
+-                Log in
+-              </Link>
+-              <Link href="/register"
+-                className="px-4 py-2 text-sm font-semibold bg-brand-700 dark:bg-brand-500 text-white rounded-md hover:bg-brand-600 transition-colors shadow-sm">
+-                Get Started
+-              </Link>
+-            </div>
+-          )}
+-
+-          {/* Mobile menu button */}
+-          <button
+-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+-            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-md border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors"
+-          >
+-            <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-transform duration-200', mobileMenuOpen && 'translate-y-[6.5px] rotate-45')} />
+-            <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-opacity duration-200', mobileMenuOpen && 'opacity-0')} />
+-            <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-transform duration-200', mobileMenuOpen && '-translate-y-[6.5px] -rotate-45')} />
+-          </button>
+-        </div>
+-      </div>
+-
+-      {/* Mobile menu */}
+-      <div className={cn(
+-        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#0d1a2e] border-b border-stone-200 dark:border-[#1e3a5f] shadow-lg transition-all duration-300 overflow-hidden',
+-        mobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+-      )}>
+-        <div className="p-4 space-y-1">
+-          {NAV_LINKS.map(link => (
+-            <Link key={link.href} href={link.href}
+-              className={cn('block px-4 py-3 rounded-lg text-base font-medium transition-colors',
+-                pathname.startsWith(link.href) ? 'text-brand-700 bg-brand-50' : 'text-stone-600 hover:bg-stone-50'
+-              )}>
+-              {link.label}
+-            </Link>
+-          ))}
+-        </div>
+-        <div className="px-4 pb-4 flex gap-3">
+-          {isLoggedIn() ? (
+-            <>
+-              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg">Dashboard</Link>
+-              <button onClick={handleLogout} className="flex-1 py-2.5 text-sm font-semibold bg-brand-700 text-white rounded-lg">Log Out</button>
+-            </>
+-          ) : (
+-            <>
+-              <Link href="/login"    className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-lg">Log in</Link>
+-              <Link href="/register" className="flex-1 py-2.5 text-center text-sm font-semibold bg-brand-700 text-white rounded-lg">Get Started</Link>
+-            </>
+-          )}
+-        </div>
+-      </div>
+-    </header>
+-  );
+-}
+diff --git a/components/ThemeProvider.tsx b/components/ThemeProvider.tsx
+deleted file mode 100644
+index ada2160..0000000
+--- a/components/ThemeProvider.tsx
++++ /dev/null
+@@ -1,3 +0,0 @@
+-'use client';
+-// components/providers/ThemeProvider.tsx
+-export { ThemeProvider } from 'next-themes';
+diff --git a/page.tsx b/page.tsx
+deleted file mode 100644
+index 07b5e71..0000000
+--- a/page.tsx
++++ /dev/null
+@@ -1,161 +0,0 @@
+-'use client';
+-// app/login/page.tsx — Supabase email/password login
+-import Link from 'next/link';
+-import { useState, useEffect } from 'react';
+-import { useRouter, useSearchParams } from 'next/navigation';
+-import { Eye, EyeOff, LogIn } from 'lucide-react';
+-import { createClient } from '@/lib/supabase/client';
+-import { useAuthStore }  from '@/lib/store';
+-import { useUIStore }    from '@/lib/store';
+-
+-export default function LoginPage() {
+-  const router       = useRouter();
+-  const searchParams = useSearchParams();
+-  const supabase     = createClient();
+-  const { setUser }  = useAuthStore();
+-  const { toast }    = useUIStore();
+-
+-  const [email,    setEmail]    = useState('');
+-  const [password, setPassword] = useState('');
+-  const [showPass, setShowPass] = useState(false);
+-  const [loading,  setLoading]  = useState(false);
+-
+-  // Show error from auth callback redirect
+-  useEffect(() => {
+-    const err = searchParams.get('error');
+-    if (err) toast(decodeURIComponent(err).replace(/_/g, ' '), 'error');
+-  }, []);
+-
+-  // Show success message after registration
+-  useEffect(() => {
+-    if (searchParams.get('registered') === '1') {
+-      toast('Account created! Check your email to confirm.', 'success', 6000);
+-    }
+-  }, []);
+-
+-  async function handleSubmit(e: React.FormEvent) {
+-    e.preventDefault();
+-    if (!email || !password) return;
+-    setLoading(true);
+-
+-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+-
+-    if (error) {
+-      toast(error.message, 'error');
+-      setLoading(false);
+-      return;
+-    }
+-
+-    if (data.user) {
+-      // Fetch profile to get plan/role
+-      const { data: profile } = await supabase
+-        .from('profiles')
+-        .select('*')
+-        .eq('id', data.user.id)
+-        .single();
+-
+-      setUser({
+-        id:    data.user.id,
+-        email: data.user.email!,
+-        name:  profile?.name ?? data.user.email!.split('@')[0],
+-        plan:  profile?.plan  ?? 'free',
+-        role:  profile?.role  ?? 'user',
+-        joinedAt: profile?.created_at ?? new Date().toISOString(),
+-        profileCompletion: profile?.profile_completion ?? 20,
+-      });
+-
+-      toast('Welcome back! 👋', 'success');
+-      router.push(searchParams.get('next') ?? '/dashboard');
+-    }
+-  }
+-
+-  return (
+-    <div className="min-h-[80vh] flex items-center justify-center px-5 py-12">
+-      <div className="w-full max-w-md">
+-
+-        {/* Logo */}
+-        <div className="text-center mb-8">
+-          <Link href="/" className="inline-flex items-center gap-2 font-display font-bold text-xl text-stone-900 dark:text-stone-100">
+-            <svg viewBox="0 0 32 32" className="w-8 h-8 text-brand-700 dark:text-brand-400" fill="none">
+-              <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.12"/>
+-              <path d="M8 20 Q12 10 16 16 Q20 22 24 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+-              <circle cx="24" cy="12" r="3" fill="currentColor"/>
+-            </svg>
+-            RemoteJobs44
+-          </Link>
+-          <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mt-6 mb-1">
+-            Welcome back
+-          </h1>
+-          <p className="text-sm text-stone-400 dark:text-stone-500">Sign in to continue your remote job search</p>
+-        </div>
+-
+-        <div className="card p-6">
+-          <form onSubmit={handleSubmit} className="space-y-4">
+-            <div>
+-              <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+-                Email address
+-              </label>
+-              <input
+-                type="email"
+-                required
+-                value={email}
+-                onChange={(e) => setEmail(e.target.value)}
+-                placeholder="you@example.com"
+-                className="input"
+-                autoComplete="email"
+-              />
+-            </div>
+-
+-            <div>
+-              <div className="flex items-center justify-between mb-1.5">
+-                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">Password</label>
+-                <Link href="/forgot-password" className="text-xs text-brand-700 dark:text-brand-400 hover:underline">
+-                  Forgot password?
+-                </Link>
+-              </div>
+-              <div className="relative">
+-                <input
+-                  type={showPass ? 'text' : 'password'}
+-                  required
+-                  value={password}
+-                  onChange={(e) => setPassword(e.target.value)}
+-                  placeholder="••••••••"
+-                  className="input pr-10"
+-                  autoComplete="current-password"
+-                />
+-                <button
+-                  type="button"
+-                  onClick={() => setShowPass(!showPass)}
+-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+-                  aria-label={showPass ? 'Hide password' : 'Show password'}
+-                >
+-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+-                </button>
+-              </div>
+-            </div>
+-
+-            <button
+-              type="submit"
+-              disabled={loading || !email || !password}
+-              className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-60 transition-colors"
+-            >
+-              {loading ? (
+-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+-              ) : (
+-                <LogIn className="w-4 h-4" />
+-              )}
+-              {loading ? 'Signing in…' : 'Sign In'}
+-            </button>
+-          </form>
+-        </div>
+-
+-        <p className="text-center text-sm text-stone-400 dark:text-stone-500 mt-5">
+-          Don't have an account?{' '}
+-          <Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">
+-            Create free account
+-          </Link>
+-        </p>
+-      </div>
+-    </div>
+-  );
+-}
+-- 
+2.43.0
+

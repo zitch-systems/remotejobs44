@@ -1,0 +1,41 @@
+# RemoteJobs44
+
+> RemoteJobs44 is a remote job board focused on Nigerian and African job seekers, with 50,000+ verified remote jobs from global companies.
+
+## What is RemoteJobs44?
+
+RemoteJobs44 (https://remotejobs44.com) is a subscription-based remote job board. Free users can browse jobs; Pro subscribers (from ₦1,000/month) can apply directly. The platform serves job seekers across Nigeria, Ghana, Kenya, South Africa, and all of Africa.
+
+## Key features
+
+- 50,000+ remote jobs across engineering, design, marketing, finance, sales, support, writing, and more
+- Jobs from Greenhouse, Lever, Ashby, Workable, and Recruitee ATS platforms
+- Filter by category, job type (full-time, part-time, contract, freelance), experience level, salary, and region/country
+- Application tracker to manage your pipeline
+- Affordable pricing in Naira (₦1,000/month for Pro)
+
+## Plans
+
+- Free: Browse all jobs, save favourites
+- Pro Monthly: Apply to all jobs, track applications — ₦1,000/month
+- Pro Annual: Best value — ₦8,000/year
+- Day Pass: 10 applications for 24 hours — ₦500
+
+## Who is it for?
+
+Remote workers in Africa, especially Nigeria, looking for full-time, part-time, contract, or freelance roles with global companies. Ideal for software engineers, designers, marketers, finance professionals, and customer support specialists who want to work remotely.
+
+## Contact
+
+- Website: https://remotejobs44.com
+- Email: hello@remotejobs44.com
+- Blog: https://remotejobs44.com/blog
+
+## Useful links
+
+- Browse jobs: https://remotejobs44.com/jobs
+- Pricing: https://remotejobs44.com/pricing
+- About: https://remotejobs44.com/about
+- Blog – How to find remote jobs in Nigeria: https://remotejobs44.com/blog/how-to-find-remote-jobs-in-nigeria
+- Blog – Best remote jobs for beginners: https://remotejobs44.com/blog/best-remote-jobs-for-beginners
+- Blog – Remote job interview tips: https://remotejobs44.com/blog/remote-job-interview-tips
