@@ -10,6 +10,16 @@ const storage = () =>
     ? localStorage
     : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
+// Reset the jobs/applications store when the signed-in user changes (or signs out).
+// Declared up top because useAuthStore.setUser needs to call it. Using getState()
+// is safe since useJobsStore is defined below in the same module — by the time
+// setUser fires at runtime the store exists.
+function resetJobsStoreForNewUser() {
+  // Lazy reference to avoid TDZ during module init.
+  const jobs = (useJobsStore as any)?.getState?.();
+  if (jobs?.reset) jobs.reset();
+}
+
 // ── Auth Store ──────────────────────────────────────────────────────────────
 interface AuthState {
   user: User | null;
@@ -35,11 +45,19 @@ export const useAuthStore = create<AuthState>()(
       dailyAppsUsed: 0,
 
       login:      (user, token) => set({ user, token }),
-      logout:     () => set({ user: null, token: null }),
-      setUser:    (user) => set((s) => ({
-        user,
-        dailyAppsUsed: (user?.plan === 'daily' && s.user?.plan !== 'daily') ? 0 : s.dailyAppsUsed,
-      })),
+      logout:     () => { resetJobsStoreForNewUser(); set({ user: null, token: null, dailyAppsUsed: 0 }); },
+      setUser:    (user) => set((s) => {
+        // If the signed-in user actually changed (different id, or signed out
+        // entirely), wipe any cached saved-jobs/applications from the previous
+        // account so the new user doesn't see stale data.
+        const prevId = s.user?.id ?? null;
+        const nextId = user?.id ?? null;
+        if (prevId !== nextId) resetJobsStoreForNewUser();
+        return {
+          user,
+          dailyAppsUsed: (user?.plan === 'daily' && s.user?.plan !== 'daily') ? 0 : s.dailyAppsUsed,
+        };
+      }),
       updateUser: (patch) =>
         set((s) => ({ user: s.user ? { ...s.user, ...patch } : null })),
       incrementDailyApp: () => set((s) => ({ dailyAppsUsed: s.dailyAppsUsed + 1 })),
@@ -100,6 +118,7 @@ interface JobsState {
   addApplication:(app: Application) => void;
   hasApplied:    (jobId: string) => boolean;
   setSavedFilters:(f: SearchFilters) => void;
+  reset:         () => void;
 }
 
 export const useJobsStore = create<JobsState>()(
@@ -123,6 +142,12 @@ export const useJobsStore = create<JobsState>()(
       addApplication: (app)   => set((s) => ({ applications: [app, ...s.applications] })),
       hasApplied:     (jobId) => get().applications.some((a) => a.jobId === jobId),
       setSavedFilters:(f)     => set({ savedFilters: f }),
+      // Wipe in-memory state AND the persisted localStorage entry. Called from
+      // useAuthStore.setUser whenever the signed-in user changes.
+      reset: () => {
+        set({ savedJobIds: [], applications: [], savedFilters: {} });
+        try { localStorage.removeItem('rj44-jobs'); } catch {}
+      },
     }),
     {
       name:    'rj44-jobs',
