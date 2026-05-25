@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, Briefcase, Zap, ChevronDown } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { resolveRole } from '@/lib/auth/redirect';
@@ -71,7 +71,21 @@ export function Header() {
 
     function buildUser(authUser: { id: string; email?: string | null }, profile: any) {
       const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
-      const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+      const dbPlan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
+
+      // Post-payment race protection: when the user is on a page that just
+      // returned from Paystack (success=1 in URL) but profile.plan hasn't
+      // been updated by the webhook yet, refuse to downgrade an optimistic
+      // Pro/Day Pass back to Free. The pricing/dashboard success-handler
+      // useEffects are polling the DB and will reconcile once the webhook
+      // lands. Without this guard, any header re-sync racing the webhook
+      // produces a "subscribed → unsubscribed → subscribed" flicker.
+      const justPaid = typeof window !== 'undefined' && /[?&]success=1/.test(window.location.search);
+      const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
+      const plan = justPaid && dbPlan === 'free' && currentPlan !== 'free'
+        ? currentPlan
+        : dbPlan;
+
       return {
         id:    authUser.id,
         email: authUser.email!,
@@ -86,10 +100,12 @@ export function Header() {
     async function syncAuth() {
       const { setHydrated } = useAuthStore.getState();
       try {
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        if (error?.status === 401 || error?.status === 403) { setUser(null); return; }
-        if (error) { setHydrated(true); return; }   // transient — keep session, but mark synced
-        if (!authUser) { setUser(null); return; }
+        // getAuthedUserSafe retries a 401 once so a stale access token mid
+        // auto-refresh doesn't briefly wipe the user (subscription flicker).
+        const { user: authUser, status } = await getAuthedUserSafe(supabase);
+        if (status === 'unauthed')  { setUser(null); return; }
+        if (status === 'transient') { setHydrated(true); return; } // keep persisted session
+        if (!authUser)              { setUser(null); return; }
         const profile = await fetchProfile(authUser.id);
         // Don't downgrade plan/role on a failed/null profile fetch — that
         // would tell a paying user they're on Free. Keep persisted state

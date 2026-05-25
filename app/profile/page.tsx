@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle, Brain, Sparkles, AlertCircle } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 
@@ -48,16 +48,11 @@ function ProfileContent() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const userRace = await Promise.race([
-        supabase.auth.getUser(),
-        new Promise<null>(res => setTimeout(() => res(null), 6000)),
-      ]);
+      const { user: authUser, status } = await getAuthedUserSafe(supabase);
       if (cancelled) return;
-      if (!userRace) { setLoading(false); return; } // network timeout — stay on page
-      const { data: { user: authUser }, error } = userRace;
-      if (error?.status === 401 || error?.status === 403) { router.replace('/login?next=/profile'); return; }
-      if (error) { setLoading(false); return; } // network blip — stay on page
-      if (!authUser) { router.replace('/login?next=/profile'); return; }
+      if (status === 'unauthed')  { router.replace('/login?next=/profile'); return; }
+      if (status === 'transient') { setLoading(false); return; } // network blip — stay on page
+      if (!authUser)              { router.replace('/login?next=/profile'); return; }
 
       let profile: any = null;
       try {

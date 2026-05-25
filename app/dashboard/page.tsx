@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Briefcase, BookmarkCheck, FileText, TrendingUp, ArrowRight, Star, Zap } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { formatRelativeDate } from '@/lib/utils';
@@ -24,17 +24,12 @@ function DashboardContent() {
   useEffect(() => {
     async function loadSession() {
       try {
-        const userRace = await Promise.race([
-          supabase.auth.getUser(),
-          new Promise<null>(res => setTimeout(() => res(null), 6000)),
-        ]);
-        if (!userRace) { setLoading(false); return; }
-        const { data: { user: authUser }, error } = userRace;
-        if (error?.status === 401 || error?.status === 403) {
-          router.replace('/login?next=/dashboard'); return;
-        }
-        if (error) { setLoading(false); return; } // network blip — stay on page
-        if (!authUser) { router.replace('/login?next=/dashboard'); return; }
+        // getAuthedUserSafe retries a 401 once so a stale-token-mid-refresh
+        // doesn't redirect a logged-in user to /login on first load.
+        const { user: authUser, status } = await getAuthedUserSafe(supabase);
+        if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
+        if (status === 'transient') { setLoading(false); return; } // stay on page
+        if (!authUser)              { router.replace('/login?next=/dashboard'); return; }
 
         let profile: any = null;
         try {
@@ -60,7 +55,18 @@ function DashboardContent() {
           router.replace('/admin');
           return;
         }
-        const plan = profile.plan ?? 'free';
+
+        // Post-payment race: if the user just landed here from Paystack
+        // (?success=1&plan=...), the webhook may not have updated profile.plan
+        // yet. The dedicated success-handler useEffect below is polling for
+        // the real plan; don't overwrite its optimistic upgrade with a stale
+        // DB read here.
+        const justPaid = searchParams.get('success') === '1' || searchParams.get('subscribed') === '1';
+        const dbPlan = profile.plan ?? 'free';
+        const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
+        const plan = justPaid && dbPlan === 'free' && currentPlan !== 'free'
+          ? currentPlan   // keep optimistic Pro/Day Pass while polling
+          : dbPlan;
 
         setUser({
           id:    authUser.id,
@@ -102,7 +108,11 @@ function DashboardContent() {
     ).then(results => setSavedJobs(results.filter(Boolean).slice(0, 3)));
   }, [savedJobIds.join(',')]);
 
-  // Post-payment: re-sync user plan from DB so UI updates immediately
+  // Post-payment: re-sync user plan from DB so UI updates immediately.
+  // Optimistically flips the plan in Zustand based on the URL so the dashboard
+  // doesn't render "Upgrade from ₦500" for a user who just paid — then polls
+  // the DB until the webhook stamps the real plan, refusing to overwrite the
+  // optimistic value with profile.plan='free' until we run out of retries.
   useEffect(() => {
     const subscribed = searchParams.get('subscribed') === '1' || searchParams.get('success') === '1';
     if (!subscribed) return;
@@ -110,26 +120,45 @@ function DashboardContent() {
     const label = plan === 'daily' ? 'Day Pass' : plan === 'pro_annual' ? 'Pro Annual' : 'Pro Monthly';
     toast(`🎉 Welcome to ${label}! Full access unlocked.`, 'success', 7000);
 
-    // Re-fetch profile to sync new plan into Zustand store
-    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
-      if (!authUser) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name,plan,role,created_at,profile_completion')
-        .eq('id', authUser.id)
-        .maybeSingle();
-      if (profile) {
+    const optimisticPlan: 'daily' | 'pro' = plan === 'daily' ? 'daily' : 'pro';
+    const { updateUser } = useAuthStore.getState();
+    updateUser({ plan: optimisticPlan });
+
+    let attempts = 0;
+    const maxAttempts = 10;
+    async function sync() {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('name,plan,role,created_at,profile_completion')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        if (error || !profile) {
+          if (attempts < maxAttempts) { attempts++; setTimeout(sync, 1000); }
+          return;
+        }
+        const dbPlan = profile.role === 'admin' ? 'admin' : (profile.plan ?? 'free');
+        if (dbPlan === 'free' && plan !== 'free' && attempts < maxAttempts) {
+          attempts++;
+          setTimeout(sync, 1000);
+          return;
+        }
         setUser({
           id: authUser.id,
           email: authUser.email!,
           name: profile.name ?? authUser.email!.split('@')[0],
-          plan: profile.plan ?? 'free',
+          plan: dbPlan,
           role: profile.role ?? 'user',
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,
         });
+      } catch {
+        if (attempts < maxAttempts) { attempts++; setTimeout(sync, 1000); }
       }
-    });
+    }
+    sync();
   }, []);
 
   async function handleLogout() {

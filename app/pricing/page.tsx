@@ -108,8 +108,20 @@ function PricingContent() {
 
     setSuccessPlan(plan);
 
-    // Poll Supabase until the plan is updated in DB (retry up to 10x, 1s apart)
-    // This handles the case where the webhook/verify DB write is slightly delayed
+    // Optimistically reflect the just-purchased plan in Zustand so the rest
+    // of the UI (Header badge, dashboard, "Current Plan" markers) flips to
+    // subscribed instantly. The poll below will reconcile against the DB once
+    // the webhook has stamped profile.plan.
+    // pro_annual + pro_monthly both bill as 'pro' in our schema.
+    const optimisticPlan: 'daily' | 'pro' =
+      plan === 'daily' ? 'daily' : 'pro';
+    const { updateUser } = useAuthStore.getState();
+    updateUser({ plan: optimisticPlan });
+
+    // Poll Supabase until the plan is updated in DB (retry up to 10x, 1s apart).
+    // The key invariant: while we're waiting for the webhook, we MUST NOT
+    // stamp profile.plan='free' back into Zustand — that's exactly the
+    // "subscribed → unsubscribed → subscribed" flicker.
     let attempts = 0;
     const maxAttempts = 10;
 
@@ -137,21 +149,27 @@ function PricingContent() {
         }
 
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });
+        const dbPlan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
+
+        // Webhook hasn't caught up yet — DB still says 'free' but the user
+        // just paid for a non-free plan. Keep the optimistic Pro/Day Pass
+        // we set above and retry. If we exhaust retries, fall through and
+        // sync the DB value (better to be honest than to lie indefinitely).
+        if (dbPlan === 'free' && plan !== 'free' && attempts < maxAttempts) {
+          attempts++;
+          setTimeout(syncProfile, 1000);
+          return;
+        }
+
         setUser({
           id:    authUser.id,
           email: authUser.email!,
           name:  profile.name ?? authUser.email!.split('@')[0],
-          plan:  role === 'admin' ? 'admin' : (profile.plan ?? 'free'),
+          plan:  dbPlan,
           role,
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,
         });
-
-        // Webhook may take a moment after payment — retry if plan didn't update yet
-        if (profile.plan === 'free' && plan !== 'free' && attempts < maxAttempts) {
-          attempts++;
-          setTimeout(syncProfile, 1000);
-        }
       } catch {
         if (attempts < maxAttempts) {
           attempts++;

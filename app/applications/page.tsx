@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Briefcase } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
 
@@ -30,14 +30,11 @@ function ApplicationsContent() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.race([
-      supabase.auth.getUser(),
-      new Promise<null>(res => setTimeout(() => res(null), 6000)),
-    ]).then(async result => {
+    (async () => {
+      const { user: authUser, status } = await getAuthedUserSafe(supabase);
       if (cancelled) return;
-      if (!result) { setChecked(true); return; } // timeout — show page (UI uses zustand-backed applications)
-      const authUser = result.data?.user;
-      if (!authUser) { router.replace('/login?next=/applications'); return; }
+      if (status === 'transient') { setChecked(true); return; } // stay on page; use zustand cache
+      if (status === 'unauthed' || !authUser) { router.replace('/login?next=/applications'); return; }
       setChecked(true);
 
       // Fetch the canonical list from the server. Without this, a user who
@@ -59,7 +56,7 @@ function ApplicationsContent() {
           if (!knownIds.has(a.id)) addApplication(a);
         }
       } catch {}
-    });
+    })();
     return () => { cancelled = true; };
   }, []);
 

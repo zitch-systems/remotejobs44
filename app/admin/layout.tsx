@@ -7,7 +7,7 @@ import {
   Rss, Building2, Settings, CreditCard,
   PlusCircle, ChevronRight, Shield, LogOut, Brain
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { resolveRole } from '@/lib/auth/redirect';
 
@@ -38,12 +38,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     async function check() {
       const supabase = createClient();
-      const { data: { user }, error } = await supabase.auth.getUser();
+      // getAuthedUserSafe absorbs the 401-then-refresh race that would
+      // otherwise bounce the admin to /login (and right back to /admin once
+      // Supabase finished refreshing) — visible as the admin panel "tab
+      // glitch" on first load after a long idle.
+      const { user, status } = await getAuthedUserSafe(supabase);
 
-      if (error && (error.status === 401 || error.status === 403)) {
-        router.replace('/login?next=/admin'); return;
-      }
-      if (error) return; // network blip — retry will happen on next render
+      if (status === 'unauthed') { router.replace('/login?next=/admin'); return; }
+      if (status === 'transient') return; // network blip — retry on next render
       if (!user) { router.replace('/login?next=/admin'); return; }
 
       // Profile lookup is best-effort (5s cap). On failure, fall back to hardcoded admin list.
