@@ -2,6 +2,7 @@
 // Called by the bulk import UI after jobs are fetched
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 import type { Job } from '@/lib/types';
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
@@ -10,8 +11,7 @@ async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResp
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    const ADMIN_EMAILS = ['admin@remotejobs44.com', 'admin@remotejobs4.com', 'zitchinfo@gmail.com'];
-    if (profile?.role !== 'admin' && !ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? '')) {
+    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
       return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
     }
     return { ok: true };
