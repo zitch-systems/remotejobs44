@@ -93,7 +93,7 @@ async function callAnthropic(cfg: AiConfig, system: string, prompt: string, maxT
     }),
     signal: AbortSignal.timeout(45000),
   });
-  if (!r.ok) throw new Error(`Anthropic ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw aiError('Anthropic', r, await r.text());
   const j = await r.json();
   return j.content?.[0]?.text ?? '';
 }
@@ -110,7 +110,7 @@ async function callGemini(cfg: AiConfig, system: string, prompt: string, maxToke
     }),
     signal: AbortSignal.timeout(45000),
   });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw aiError('Gemini', r, await r.text());
   const j = await r.json();
   return j.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 }
@@ -145,7 +145,16 @@ async function callOpenAiCompatible(cfg: AiConfig, system: string, prompt: strin
     }),
     signal: AbortSignal.timeout(45000),
   });
-  if (!r.ok) throw new Error(`${cfg.providerId} ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw aiError(cfg.providerId, r, await r.text());
   const j = await r.json();
   return j.choices?.[0]?.message?.content ?? '';
+}
+
+// Builds a safe-to-bubble-up error. The raw body is logged server-side only;
+// the message we surface mentions just status + provider so we never echo back
+// an API key, partial prompt, or other sensitive content the provider may
+// include in its own error responses.
+function aiError(provider: string, r: Response, body: string): Error {
+  console.error(`[ai/${provider}] HTTP ${r.status} ${r.statusText}: ${body.slice(0, 1500)}`);
+  return new Error(`${provider} API returned ${r.status}. Try again or contact support.`);
 }

@@ -87,7 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@remotejobs44.com' }
             }
           ]
-        })}} />
+        }).replace(/</g, '\\u003c') }} />
         <style dangerouslySetInnerHTML={{ __html: `
           :root {
             --font-sora: 'Sora', system-ui, sans-serif;

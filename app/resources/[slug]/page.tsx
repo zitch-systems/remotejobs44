@@ -42,7 +42,9 @@ export default function ArticlePage({ params }: { params: { slug: string } }) {
 
   return (
     <div className="max-w-[760px] mx-auto px-5 py-10">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* Escape </script> sequences so a future article body containing one
+          can't break out of the JSON-LD block. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
       <Link href="/resources" className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 dark:text-brand-400 hover:underline mb-5">
         <ArrowLeft className="w-3 h-3" /> All resources
       </Link>

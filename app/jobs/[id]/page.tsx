@@ -139,7 +139,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="max-w-[900px] mx-auto px-5 py-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
       <Link href="/jobs" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Jobs
       </Link>
