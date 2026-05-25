@@ -4,12 +4,27 @@ import Link from 'next/link';
 import { Briefcase, Users, TrendingUp, DollarSign, Rss, PlusCircle, RefreshCw, ArrowRight, Zap, Search, Activity, CheckCircle, AlertCircle, Shield, Globe, Trash2, Star, Eye } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatRelativeDate, formatNumber, CATEGORY_META } from '@/lib/utils';
-import { MOCK_JOBS } from '@/lib/mock-data';
 import { jobsApi } from '@/lib/api';
 import { useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import type { Job } from '@/lib/types';
 
-interface Stats { jobs: number; users: number; pro: number; daily: number; mrr: number; newToday: number; }
+interface Stats {
+  jobs:    number;
+  users:   number;
+  pro:     number;
+  daily:   number;
+  mrr:     number;
+  newToday: number;
+  // 30-day signup trend: one bucket per day, oldest first.
+  signups30d: number[];
+}
+
+// Plan prices in NGN, from app/pricing/page.tsx. Pro Annual amortised to
+// monthly so it contributes the right amount to MRR (₦29,999 / 12 ≈ ₦2,500).
+// Day Pass is one-off so we don't include it in *monthly* recurring revenue.
+const PRO_MONTHLY_NGN   = 2999;
+const PRO_ANNUAL_MONTHLY_NGN = Math.round(29999 / 12); // 2500
 
 export default function AdminPage() {
   const supabase = createClient();
@@ -19,26 +34,77 @@ export default function AdminPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [jobSearch, setJobSearch] = useState('');
-  const [recentJobs, setRecentJobs] = useState(MOCK_JOBS.slice(0, 8));
+  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
   const [health, setHealth] = useState<{ db: boolean; api: boolean; paystack: boolean } | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [{ count: jobCount }, { data: profiles }] = await Promise.all([
+      const since30d = new Date();
+      since30d.setDate(since30d.getDate() - 29);
+      since30d.setHours(0, 0, 0, 0);
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const [{ count: jobCount }, { data: profiles }, { count: newTodayCount }, { data: activeSubs }] = await Promise.all([
         supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('profiles').select('plan'),
-      ]).catch(() => [{ count: null }, { data: null }] as any);
-      const pro       = profiles?.filter((p: any) => p.plan === 'pro').length   ?? 0;
-      const daily     = profiles?.filter((p: any) => p.plan === 'daily').length  ?? 0;
-      const mrr       = pro * 8999 + daily * 1000 * 4;
-      const today     = new Date(); today.setHours(0,0,0,0);
-      const newToday  = MOCK_JOBS.filter(j => new Date(j.posted) >= today).length;
-      setStats({ jobs: jobCount ?? MOCK_JOBS.length, users: profiles?.length ?? 0, pro, daily, mrr, newToday });
+        supabase.from('profiles').select('plan,created_at').gte('created_at', since30d.toISOString()),
+        supabase.from('jobs').select('*', { count: 'exact', head: true })
+          .eq('is_active', true).gte('posted_at', todayStart.toISOString()),
+        // MRR comes from the subscriptions table — that's the only place that
+        // knows monthly vs annual billing. profiles.plan='pro' doesn't tell us
+        // whether the user is on a ₦2,999/mo or ₦29,999/yr plan.
+        supabase.from('subscriptions')
+          .select('plan,billing,price')
+          .eq('status', 'active'),
+      ]).catch(() => [{ count: null }, { data: null }, { count: null }, { data: null }] as any);
+
+      // Plan-tier counts come from the ALL profiles query (not the 30-day
+      // window above), so refetch the plan totals cheaply.
+      const { data: allPlans } = await supabase.from('profiles').select('plan');
+      const pro   = allPlans?.filter((p: any) => p.plan === 'pro').length   ?? 0;
+      const daily = allPlans?.filter((p: any) => p.plan === 'daily').length ?? 0;
+
+      // Sum monthly-equivalent revenue from each active subscription. Day
+      // passes are one-off charges — they boost cash flow but aren't MRR.
+      let mrr = 0;
+      for (const s of (activeSubs ?? [])) {
+        if (s.billing === 'annually') {
+          mrr += Math.round((s.price ?? PRO_ANNUAL_MONTHLY_NGN * 12) / 12);
+        } else if (s.billing === 'monthly') {
+          mrr += s.price ?? PRO_MONTHLY_NGN;
+        }
+        // daily intentionally excluded
+      }
+      // Fallback when no subscriptions rows yet — estimate from profiles plan.
+      if (mrr === 0 && pro > 0) mrr = pro * PRO_MONTHLY_NGN;
+
+      // 30-day signup sparkline buckets (oldest → newest)
+      const buckets: number[] = Array(30).fill(0);
+      for (const p of (profiles ?? [])) {
+        const d = new Date(p.created_at);
+        const dayIndex = Math.floor((d.getTime() - since30d.getTime()) / 86_400_000);
+        if (dayIndex >= 0 && dayIndex < 30) buckets[dayIndex]++;
+      }
+
+      setStats({
+        jobs:       jobCount ?? 0,
+        users:      allPlans?.length ?? 0,
+        pro,
+        daily,
+        mrr,
+        newToday:   newTodayCount ?? 0,
+        signups30d: buckets,
+      });
       setLoading(false);
-      // Health check
       setHealth({ db: jobCount !== null, api: true, paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY });
     }
     load();
+
+    // Recent jobs panel — show real DB rows, not the dev fixtures.
+    jobsApi.getJobs({ perPage: 8, sort: 'newest' })
+      .then(r => { setRecentJobs(r.jobs); setJobsLoading(false); })
+      .catch(() => setJobsLoading(false));
   }, []);
 
   async function handleSync() {
@@ -143,6 +209,22 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {/* 30-day signup sparkline */}
+      {stats && stats.signups30d.some(n => n > 0) && (
+        <div className="card p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-brand-600" /> Signups — last 30 days
+            </h2>
+            <p className="text-xs text-stone-400">
+              {stats.signups30d.reduce((a, b) => a + b, 0)} total ·
+              last 7d: {stats.signups30d.slice(-7).reduce((a, b) => a + b, 0)}
+            </p>
+          </div>
+          <Sparkline values={stats.signups30d} />
+        </div>
+      )}
+
       {/* System Health */}
       {health && (
         <div className="card p-5 mb-8">
@@ -190,7 +272,14 @@ export default function AdminPage() {
           <div className="col-span-2">Posted</div>
           <div className="col-span-2">Actions</div>
         </div>
-        {filteredJobs.slice(0, 8).map(job => {
+        {jobsLoading && (
+          <div className="px-5 py-8">
+            <div className="animate-pulse space-y-3">
+              {[1,2,3].map(i => <div key={i} className="skeleton h-12 rounded" />)}
+            </div>
+          </div>
+        )}
+        {!jobsLoading && filteredJobs.slice(0, 8).map(job => {
           const cat = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
           return (
             <div key={job.id} className="flex sm:grid sm:grid-cols-12 gap-2 items-center px-5 py-3 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors border-b border-stone-50 dark:border-[#162033] last:border-0">
@@ -225,10 +314,33 @@ export default function AdminPage() {
             </div>
           );
         })}
-        {filteredJobs.length === 0 && (
-          <div className="px-5 py-8 text-center text-sm text-stone-400">No jobs match your search.</div>
+        {!jobsLoading && filteredJobs.length === 0 && (
+          <div className="px-5 py-8 text-center text-sm text-stone-400">
+            {recentJobs.length === 0 ? 'No jobs in the database yet — run a sync.' : 'No jobs match your search.'}
+          </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Tiny dependency-free sparkline. Renders one bar per value, scaled to the
+// max value in the series. A flat zero series renders as a faint baseline.
+function Sparkline({ values, height = 56 }: { values: number[]; height?: number }) {
+  const max = Math.max(1, ...values);
+  return (
+    <div className="flex items-end gap-1" style={{ height }}>
+      {values.map((v, i) => {
+        const pct = (v / max) * 100;
+        return (
+          <div
+            key={i}
+            title={`Day ${i + 1}: ${v}`}
+            className="flex-1 rounded-t-sm bg-brand-500/80 dark:bg-brand-400/80 transition-all hover:bg-brand-600 dark:hover:bg-brand-300"
+            style={{ height: `${Math.max(pct, 2)}%`, minWidth: 4 }}
+          />
+        );
+      })}
     </div>
   );
 }

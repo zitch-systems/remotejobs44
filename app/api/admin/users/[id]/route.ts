@@ -1,0 +1,115 @@
+// app/api/admin/users/[id]/route.ts
+// Admin actions on a single user: update plan/role, delete account.
+// Password reset lives in a sibling route so it's POST-only (no idempotency
+// concerns mixed with PATCH semantics).
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Verify the calling user is an admin. Returns the admin's auth user so we
+// can audit-log "who changed whom" without a separate lookup.
+async function requireAdmin(): Promise<
+  { ok: true; adminId: string; adminEmail: string | null } | { ok: false; res: NextResponse }
+> {
+  const supabase = createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
+    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
+}
+
+// GET — full user record for the drill-in page.
+// Returns: profile, current subscription (if any), and recent applications.
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+
+  const supabase = createAdminSupabaseClient();
+  const [{ data: profile }, { data: subscription }, { data: applications }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', params.id).maybeSingle(),
+    supabase.from('subscriptions').select('*').eq('user_id', params.id).maybeSingle(),
+    supabase.from('applications').select('id,job_title,company,status,applied_at')
+      .eq('user_id', params.id).order('applied_at', { ascending: false }).limit(20),
+  ]);
+
+  if (!profile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+  return NextResponse.json({ profile, subscription, applications: applications ?? [] });
+}
+
+// PATCH — update plan and/or role. Pass only the fields you want changed.
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+
+  let body: { plan?: string; role?: string; name?: string } = {};
+  try { body = await req.json(); } catch {}
+
+  const ALLOWED_PLANS = ['free', 'daily', 'pro', 'admin'];
+  const ALLOWED_ROLES = ['user', 'admin'];
+
+  const patch: Record<string, any> = {};
+  if (body.plan !== undefined) {
+    if (!ALLOWED_PLANS.includes(body.plan)) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    patch.plan = body.plan;
+  }
+  if (body.role !== undefined) {
+    if (!ALLOWED_ROLES.includes(body.role)) return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    // Belt-and-braces: an admin should not be able to demote themselves and
+    // immediately lose access to this very endpoint.
+    if (params.id === auth.adminId && body.role !== 'admin') {
+      return NextResponse.json({ error: 'You cannot demote yourself' }, { status: 400 });
+    }
+    patch.role = body.role;
+  }
+  if (typeof body.name === 'string' && body.name.length <= 200) {
+    patch.name = body.name;
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  }
+  patch.updated_at = new Date().toISOString();
+
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase.from('profiles').update(patch).eq('id', params.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  console.log(`[admin] ${auth.adminEmail} updated user ${params.id}:`, patch);
+  return NextResponse.json({ success: true, patched: patch });
+}
+
+// DELETE — wipe the user from auth.users. profiles, applications, saved_jobs,
+// and subscriptions all cascade via FK constraints in schema.sql.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+
+  // Hard guard: an admin must not delete their own account from this route —
+  // accidental click would log them out and leave the app with one fewer admin.
+  if (params.id === auth.adminId) {
+    return NextResponse.json({ error: 'You cannot delete yourself' }, { status: 400 });
+  }
+
+  const supabase = createAdminSupabaseClient();
+  // Best-effort cancel any active subscription first so Paystack isn't still
+  // billing a deleted account. We don't await Paystack's API here — the
+  // periodic cron / next webhook will reconcile.
+  await supabase.from('subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('user_id', params.id);
+
+  const { error } = await supabase.auth.admin.deleteUser(params.id);
+  if (error) {
+    console.error('[admin] deleteUser failed:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  console.log(`[admin] ${auth.adminEmail} deleted user ${params.id}`);
+  return NextResponse.json({ success: true });
+}

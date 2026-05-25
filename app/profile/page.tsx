@@ -125,11 +125,17 @@ function ProfileContent() {
       </div>
 
       {/* Plan */}
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold mb-6 ${planColor}`}>
-        <Shield className="w-4 h-4" /> {planLabel} Plan
-        {user?.plan === 'free' && (
-          <Link href="/pricing" className="ml-2 text-xs text-brand-700 dark:text-brand-400 underline font-semibold">Upgrade →</Link>
-        )}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold ${planColor}`}>
+          <Shield className="w-4 h-4" /> {planLabel} Plan
+          {user?.plan === 'free' && (
+            <Link href="/pricing" className="ml-2 text-xs text-brand-700 dark:text-brand-400 underline font-semibold">Upgrade →</Link>
+          )}
+        </div>
+        <Link href="/profile/billing"
+          className="text-xs font-semibold text-brand-700 dark:text-brand-400 hover:underline">
+          Billing &amp; account →
+        </Link>
       </div>
 
       <div className="space-y-5">

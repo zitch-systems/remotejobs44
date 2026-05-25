@@ -11,13 +11,24 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: profiles } = await supabase.from('profiles').select('plan');
+      const [{ data: profiles }, { data: activeSubs }] = await Promise.all([
+        supabase.from('profiles').select('plan'),
+        // MRR comes from real subscription rows so monthly vs annual is
+        // distinguished correctly. Annual contributes price/12 per month.
+        supabase.from('subscriptions').select('billing,price').eq('status', 'active'),
+      ]);
       if (profiles) {
         const pro   = profiles.filter(p => p.plan === 'pro').length;
         const daily = profiles.filter(p => p.plan === 'daily').length;
         const free  = profiles.filter(p => p.plan === 'free').length;
-        // Estimate MRR in NGN
-        const mrr = (pro * 8999) + (daily * 1000 * 4); // assume daily users buy 4x/month
+        let mrr = 0;
+        for (const s of (activeSubs ?? [])) {
+          if (s.billing === 'annually') mrr += Math.round((s.price ?? 29999) / 12);
+          else if (s.billing === 'monthly') mrr += s.price ?? 2999;
+          // daily is one-off, not recurring
+        }
+        // Fallback estimate when there are no subscription rows yet.
+        if (mrr === 0 && pro > 0) mrr = pro * 2999;
         setCounts({ users: profiles.length, pro, daily, free, revenue: mrr });
       }
       setLoading(false);
