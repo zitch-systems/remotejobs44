@@ -3,26 +3,11 @@
 // Password reset lives in a sibling route so it's POST-only (no idempotency
 // concerns mixed with PATCH semantics).
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
+import { requireAdmin } from '@/lib/admin/auth';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Verify the calling user is an admin. Returns the admin's auth user so we
-// can audit-log "who changed whom" without a separate lookup.
-async function requireAdmin(): Promise<
-  { ok: true; adminId: string; adminEmail: string | null } | { ok: false; res: NextResponse }
-> {
-  const supabase = createServerSupabaseClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  }
-  return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
-}
 
 // GET — full user record for the drill-in page.
 // Returns: profile, current subscription (if any), and recent applications.

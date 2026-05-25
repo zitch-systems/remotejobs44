@@ -8,25 +8,15 @@
 // for users who applied — saved_jobs / applications FK back to the row, and
 // blowing them away would corrupt their dashboards.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
-
-async function requireAdmin(): Promise<{ ok: true; adminId: string; adminEmail: string | null } | { ok: false }> {
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
-  if (!isAdmin) return { ok: false };
-  return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
-}
+import { requireAdmin } from '@/lib/admin/auth';
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!auth.ok) return auth.res;
 
   let body: { company?: string; platform?: ATSPlatform; slug?: string; apply_url_sample?: string } = {};
   try { body = await req.json(); } catch {}

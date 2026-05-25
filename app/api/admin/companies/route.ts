@@ -8,17 +8,9 @@
 // source_url, apply_url, is_active, updated_at) to keep the payload
 // manageable even with 50k+ rows.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
-
-async function requireAdmin(): Promise<boolean> {
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  return profile?.role === 'admin' || isHardcodedAdmin(user.email);
-}
+import { requireAdmin } from '@/lib/admin/auth';
 
 interface CompanyRow {
   company:        string;
@@ -33,7 +25,8 @@ interface CompanyRow {
 }
 
 export async function GET(_req: NextRequest) {
-  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
 
   const supabase = createAdminSupabaseClient();
   // Pull only the columns we actually aggregate over. updated_at gives us

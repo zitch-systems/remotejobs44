@@ -22,6 +22,15 @@ test.describe('Pricing Page', () => {
     await expect(page.getByText(/Pro Annual/i).first()).toBeVisible();
   });
 
+  test('annual monthly-equivalent is ₦2,500 (not ₦7,500 — regression check)', async ({ page }) => {
+    // ₦29,999 / 12 ≈ ₦2,500. The page previously displayed ₦7,500/mo which
+    // was a hardcoded typo (commit 4af41c3 fixed it). This test fails loudly
+    // if the wrong number ever creeps back in.
+    await page.goto('/pricing');
+    await expect(page.getByText(/= ₦2,500\/mo/i)).toBeVisible();
+    await expect(page.getByText(/= ₦7,500\/mo/i)).toHaveCount(0);
+  });
+
   test('subscribe buttons are present', async ({ page }) => {
     await page.goto('/pricing');
     const subscribeBtn = page.getByRole('button', { name: /get pro|get day pass|get annual|start free|subscribe/i }).first();

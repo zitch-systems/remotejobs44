@@ -2,25 +2,15 @@
 // Admin-triggered password reset — sends Supabase's standard recovery email
 // to the user's address. The user clicks the link and lands on /reset-password.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
+import { requireAdmin } from '@/lib/admin/auth';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function requireAdmin(): Promise<{ ok: false } | { ok: true; adminId: string; adminEmail: string | null }> {
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
-  if (!isAdmin) return { ok: false };
-  return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
-}
-
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!auth.ok) return auth.res;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const supabase = createAdminSupabaseClient();
