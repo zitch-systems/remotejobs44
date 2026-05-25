@@ -7,7 +7,7 @@ import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, Brie
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { resolveRole } from '@/lib/auth/redirect';
 
 const NAV_LINKS = [
   { href: '/jobs',      label: 'Jobs'      },
@@ -70,7 +70,7 @@ export function Header() {
     }
 
     function buildUser(authUser: { id: string; email?: string | null }, profile: any) {
-      const role: 'admin' | 'user' = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
+      const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
       const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
       return {
         id:    authUser.id,
@@ -110,12 +110,16 @@ export function Header() {
       }
       if (event === 'SIGNED_OUT') {
         if (ignoreNextSignedOut) return; // spurious event during token refresh
-        // Double-check: if getUser still returns a valid user, the SIGNED_OUT was spurious.
-        // This guards against transient cookie/session blips logging the user out.
+        // Confirm the logout with a fresh getUser. Only clear local state when
+        // we're CERTAIN (401/403, or no user with no error). A network blip
+        // here previously caused random logouts.
         try {
-          const { data: { user: stillAuthed } } = await supabase.auth.getUser();
+          const { data: { user: stillAuthed }, error } = await supabase.auth.getUser();
           if (stillAuthed) return;
-        } catch {}
+          if (error && error.status !== 401 && error.status !== 403) return; // transient
+        } catch {
+          return; // network exception — keep session, don't log out
+        }
         setUser(null);
         return;
       }

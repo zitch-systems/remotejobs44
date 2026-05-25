@@ -52,11 +52,19 @@ export async function GET(req: NextRequest) {
     const planTier  = getPlanTier(plan);
     const expiresAt = getPlanExpiry(plan);
 
-    // Update user plan
-    await supabase
+    // Update user plan — but never overwrite an admin's special 'admin' plan tag.
+    const { data: existing } = await supabase
       .from('profiles')
-      .update({ plan: planTier, plan_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', user_id);
+      .select('role')
+      .eq('id', user_id)
+      .maybeSingle();
+    if (existing?.role !== 'admin') {
+      const { error: planErr } = await supabase
+        .from('profiles')
+        .update({ plan: planTier, plan_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', user_id);
+      if (planErr) console.error('[verify] profile plan update failed:', planErr.message);
+    }
 
     // Upsert subscription record
     await supabase.from('subscriptions').upsert({

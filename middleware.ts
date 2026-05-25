@@ -1,6 +1,12 @@
 // middleware.ts — Supabase session refresh + route-level role enforcement.
 // Uses the @supabase/ssr getAll/setAll pattern recommended by Supabase to avoid
 // random logouts caused by inconsistent cookie propagation.
+//
+// Random-logout guard: getUser() can throw or return 5xx on transient network
+// blips. We must NOT redirect to /login on those — we only redirect when we
+// have a *confirmed* "no session" response (401/403 with no user), or when no
+// Supabase cookies exist at all. Anything else we let through and let the
+// page render so a temporary network hiccup doesn't kick the user out.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { ADMIN_EMAILS } from '@/lib/admin-emails';
@@ -8,6 +14,13 @@ import { ADMIN_EMAILS } from '@/lib/admin-emails';
 function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+// Detects presence of any Supabase auth cookie. If there's no auth cookie at
+// all, the user is truly logged out. If there IS a cookie but getUser fails,
+// it's a transient error — keep them logged in.
+function hasSupabaseSessionCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'));
 }
 
 export async function middleware(request: NextRequest) {
@@ -36,26 +49,46 @@ export async function middleware(request: NextRequest) {
 
   // IMPORTANT: do not run code between createServerClient and supabase.auth.getUser()
   // — doing so can cause users to be randomly logged out (per Supabase docs).
-  let user = null;
+  let user: { id: string; email?: string | null } | null = null;
+  let confirmedUnauthed = false;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data?.user ?? null;
-  } catch {}
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      // 401/403 = real "no session". 5xx / network = transient.
+      const status = (error as any)?.status;
+      if (status === 401 || status === 403) confirmedUnauthed = true;
+    } else {
+      user = data?.user ?? null;
+      // No error and no user → also confirmed unauthed.
+      if (!user) confirmedUnauthed = true;
+    }
+  } catch {
+    // Network exception — treat as transient. Do not bounce.
+  }
+
+  // If we couldn't verify but there's no auth cookie at all, treat as unauthed.
+  if (!user && !confirmedUnauthed && !hasSupabaseSessionCookie(request)) {
+    confirmedUnauthed = true;
+  }
 
   const path = request.nextUrl.pathname;
   const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
   const isDashboardRoute = path === '/dashboard' || path.startsWith('/dashboard/');
 
-  if ((isAdminRoute || isDashboardRoute) && !user) {
+  // Only bounce to /login when we are CERTAIN the user has no session — not on
+  // transient errors. Otherwise the page renders and its client-side auth check
+  // can handle redirect or render a "loading" state.
+  if ((isAdminRoute || isDashboardRoute) && confirmedUnauthed) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);
     return NextResponse.redirect(url);
   }
 
-  // Cheap role hint based on hardcoded admin list — DB lookup happens client-side
-  // in the layout for accuracy. This middleware just shortcuts the obvious wrong-area
-  // bounces so the user doesn't see the wrong area flash on screen.
+  // Server-side shortcut for the hardcoded admin list, so admins never see the
+  // /dashboard flash before the client-side check fires. Members are routed by
+  // the /admin layout's client-side profile lookup (DB role is the source of
+  // truth there).
   if (user && isDashboardRoute && isAdminEmail(user.email)) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin';
