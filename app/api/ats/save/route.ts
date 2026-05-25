@@ -38,59 +38,64 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabaseClient();
 
-    // Transform camelCase Job to snake_case DB row
-    const rows = jobs.map(j => ({
-      // Use ATS-specific ID as external reference, generate UUID for PK
-      title:        j.title ?? 'Untitled',
-      company:      j.company ?? 'Unknown',
-      logo:         j.logo ?? (j.company ? j.company[0] : '?'),
-      category:     j.category ?? 'other',
-      type:         j.type ?? 'full-time',
-      level:        j.level ?? null,
-      salary_min:   j.salaryMin ?? null,
-      salary_max:   j.salaryMax ?? null,
-      currency:     j.currency ?? 'USD',
-      location:     j.location ?? 'Worldwide',
-      timezone:     j.timezone ?? null,
-      description:  j.description ?? '',
-      requirements: j.requirements ?? null,
-      skills:       j.skills ?? null,
-      benefits:     j.benefits ?? null,
-      apply_url:    j.applyUrl ?? null,
-      apply_email:  j.applyEmail ?? null,
-      posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
-      expires_at:   j.expires ?? null,
-      featured:     false,
-      is_new:       true,
-      is_active:    true,
-      source:       j.source ?? 'api',
-      source_url:   j.sourceUrl ?? null,
-      remote:       j.remote ?? true,
-    }));
+    // Transform camelCase Job to snake_case DB row.
+    // Rows without apply_url cannot be deduplicated (the unique index in
+    // migration_v2.sql is partial: WHERE apply_url IS NOT NULL), so drop them
+    // up front — otherwise repeated bulk imports of the same JS-rendered page
+    // would silently pile up duplicates.
+    const rows = jobs
+      .filter(j => typeof j.applyUrl === 'string' && j.applyUrl.length > 0)
+      .map(j => ({
+        title:        j.title ?? 'Untitled',
+        company:      j.company ?? 'Unknown',
+        logo:         j.logo ?? (j.company ? j.company[0] : '?'),
+        category:     j.category ?? 'other',
+        type:         j.type ?? 'full-time',
+        level:        j.level ?? null,
+        salary_min:   j.salaryMin ?? null,
+        salary_max:   j.salaryMax ?? null,
+        currency:     j.currency ?? 'USD',
+        location:     j.location ?? 'Worldwide',
+        timezone:     j.timezone ?? null,
+        description:  j.description ?? '',
+        requirements: j.requirements ?? null,
+        skills:       j.skills ?? null,
+        benefits:     j.benefits ?? null,
+        apply_url:    j.applyUrl!,
+        apply_email:  j.applyEmail ?? null,
+        posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
+        expires_at:   j.expires ?? null,
+        featured:     false,
+        is_new:       true,
+        is_active:    true,
+        source:       j.source ?? 'api',
+        source_url:   j.sourceUrl ?? null,
+        remote:       j.remote ?? true,
+      }));
 
-    // Upsert — skip duplicates based on title+company+apply_url
-    // We insert in batches of 100 to avoid payload limits
+    const noUrl = jobs.length - rows.length;
+
+    // Upsert against the unique partial index on apply_url so duplicates are
+    // skipped per-row instead of failing the whole batch (the prior .insert()
+    // would mark all 100 rows skipped on a single 23505 conflict).
     let inserted = 0;
-    let skipped = 0;
+    let skipped  = noUrl;
 
     for (let i = 0; i < rows.length; i += 100) {
       const batch = rows.slice(i, i + 100);
 
       const { data, error } = await supabase
         .from('jobs')
-        .insert(batch)
+        .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
         .select('id');
 
       if (error) {
-        // Duplicate key errors are expected — count skips
-        if (error.code === '23505') {
-          skipped += batch.length;
-        } else {
-          console.error('[ats/save] batch error:', error.message);
-          skipped += batch.length;
-        }
+        console.error('[ats/save] batch error:', error.message);
+        skipped += batch.length;
       } else {
-        inserted += data?.length ?? 0;
+        const n = data?.length ?? 0;
+        inserted += n;
+        skipped  += batch.length - n;
       }
     }
 
