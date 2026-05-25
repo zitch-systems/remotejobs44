@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://remotejobs44.com'),
   alternates: { canonical: 'https://remotejobs44.com' },
   title: { default: 'RemoteJobs44 – Remote Jobs in Nigeria & Worldwide', template: '%s | RemoteJobs44' },
-  description: 'Find 50,000+ verified remote jobs from top global companies. Search engineering, design, marketing, finance, and more. Browse free — apply from ₦1,000.',
+  description: 'Find 50,000+ verified remote jobs from top global companies. Search engineering, design, marketing, finance, and more. Browse free — apply from ₦500.',
   keywords: [
     'remote jobs Nigeria', 'work from home Nigeria', 'remote work Africa', 'online jobs Nigeria',
     'remote jobs 2025', 'remote jobs Lagos', 'remote jobs Abuja', 'remote engineering jobs',
@@ -23,10 +23,10 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website', locale: 'en_NG', siteName: 'RemoteJobs44',
     title: 'RemoteJobs44 – Find Remote Jobs in Nigeria & Worldwide',
-    description: 'Browse 50,000+ verified remote jobs. Engineering, design, marketing and more. Subscribe from ₦1,000.',
+    description: 'Browse 50,000+ verified remote jobs. Engineering, design, marketing and more. Subscribe from ₦500.',
     images: [{ url: '/api/og', width: 1200, height: 630, alt: 'RemoteJobs44 – Remote Jobs Board' }],
   },
-  twitter: { card: 'summary_large_image', title: 'RemoteJobs44 – Remote Jobs', description: 'Browse 50,000+ remote jobs worldwide. Subscribe from ₦1,000.', images: ['/api/og'] },
+  twitter: { card: 'summary_large_image', title: 'RemoteJobs44 – Remote Jobs', description: 'Browse 50,000+ remote jobs worldwide. Subscribe from ₦500.', images: ['/api/og'] },
   manifest: '/manifest.json',
   icons: {
     icon: [

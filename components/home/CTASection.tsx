@@ -14,7 +14,7 @@ export function CTASection() {
           Your remote career<br />is one click away
         </h2>
         <p className="text-brand-200 mb-10 text-base max-w-md mx-auto leading-relaxed">
-          Browse free. Get full access from ₦1,000. Work from anywhere in the world.
+          Browse free. Get full access from ₦500. Work from anywhere in the world.
         </p>
         <div className="flex gap-4 justify-center flex-wrap">
           <Link href="/jobs"

@@ -16,7 +16,7 @@ const steps = [
     iconBg: 'bg-orange-50 dark:bg-orange-950/40',
     iconColor: 'text-orange-500 dark:text-orange-400',
     title: 'Unlock access',
-    desc: 'Start with a ₦1,000 Day Pass or go Pro at ₦8,999/month. Instantly unlock every apply link and email.',
+    desc: 'Start with a ₦500 Day Pass or go Pro at ₦2,999/month. Instantly unlock every apply link and email.',
   },
   {
     num: '03',

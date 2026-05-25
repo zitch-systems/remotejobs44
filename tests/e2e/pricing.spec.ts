@@ -4,8 +4,8 @@ test.describe('Pricing Page', () => {
   test('pricing page loads with plans', async ({ page }) => {
     await page.goto('/pricing');
     await expect(page).toHaveTitle(/pricing|plans|RemoteJobs44/i);
-    // Day pass is ₦1,000 — always visible
-    await expect(page.getByText(/₦1,000/i).first()).toBeVisible();
+    // Day pass is ₦500 — always visible
+    await expect(page.getByText(/₦500/i).first()).toBeVisible();
   });
 
   test('all plan tiers are visible', async ({ page }) => {
@@ -18,7 +18,7 @@ test.describe('Pricing Page', () => {
   test('annual plan is shown with correct price', async ({ page }) => {
     await page.goto('/pricing');
     // Pro Annual plan is always shown — no toggle needed
-    await expect(page.getByText(/₦89,999/i).first()).toBeVisible();
+    await expect(page.getByText(/₦29,999/i).first()).toBeVisible();
     await expect(page.getByText(/Pro Annual/i).first()).toBeVisible();
   });
 

@@ -9,7 +9,7 @@ const PLANS = [
   {
     id:        'daily'      as const,
     name:      'Day Pass',
-    price:     '₦1,000',
+    price:     '₦500',
     period:    '/ 24 hours',
     desc:      'Full access for a day. Great for an active job hunt.',
     features:  ['Up to 10 job applications', 'All apply links & emails', 'CV auto-apply', '24-hour access'],
@@ -20,7 +20,7 @@ const PLANS = [
   {
     id:        'pro'        as const,
     name:      'Pro Monthly',
-    price:     '₦8,999',
+    price:     '₦2,999',
     period:    '/ month',
     desc:      'Unlimited access, ongoing alerts, and priority support.',
     features:  ['Everything in Day Pass', 'Ongoing job alerts', 'Priority support', 'Cancel anytime'],
@@ -31,10 +31,10 @@ const PLANS = [
   {
     id:        'pro_annual' as const,
     name:      'Pro Annual',
-    price:     '₦89,999',
+    price:     '₦29,999',
     period:    '/ year',
-    desc:      'Best value — save ₦17,989 vs monthly.',
-    features:  ['Everything in Pro Monthly', 'Save ₦17,989/yr', 'Early feature access', 'Priority support'],
+    desc:      'Best value — save ₦5,989 vs monthly.',
+    features:  ['Everything in Pro Monthly', 'Save ₦5,989/yr', 'Early feature access', 'Priority support'],
     cta:       'Get Annual',
     highlight: false,
     badge:     'Best Value' as string | null,
@@ -63,7 +63,7 @@ export function PricingPreview() {
             Flexible plans for everyone
           </h2>
           <p className="text-stone-400 dark:text-stone-500 max-w-md mx-auto text-sm">
-            Start free, upgrade when you&apos;re ready. Access from just ₦1,000.
+            Start free, upgrade when you&apos;re ready. Access from just ₦500.
           </p>
         </div>
 

@@ -31,7 +31,7 @@ export default function Post() {
           { h: 'Best platforms to find remote jobs', p: 'RemoteJobs44 aggregates 50,000+ remote jobs from top companies. We Work Remotely, Remote.co, and Remotive list vetted remote positions. LinkedIn remote filter and Greenhouse/Lever ATS boards at specific companies are excellent sources for mid-to-senior roles.' },
           { h: 'How to get paid internationally', p: 'Wise (TransferWise) is the most popular option — low fees, fast transfers to Nigerian bank accounts. Grey, Geegpay, and Chipper Cash are built specifically for African remote workers. Some employers will also set you up on Deel or Remote.com for payroll compliance.' },
           { h: 'How to stand out as a Nigerian applicant', p: 'Competition is global, so quality matters. Build a strong GitHub profile or portfolio. Write a compelling cover letter that addresses timezone availability and your communication tools (Slack, Zoom, Notion). List your current time zone (WAT, UTC+1) — it overlaps with European morning hours, which is a genuine advantage.' },
-          { h: 'Your first step', p: 'Start by browsing RemoteJobs44 for free. When you\'re ready to apply, a Day Pass at ₦1,000 gives you 24-hour access to all contact emails and apply links. Go all-in with Pro at ₦8,999/month for unlimited applications, job alerts, and auto-apply.' },
+          { h: 'Your first step', p: 'Start by browsing RemoteJobs44 for free. When you\'re ready to apply, a Day Pass at ₦500 gives you 24-hour access to all contact emails and apply links. Go all-in with Pro at ₦2,999/month for unlimited applications, job alerts, and auto-apply.' },
         ].map((section, i) => (
           <div key={i}>
             <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-3">{section.h}</h2>
@@ -42,7 +42,7 @@ export default function Post() {
 
       <div className="mt-12 card p-6 bg-brand-50 dark:bg-brand-900/10 border-brand-200 dark:border-brand-800">
         <h3 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">Ready to start your remote career?</h3>
-        <p className="text-stone-500 dark:text-stone-400 text-sm mb-4">Browse 50,000+ remote jobs. Access from ₦1,000.</p>
+        <p className="text-stone-500 dark:text-stone-400 text-sm mb-4">Browse 50,000+ remote jobs. Access from ₦500.</p>
         <Link href="/jobs" className="inline-block px-6 py-3 bg-brand-700 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors text-sm">
           Browse Jobs →
         </Link>

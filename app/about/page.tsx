@@ -55,7 +55,7 @@ export default function AboutPage() {
             RemoteJobs44 was built to fix that. We automatically ingest thousands of jobs from top companies every day, using free public APIs from Greenhouse, Lever, Ashby, and direct RSS feeds. You see the same jobs as everyone else, for a fraction of the cost.
           </p>
           <p>
-            Our Day Pass model means you can spend a focused day applying to 20 jobs for ₦1,000 — less than a cup of coffee in most cities. If you're actively job hunting, Pro gives you unlimited access for ₦8,999/month.
+            Our Day Pass model means you can spend a focused day applying to 10 jobs for ₦500 — less than a cup of coffee in most cities. If you&apos;re actively job hunting, Pro gives you unlimited access for ₦2,999/month.
           </p>
         </div>
       </div>

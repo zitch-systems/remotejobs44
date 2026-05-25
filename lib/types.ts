@@ -122,7 +122,7 @@ export interface Subscription {
   status: 'active' | 'cancelled' | 'past_due';
 }
 
-// Plans: daily=₦1,000 | pro_monthly=₦8,999 | pro_annual=₦89,999
+// Plans: daily=₦500 | pro_monthly=₦2,999 | pro_annual=₦29,999
 export interface PricingPlan {
   id: string;
   name: string;

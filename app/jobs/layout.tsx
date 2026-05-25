@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   keywords: ['remote jobs', 'work from home jobs', 'remote jobs Nigeria', 'remote jobs Africa', 'online jobs', 'telecommute jobs', 'remote engineering jobs', 'remote design jobs'],
   openGraph: {
     title: 'Browse 50,000+ Remote Jobs | RemoteJobs44',
-    description: 'Find remote jobs from top global companies. Filter by category, salary, region. Subscribe from ₦1,000.',
+    description: 'Find remote jobs from top global companies. Filter by category, salary, region. Subscribe from ₦500.',
     url: 'https://remotejobs44.com/jobs',
     images: [{ url: '/api/og', width: 1200, height: 630 }],
   },

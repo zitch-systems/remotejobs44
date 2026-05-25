@@ -4,11 +4,12 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 
-// Amounts in kobo (1 Naira = 100 kobo)
+// Amounts in kobo (1 Naira = 100 kobo). Match what's configured on Paystack
+// Dashboard → Subscriptions → Plans for pro / pro_annual.
 const PLAN_AMOUNTS: Record<string, number> = {
-  daily:      100000,   // ₦1,000
-  pro:        899900,   // ₦8,999
-  pro_annual: 8999900,  // ₦89,999
+  daily:      50000,    // ₦500
+  pro:        299900,   // ₦2,999
+  pro_annual: 2999900,  // ₦29,999
 };
 
 // Plan codes set in Paystack Dashboard → Subscriptions → Plans

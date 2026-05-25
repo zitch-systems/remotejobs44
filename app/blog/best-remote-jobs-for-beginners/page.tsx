@@ -47,7 +47,7 @@ export default function Post() {
       </div>
       <div className="mt-12 card p-6 bg-brand-50 dark:bg-brand-900/10 border-brand-200 dark:border-brand-800">
         <h3 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">Start your remote job search today</h3>
-        <p className="text-stone-500 dark:text-stone-400 text-sm mb-4">Browse free. Apply from ₦1,000.</p>
+        <p className="text-stone-500 dark:text-stone-400 text-sm mb-4">Browse free. Apply from ₦500.</p>
         <Link href="/jobs" className="inline-block px-6 py-3 bg-brand-700 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors text-sm">Browse Jobs →</Link>
       </div>
     </div>

@@ -245,7 +245,7 @@ export function Header() {
                       <Link href="/pricing" onClick={() => setUserOpen(false)}
                         className="flex items-center gap-2 px-4 py-2.5 bg-brand-50 dark:bg-brand-900/20 border-b border-stone-100 dark:border-[#1e3a5f] text-sm text-brand-700 dark:text-brand-400 font-semibold hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors">
                         <Zap className="w-4 h-4" />
-                        Upgrade from ₦1,000 →
+                        Upgrade from ₦500 →
                       </Link>
                     )}
 

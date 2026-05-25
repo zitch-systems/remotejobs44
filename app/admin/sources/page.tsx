@@ -160,12 +160,55 @@ export default function SourcesPage() {
     document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
   }
 
+  // Manual "run all free feeds now" button — calls /api/admin/ingest-now
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestResult, setIngestResult] = useState<{ totalAdded: number; results: Record<string, number | string> } | null>(null);
+
+  async function handleIngestNow() {
+    setIngesting(true); setIngestResult(null);
+    try {
+      const r = await fetch('/api/admin/ingest-now', { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'failed');
+      setIngestResult({ totalAdded: j.totalAdded ?? 0, results: j.results ?? {} });
+    } catch (err: any) {
+      setIngestResult({ totalAdded: 0, results: { error: err.message } });
+    } finally {
+      setIngesting(false);
+    }
+  }
+
   return (
     <div className="max-w-[900px] mx-auto px-5 py-8">
       <div className="mb-7">
         <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-1">Job Sources</h1>
         <p className="text-sm text-stone-400 dark:text-stone-500">Auto-detects RSS, JSON API, Greenhouse, Lever, Ashby, or Workable from any URL.</p>
         {importedCount > 0 && <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 rounded-lg text-sm font-bold"><CheckCircle className="w-4 h-4" /> {importedCount} jobs imported</div>}
+      </div>
+
+      {/* Run-now panel */}
+      <div className="card p-5 mb-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-1">Run All Free Feeds Now</h2>
+            <p className="text-xs text-stone-400 dark:text-stone-500">Triggers the same ingestion the cron runs every 6 hours: Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas (+ Findwork/SerpApi when keys are set).</p>
+            {ingestResult && (
+              <div className="mt-3 p-3 rounded-lg bg-stone-50 dark:bg-[#162033] text-xs">
+                <p className="font-bold text-brand-700 dark:text-brand-400 mb-1">Added {ingestResult.totalAdded} new jobs</p>
+                <ul className="space-y-0.5 text-stone-600 dark:text-stone-300">
+                  {Object.entries(ingestResult.results).map(([k, v]) => (
+                    <li key={k}><span className="font-semibold">{k}:</span> {v}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <button onClick={handleIngestNow} disabled={ingesting}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors shrink-0">
+            {ingesting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {ingesting ? 'Running…' : 'Run Now'}
+          </button>
+        </div>
       </div>
 
       <div className="card p-5 mb-5">

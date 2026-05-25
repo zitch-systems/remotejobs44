@@ -125,7 +125,7 @@ export function Footer() {
               RemoteJobs44
             </Link>
             <p className="text-sm text-stone-400 dark:text-stone-500 max-w-[220px] leading-relaxed mb-3">
-              Your global remote career starts here. Find jobs from anywhere. Subscribe from ₦1,000.
+              Your global remote career starts here. Find jobs from anywhere. Subscribe from ₦500.
             </p>
             <a href="mailto:hello@remotejobs44.com"
               className="inline-flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:underline mb-5 font-medium">

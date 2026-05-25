@@ -185,7 +185,7 @@ function DashboardContent() {
           {user.plan === 'free' && (
             <Link href="/pricing"
               className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-bold hover:bg-amber-100 transition-colors">
-              <Zap className="w-4 h-4" /> Upgrade from ₦1,000
+              <Zap className="w-4 h-4" /> Upgrade from ₦500
             </Link>
           )}
           <button onClick={handleLogout}

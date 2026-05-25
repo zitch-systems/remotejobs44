@@ -178,7 +178,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: 'daily',
     name: 'Day Pass',
-    nairaPrice: 1000,
+    nairaPrice: 500,
     billing: 'daily',
     description: 'Full access for 24 hours. Perfect for active job hunting.',
     cta: 'Get Day Pass',
@@ -197,7 +197,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: 'pro',
     name: 'Pro Monthly',
-    nairaPrice: 8999,
+    nairaPrice: 2999,
     billing: 'monthly',
     description: 'Everything you need to land your remote job.',
     cta: 'Get Pro',
@@ -216,15 +216,15 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: 'pro_annual',
     name: 'Pro Annual',
-    nairaPrice: 89999,
-    nairaMonthlyEquiv: 7500,
+    nairaPrice: 29999,
+    nairaMonthlyEquiv: 2500,
     billing: 'annually',
-    description: 'Best value — save ₦17,989 vs monthly.',
+    description: 'Best value — save ₦5,989 vs monthly.',
     cta: 'Get Annual',
     badge: 'Best Value',
     features: [
       { text: 'Everything in Pro Monthly', included: true },
-      { text: 'Save ₦17,989 per year', included: true },
+      { text: 'Save ₦5,989 per year', included: true },
       { text: 'Priority support', included: true },
       { text: 'Early access to new features', included: true },
       { text: 'Cancel anytime', included: true },

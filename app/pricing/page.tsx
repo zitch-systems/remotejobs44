@@ -34,7 +34,7 @@ const PLANS = [
   {
     id: 'daily' as const,
     name: 'Day Pass',
-    price: '₦1,000',
+    price: '₦500',
     period: '/ 24 hours',
     icon: <Clock className="w-4 h-4" />,
     desc: 'Full access for 24 hours with 10 applications. Perfect for a focused job-hunt day.',
@@ -55,7 +55,7 @@ const PLANS = [
   {
     id: 'pro' as const,
     name: 'Pro Monthly',
-    price: '₦8,999',
+    price: '₦2,999',
     period: '/ month',
     icon: <Zap className="w-4 h-4" />,
     desc: 'Everything you need to land your remote job, month after month.',
@@ -75,15 +75,15 @@ const PLANS = [
   {
     id: 'pro_annual' as const,
     name: 'Pro Annual',
-    price: '₦89,999',
+    price: '₦29,999',
     period: '/ year',
     icon: <Calendar className="w-4 h-4" />,
-    desc: 'Best value — save ₦17,989 compared to monthly.',
+    desc: 'Best value — save ₦5,989 compared to monthly.',
     cta: 'Get Annual',
     popular: false,
     features: [
       { text: 'Everything in Pro Monthly', ok: true },
-      { text: 'Save ₦17,989 per year', ok: true },
+      { text: 'Save ₦5,989 per year', ok: true },
       { text: 'Early access to new features', ok: true },
       { text: 'Priority support', ok: true },
       { text: 'Cancel anytime', ok: true },

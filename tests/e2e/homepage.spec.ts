@@ -36,7 +36,7 @@ test.describe('Homepage', () => {
 
   test('pricing section is visible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/₦1,000|pricing|pro plan/i).first()).toBeVisible();
+    await expect(page.getByText(/₦500|pricing|pro plan/i).first()).toBeVisible();
   });
 
   test('footer has correct links', async ({ page }) => {

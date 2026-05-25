@@ -7,9 +7,9 @@ import { createClient } from '@/lib/supabase/client';
 interface PaywallModalProps { mode: 'login' | 'subscribe'; }
 
 const PLANS = [
-  { id: 'daily'      as const, label: 'Day Pass',    price: '₦1,000',  sub: '24-hour full access',   highlight: false },
-  { id: 'pro'        as const, label: 'Pro Monthly', price: '₦8,999',  sub: 'per month',             highlight: true  },
-  { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦89,999', sub: 'per year · save ₦17,989', highlight: false },
+  { id: 'daily'      as const, label: 'Day Pass',    price: '₦500',    sub: '24-hour full access',   highlight: false },
+  { id: 'pro'        as const, label: 'Pro Monthly', price: '₦2,999',  sub: 'per month',             highlight: true  },
+  { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦29,999', sub: 'per year · save ₦5,989', highlight: false },
 ];
 
 export function PaywallModal({ mode }: PaywallModalProps) {
