@@ -1,8 +1,8 @@
 {
   "crons": [
     { "path": "/api/cron/daily",        "schedule": "0 6 * * *" },
-    { "path": "/api/cron/ingest",       "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/expire-daily", "schedule": "0 * * * *" }
+    { "path": "/api/cron/ingest",       "schedule": "0 6 * * *" },
+    { "path": "/api/cron/expire-daily", "schedule": "0 6 * * *" }
   ],
   "functions": {
     "app/api/cron/daily/route.ts":        { "maxDuration": 60 },
