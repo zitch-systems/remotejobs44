@@ -8,6 +8,7 @@ import { cn, formatRelativeDate } from '@/lib/utils';
 interface Profile {
   id: string; name: string | null; email: string;
   plan: string; role: string; created_at: string;
+  suspended?: boolean | null;
 }
 
 type PlanFilter = 'all' | 'free' | 'daily' | 'pro' | 'admin';
@@ -52,7 +53,9 @@ export default function AdminUsersPage() {
     const { col, asc } = SORT_FIELDS[sortBy];
     let query = supabase
       .from('profiles')
-      .select('id,name,email,plan,role,created_at', { count: 'exact' })
+      // suspended is added in migration_v4 — Supabase ignores unknown columns
+      // in the select list on older schemas, so this is forward-compatible.
+      .select('id,name,email,plan,role,created_at,suspended', { count: 'exact' })
       .order(col, { ascending: asc, nullsFirst: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
@@ -179,13 +182,18 @@ export default function AdminUsersPage() {
                     <p className="text-xs text-stone-400 truncate">{user.email}</p>
                   </div>
                 </Link>
-                <div className="col-span-2">
+                <div className="col-span-2 flex flex-wrap items-center gap-1">
                   <span className={cn('badge', planColor(user.plan))}>
                     {user.plan === 'admin' ? <Shield className="w-3 h-3" /> :
                      user.plan !== 'free' ? <Zap className="w-3 h-3" /> :
                      <User className="w-3 h-3" />}
                     {user.plan}
                   </span>
+                  {user.suspended && (
+                    <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]">
+                      suspended
+                    </span>
+                  )}
                 </div>
                 <div className="col-span-3 text-xs text-stone-400">
                   {user.created_at ? formatRelativeDate(user.created_at) : '—'}

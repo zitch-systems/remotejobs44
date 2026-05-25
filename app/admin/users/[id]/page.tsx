@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Shield, Zap, User, Mail, Calendar, CreditCard,
   Briefcase, RefreshCw, Trash2, KeyRound, Save, AlertTriangle,
+  Ban, CheckCircle as Unsuspend,
 } from 'lucide-react';
 import { useUIStore } from '@/lib/store';
 import { cn, formatRelativeDate } from '@/lib/utils';
@@ -15,6 +16,9 @@ interface Profile {
   profile_completion: number | null;
   paystack_customer_code: string | null;
   paystack_subscription_code: string | null;
+  suspended: boolean | null;
+  suspended_at: string | null;
+  suspended_reason: string | null;
 }
 interface Subscription {
   plan: string; billing: string; status: string;
@@ -45,6 +49,8 @@ export default function AdminUserDetailPage() {
   const [saving, setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [suspending, setSuspending] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
 
   useEffect(() => {
@@ -96,6 +102,29 @@ export default function AdminUserDetailPage() {
     setResetting(false);
     if (!res.ok) { toast(data.error ?? 'Reset failed', 'error'); return; }
     toast(`Recovery email sent to ${data.sent_to}`, 'success');
+  }
+
+  async function handleSuspend(nextSuspended: boolean) {
+    if (!profile) return;
+    setSuspending(true);
+    const body: any = { suspended: nextSuspended };
+    if (nextSuspended && suspendReason.trim()) body.suspended_reason = suspendReason.trim();
+    const res = await fetch(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    setSuspending(false);
+    if (!res.ok) { toast(data.error ?? 'Action failed', 'error'); return; }
+    setProfile(p => p ? {
+      ...p,
+      suspended: nextSuspended,
+      suspended_at: nextSuspended ? new Date().toISOString() : null,
+      suspended_reason: nextSuspended ? (suspendReason.trim() || null) : null,
+    } : p);
+    if (!nextSuspended) setSuspendReason('');
+    toast(nextSuspended ? 'User suspended' : 'User unsuspended', 'success');
   }
 
   async function handleDelete() {
@@ -267,6 +296,51 @@ export default function AdminUserDetailPage() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Suspension */}
+      <div className={cn(
+        'card p-6 mb-6',
+        profile.suspended && 'border-amber-200 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-900/5'
+      )}>
+        <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-2 flex items-center gap-2">
+          <Ban className={cn('w-4 h-4', profile.suspended ? 'text-amber-600' : 'text-stone-400')} />
+          Account status
+          {profile.suspended && (
+            <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-2">
+              Suspended
+            </span>
+          )}
+        </h2>
+        {profile.suspended ? (
+          <>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+              Suspended {profile.suspended_at ? formatRelativeDate(profile.suspended_at) : ''}
+              {profile.suspended_reason && (
+                <> — <span className="italic">"{profile.suspended_reason}"</span></>
+              )}
+            </p>
+            <button onClick={() => handleSuspend(false)} disabled={suspending}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors">
+              {suspending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Unsuspend className="w-3.5 h-3.5" />}
+              Unsuspend
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+              Suspended users can still log in but the API treats them as logged-out for any state-changing action.
+            </p>
+            <input value={suspendReason} onChange={e => setSuspendReason(e.target.value)}
+              placeholder="Optional reason (shown in audit log)" maxLength={500}
+              className="input text-sm mb-3" />
+            <button onClick={() => handleSuspend(true)} disabled={suspending}
+              className="flex items-center gap-2 px-4 py-2 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm font-semibold rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10 disabled:opacity-50 transition-colors">
+              {suspending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+              Suspend account
+            </button>
+          </>
         )}
       </div>
 

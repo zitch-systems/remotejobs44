@@ -4,19 +4,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { recordAdminAction } from '@/lib/admin/audit';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function requireAdmin() {
+async function requireAdmin(): Promise<{ ok: false } | { ok: true; adminId: string; adminEmail: string | null }> {
   const supabase = createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { ok: false };
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  return profile?.role === 'admin' || isHardcodedAdmin(user.email);
+  const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
+  if (!isAdmin) return { ok: false };
+  return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
 }
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const supabase = createAdminSupabaseClient();
@@ -32,5 +36,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     redirectTo: appUrl ? `${appUrl}/reset-password` : undefined,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await recordAdminAction({
+    adminId: auth.adminId, adminEmail: auth.adminEmail,
+    action: 'user.reset_password', targetType: 'user', targetId: params.id,
+    metadata: { sent_to: profile.email },
+  });
+
   return NextResponse.json({ success: true, sent_to: profile.email });
 }

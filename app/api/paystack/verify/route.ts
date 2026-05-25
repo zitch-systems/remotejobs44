@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentSuccessEmail } from '@/lib/email/templates';
+import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
@@ -66,13 +67,23 @@ export async function GET(req: NextRequest) {
       if (planErr) console.error('[verify] profile plan update failed:', planErr.message);
     }
 
+    // Look up the actual Paystack subscription so we can persist its
+    // email_token. Without that, user-initiated cancellation has to fall
+    // back to a soft cancel in our DB. Day Pass is one-off — no
+    // subscription row — so we skip the lookup there.
+    const paystackSub = plan === 'daily'
+      ? null
+      : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
+
     // Upsert subscription record
     await supabase.from('subscriptions').upsert({
       user_id,
       plan: planTier,
       billing:     plan === 'daily' ? 'daily' : plan === 'pro_annual' ? 'annually' : 'monthly',
       status:      'active',
-      paystack_customer_code: customer?.customer_code ?? null,
+      paystack_customer_code:     customer?.customer_code ?? null,
+      paystack_subscription_code: paystackSub?.subscription_code ?? null,
+      paystack_email_token:       paystackSub?.email_token ?? null,
       current_period_start:   new Date().toISOString(),
       current_period_end:     expiresAt.toISOString(),
       currency:    currency ?? 'NGN',

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   CreditCard, Calendar, CheckCircle, XCircle, AlertCircle,
-  ArrowLeft, RefreshCw, Trash2, Zap,
+  ArrowLeft, RefreshCw, Trash2, Zap, Bell,
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -28,16 +28,46 @@ export default function BillingPage() {
   const [deleting,   setDeleting]   = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [emailPrefs, setEmailPrefs] = useState<Record<string, boolean> | null>(null);
+  const [savingPref, setSavingPref] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login?next=/profile/billing'); return; }
     (async () => {
-      const res = await fetch('/api/profile/billing');
-      const data = await res.json();
-      if (res.ok) setSub(data.subscription);
+      const [billRes, prefRes] = await Promise.all([
+        fetch('/api/profile/billing'),
+        fetch('/api/profile/email-prefs'),
+      ]);
+      if (billRes.ok) {
+        const data = await billRes.json();
+        setSub(data.subscription);
+      }
+      if (prefRes.ok) {
+        const data = await prefRes.json();
+        setEmailPrefs(data.prefs);
+      }
       setLoading(false);
     })();
   }, []);
+
+  async function togglePref(key: string, value: boolean) {
+    if (!emailPrefs) return;
+    setSavingPref(key);
+    const prev = emailPrefs;
+    // Optimistic update so the checkbox flips instantly; revert on error.
+    setEmailPrefs({ ...emailPrefs, [key]: value });
+    const res = await fetch('/api/profile/email-prefs', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    });
+    if (!res.ok) {
+      setEmailPrefs(prev);
+      const data = await res.json().catch(() => ({}));
+      toast(data.error ?? 'Failed to update preference', 'error');
+    }
+    setSavingPref(null);
+  }
 
   async function handleCancel() {
     setCancelling(true);
@@ -188,6 +218,47 @@ export default function BillingPage() {
             className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
             Re-subscribe
           </Link>
+        </div>
+      )}
+
+      {/* Email preferences */}
+      {emailPrefs && (
+        <div className="card p-6 mb-5">
+          <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-2 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-brand-600" /> Email notifications
+          </h2>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">
+            Choose what we email you. Billing receipts always send — they're required by Paystack.
+          </p>
+          <div className="space-y-3">
+            {([
+              { key: 'job_alerts',      label: 'Job alerts',      desc: 'Personalised job matches & saved-search digests.' },
+              { key: 'product_updates', label: 'Product updates', desc: 'New features, ATS adapters, big improvements.' },
+              { key: 'marketing',       label: 'Marketing',       desc: 'Tips, founder notes, occasional promos.' },
+              { key: 'billing',         label: 'Billing & receipts', desc: 'Required transactional emails (always on).' },
+            ] as const).map(row => {
+              const checked = emailPrefs[row.key] ?? true;
+              const forced  = row.key === 'billing'; // can't turn off receipts
+              return (
+                <label key={row.key} className="flex items-start gap-3 p-3 rounded-lg border border-stone-100 dark:border-[#1e3a5f] hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={forced ? true : checked}
+                    disabled={forced || savingPref === row.key}
+                    onChange={e => !forced && togglePref(row.key, e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-stone-300 dark:border-[#1e3a5f] text-brand-600 focus:ring-brand-500 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-stone-900 dark:text-stone-100">{row.label}</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500">{row.desc}</p>
+                  </div>
+                  {savingPref === row.key && (
+                    <RefreshCw className="w-3.5 h-3.5 text-stone-400 animate-spin shrink-0 mt-1" />
+                  )}
+                </label>
+              );
+            })}
+          </div>
         </div>
       )}
 

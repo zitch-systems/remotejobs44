@@ -18,6 +18,7 @@ const NAV = [
   { href: '/admin',               icon: LayoutDashboard, label: 'Overview',      exact: true  },
   { href: '/admin/jobs',          icon: Briefcase,       label: 'Jobs'                        },
   { href: '/admin/jobs/new',      icon: PlusCircle,      label: 'Post Job',      indent: true  },
+  { href: '/admin/companies',     icon: Building2,       label: 'Companies'                   },
   { href: '/admin/users',         icon: Users,           label: 'Users'                       },
   { href: '/admin/subscriptions', icon: CreditCard,      label: 'Subscriptions'               },
   { href: '/admin/analytics',     icon: BarChart3,       label: 'Analytics'                   },

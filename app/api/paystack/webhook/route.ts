@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
@@ -135,16 +136,25 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Persist Paystack's subscription_code + email_token so user-initiated
+      // cancellation can call /subscription/disable directly. Day Pass is
+      // a one-off — no subscription is created — so skip the lookup.
+      const paystackSub = plan === 'daily'
+        ? null
+        : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
+
       const { error: subError } = await supabase.from('subscriptions').upsert({
-        user_id:                userId,
-        plan:                   tier,
+        user_id:                    userId,
+        plan:                       tier,
         billing,
-        status:                 'active',
-        paystack_customer_code: customer?.customer_code ?? null,
-        current_period_start:   new Date().toISOString(),
-        current_period_end:     expiresAt.toISOString(),
-        currency:               currency ?? 'NGN',
-        price:                  (amount ?? 0) / 100,
+        status:                     'active',
+        paystack_customer_code:     customer?.customer_code ?? null,
+        paystack_subscription_code: paystackSub?.subscription_code ?? null,
+        paystack_email_token:       paystackSub?.email_token ?? null,
+        current_period_start:       new Date().toISOString(),
+        current_period_end:         expiresAt.toISOString(),
+        currency:                   currency ?? 'NGN',
+        price:                      (amount ?? 0) / 100,
       }, { onConflict: 'user_id' });
       if (subError) console.error('[webhook] subscription upsert failed:', subError.message);
 
