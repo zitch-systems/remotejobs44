@@ -84,6 +84,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               name: 'RemoteJobs44',
               url: 'https://remotejobs44.com',
               logo: 'https://remotejobs44.com/icons/apple-touch-icon.png',
+              // sameAs tells search engines (and AI assistants) which social
+              // profiles are officially ours, so they link to the right ones
+              // in Knowledge Panels and answer snippets.
+              sameAs: [
+                'https://instagram.com/remotejobs_44',
+                'https://x.com/remotejobs44',
+                'https://facebook.com/remotejobs44',
+                'https://linkedin.com/company/remotejobs44',
+                'https://tiktok.com/@remotejobs44',
+                'https://youtube.com/@remotejobs44'
+              ],
               contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@remotejobs44.com' }
             }
           ]
