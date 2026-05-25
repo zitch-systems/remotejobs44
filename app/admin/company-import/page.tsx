@@ -134,7 +134,10 @@ export default function CompanyImportPage() {
         slug: d?.slug ?? '',
         apiEndpoint: d?.apiEndpoint ?? null,
         confidence: d?.confidence ?? null,
-        status: d ? 'ready' : 'pending',
+        // Mark every parsed URL as 'ready' so it shows up in the Fetch All
+        // queue — even URLs we couldn't ATS-detect from the URL alone get
+        // a second chance via HTML scrape on the backend.
+        status: 'ready',
         jobCount: 0,
         expanded: false,
         jobs: [],
@@ -143,7 +146,12 @@ export default function CompanyImportPage() {
     setEntries(detected);
   }
 
-  // Step 2: Fetch jobs from all detected entries
+  // Step 2: Fetch jobs from all detected entries.
+  // We also process status='pending' entries (URLs whose ATS couldn't be
+  // detected from the URL alone, e.g. fireworks.ai/careers). The backend
+  // /api/ats?url= path fetches the HTML and finds embedded ATS links
+  // (boards.greenhouse.io/fireworksai etc.), so unknown URLs often still
+  // resolve to jobs.
   async function fetchAll() {
     if (running) { pauseRef.current = !pauseRef.current; setPaused(p => !p); return; }
     setRunning(true);
@@ -151,7 +159,7 @@ export default function CompanyImportPage() {
     abortRef.current = false;
     pauseRef.current = false;
 
-    const toFetch = entries.filter(e => e.status === 'ready' || e.status === 'error');
+    const toFetch = entries.filter(e => e.status === 'ready' || e.status === 'error' || e.status === 'pending');
 
     for (let i = 0; i < toFetch.length; i++) {
       if (abortRef.current) break;
@@ -161,7 +169,9 @@ export default function CompanyImportPage() {
       setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: 'fetching' } : e));
 
       try {
-        const params = entry.platform !== 'unknown'
+        // Use the slug+platform shortcut when we already know it; otherwise
+        // hand the full URL to the backend so it can HTML-scrape for ATS links.
+        const params = entry.platform !== 'unknown' && entry.slug
           ? `/api/ats?platform=${entry.platform}&slug=${entry.slug}`
           : `/api/ats?url=${encodeURIComponent(entry.url)}`;
         const res = await fetch(params);
