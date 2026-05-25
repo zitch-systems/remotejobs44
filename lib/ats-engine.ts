@@ -1,16 +1,16 @@
-// lib/ats-engine.ts — ATS detection + public API fetching for 5 platforms
-// All endpoints are FREE with no authentication required
+// lib/ats-engine.ts — Server-only ATS fetching for 5 platforms.
+// All endpoints are FREE with no authentication required.
+//
+// The pure detection logic + types live in lib/ats-detect.ts so client
+// components (admin/company-import) can import detectATSFromUrl without
+// pulling puppeteer-core / @sparticuz/chromium into the browser bundle.
 import type { Job } from './types';
 import { uid } from './utils';
+import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
 
-export type ATSPlatform = 'greenhouse' | 'lever' | 'ashby' | 'workable' | 'recruitee' | 'unknown';
-
-export interface ATSDetectResult {
-  platform: ATSPlatform;
-  slug: string;           // company slug/identifier on the ATS
-  apiEndpoint: string;    // direct API URL
-  confidence: 'high' | 'medium' | 'low';
-}
+// Re-export so existing imports of `from '@/lib/ats-engine'` still work.
+export { detectATSFromUrl, detectATSFromHtml };
+export type { ATSPlatform, ATSDetectResult };
 
 export interface ATSFetchResult {
   jobs: Partial<Job>[];
@@ -18,101 +18,6 @@ export interface ATSFetchResult {
   platform: ATSPlatform;
   slug: string;
   error?: string;
-}
-
-// ── ATS slug patterns ────────────────────────────────────────────────────
-const ATS_URL_PATTERNS: Array<{
-  platform: ATSPlatform;
-  regex: RegExp;
-  extractSlug: (match: RegExpMatchArray) => string;
-  buildApi: (slug: string) => string;
-}> = [
-  // Greenhouse: boards.greenhouse.io/company OR boards-api.greenhouse.io...
-  {
-    platform: 'greenhouse',
-    regex: /boards\.greenhouse\.io\/([a-z0-9_-]+)/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`,
-  },
-  // Lever: jobs.lever.co/company
-  {
-    platform: 'lever',
-    regex: /jobs\.lever\.co\/([a-z0-9_-]+)/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://api.lever.co/v0/postings/${slug}?mode=json`,
-  },
-  // Ashby: jobs.ashbyhq.com/company
-  {
-    platform: 'ashby',
-    regex: /jobs\.ashbyhq\.com\/([a-z0-9_-]+)/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`,
-  },
-  // Workable: apply.workable.com/company
-  {
-    platform: 'workable',
-    regex: /apply\.workable\.com\/([a-z0-9_-]+)/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://apply.workable.com/api/v1/widget/accounts/${slug}`,
-  },
-  // Workable: company.workable.com
-  {
-    platform: 'workable',
-    regex: /([a-z0-9-]+)\.workable\.com/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://apply.workable.com/api/v1/widget/accounts/${slug}`,
-  },
-  // Recruitee: company.recruitee.com
-  {
-    platform: 'recruitee',
-    regex: /([a-z0-9-]+)\.recruitee\.com/i,
-    extractSlug: m => m[1],
-    buildApi: slug => `https://${slug}.recruitee.com/api/offers`,
-  },
-];
-
-// ── Detect ATS from a URL ─────────────────────────────────────────────────
-export function detectATSFromUrl(url: string): ATSDetectResult | null {
-  for (const p of ATS_URL_PATTERNS) {
-    const m = url.match(p.regex);
-    if (m) {
-      const slug = p.extractSlug(m);
-      return {
-        platform: p.platform,
-        slug,
-        apiEndpoint: p.buildApi(slug),
-        confidence: 'high',
-      };
-    }
-  }
-  return null;
-}
-
-// ── Detect ATS from page HTML ─────────────────────────────────────────────
-export function detectATSFromHtml(html: string, pageUrl: string): ATSDetectResult | null {
-  const lower = html.toLowerCase();
-
-  for (const p of ATS_URL_PATTERNS) {
-    const m = html.match(p.regex);
-    if (m) {
-      const slug = p.extractSlug(m);
-      return {
-        platform: p.platform,
-        slug,
-        apiEndpoint: p.buildApi(slug),
-        confidence: 'medium',
-      };
-    }
-  }
-
-  // Try to detect from meta tags or script src
-  const scriptMatches = [...html.matchAll(/src="([^"]+)"/gi)].map(m => m[1]);
-  for (const src of scriptMatches) {
-    const r = detectATSFromUrl(src);
-    if (r) return { ...r, confidence: 'low' };
-  }
-
-  return null;
 }
 
 // ── Guess ATS slug from company name / domain ────────────────────────────
@@ -316,14 +221,16 @@ async function fetchRecruitee(slug: string, sourceUrl: string): Promise<ATSFetch
 
 // ── Auto-detect and fetch from any career page URL ────────────────────────
 export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResult & { detected: ATSDetectResult | null }> {
-  // 1. Try to detect ATS directly from the URL
+  // 1. Try to detect ATS directly from the URL.
   const directDetect = detectATSFromUrl(url);
   if (directDetect) {
     const result = await fetchATSJobs(directDetect.platform, directDetect.slug, url);
     return { ...result, detected: directDetect };
   }
 
-  // 2. Fetch the page and inspect HTML for ATS links
+  // 2. Fetch the page and inspect its server-rendered HTML for ATS links.
+  //    Cheap path — works for sites where the careers page links out to a
+  //    boards.greenhouse.io / jobs.lever.co URL in the markup itself.
   try {
     const pageRes = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RemoteJobs44/1.0)' },
@@ -338,6 +245,26 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
       }
     }
   } catch {}
+
+  // 3. Last resort: render the page with headless Chromium to catch ATS
+  //    links that are only injected after the JS bundle runs (Next.js
+  //    SPAs, custom React boards, Sequoia/a16z-style portfolio pages).
+  //    Expensive — ~5-8s and ~512MB RAM — so only attempt after the
+  //    cheap HTML scrape in step 2 found nothing.
+  try {
+    const { renderHtml } = await import('@/lib/render-js');
+    const rendered = await renderHtml(url, { timeoutMs: 25_000 });
+    const renderedDetect = detectATSFromHtml(rendered, url);
+    if (renderedDetect) {
+      const result = await fetchATSJobs(renderedDetect.platform, renderedDetect.slug, url);
+      return { ...result, detected: renderedDetect };
+    }
+  } catch (err: any) {
+    // Render path is best-effort. If chromium fails to launch (e.g. local
+    // dev without the binary), we just report the original "could not
+    // detect" error rather than crashing the whole request.
+    console.error('[autoFetchFromCareerUrl render-js]', err?.message ?? err);
+  }
 
   return { jobs: [], total: 0, platform: 'unknown', slug: '', detected: null, error: 'Could not detect ATS from this URL' };
 }

@@ -9,7 +9,10 @@ import {
   CloudUpload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-engine';
+// Import from the client-safe detection module — lib/ats-engine pulls in
+// puppeteer-core / @sparticuz/chromium for its server-side render fallback,
+// which would bloat the admin bundle and break webpack on the browser.
+import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
 
 type DetectStatus = 'pending' | 'detecting' | 'ready' | 'fetching' | 'done' | 'error' | 'skipped';
 

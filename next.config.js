@@ -16,6 +16,10 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    // @sparticuz/chromium ships a Chromium binary that Webpack must NOT try
+    // to bundle — keep it as an external server-side dependency so it lives
+    // in node_modules in the Vercel function and gets loaded at runtime.
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   },
   async headers() {
     return [
