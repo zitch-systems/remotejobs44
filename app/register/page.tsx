@@ -1,7 +1,7 @@
 'use client';
 // app/register/page.tsx — Supabase email/password registration
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, UserPlus, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -47,15 +47,31 @@ export default function RegisterPage() {
   const [agree,    setAgree]    = useState(false);
   const [loading,  setLoading]  = useState(false);
 
+  // If someone is already logged in and lands on /register, send them home —
+  // they don't need to create another account. Same guard as on /login.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        const role = resolveRole({ profileRole: undefined, email: authUser.email });
+        window.location.replace(destinationForRole(role, null));
+      } catch {}
+    })();
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!agree) { toast('Please accept the terms to continue', 'error'); return; }
     if (password.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
     setLoading(true);
 
+    // Trim password too — see the same fix on /login. Trailing-space typos
+    // from autocomplete account for a meaningful chunk of "invalid creds"
+    // failures in our auth logs.
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
-      password,
+      password: password.trim(),
       options: {
         data: { name },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -72,6 +88,13 @@ export default function RegisterPage() {
     // hit /api/profile so the profile row + welcome email get created, then
     // route to /admin or /dashboard based on role.
     if (data.session && data.user) {
+      // Clear any leftover persisted store from a different account FIRST,
+      // so a slow /api/profile doesn't render the previous user's data.
+      try {
+        localStorage.removeItem('rj44-auth');
+        localStorage.removeItem('rj44-jobs');
+      } catch {}
+
       let profile: any = null;
       try {
         const res = await fetch('/api/profile');
@@ -80,12 +103,10 @@ export default function RegisterPage() {
 
       const role = resolveRole({ profileRole: profile?.role, email: data.user.email });
 
-      // Wipe any leftover persisted store from a different account
-      try {
-        localStorage.removeItem('rj44-auth');
-        localStorage.removeItem('rj44-jobs');
-      } catch {}
-
+      // For a brand-new signup we always have at least the email + name
+      // entered in the form, so it's safe to seed Zustand even if the
+      // /api/profile call hasn't finished. New signups are always 'free'
+      // unless their email is in the hardcoded admin list.
       setUser({
         id:    data.user.id,
         email: data.user.email!,

@@ -28,6 +28,23 @@ function LoginForm() {
     // Pre-fill email if passed (e.g. from "already registered" redirect)
     const emailParam = searchParams.get('email');
     if (emailParam) setEmail(decodeURIComponent(emailParam));
+
+    // If someone is already logged in and lands on /login, send them straight
+    // to their home. Without this, signing in as a different account briefly
+    // shows the previous user's persisted state in the Header — confusing
+    // and also a UX nuisance. We verify against the live Supabase session
+    // (not just persisted Zustand) so a stale localStorage doesn't trick us
+    // into redirecting a logged-out user.
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        const role = resolveRole({ profileRole: undefined, email: authUser.email });
+        const next = searchParams.get('next');
+        window.location.replace(destinationForRole(role, next));
+      } catch {}
+    })();
   }, []);
 
   async function handleGoogleLogin() {
@@ -67,9 +84,12 @@ function LoginForm() {
     try {
       const supabase = createClient();
 
+      // Trim whitespace from password too — users on mobile often double-tap
+      // a space after autocomplete, and that one trailing char fails the auth
+      // with "invalid_credentials" while looking identical to the user.
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
-        password,
+        password: password.trim(),
       });
 
       // Auth call returned — clear the timer regardless of outcome
@@ -98,6 +118,13 @@ function LoginForm() {
         return;
       }
 
+      // Wipe persisted client store from any previous user before writing the
+      // new one, so stale role/plan from a different account can't leak through.
+      try {
+        localStorage.removeItem('rj44-auth');
+        localStorage.removeItem('rj44-jobs');
+      } catch {}
+
       // Best-effort profile fetch — never blocks login on failure
       let profile: any = null;
       try {
@@ -111,25 +138,27 @@ function LoginForm() {
         }
       } catch {}
 
+      // Hardcoded-admin email check works without a profile fetch and is
+      // sufficient for routing to /admin vs /dashboard.
       const resolvedRole = resolveRole({ profileRole: profile?.role, email: data.user.email });
-      const resolvedPlan = resolvedRole === 'admin' ? 'admin' : (profile?.plan ?? 'free');
 
-      // Wipe persisted client store from any previous user before writing the new one,
-      // so stale role/plan from a different account can't leak through.
-      try {
-        localStorage.removeItem('rj44-auth');
-        localStorage.removeItem('rj44-jobs');
-      } catch {}
-
-      setUser({
-        id:    data.user.id,
-        email: data.user.email!,
-        name:  profile?.name ?? data.user.email!.split('@')[0],
-        plan:  resolvedPlan,
-        role:  resolvedRole,
-        joinedAt: profile?.created_at ?? new Date().toISOString(),
-        profileCompletion: profile?.profile_completion ?? 20,
-      });
+      if (profile) {
+        // Full profile available — write the real user.
+        setUser({
+          id:    data.user.id,
+          email: data.user.email!,
+          name:  profile.name ?? data.user.email!.split('@')[0],
+          plan:  resolvedRole === 'admin' ? 'admin' : (profile.plan ?? 'free'),
+          role:  resolvedRole,
+          joinedAt: profile.created_at ?? new Date().toISOString(),
+          profileCompletion: profile.profile_completion ?? 20,
+        });
+      }
+      // No profile (timeout / RLS hiccup / cold start): DON'T write a
+      // half-complete user object with plan='free'. That's how paying
+      // users briefly appeared unsubscribed. The dashboard / admin
+      // layout will fetch a fresh profile on mount and call setUser
+      // there with the correct plan.
 
       const dest = destinationForRole(resolvedRole, searchParams.get('next'));
       window.location.replace(dest);
