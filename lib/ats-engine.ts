@@ -4,7 +4,7 @@
 // The pure detection logic + types live in lib/ats-detect.ts so client
 // components (admin/company-import) can import detectATSFromUrl without
 // pulling puppeteer-core / @sparticuz/chromium into the browser bundle.
-import type { Job } from './types';
+import type { Job, JobCategory, JobLevel } from './types';
 import { uid } from './utils';
 import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
 
@@ -29,12 +29,38 @@ export function guessATSSlugs(companyName: string, domain?: string): Record<ATSP
   const candidates = [...new Set([name, nameDash, domainSlug].filter(Boolean))] as string[];
 
   return {
-    greenhouse: candidates,
-    lever: candidates,
-    ashby: candidates,
-    workable: candidates,
-    recruitee: candidates,
-    unknown: [],
+    greenhouse:      candidates,
+    lever:           candidates,
+    ashby:           candidates,
+    workable:        candidates,
+    recruitee:       candidates,
+    // Workday needs tenant|shard|site — we don't have the shard/site without
+    // visiting the page, so guessing isn't useful here.
+    workday:         [],
+    smartrecruiters: candidates,
+    personio:        candidates,
+    bamboohr:        candidates,
+    jazzhr:          candidates,
+    breezy:          candidates,
+    // Comeet needs the numeric company ID — can't guess from name alone.
+    comeet:          [],
+    jobvite:         candidates,
+    icims:           candidates,
+    recruiterbox:    candidates,
+    jobscore:        candidates,
+    zohorecruit:     candidates,
+    teamtailor:      candidates,
+    manatal:         candidates,
+    pinpoint:        candidates,
+    jobadder:        candidates,
+    talentlyft:      candidates,
+    heyrecruit:      candidates,
+    vivahr:          candidates,
+    polymer:         candidates,
+    // Taleo + SuccessFactors need tenant + site/company-id pairs.
+    taleo:           [],
+    successfactors:  candidates,
+    unknown:         [],
   };
 }
 
@@ -42,12 +68,34 @@ export function guessATSSlugs(companyName: string, domain?: string): Record<ATSP
 export async function fetchATSJobs(platform: ATSPlatform, slug: string, sourceUrl: string): Promise<ATSFetchResult> {
   try {
     switch (platform) {
-      case 'greenhouse': return await fetchGreenhouse(slug, sourceUrl);
-      case 'lever':      return await fetchLever(slug, sourceUrl);
-      case 'ashby':      return await fetchAshby(slug, sourceUrl);
-      case 'workable':   return await fetchWorkable(slug, sourceUrl);
-      case 'recruitee':  return await fetchRecruitee(slug, sourceUrl);
-      default:           return { jobs: [], total: 0, platform, slug, error: 'Unknown platform' };
+      case 'greenhouse':      return await fetchGreenhouse(slug, sourceUrl);
+      case 'lever':           return await fetchLever(slug, sourceUrl);
+      case 'ashby':           return await fetchAshby(slug, sourceUrl);
+      case 'workable':        return await fetchWorkable(slug, sourceUrl);
+      case 'recruitee':       return await fetchRecruitee(slug, sourceUrl);
+      case 'workday':         return await fetchWorkday(slug, sourceUrl);
+      case 'smartrecruiters': return await fetchSmartRecruiters(slug, sourceUrl);
+      case 'personio':        return await fetchPersonio(slug, sourceUrl);
+      case 'bamboohr':        return await fetchBambooHR(slug, sourceUrl);
+      case 'jazzhr':          return await fetchJazzHR(slug, sourceUrl);
+      case 'breezy':          return await fetchBreezy(slug, sourceUrl);
+      case 'comeet':          return await fetchComeet(slug, sourceUrl);
+      case 'jobvite':         return await fetchJobvite(slug, sourceUrl);
+      case 'icims':           return await fetchICIMS(slug, sourceUrl);
+      case 'recruiterbox':    return await fetchRecruiterbox(slug, sourceUrl);
+      case 'jobscore':        return await fetchJobScore(slug, sourceUrl);
+      case 'zohorecruit':     return await fetchZohoRecruit(slug, sourceUrl);
+      case 'teamtailor':      return await fetchTeamtailor(slug, sourceUrl);
+      case 'manatal':         return await fetchManatal(slug, sourceUrl);
+      case 'pinpoint':        return await fetchPinpoint(slug, sourceUrl);
+      case 'jobadder':        return await fetchJobAdder(slug, sourceUrl);
+      case 'talentlyft':      return await fetchTalentLyft(slug, sourceUrl);
+      case 'heyrecruit':      return await fetchHeyrecruit(slug, sourceUrl);
+      case 'vivahr':          return await fetchVivaHR(slug, sourceUrl);
+      case 'polymer':         return await fetchPolymer(slug, sourceUrl);
+      case 'taleo':           return await fetchTaleo(slug, sourceUrl);
+      case 'successfactors':  return await fetchSuccessFactors(slug, sourceUrl);
+      default:                return { jobs: [], total: 0, platform, slug, error: 'Unknown platform' };
     }
   } catch (err: any) {
     return { jobs: [], total: 0, platform, slug, error: err.message };
@@ -219,6 +267,98 @@ async function fetchRecruitee(slug: string, sourceUrl: string): Promise<ATSFetch
   return { jobs, total: jobs.length, platform: 'recruitee', slug };
 }
 
+// ── Workday ────────────────────────────────────────────────────────────────
+// Workday's public board lives at `{tenant}.{shard}.myworkdayjobs.com/<site>`
+// and the CXS jobs API requires all three. We encoded them as "tenant|shard|site"
+// in the detect step so the slug round-trips cleanly through /api/ats.
+async function fetchWorkday(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const [tenant, shard, site] = slug.split('|');
+  if (!tenant || !shard || !site) {
+    throw new Error(`Workday slug must encode tenant|shard|site (got "${slug}")`);
+  }
+  const url = `https://${tenant}.${shard}.myworkdayjobs.com/wday/cxs/${tenant}/${site}/jobs`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ appliedFacets: {}, limit: 50, offset: 0, searchText: '' }),
+    signal: AbortSignal.timeout(15000),
+    next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`Workday ${res.status}: ${tenant}/${site} not found`);
+  const data = await res.json();
+  const postings = data.jobPostings ?? [];
+  const tenantPretty = tenant.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const jobs: Partial<Job>[] = postings.map((j: any) => {
+    const externalPath = j.externalPath ?? '';
+    const applyUrl = externalPath
+      ? `https://${tenant}.${shard}.myworkdayjobs.com${externalPath.startsWith('/') ? '' : '/'}${externalPath}`
+      : sourceUrl;
+    const location = j.locationsText ?? j.bulletFields?.[0] ?? 'Unknown';
+    return {
+      id: `wd_${j.bulletFields?.[0] ?? j.title ?? uid()}`,
+      title: j.title,
+      company: tenantPretty,
+      description: stripHtml(j.shortDescription ?? ''),
+      applyUrl,
+      location,
+      posted: j.postedOn ?? new Date().toISOString(),
+      remote: /remote/i.test(location),
+      type: 'full-time',
+      level: guessLevel(j.title ?? ''),
+      category: guessCategory(j.title ?? '', ''),
+      skills: extractSkills(j.title ?? ''),
+      source: 'api',
+      sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'workday', slug };
+}
+
+// ── SmartRecruiters ────────────────────────────────────────────────────────
+// Public postings API — no auth, returns up to 100 per page. We stick to the
+// first page (matches the other platforms' behaviour) so a single company
+// with thousands of openings can't dominate the import.
+async function fetchSmartRecruiters(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`SmartRecruiters ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const postings = data.content ?? [];
+  const jobs: Partial<Job>[] = postings.map((j: any) => {
+    const loc = j.location?.city
+      ? `${j.location.city}${j.location.region ? ', ' + j.location.region : ''}${j.location.country ? ', ' + j.location.country.toUpperCase() : ''}`
+      : (j.location?.country ?? 'Unknown');
+    const remote = j.location?.remote === true || /remote/i.test(loc);
+    return {
+      id: `sr_${j.id ?? j.uuid ?? uid()}`,
+      title: j.name,
+      company: j.company?.name ?? slug,
+      description: stripHtml(j.jobAd?.sections?.jobDescription?.text ?? ''),
+      applyUrl: j.ref ?? `https://jobs.smartrecruiters.com/${slug}/${j.id}`,
+      location: loc,
+      posted: j.releasedDate ?? j.createdOn ?? new Date().toISOString(),
+      remote,
+      type: mapSmartRecruitersType(j.typeOfEmployment?.id),
+      level: guessLevel(j.name ?? ''),
+      category: guessCategory(j.name ?? '', j.jobAd?.sections?.jobDescription?.text ?? ''),
+      skills: extractSkills(j.name ?? ''),
+      source: 'api',
+      sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'smartrecruiters', slug };
+}
+
+function mapSmartRecruitersType(id?: string): any {
+  const t = (id ?? '').toLowerCase();
+  if (t.includes('part')) return 'part-time';
+  if (t.includes('contract') || t.includes('temporary')) return 'contract';
+  if (t.includes('intern')) return 'entry';
+  return 'full-time';
+}
+
 // ── Auto-detect and fetch from any career page URL ────────────────────────
 export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResult & { detected: ATSDetectResult | null }> {
   // 1. Try to detect ATS directly from the URL.
@@ -305,7 +445,7 @@ function mapWorkableType(type?: string): any {
   return 'full-time';
 }
 
-function guessLevel(title: string): string {
+function guessLevel(title: string): JobLevel {
   const t = title.toLowerCase();
   if (/staff|principal|architect/.test(t)) return 'lead';
   if (/senior|sr\.?|sr /.test(t)) return 'senior';
@@ -314,7 +454,7 @@ function guessLevel(title: string): string {
   return 'mid';
 }
 
-function guessCategory(title: string, desc: string): string {
+function guessCategory(title: string, desc: string): JobCategory {
   // Check the job TITLE first — it's the strongest signal.
   // Broad keywords like "platform" or "cloud" only count when the title itself
   // points to an engineering role (e.g. "Platform Engineer", "Cloud Architect").
@@ -353,4 +493,635 @@ function guessCategory(title: string, desc: string): string {
 const SKILLS = ['React','Vue','Angular','Next.js','TypeScript','JavaScript','Python','Go','Rust','Java','Kotlin','Swift','Node.js','Django','Rails','Docker','Kubernetes','AWS','GCP','Azure','Terraform','PostgreSQL','MySQL','MongoDB','Redis','GraphQL','REST','Figma','SQL','Spark','Airflow','dbt','Salesforce','HubSpot','Git','CI/CD','PyTorch','TensorFlow','NLP','Tableau','Power BI','Excel','Stripe','Twilio'];
 function extractSkills(text: string): string[] {
   return SKILLS.filter(s => new RegExp(`\\b${s.replace('.','\\.')}\\b`, 'i').test(text)).slice(0, 8);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//                  "20 more" ATS adapters — see ats-detect.ts
+// ══════════════════════════════════════════════════════════════════════════
+//
+// These are best-effort public-API integrations. Each platform's response
+// shape was modelled from public documentation; some may need a small
+// follow-up tweak once we see real boards in the wild (date fields,
+// location nesting, salary keys vary across platforms).
+//
+// Conventions used below:
+// - Every fetcher accepts (slug, sourceUrl) and returns ATSFetchResult.
+// - Non-2xx HTTP responses throw with `${Platform} ${status}: ${slug} not found`
+//   so the autoFetchFromCareerUrl wrapper can surface them in the admin UI.
+// - All fetchers use a 10–15s timeout and cache-revalidate the response for
+//   5 minutes (`next: { revalidate: 300 }`) so a cron sweep is cheap.
+// - Item arrays are accessed defensively (`?? []`) to survive shape drift.
+
+// ── Tiny RSS/Atom parser ───────────────────────────────────────────────────
+// Used by Jobvite, iCIMS, JazzHR, JobScore, Zoho. Pulls <item>/<entry> blocks
+// and extracts a small set of fields. Not a full XML parser — just enough to
+// turn well-formed feeds into Partial<Job>.
+function parseFeedItems(xml: string): Array<Record<string, string>> {
+  const blocks = xml.match(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi) ?? [];
+  return blocks.map(block => {
+    const pick = (tag: string): string => {
+      // <tag>value</tag> OR <tag><![CDATA[value]]></tag>
+      const m = block.match(new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`, 'i'));
+      return m?.[1]?.trim() ?? '';
+    };
+    const linkAttr = block.match(/<link[^>]*href="([^"]+)"/i)?.[1];
+    return {
+      title: pick('title'),
+      link: linkAttr ?? pick('link'),
+      description: pick('description') || pick('summary') || pick('content'),
+      pubDate: pick('pubDate') || pick('published') || pick('updated'),
+      location: pick('location') || pick('city') || '',
+      category: pick('category') || pick('department') || '',
+    };
+  });
+}
+
+// ── Personio ───────────────────────────────────────────────────────────────
+async function fetchPersonio(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.jobs.personio.de/xml`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Personio ${res.status}: ${slug} not found`);
+  const xml = await res.text();
+  // Personio's feed uses <position>...</position> blocks.
+  const blocks = xml.match(/<position\b[\s\S]*?<\/position>/gi) ?? [];
+  const jobs: Partial<Job>[] = blocks.map(b => {
+    const pick = (tag: string) => b.match(new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`, 'i'))?.[1]?.trim() ?? '';
+    const id = pick('id');
+    const name = pick('name');
+    const office = pick('office');
+    const department = pick('department');
+    return {
+      id: `pn_${id || uid()}`,
+      title: name,
+      company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(pick('jobDescriptions') || pick('description')),
+      applyUrl: `https://${slug}.jobs.personio.de/job/${id}`,
+      location: office || 'Unknown',
+      posted: pick('createdAt') || new Date().toISOString(),
+      remote: /remote/i.test(office),
+      type: 'full-time',
+      level: guessLevel(name),
+      category: guessCategory(name, department),
+      skills: extractSkills(name + ' ' + department),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'personio', slug };
+}
+
+// ── BambooHR ───────────────────────────────────────────────────────────────
+async function fetchBambooHR(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.bamboohr.com/careers/list`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`BambooHR ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.result ?? data.jobs ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => {
+    const loc = [j.location?.city, j.location?.state, j.location?.country].filter(Boolean).join(', ') || 'Unknown';
+    return {
+      id: `bb_${j.id ?? uid()}`,
+      title: j.jobOpeningName ?? j.title,
+      company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(j.description ?? ''),
+      applyUrl: j.jobUrl ?? `https://${slug}.bamboohr.com/careers/${j.id}`,
+      location: loc,
+      posted: j.datePosted ?? new Date().toISOString(),
+      remote: j.location?.isRemote === true || /remote/i.test(loc),
+      type: mapEmploymentTypeStatus(j.employmentStatusLabel),
+      level: guessLevel(j.jobOpeningName ?? ''),
+      category: guessCategory(j.jobOpeningName ?? '', j.departmentLabel ?? ''),
+      skills: extractSkills(j.jobOpeningName ?? ''),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'bamboohr', slug };
+}
+
+function mapEmploymentTypeStatus(raw?: string): any {
+  const t = (raw ?? '').toLowerCase();
+  if (t.includes('part')) return 'part-time';
+  if (t.includes('contract') || t.includes('temp')) return 'contract';
+  if (t.includes('intern')) return 'entry';
+  return 'full-time';
+}
+
+// ── JazzHR (Employ) ────────────────────────────────────────────────────────
+async function fetchJazzHR(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.applytojob.com/apply/jobs.xml`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`JazzHR ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `jz_${uid()}`,
+    title: it.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'jazzhr', slug };
+}
+
+// ── Breezy HR ──────────────────────────────────────────────────────────────
+async function fetchBreezy(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.breezy.hr/json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Breezy ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const positions = Array.isArray(data) ? data : (data.positions ?? []);
+  const jobs: Partial<Job>[] = positions.map((j: any) => {
+    const loc = j.location?.city
+      ? `${j.location.city}${j.location.country?.name ? ', ' + j.location.country.name : ''}`
+      : (j.location?.name ?? 'Unknown');
+    return {
+      id: `bz_${j._id ?? j.id ?? uid()}`,
+      title: j.name,
+      company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(j.description ?? ''),
+      applyUrl: j.url ?? `https://${slug}.breezy.hr/p/${j._id}`,
+      location: loc,
+      posted: j.published_date ?? j.creation_date ?? new Date().toISOString(),
+      remote: j.location?.is_remote === true || /remote/i.test(loc),
+      type: mapBreezyType(j.type?.name ?? j.category?.name),
+      level: guessLevel(j.name),
+      category: guessCategory(j.name, j.description ?? ''),
+      skills: extractSkills(j.name + ' ' + (j.description ?? '')),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'breezy', slug };
+}
+
+function mapBreezyType(raw?: string): any {
+  const t = (raw ?? '').toLowerCase();
+  if (t.includes('part')) return 'part-time';
+  if (t.includes('contract') || t.includes('freelance')) return 'contract';
+  if (t.includes('intern')) return 'entry';
+  return 'full-time';
+}
+
+// ── Comeet ─────────────────────────────────────────────────────────────────
+// Slug arrives as "company-name|numeric-id" from the detect step.
+async function fetchComeet(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const [name, id] = slug.split('|');
+  if (!id) throw new Error(`Comeet slug must encode "name|id" (got "${slug}")`);
+  const url = `https://www.comeet.com/careers-api/2.0/company/${id}/positions?details=true`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Comeet ${res.status}: ${id} not found`);
+  const data = await res.json();
+  const positions = Array.isArray(data) ? data : (data.positions ?? []);
+  const jobs: Partial<Job>[] = positions.map((j: any) => {
+    const loc = j.location?.name ?? [j.location?.city, j.location?.country].filter(Boolean).join(', ') ?? 'Unknown';
+    return {
+      id: `cm_${j.uid ?? uid()}`,
+      title: j.name,
+      company: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(j.details ?? j.description ?? ''),
+      applyUrl: j.url_active ?? `https://www.comeet.com/jobs/${name}/${id}/${j.uid}`,
+      location: loc,
+      posted: j.time_updated ?? new Date().toISOString(),
+      remote: /remote/i.test(loc),
+      type: 'full-time',
+      level: guessLevel(j.name),
+      category: guessCategory(j.name, j.details ?? ''),
+      skills: extractSkills(j.name + ' ' + (j.details ?? '')),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'comeet', slug };
+}
+
+// ── Jobvite ────────────────────────────────────────────────────────────────
+async function fetchJobvite(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://jobs.jobvite.com/careers/${slug}/jobs.rss`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Jobvite ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `jv_${uid()}`,
+    title: it.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'jobvite', slug };
+}
+
+// ── iCIMS ──────────────────────────────────────────────────────────────────
+async function fetchICIMS(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://careers-${slug}.icims.com/jobs/feed`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`iCIMS ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `ic_${uid()}`,
+    title: it.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'icims', slug };
+}
+
+// ── Recruiterbox / Trakstar Hire ───────────────────────────────────────────
+async function fetchRecruiterbox(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.recruiterbox.com/widget/jobs.json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Recruiterbox ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.jobs ?? data.openings ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `rb_${j.id ?? uid()}`,
+    title: j.title ?? j.position,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.hosted_url ?? j.url ?? `https://${slug}.recruiterbox.com/jobs/${j.id}`,
+    location: j.location?.city ?? j.location ?? 'Unknown',
+    posted: j.published_on ?? j.created_at ?? new Date().toISOString(),
+    remote: /remote/i.test(j.location?.city ?? j.location ?? ''),
+    type: mapBreezyType(j.employment_type),
+    level: guessLevel(j.title ?? ''),
+    category: guessCategory(j.title ?? '', j.description ?? ''),
+    skills: extractSkills(j.title ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'recruiterbox', slug };
+}
+
+// ── JobScore ───────────────────────────────────────────────────────────────
+async function fetchJobScore(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://careers.jobscore.com/careers/${slug}/feeds/jobs.atom`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`JobScore ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `js_${uid()}`,
+    title: it.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'jobscore', slug };
+}
+
+// ── Zoho Recruit ───────────────────────────────────────────────────────────
+async function fetchZohoRecruit(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.zohorecruit.com/recruit/Rss.do?action=jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Zoho ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `zh_${uid()}`,
+    title: it.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'zohorecruit', slug };
+}
+
+// ── Teamtailor ─────────────────────────────────────────────────────────────
+// Teamtailor's authenticated REST API needs a token, but every public board
+// has a /jobs.json endpoint that returns the listing.
+async function fetchTeamtailor(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.teamtailor.com/jobs.json`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`Teamtailor ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.jobs ?? data.data ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => {
+    const attrs = j.attributes ?? j;
+    const loc = attrs.location?.name ?? attrs['location-name'] ?? attrs.location ?? 'Unknown';
+    return {
+      id: `tt_${j.id ?? uid()}`,
+      title: attrs.title,
+      company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(attrs.body ?? attrs.description ?? ''),
+      applyUrl: attrs.url ?? attrs['careersite-job-url'] ?? `https://${slug}.teamtailor.com/jobs/${j.id}`,
+      location: loc,
+      posted: attrs['created-at'] ?? attrs.created_at ?? new Date().toISOString(),
+      remote: attrs['remote-status'] === 'fully' || /remote/i.test(loc),
+      type: mapBreezyType(attrs['employment-type']),
+      level: guessLevel(attrs.title ?? ''),
+      category: guessCategory(attrs.title ?? '', attrs.body ?? ''),
+      skills: extractSkills(attrs.title ?? ''),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'teamtailor', slug };
+}
+
+// ── Manatal ────────────────────────────────────────────────────────────────
+async function fetchManatal(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.manatal.com/api/career-website/positions`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Manatal ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.results ?? data.positions ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `mn_${j.id ?? uid()}`,
+    title: j.title ?? j.position_title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.public_url ?? `https://${slug}.manatal.com/career/positions/${j.id}`,
+    location: j.location ?? j.city ?? 'Unknown',
+    posted: j.created_at ?? new Date().toISOString(),
+    remote: j.is_remote === true || /remote/i.test(j.location ?? ''),
+    type: mapBreezyType(j.employment_type),
+    level: guessLevel(j.title ?? ''),
+    category: guessCategory(j.title ?? '', j.description ?? ''),
+    skills: extractSkills(j.title ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'manatal', slug };
+}
+
+// ── Pinpoint ───────────────────────────────────────────────────────────────
+async function fetchPinpoint(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.pinpointhq.com/api/v1/public/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Pinpoint ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.data ?? data.jobs ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => {
+    const attrs = j.attributes ?? j;
+    const loc = attrs.location ?? attrs.locations?.[0]?.name ?? 'Unknown';
+    return {
+      id: `pp_${j.id ?? uid()}`,
+      title: attrs.title,
+      company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      description: stripHtml(attrs.description ?? ''),
+      applyUrl: attrs.url ?? `https://${slug}.pinpointhq.com/jobs/${j.id}`,
+      location: loc,
+      posted: attrs.published_at ?? attrs.created_at ?? new Date().toISOString(),
+      remote: attrs.remote === true || /remote/i.test(loc),
+      type: mapBreezyType(attrs.employment_type),
+      level: guessLevel(attrs.title ?? ''),
+      category: guessCategory(attrs.title ?? '', attrs.description ?? ''),
+      skills: extractSkills(attrs.title ?? ''),
+      source: 'api', sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
+  return { jobs, total: jobs.length, platform: 'pinpoint', slug };
+}
+
+// ── JobAdder ───────────────────────────────────────────────────────────────
+async function fetchJobAdder(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.jobadder.com/api/v1/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`JobAdder ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.items ?? data.jobs ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `ja_${j.jobId ?? j.id ?? uid()}`,
+    title: j.jobTitle ?? j.title,
+    company: j.company?.name ?? slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.summary ?? j.description ?? ''),
+    applyUrl: j.applicationUrl ?? j.url,
+    location: j.location?.name ?? j.location ?? 'Unknown',
+    posted: j.postedAt ?? j.dateCreated ?? new Date().toISOString(),
+    remote: /remote/i.test(j.location?.name ?? ''),
+    type: mapBreezyType(j.workType?.name),
+    level: guessLevel(j.jobTitle ?? ''),
+    category: guessCategory(j.jobTitle ?? '', j.summary ?? ''),
+    skills: extractSkills(j.jobTitle ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'jobadder', slug };
+}
+
+// ── TalentLyft ─────────────────────────────────────────────────────────────
+async function fetchTalentLyft(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.talentlyft.com/api/v2/published-jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`TalentLyft ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : (data.jobs ?? []);
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `tl_${j.id ?? uid()}`,
+    title: j.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.url ?? `https://${slug}.talentlyft.com/job/${j.id}`,
+    location: j.location ?? j.city ?? 'Unknown',
+    posted: j.publishDate ?? new Date().toISOString(),
+    remote: j.isRemote === true || /remote/i.test(j.location ?? ''),
+    type: mapBreezyType(j.workType),
+    level: guessLevel(j.title),
+    category: guessCategory(j.title, j.description ?? ''),
+    skills: extractSkills(j.title),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'talentlyft', slug };
+}
+
+// ── Heyrecruit ─────────────────────────────────────────────────────────────
+async function fetchHeyrecruit(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.heyrecruit.com/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Heyrecruit ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : (data.jobs ?? []);
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `hr_${j.id ?? uid()}`,
+    title: j.title,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.url ?? `https://${slug}.heyrecruit.com/job/${j.id}`,
+    location: j.location ?? 'Unknown',
+    posted: j.publishedAt ?? j.createdAt ?? new Date().toISOString(),
+    remote: /remote/i.test(j.location ?? ''),
+    type: 'full-time',
+    level: guessLevel(j.title),
+    category: guessCategory(j.title, j.description ?? ''),
+    skills: extractSkills(j.title),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'heyrecruit', slug };
+}
+
+// ── VivaHR ─────────────────────────────────────────────────────────────────
+async function fetchVivaHR(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.vivahr.com/api/v1/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`VivaHR ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : (data.jobs ?? data.data ?? []);
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `vh_${j.id ?? uid()}`,
+    title: j.title ?? j.name,
+    company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.url ?? j.apply_url ?? `https://${slug}.vivahr.com/jobs/${j.id}`,
+    location: j.location ?? 'Unknown',
+    posted: j.published_at ?? j.created_at ?? new Date().toISOString(),
+    remote: /remote/i.test(j.location ?? ''),
+    type: mapBreezyType(j.employment_type),
+    level: guessLevel(j.title ?? ''),
+    category: guessCategory(j.title ?? '', j.description ?? ''),
+    skills: extractSkills(j.title ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'vivahr', slug };
+}
+
+// ── Polymer ────────────────────────────────────────────────────────────────
+async function fetchPolymer(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://polymer.co/api/companies/${slug}/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Polymer ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.jobs ?? data.data ?? [];
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `pm_${j.id ?? uid()}`,
+    title: j.title,
+    company: j.company?.name ?? slug,
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.applyUrl ?? j.url ?? `https://polymer.co/${slug}/jobs/${j.id}`,
+    location: j.location ?? 'Unknown',
+    posted: j.publishedAt ?? new Date().toISOString(),
+    remote: j.isRemote === true || /remote/i.test(j.location ?? ''),
+    type: 'full-time',
+    level: guessLevel(j.title),
+    category: guessCategory(j.title, j.description ?? ''),
+    skills: extractSkills(j.title),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'polymer', slug };
+}
+
+// ── Oracle Taleo ───────────────────────────────────────────────────────────
+// Slug arrives as "tenant|section" — Taleo URLs always have both.
+async function fetchTaleo(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const [tenant, section] = slug.split('|');
+  if (!tenant || !section) throw new Error(`Taleo slug must encode "tenant|section" (got "${slug}")`);
+  const url = `https://${tenant}.taleo.net/careersection/rss/jobs.rss?lang=en&portal=${section}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Taleo ${res.status}: ${tenant}/${section} not found`);
+  const items = parseFeedItems(await res.text());
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `tl_${uid()}`,
+    title: it.title,
+    company: tenant.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'taleo', slug };
+}
+
+// ── SAP SuccessFactors ─────────────────────────────────────────────────────
+// SuccessFactors career sites expose a JSON search endpoint that takes the
+// companyId as a query param. The endpoint host is whichever data centre the
+// customer is on; .eu is the most common shard, so we default there and rely
+// on follow-up tuning to add the other shards when we see them.
+async function fetchSuccessFactors(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://career4.successfactors.eu/career?company=${slug}&_s.crb=&career_ns=job_listing_summary`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`SuccessFactors ${res.status}: ${slug} not found`);
+  // SuccessFactors usually returns HTML by default; if we got HTML, extract
+  // the embedded JSON job list rather than failing.
+  const text = await res.text();
+  let items: any[] = [];
+  try {
+    const data = JSON.parse(text);
+    items = data.jobList ?? data.jobs ?? data.results ?? [];
+  } catch {
+    // Cheap HTML fallback — find JSON blob assignments in the markup.
+    const m = text.match(/"jobList"\s*:\s*(\[[\s\S]*?\])/);
+    if (m) {
+      try { items = JSON.parse(m[1]); } catch { items = []; }
+    }
+  }
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `sf_${j.jobReqId ?? j.id ?? uid()}`,
+    title: j.jobTitle ?? j.title,
+    company: slug,
+    description: stripHtml(j.jobDescription ?? j.externalJobDescription ?? ''),
+    applyUrl: j.applyUrl ?? `https://career4.successfactors.eu/sfcareer/jobreqcareer?jobId=${j.jobReqId}&company=${slug}`,
+    location: j.location ?? j.locationName ?? 'Unknown',
+    posted: j.postingStartDate ?? new Date().toISOString(),
+    remote: /remote/i.test(j.location ?? ''),
+    type: 'full-time',
+    level: guessLevel(j.jobTitle ?? ''),
+    category: guessCategory(j.jobTitle ?? '', j.jobDescription ?? ''),
+    skills: extractSkills(j.jobTitle ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'successfactors', slug };
 }
