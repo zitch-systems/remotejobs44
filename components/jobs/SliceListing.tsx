@@ -1,0 +1,78 @@
+// components/jobs/SliceListing.tsx
+// Renders a single "slice" landing page: heading, blurb, then a clean list of
+// the first ~30 jobs that match the filter, with a CTA to view all matches.
+// Used by /jobs/category/[slug], /jobs/country/[slug], /jobs/skill/[slug],
+// /jobs/timezone/[slug], and /jobs/region/[slug].
+import Link from 'next/link';
+import { ArrowRight, MapPin, Building2 } from 'lucide-react';
+import { formatRelativeDate } from '@/lib/utils';
+
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location?: string;
+  posted_at?: string;
+}
+
+export function SliceListing({
+  title,
+  blurb,
+  jobs,
+  total,
+  browseHref,
+}: {
+  title: string;
+  blurb: string;
+  jobs: Job[];
+  total: number;
+  browseHref: string;
+}) {
+  return (
+    <div className="max-w-[1000px] mx-auto px-5 py-10">
+      <div className="mb-8">
+        <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight">{title}</h1>
+        <p className="text-stone-500 dark:text-stone-400 mt-2 max-w-2xl leading-relaxed">{blurb}</p>
+        <div className="mt-3 flex items-center gap-2 text-sm">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 font-bold">
+            {total.toLocaleString()} open roles
+          </span>
+        </div>
+      </div>
+
+      {jobs.length === 0 ? (
+        <div className="card p-12 text-center">
+          <p className="text-stone-400 mb-4">No matching jobs right now. New listings get added every few hours.</p>
+          <Link href="/jobs" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
+            Browse all jobs <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      ) : (
+        <div className="card divide-y divide-stone-100 dark:divide-[#1e3a5f]">
+          {jobs.map(j => (
+            <Link key={j.id} href={`/jobs/${j.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 flex items-center justify-center text-sm font-black">
+                {j.company[0]?.toUpperCase() ?? '?'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-stone-900 dark:text-stone-100 truncate">{j.title}</p>
+                <p className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-2 flex-wrap mt-0.5">
+                  <span className="inline-flex items-center gap-1"><Building2 className="w-3 h-3" />{j.company}</span>
+                  {j.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{j.location}</span>}
+                  {j.posted_at && <span>· {formatRelativeDate(j.posted_at)}</span>}
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-stone-300 shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-6 text-center">
+        <Link href={browseHref} className="inline-flex items-center gap-2 px-5 py-2.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 text-sm font-bold rounded-lg hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+          See all {total.toLocaleString()} jobs <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}

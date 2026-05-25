@@ -1,41 +1,65 @@
 # RemoteJobs44
 
-> RemoteJobs44 is a remote job board focused on Nigerian and African job seekers, with 50,000+ verified remote jobs from global companies.
+> RemoteJobs44 is a remote job board focused on African job seekers (Nigeria, Kenya, South Africa, Ghana, Egypt, Morocco, Rwanda, Uganda) with 50,000+ verified remote jobs from global companies. AI-powered CV review and interview prep included.
 
 ## What is RemoteJobs44?
 
-RemoteJobs44 (https://remotejobs44.com) is a subscription-based remote job board. Free users can browse jobs; Pro subscribers (from ₦1,000/month) can apply directly. The platform serves job seekers across Nigeria, Ghana, Kenya, South Africa, and all of Africa.
-
-## Key features
-
-- 50,000+ remote jobs across engineering, design, marketing, finance, sales, support, writing, and more
-- Jobs from Greenhouse, Lever, Ashby, Workable, and Recruitee ATS platforms
-- Filter by category, job type (full-time, part-time, contract, freelance), experience level, salary, and region/country
-- Application tracker to manage your pipeline
-- Affordable pricing in Naira (₦1,000/month for Pro)
+RemoteJobs44 (https://remotejobs44.com) is a subscription-based remote job board built for African talent applying to global companies. Free users browse jobs; paid plans unlock direct apply links, application tracking, AI CV review, and AI interview prep. Jobs are aggregated from Remotive, RemoteOK, Arbeitnow, Working Nomads, Himalayas, Jobicy, plus direct Greenhouse / Lever / Ashby / Workable ATS feeds and SerpApi-backed Google Jobs.
 
 ## Plans
 
-- Free: Browse all jobs, save favourites
-- Pro Monthly: Apply to all jobs, track applications — ₦1,000/month
-- Pro Annual: Best value — ₦8,000/year
-- Day Pass: 10 applications for 24 hours — ₦500
+- **Free**: Browse all 50,000+ jobs, save favourites
+- **Day Pass**: 24-hour full access, 10 applications — ₦500
+- **Pro Monthly**: Unlimited applications, alerts, AI tools — ₦2,999 / month
+- **Pro Annual**: Same as Pro Monthly, billed yearly — ₦29,999 / year (saves ₦5,989)
+
+## Key features
+
+- 50,000+ remote jobs from 8+ aggregators and direct ATS feeds, refreshed every 6 hours
+- Application tracker (Slack-style status board)
+- **AI CV review** — paste your CV, get a 0–100 score, strengths, gaps, ATS keywords missing, and rewrite tips (uses the AI provider an admin enables in /admin/ai-discovery)
+- **AI interview prep** — type a role + level, get behavioural / technical / remote-specific questions with answer skeletons and red-flag mistakes
+- Filter by category, job type, experience level, salary, country, region, timezone, skill
+- Category landing pages: /jobs/category/{engineering,design,marketing,finance,sales,data,hr,product,legal,operations}
+- Country landing pages: /jobs/country/{nigeria,kenya,south-africa,ghana,egypt,morocco,rwanda,uganda,india,philippines,pakistan,brazil,mexico,argentina,worldwide}
+- Skill landing pages: /jobs/skill/{react,typescript,node,python,django,rails,go,rust,java,kotlin,swift,flutter,react-native,devops,aws,kubernetes,terraform,sql,postgres,figma,seo,content,copywriting,sales-dev}
+- Timezone landing pages: /jobs/timezone/{wat,eat,sast,gmt,cet,est,pst}
+- Region landing pages: /jobs/region/{africa,europe,americas,asia,middle-east,worldwide}
 
 ## Who is it for?
 
-Remote workers in Africa, especially Nigeria, looking for full-time, part-time, contract, or freelance roles with global companies. Ideal for software engineers, designers, marketers, finance professionals, and customer support specialists who want to work remotely.
+Remote workers in Africa (especially Nigeria, Kenya, South Africa, Ghana, Egypt, Morocco, Rwanda, Uganda) applying to global companies. Categories well-served: software engineering, product design, product management, marketing, content, customer success, sales development, data analytics. Levels: entry, mid, senior, lead, executive.
 
 ## Contact
 
 - Website: https://remotejobs44.com
 - Email: hello@remotejobs44.com
 - Blog: https://remotejobs44.com/blog
+- Resources hub: https://remotejobs44.com/resources
 
 ## Useful links
 
 - Browse jobs: https://remotejobs44.com/jobs
 - Pricing: https://remotejobs44.com/pricing
+- AI Interview Prep: https://remotejobs44.com/interview-prep
+- Career Resources hub: https://remotejobs44.com/resources
 - About: https://remotejobs44.com/about
-- Blog – How to find remote jobs in Nigeria: https://remotejobs44.com/blog/how-to-find-remote-jobs-in-nigeria
-- Blog – Best remote jobs for beginners: https://remotejobs44.com/blog/best-remote-jobs-for-beginners
-- Blog – Remote job interview tips: https://remotejobs44.com/blog/remote-job-interview-tips
+- Sitemap (XML): https://remotejobs44.com/sitemap.xml
+
+## Featured resource articles
+
+- Remote Work 101 for Africans: https://remotejobs44.com/resources/remote-work-101-for-africans
+- Remote Developer Salary Guide for Africa (2026): https://remotejobs44.com/resources/remote-developer-salary-guide-africa
+- Top Free Tools for Remote Job Seekers in Africa: https://remotejobs44.com/resources/top-tools-for-remote-african-job-seekers
+- How to Pass a Remote Technical Interview: https://remotejobs44.com/resources/how-to-pass-a-remote-technical-interview
+- Write a CV That Passes ATS: https://remotejobs44.com/resources/write-a-cv-that-passes-ats
+- Remote Jobs in Nigeria (2026): https://remotejobs44.com/resources/remote-jobs-nigeria-2026
+- Remote Jobs in Kenya (2026): https://remotejobs44.com/resources/remote-jobs-kenya-2026
+- Remote Jobs in South Africa (2026): https://remotejobs44.com/resources/remote-jobs-south-africa-2026
+- Remote Jobs in Ghana (2026): https://remotejobs44.com/resources/remote-jobs-ghana-2026
+- How to Avoid Remote Job Scams: https://remotejobs44.com/resources/avoiding-remote-job-scams
+- Frontend Engineer Learning Roadmap (2026): https://remotejobs44.com/resources/learning-roadmap-frontend-2026
+- Backend Engineer Learning Roadmap (2026): https://remotejobs44.com/resources/learning-roadmap-backend-2026
+- Tax Basics for Remote Workers in Africa: https://remotejobs44.com/resources/remote-work-from-africa-tax-basics
+
+(30 resource articles total — full index at /resources)
