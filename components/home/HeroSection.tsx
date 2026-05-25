@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { Search, ArrowRight, ArrowDownToLine } from 'lucide-react';
+import { Search, ArrowRight, ArrowDownToLine, LogIn, UserPlus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/store';
 
 // Extend WindowEventMap for beforeinstallprompt
 interface BeforeInstallPromptEvent extends Event {
@@ -27,6 +28,11 @@ const POPULAR = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps', 
 
 export function HeroSection() {
   const router = useRouter();
+  const { user, hydrated } = useAuthStore();
+  // Treat as unauthed only AFTER a confirmed sync; before that, show a
+  // neutral primary CTA so we don't briefly flash "Get Started" to a
+  // logged-in user (or vice versa).
+  const isUnauthed = hydrated && !user;
   const [q, setQ] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
@@ -144,14 +150,29 @@ export function HeroSection() {
 
         {/* CTAs */}
         <div className="flex gap-3 flex-wrap justify-center">
-          <Link href="/jobs"
-            className="flex items-center gap-2 px-7 py-3.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors text-sm shadow-md-brand">
-            Browse All Jobs <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link href="/pricing"
-            className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
-            View Plans
-          </Link>
+          {isUnauthed ? (
+            <>
+              <Link href="/register"
+                className="flex items-center gap-2 px-7 py-3.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors text-sm shadow-md-brand">
+                <UserPlus className="w-4 h-4" /> Get Started Free <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link href="/login"
+                className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
+                <LogIn className="w-4 h-4" /> Log In
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/jobs"
+                className="flex items-center gap-2 px-7 py-3.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors text-sm shadow-md-brand">
+                Browse All Jobs <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link href="/pricing"
+                className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
+                View Plans
+              </Link>
+            </>
+          )}
           {/* PWA Install button — shown only when browser supports it and app isn't installed */}
           {showInstall && (
             <button

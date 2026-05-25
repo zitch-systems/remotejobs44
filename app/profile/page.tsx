@@ -44,18 +44,16 @@ function ProfileContent() {
       } catch {}
       if (cancelled) return;
 
-      const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
-      const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
-
       if (profile) {
+        const role = resolveRole({ profileRole: profile.role, email: authUser.email });
+        const plan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
         setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan, role, joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
         setCvUrl(profile.cv_url ?? null);
-      } else {
-        // Profile fetch failed/timed out — still render the page with safe defaults
-        setUser({ id: authUser.id, email: authUser.email!, name: authUser.email!.split('@')[0], plan, role, joinedAt: new Date().toISOString(), profileCompletion: 20 });
-        setName(authUser.email!.split('@')[0]);
       }
+      // No profile (timeout/network): KEEP whatever was previously in the
+      // store. Don't overwrite plan with 'free' just because the lookup
+      // failed — that's the "user appears unsubscribed" bug.
       setLoading(false);
     }
     load();

@@ -119,29 +119,45 @@ function PricingContent() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser) return;
 
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('name,plan,role,created_at,profile_completion')
           .eq('id', authUser.id)
           .maybeSingle();
 
-        const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
+        // Profile lookup failed (RLS, transient, network) — don't downgrade
+        // the user's in-memory plan to 'free'. Just retry until we get an
+        // answer or give up after maxAttempts.
+        if (error || !profile) {
+          if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(syncProfile, 1000);
+          }
+          return;
+        }
+
+        const role = resolveRole({ profileRole: profile.role, email: authUser.email });
         setUser({
           id:    authUser.id,
           email: authUser.email!,
-          name:  profile?.name ?? authUser.email!.split('@')[0],
-          plan:  role === 'admin' ? 'admin' : (profile?.plan ?? 'free'),
+          name:  profile.name ?? authUser.email!.split('@')[0],
+          plan:  role === 'admin' ? 'admin' : (profile.plan ?? 'free'),
           role,
-          joinedAt: profile?.created_at ?? new Date().toISOString(),
-          profileCompletion: profile?.profile_completion ?? 20,
+          joinedAt: profile.created_at ?? new Date().toISOString(),
+          profileCompletion: profile.profile_completion ?? 20,
         });
 
-        // If plan not yet updated in DB, retry
-        if (profile?.plan === 'free' && plan !== 'free' && attempts < maxAttempts) {
+        // Webhook may take a moment after payment — retry if plan didn't update yet
+        if (profile.plan === 'free' && plan !== 'free' && attempts < maxAttempts) {
           attempts++;
           setTimeout(syncProfile, 1000);
         }
-      } catch {}
+      } catch {
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(syncProfile, 1000);
+        }
+      }
     }
 
     syncProfile();

@@ -36,7 +36,25 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    jobsApi.getJob(id).then(j => { setJob(j); setLoading(false); });
+    jobsApi.getJob(id).then(j => {
+      // If the job exists but has no real description (often the case for
+      // scraped/aggregated postings where we only got title + link), send
+      // the user straight to the company's vacancy page in a new tab and
+      // back to /jobs so they don't see a blank detail screen.
+      if (j) {
+        const hasUsefulDescription = j.description && j.description.trim().length > 40;
+        if (!hasUsefulDescription) {
+          const target = j.applyUrl || j.sourceUrl || (j.applyEmail ? `mailto:${j.applyEmail}` : null);
+          if (target) {
+            window.open(target, '_blank', 'noopener,noreferrer');
+            router.replace('/jobs');
+            return;
+          }
+        }
+      }
+      setJob(j);
+      setLoading(false);
+    });
   }, [id]);
 
   if (loading) return (

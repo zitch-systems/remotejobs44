@@ -45,22 +45,31 @@ function DashboardContent() {
           profile = await Promise.race([queryPromise, timeoutPromise]);
         } catch {}
 
-        const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
+        // If the profile fetch failed or timed out, DO NOT overwrite the
+        // persisted user with plan='free' — that's how a paying user on a
+        // slow connection would falsely appear unsubscribed. Just keep
+        // whatever we had, and try again on next page load.
+        if (!profile) {
+          setLoading(false);
+          return;
+        }
+
+        const role = resolveRole({ profileRole: profile.role, email: authUser.email });
         // Admins shouldn't be on /dashboard — send them to /admin
         if (role === 'admin') {
           router.replace('/admin');
           return;
         }
-        const plan = profile?.plan ?? 'free';
+        const plan = profile.plan ?? 'free';
 
         setUser({
           id:    authUser.id,
           email: authUser.email!,
-          name:  profile?.name ?? authUser.email!.split('@')[0],
+          name:  profile.name ?? authUser.email!.split('@')[0],
           plan,
           role,
-          joinedAt: profile?.created_at ?? new Date().toISOString(),
-          profileCompletion: profile?.profile_completion ?? 20,
+          joinedAt: profile.created_at ?? new Date().toISOString(),
+          profileCompletion: profile.profile_completion ?? 20,
         });
       } catch {
         // Network exception — don't redirect, keep showing the page

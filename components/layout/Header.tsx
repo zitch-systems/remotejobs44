@@ -91,6 +91,13 @@ export function Header() {
         if (error) { setHydrated(true); return; }   // transient — keep session, but mark synced
         if (!authUser) { setUser(null); return; }
         const profile = await fetchProfile(authUser.id);
+        // Don't downgrade plan/role on a failed/null profile fetch — that
+        // would tell a paying user they're on Free. Keep persisted state
+        // and try again next render.
+        if (!profile) {
+          setHydrated(true);
+          return;
+        }
         setUser(buildUser(authUser, profile));
       } catch {
         setHydrated(true); // network exception — keep session, mark synced so UI can render
