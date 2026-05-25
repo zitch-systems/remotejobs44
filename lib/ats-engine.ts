@@ -251,22 +251,36 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
   //    SPAs, custom React boards, Sequoia/a16z-style portfolio pages).
   //    Expensive — ~5-8s and ~512MB RAM — so only attempt after the
   //    cheap HTML scrape in step 2 found nothing.
+  console.log('[autoFetchFromCareerUrl] step-3 chromium fallback for', url);
+  let renderError: string | undefined;
   try {
+    const t0 = Date.now();
     const { renderHtml } = await import('@/lib/render-js');
+    console.log('[autoFetchFromCareerUrl] render-js loaded in', Date.now() - t0, 'ms');
     const rendered = await renderHtml(url, { timeoutMs: 25_000 });
+    console.log('[autoFetchFromCareerUrl] rendered', rendered.length, 'bytes in', Date.now() - t0, 'ms');
     const renderedDetect = detectATSFromHtml(rendered, url);
     if (renderedDetect) {
+      console.log('[autoFetchFromCareerUrl] chromium found ATS:', renderedDetect.platform, renderedDetect.slug);
       const result = await fetchATSJobs(renderedDetect.platform, renderedDetect.slug, url);
       return { ...result, detected: renderedDetect };
     }
+    renderError = 'rendered HTML had no ATS link either';
+    console.log('[autoFetchFromCareerUrl] chromium found no ATS link in', rendered.length, 'bytes of rendered HTML');
   } catch (err: any) {
     // Render path is best-effort. If chromium fails to launch (e.g. local
     // dev without the binary), we just report the original "could not
     // detect" error rather than crashing the whole request.
-    console.error('[autoFetchFromCareerUrl render-js]', err?.message ?? err);
+    renderError = err?.message ?? String(err);
+    console.error('[autoFetchFromCareerUrl render-js failed]', renderError, err?.stack?.slice(0, 500));
   }
 
-  return { jobs: [], total: 0, platform: 'unknown', slug: '', detected: null, error: 'Could not detect ATS from this URL' };
+  return {
+    jobs: [], total: 0, platform: 'unknown', slug: '', detected: null,
+    error: renderError
+      ? `Could not detect ATS (HTML scrape + JS render both failed: ${renderError})`
+      : 'Could not detect ATS from this URL',
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
