@@ -50,7 +50,10 @@ const PLATFORM_META: Record<string, { label: string; color: string }> = {
   unknown:    { label: 'Unknown',    color: 'text-stone-500 bg-stone-100 dark:bg-stone-800' },
 };
 
-// Pre-populated with the company list from the document
+// Curated preset of ATS URLs that actually return jobs as of writing.
+// Greenhouse + Ashby are the most reliable. Lever/Workable are spotty —
+// many of their customers have migrated to other ATSs but the slug remains.
+// If you want to add more, paste your own URLs and click Detect ATS.
 const PRESET_COMPANIES = `https://boards.greenhouse.io/anthropic
 https://boards.greenhouse.io/stripe
 https://boards.greenhouse.io/figma
@@ -59,18 +62,28 @@ https://boards.greenhouse.io/vercel
 https://boards.greenhouse.io/linear
 https://boards.greenhouse.io/retool
 https://boards.greenhouse.io/airbnb
-https://jobs.lever.co/netflix
-https://jobs.lever.co/shopify
-https://jobs.lever.co/zapier
-https://jobs.lever.co/buffer
-https://jobs.ashbyhq.com/adaptive-ml
+https://boards.greenhouse.io/discord
+https://boards.greenhouse.io/scale
+https://boards.greenhouse.io/openai
+https://boards.greenhouse.io/databricks
+https://boards.greenhouse.io/instacart
+https://boards.greenhouse.io/duolingo
+https://boards.greenhouse.io/coinbase
+https://boards.greenhouse.io/dropbox
+https://boards.greenhouse.io/asana
+https://boards.greenhouse.io/clickup
+https://boards.greenhouse.io/affirm
+https://boards.greenhouse.io/whatnot
 https://jobs.ashbyhq.com/cohere
 https://jobs.ashbyhq.com/mistral
-https://apply.workable.com/algolia
-https://apply.workable.com/deliveroo
-https://apply.workable.com/typeform
-https://datadog.recruitee.com
-https://confluent.recruitee.com`.trim();
+https://jobs.ashbyhq.com/posthog
+https://jobs.ashbyhq.com/replicate
+https://jobs.ashbyhq.com/perplexity
+https://jobs.ashbyhq.com/clay
+https://jobs.ashbyhq.com/granola
+https://jobs.lever.co/palantir
+https://jobs.lever.co/leadgenius
+https://jobs.lever.co/octopusdeploy`.trim();
 
 export default function CompanyImportPage() {
   const [rawInput, setRawInput] = useState(PRESET_COMPANIES);

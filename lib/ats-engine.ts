@@ -208,22 +208,28 @@ async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResu
   const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Ashby ${res.status}: ${slug} not found`);
   const data = await res.json();
-  const postings = data.jobPostings ?? [];
+  // Ashby's posting-api now returns `data.jobs` (it was `jobPostings` in
+  // an older version). Accept both so we keep working if they rename
+  // either field later.
+  const postings = data.jobs ?? data.jobPostings ?? [];
   const jobs: Partial<Job>[] = postings.map((j: any) => ({
     id: `ash_${j.id ?? uid()}`,
     title: j.title,
-    company: data.organization?.name ?? slug,
+    company: data.organization?.name ?? data.name ?? slug,
     description: stripHtml(j.descriptionHtml ?? j.description ?? ''),
-    applyUrl: j.jobUrl ?? j.applyUrl,
-    location: j.isRemote ? 'Remote' : (j.locationName ?? 'Unknown'),
-    posted: j.publishedDate ?? new Date().toISOString(),
-    remote: j.isRemote ?? false,
-    type: 'full-time',
+    // Ashby exposes per-job urls under several names depending on the API
+    // version: jobUrl (new), applyUrl, hostedUrl, or you have to construct
+    // from /<slug>/<job-id>.
+    applyUrl: j.jobUrl ?? j.applyUrl ?? j.hostedUrl ?? `https://jobs.ashbyhq.com/${slug}/${j.id}`,
+    location: j.isRemote ? 'Remote' : (j.locationName ?? j.location ?? 'Unknown'),
+    posted: j.publishedAt ?? j.publishedDate ?? new Date().toISOString(),
+    remote: j.isRemote === true || j.workplaceType === 'Remote',
+    type: mapAshbyType(j.employmentType),
     level: guessLevel(j.title),
     category: guessCategory(j.title, j.description ?? ''),
     skills: extractSkills(j.title + ' ' + (j.description ?? '')),
-    salaryMin: j.compensation?.minValue ?? undefined,
-    salaryMax: j.compensation?.maxValue ?? undefined,
+    salaryMin: j.compensation?.minValue ?? j.compensation?.compensationTierSummary?.minValue ?? undefined,
+    salaryMax: j.compensation?.maxValue ?? j.compensation?.compensationTierSummary?.maxValue ?? undefined,
     currency: j.compensation?.currency ?? 'USD',
     source: 'api',
     sourceUrl: url,
@@ -232,30 +238,52 @@ async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResu
   return { jobs, total: jobs.length, platform: 'ashby', slug };
 }
 
+function mapAshbyType(raw: string | undefined): 'full-time' | 'part-time' | 'contract' | 'freelance' {
+  const t = (raw ?? '').toLowerCase();
+  if (t === 'parttime' || t === 'part-time' || t === 'part_time') return 'part-time';
+  if (t === 'contract' || t === 'temporary' || t === 'temp')      return 'contract';
+  if (t === 'intern' || t === 'internship')                       return 'contract';
+  return 'full-time';
+}
+
 // ── Workable ───────────────────────────────────────────────────────────────
+// Workable retired the public widget jobs endpoint a while back. The current
+// public board API is v3 and requires a POST with empty filter arrays.
 async function fetchWorkable(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
-  const url = `https://apply.workable.com/api/v1/widget/accounts/${slug}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  const url = `https://apply.workable.com/api/v3/accounts/${slug}/jobs`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: '', department: [], location: [], workplace: [], remote: [] }),
+    signal: AbortSignal.timeout(10000),
+    next: { revalidate: 300 },
+  });
   if (!res.ok) throw new Error(`Workable ${res.status}: ${slug} not found`);
   const data = await res.json();
-  const positions = data.jobs ?? [];
-  const jobs: Partial<Job>[] = positions.map((j: any) => ({
-    id: `wk_${j.shortcode ?? uid()}`,
-    title: j.title,
-    company: data.name ?? slug,
-    description: stripHtml(j.description ?? ''),
-    applyUrl: `https://apply.workable.com/${slug}/j/${j.shortcode}`,
-    location: j.location ?? j.city ?? 'Remote',
-    posted: j.published_on ?? new Date().toISOString(),
-    remote: j.telecommuting ?? /remote/i.test(j.location ?? ''),
-    type: mapWorkableType(j.employment_type),
-    level: guessLevel(j.title),
-    category: guessCategory(j.title, j.description ?? ''),
-    skills: extractSkills(j.title + ' ' + (j.description ?? '')),
-    source: 'api',
-    sourceUrl: url,
-    featured: false, isNew: true,
-  }));
+  // v3 returns { total, results: [{ shortcode, title, description, location, ...}] }
+  const positions = data.results ?? [];
+  const jobs: Partial<Job>[] = positions.map((j: any) => {
+    const loc = j.location?.city
+      ? `${j.location.city}${j.location.region ? ', ' + j.location.region : ''}${j.location.country ? ', ' + j.location.country : ''}`
+      : (j.location?.country ?? (j.remote ? 'Remote' : 'Unknown'));
+    return {
+      id: `wk_${j.shortcode ?? j.id ?? uid()}`,
+      title: j.title,
+      company: j.account?.name ?? slug,
+      description: stripHtml(j.description ?? ''),
+      applyUrl: j.url ?? `https://apply.workable.com/${slug}/j/${j.shortcode}`,
+      location: loc,
+      posted: j.published_on ?? j.created_at ?? new Date().toISOString(),
+      remote: j.remote === true || j.workplace === 'remote' || /remote/i.test(loc),
+      type: mapWorkableType(j.employment_type ?? j.type),
+      level: guessLevel(j.title),
+      category: guessCategory(j.title, j.description ?? ''),
+      skills: extractSkills(j.title + ' ' + (j.description ?? '')),
+      source: 'api',
+      sourceUrl: url,
+      featured: false, isNew: true,
+    };
+  });
   return { jobs, total: jobs.length, platform: 'workable', slug };
 }
 
