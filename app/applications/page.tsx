@@ -19,20 +19,46 @@ const STATUS_CONFIG = {
 function ApplicationsContent() {
   const router   = useRouter();
   const supabase = createClient();
-  const { applications } = useJobsStore();
+  const { applications: localApps, addApplication } = useJobsStore();
   const [checked, setChecked] = useState(false);
+  // Server applications fetched from /api/applications. Source of truth — local
+  // zustand applications are kept only as a fallback for the first paint
+  // while the network call is in flight.
+  const [serverApps, setServerApps] = useState<typeof localApps | null>(null);
+
+  const applications = serverApps ?? localApps;
 
   useEffect(() => {
     let cancelled = false;
     Promise.race([
       supabase.auth.getUser(),
       new Promise<null>(res => setTimeout(() => res(null), 6000)),
-    ]).then(result => {
+    ]).then(async result => {
       if (cancelled) return;
       if (!result) { setChecked(true); return; } // timeout — show page (UI uses zustand-backed applications)
       const authUser = result.data?.user;
       if (!authUser) { router.replace('/login?next=/applications'); return; }
       setChecked(true);
+
+      // Fetch the canonical list from the server. Without this, a user who
+      // applied on another device or browser sees zero applications here.
+      // Failures fall back to the zustand-cached list so the page never
+      // looks empty when the network is briefly down.
+      try {
+        const res = await fetch('/api/applications');
+        if (cancelled) return;
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = Array.isArray(json.applications) ? json.applications : [];
+        setServerApps(list);
+        // Backfill the local zustand store with any server rows we hadn't
+        // seen locally yet, so other pages (dashboard recent-apps) stay
+        // in sync with the server.
+        const knownIds = new Set(localApps.map(a => a.id));
+        for (const a of list) {
+          if (!knownIds.has(a.id)) addApplication(a);
+        }
+      } catch {}
     });
     return () => { cancelled = true; };
   }, []);

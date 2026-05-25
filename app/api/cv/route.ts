@@ -20,7 +20,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File too large (max 5MB)' }, { status: 400 });
     }
 
-    const ext      = file.name.split('.').pop();
+    // Whitelist the file extension instead of trusting whatever the client
+    // sent in file.name. Pairs with the MIME-type check above so a client
+    // can't upload a `.html` named-as-PDF and have Storage serve it as HTML.
+    const ALLOWED_EXT: Record<string, string> = {
+      'application/pdf':                                                                'pdf',
+      'application/msword':                                                             'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':        'docx',
+    };
+    const ext      = ALLOWED_EXT[file.type] ?? 'pdf';
     const filename = `${user.id}/cv.${ext}`;
     const buffer   = Buffer.from(await file.arrayBuffer());
 

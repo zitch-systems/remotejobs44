@@ -12,8 +12,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { sendEmail } from '@/lib/email/send';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
+const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
+
+// Fire-and-forget: tell ops a paid charge landed for a user that no longer
+// exists in the profiles table. Without this, the user is silently never
+// upgraded after paying — they'd have to email support before anyone noticed.
+function notifyOrphanCharge(reference: string, userId: string, plan: string, amountKobo: number) {
+  const naira = (amountKobo / 100).toLocaleString();
+  sendEmail({
+    to: ADMIN_NOTIFY,
+    subject: `[RemoteJobs44] Orphan Paystack charge — refund or fix profile`,
+    html: `<p>A successful Paystack <strong>charge.success</strong> event arrived for a user_id that does not exist in <code>public.profiles</code>.</p>
+      <ul>
+        <li><strong>Reference:</strong> ${reference}</li>
+        <li><strong>Missing user_id:</strong> ${userId}</li>
+        <li><strong>Plan:</strong> ${plan}</li>
+        <li><strong>Amount:</strong> ₦${naira}</li>
+      </ul>
+      <p>Action: either refund the customer in the Paystack dashboard, or (if the user just deleted their account and re-signed up) manually upgrade the new profile and re-link the subscription row.</p>`,
+  }).catch(err => console.error('[webhook orphan-charge email]', err));
+}
 
 function getPlanTier(plan: string): 'daily' | 'pro' | 'free' {
   if (plan === 'daily')      return 'daily';
@@ -81,7 +102,11 @@ export async function POST(req: NextRequest) {
       if (!userId || !plan) break;
       if (!validatePlan(plan)) { console.warn('[webhook] invalid plan: ' + plan); break; }
       if (!(await validateUserId(supabase, userId))) {
-        console.warn('[webhook] user not found: ' + userId);
+        // Money was charged but the user no longer exists. Fire an alert
+        // email so ops can refund or hand-fix instead of silently dropping
+        // the payment.
+        console.warn('[webhook] orphan charge — user not found: ' + userId);
+        notifyOrphanCharge(reference ?? 'unknown', userId, plan, amount ?? 0);
         break;
       }
 
