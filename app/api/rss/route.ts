@@ -1,13 +1,23 @@
-// app/api/rss/route.ts — Server-side RSS fetcher & parser
+// app/api/rss/route.ts — Server-side RSS fetcher & parser.
+// Hardened against SSRF: the user-supplied URL is validated by
+// lib/ssrf-guard before we fetch anything, blocking loopback,
+// private IPv4 ranges, cloud metadata endpoints, and IPv6 literals.
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeJob } from '@/lib/ingestion';
+import { validateExternalUrl } from '@/lib/ssrf-guard';
 
 export const runtime = 'edge';
 export const revalidate = 300; // 5 minutes
 
 export async function GET(req: NextRequest) {
-  const url = req.nextUrl.searchParams.get('url');
-  if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
+  const raw = req.nextUrl.searchParams.get('url');
+  if (!raw) return NextResponse.json({ error: 'url required' }, { status: 400 });
+
+  const v = validateExternalUrl(raw);
+  if (!v.ok) {
+    return NextResponse.json({ error: v.error, jobs: [] }, { status: 400 });
+  }
+  const url = v.url.toString();
 
   try {
     // Fetch the RSS/XML with a browser-like UA
@@ -17,6 +27,10 @@ export async function GET(req: NextRequest) {
         'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*',
       },
       signal: AbortSignal.timeout(10000),
+      // Prevent the fetch from following redirects into a previously-blocked
+      // private host. (Next.js edge fetch defaults to follow; manual gives us
+      // a chance to re-validate — but the simplest fix is to reject 3xx.)
+      redirect: 'error',
     });
 
     if (!res.ok) {

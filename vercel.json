@@ -1,14 +1,19 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/daily",
-      "schedule": "0 6 * * *"
-    }
+    { "path": "/api/cron/daily",        "schedule": "0 6 * * *" },
+    { "path": "/api/cron/ingest",       "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/expire-daily", "schedule": "0 * * * *" }
   ],
   "functions": {
-    "app/api/cron/daily/route.ts":       { "maxDuration": 60 },
-    "app/api/paystack/webhook/route.ts": { "maxDuration": 30 },
-    "app/api/cv/route.ts":               { "maxDuration": 30 },
-    "app/api/scrape/route.ts":           { "maxDuration": 30 }
+    "app/api/cron/daily/route.ts":        { "maxDuration": 60 },
+    "app/api/cron/ingest/route.ts":       { "maxDuration": 60 },
+    "app/api/cron/expire-daily/route.ts": { "maxDuration": 30 },
+    "app/api/paystack/webhook/route.ts":  { "maxDuration": 30 },
+    "app/api/paystack/verify/route.ts":   { "maxDuration": 30 },
+    "app/api/ai/cv-review/route.ts":      { "maxDuration": 60 },
+    "app/api/ai/interview-prep/route.ts": { "maxDuration": 60 },
+    "app/api/admin/ingest-now/route.ts":  { "maxDuration": 120 },
+    "app/api/cv/route.ts":                { "maxDuration": 30 },
+    "app/api/scrape/route.ts":            { "maxDuration": 30 }
   }
 }
