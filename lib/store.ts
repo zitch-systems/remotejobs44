@@ -25,10 +25,16 @@ interface AuthState {
   user: User | null;
   token: string | null;
   dailyAppsUsed: number;
+  // True after Header's syncAuth has confirmed the persisted user matches a
+  // real Supabase session (or cleared it). Until then, persisted role/plan
+  // might be from a *previous* account on this browser, so role-dependent UI
+  // (Admin link, plan badge) must not render.
+  hydrated: boolean;
   // Actions
   login:      (user: User, token: string) => void;
   logout:     () => void;
   setUser:    (user: User | null) => void;
+  setHydrated:(v: boolean) => void;
   updateUser: (patch: Partial<User>) => void;
   incrementDailyApp: () => void;
   // Selectors (functions so they always read latest state)
@@ -43,9 +49,11 @@ export const useAuthStore = create<AuthState>()(
       user:  null,
       token: null,
       dailyAppsUsed: 0,
+      hydrated: false,
 
-      login:      (user, token) => set({ user, token }),
-      logout:     () => { resetJobsStoreForNewUser(); set({ user: null, token: null, dailyAppsUsed: 0 }); },
+      login:      (user, token) => set({ user, token, hydrated: true }),
+      logout:     () => { resetJobsStoreForNewUser(); set({ user: null, token: null, dailyAppsUsed: 0, hydrated: true }); },
+      setHydrated:(v) => set({ hydrated: v }),
       setUser:    (user) => set((s) => {
         // If the signed-in user actually changed (different id, or signed out
         // entirely), wipe any cached saved-jobs/applications from the previous
@@ -55,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
         if (prevId !== nextId) resetJobsStoreForNewUser();
         return {
           user,
+          hydrated: true, // any explicit setUser counts as a confirmed sync
           dailyAppsUsed: (user?.plan === 'daily' && s.user?.plan !== 'daily') ? 0 : s.dailyAppsUsed,
         };
       }),
@@ -69,6 +78,17 @@ export const useAuthStore = create<AuthState>()(
     {
       name:    'rj44-auth',
       storage: createJSONStorage(storage),
+      // Don't persist `hydrated` — it must be false on every fresh page load
+      // so the UI waits for syncAuth to confirm the persisted user matches a
+      // real Supabase session before rendering role-dependent elements.
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        dailyAppsUsed: state.dailyAppsUsed,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.hydrated = false;
+      },
     }
   )
 );

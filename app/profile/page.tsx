@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { resolveRole } from '@/lib/auth/redirect';
 
 function ProfileContent() {
   const router   = useRouter();
@@ -44,7 +44,7 @@ function ProfileContent() {
       } catch {}
       if (cancelled) return;
 
-      const role = (profile?.role === 'admin' || isHardcodedAdmin(authUser.email)) ? 'admin' : 'user';
+      const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
       const plan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
 
       if (profile) {

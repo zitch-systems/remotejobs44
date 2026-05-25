@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store';
 import { usePaystack } from '@/hooks/usePaystack';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { resolveRole } from '@/lib/auth/redirect';
 
 const PLANS = [
   {
@@ -124,12 +125,13 @@ function PricingContent() {
           .eq('id', authUser.id)
           .maybeSingle();
 
+        const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
         setUser({
           id:    authUser.id,
           email: authUser.email!,
           name:  profile?.name ?? authUser.email!.split('@')[0],
-          plan:  profile?.plan ?? 'free',
-          role:  profile?.role ?? 'user',
+          plan:  role === 'admin' ? 'admin' : (profile?.plan ?? 'free'),
+          role,
           joinedAt: profile?.created_at ?? new Date().toISOString(),
           profileCompletion: profile?.profile_completion ?? 20,
         });

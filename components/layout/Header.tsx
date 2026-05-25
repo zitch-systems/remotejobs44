@@ -32,7 +32,7 @@ export function Header() {
   const userRef = useRef<HTMLDivElement>(null);
 
   const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
-  const { user, isLoggedIn, isAdmin, setUser } = useAuthStore();
+  const { user, isLoggedIn, isAdmin, setUser, hydrated } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -84,15 +84,16 @@ export function Header() {
     }
 
     async function syncAuth() {
+      const { setHydrated } = useAuthStore.getState();
       try {
         const { data: { user: authUser }, error } = await supabase.auth.getUser();
         if (error?.status === 401 || error?.status === 403) { setUser(null); return; }
-        if (error) return; // network blip — keep existing session
+        if (error) { setHydrated(true); return; }   // transient — keep session, but mark synced
         if (!authUser) { setUser(null); return; }
         const profile = await fetchProfile(authUser.id);
         setUser(buildUser(authUser, profile));
       } catch {
-        // Never log out on exceptions (network down, timeout, etc.)
+        setHydrated(true); // network exception — keep session, mark synced so UI can render
       }
     }
 
@@ -224,9 +225,11 @@ export function Header() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{user?.name}</p>
                         <p className="text-xs text-stone-400 truncate">{user?.email}</p>
-                        <span className={cn('inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold', planColor)}>
-                          {planLabel}
-                        </span>
+                        {hydrated && (
+                          <span className={cn('inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold', planColor)}>
+                            {planLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -245,7 +248,11 @@ export function Header() {
                         { href: '/applications', icon: <ClipboardList className="w-4 h-4"/>,  label: 'My Applications'  },
                         { href: '/profile',      icon: <User className="w-4 h-4"/>,            label: 'Profile & CV'     },
                         { href: '/pricing',      icon: <Briefcase className="w-4 h-4"/>,       label: 'Plans'            },
-                        ...(isAdmin() ? [{ href: '/admin', icon: <Settings className="w-4 h-4"/>, label: 'Admin Panel' }] : []),
+                        // Only render Admin link when we've confirmed the live
+                        // session role — otherwise persisted state from a
+                        // previous admin login can briefly flash this link to a
+                        // regular member, confusing the user.
+                        ...(hydrated && isAdmin() ? [{ href: '/admin', icon: <Settings className="w-4 h-4"/>, label: 'Admin Panel' }] : []),
                       ].map(item => (
                         <li key={item.href}>
                           <Link href={item.href} onClick={() => setUserOpen(false)}
