@@ -302,7 +302,7 @@ function PricingContent() {
         <h2 className="font-display font-bold text-2xl text-stone-900 dark:text-stone-100 text-center mb-8">Common questions</h2>
         <div className="space-y-4">
           {[
-            { q: 'What is the Day Pass?', a: 'A one-time payment of ₦1,000 that gives you full Pro access for exactly 24 hours. Great if you want to spend a focused day applying to jobs.' },
+            { q: 'What is the Day Pass?', a: 'A one-time payment of ₦500 that gives you full Pro access for exactly 24 hours, with up to 10 job applications. Great if you want to spend a focused day applying to jobs.' },
             { q: 'How does auto-apply work?', a: 'Upload your CV once in your profile. For jobs that support it, we pre-fill the application form and submit it with one tap.' },
             { q: 'Can I cancel my monthly subscription?', a: 'Yes — cancel anytime from your dashboard. You keep access until the end of your current billing period.' },
             { q: 'What payment methods does Paystack support?', a: 'All major debit/credit cards, bank transfers, USSD, and mobile money. Fully encrypted and PCI-compliant.' },

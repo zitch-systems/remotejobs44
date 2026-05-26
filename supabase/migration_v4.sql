@@ -45,7 +45,10 @@ update public.profiles
 -- there is no policy for update or delete. RLS allows admins to read all
 -- rows and insert their own; everyone else is locked out entirely.
 create table if not exists public.admin_actions (
-  id           uuid default uuid_generate_v4() primary key,
+  -- gen_random_uuid (pgcrypto) is enabled by default on Supabase; the rest
+  -- of our migrations use it. v2/v3 mixed uuid_generate_v4 which needs the
+  -- uuid-ossp extension — fresh Supabase projects don't always have it.
+  id           uuid default gen_random_uuid() primary key,
   admin_id     uuid references public.profiles(id) on delete set null,
   admin_email  text,
   -- e.g. 'user.update_plan', 'user.delete', 'user.suspend',

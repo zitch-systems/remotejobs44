@@ -130,6 +130,8 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
         {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
         <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
         <button onClick={handleApply} onAuxClick={cancelAux}
+          aria-label={applied ? 'Already applied' : isPro() ? 'Apply to this job' : 'Subscribe to apply'}
+          title={applied ? 'Already applied' : isPro() ? 'Apply' : 'Subscribe to apply'}
           className={cn(
             'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
