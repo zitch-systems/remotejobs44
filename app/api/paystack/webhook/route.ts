@@ -14,6 +14,10 @@ import { createHmac } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import {
+  isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
+  getBilling as billingShared, getPlanExpiry as planExpiryShared,
+} from '@/lib/paystack/plans';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
@@ -37,26 +41,8 @@ function notifyOrphanCharge(reference: string, userId: string, plan: string, amo
   }).catch(err => console.error('[webhook orphan-charge email]', err));
 }
 
-function getPlanTier(plan: string): 'daily' | 'pro' | 'free' {
-  if (plan === 'daily')      return 'daily';
-  if (plan === 'pro_annual') return 'pro';
-  if (plan === 'pro')        return 'pro';
-  return 'free';
-}
-
-function getBilling(plan: string): 'daily' | 'monthly' | 'annually' {
-  if (plan === 'daily')      return 'daily';
-  if (plan === 'pro_annual') return 'annually';
-  return 'monthly';
-}
-
-function getExpiresAt(plan: string): Date {
-  const d = new Date();
-  if (plan === 'daily')      d.setHours(d.getHours() + 24);
-  else if (plan === 'pro_annual') d.setFullYear(d.getFullYear() + 1);
-  else                       d.setMonth(d.getMonth() + 1);
-  return d;
-}
+// Plan helpers (getPlanTier, getBilling, getExpiresAt, isValidPlan) moved
+// to lib/paystack/plans.ts so initialize, verify, and webhook all agree.
 
 async function validateUserId(supabase: ReturnType<typeof createAdminSupabaseClient>, userId: string): Promise<boolean> {
   if (!userId || typeof userId !== 'string') return false;
@@ -64,10 +50,6 @@ async function validateUserId(supabase: ReturnType<typeof createAdminSupabaseCli
   if (!UUID_RE.test(userId)) return false;
   const { data } = await supabase.from('profiles').select('id, role').eq('id', userId).maybeSingle();
   return !!data;
-}
-
-function validatePlan(plan: string): boolean {
-  return ['daily', 'pro', 'pro_annual'].includes(plan);
 }
 
 export async function POST(req: NextRequest) {
@@ -101,7 +83,19 @@ export async function POST(req: NextRequest) {
       const plan   = metadata?.plan;
 
       if (!userId || !plan) break;
-      if (!validatePlan(plan)) { console.warn('[webhook] invalid plan: ' + plan); break; }
+      if (!isValidPlan(plan)) {
+        console.warn('[webhook] invalid plan: ' + plan);
+        notifyOrphanCharge(reference ?? 'unknown', userId, plan ?? 'unknown', amount ?? 0);
+        break;
+      }
+      // Stop the "metadata says pro_annual, charge was ₦500" tampering
+      // attack: if the verified amount doesn't match what we expect for
+      // the plan, refuse to credit anything.
+      if (!chargeMatchesPlan(plan, amount, currency)) {
+        console.warn(`[webhook] amount mismatch — plan=${plan} got=${amount}${currency}`);
+        notifyOrphanCharge(reference ?? 'unknown', userId, plan, amount ?? 0);
+        break;
+      }
       if (!(await validateUserId(supabase, userId))) {
         // Money was charged but the user no longer exists. Fire an alert
         // email so ops can refund or hand-fix instead of silently dropping
@@ -111,11 +105,23 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      // Idempotency: if a subscription row already exists for this period_end,
-      // assume the verify endpoint already processed this payment.
-      const tier      = getPlanTier(plan);
-      const billing   = getBilling(plan);
-      const expiresAt = getExpiresAt(plan);
+      // Idempotency: if this paystack_reference is already on a sub row,
+      // verify endpoint already credited this charge. No-op.
+      if (reference) {
+        const { data: refRow } = await supabase
+          .from('subscriptions')
+          .select('user_id')
+          .eq('paystack_reference', reference)
+          .maybeSingle();
+        if (refRow) {
+          console.log('[webhook] charge.success: skipped duplicate reference ' + reference);
+          break;
+        }
+      }
+
+      const tier      = planTierShared(plan);
+      const billing   = billingShared(plan);
+      const expiresAt = planExpiryShared(plan);
 
       // Skip plan write if user is an admin — admins get a permanent 'admin' plan tag.
       const { data: profile } = await supabase
@@ -148,6 +154,7 @@ export async function POST(req: NextRequest) {
         plan:                       tier,
         billing,
         status:                     'active',
+        paystack_reference:         reference ?? null,
         paystack_customer_code:     customer?.customer_code ?? null,
         paystack_subscription_code: paystackSub?.subscription_code ?? null,
         paystack_email_token:       paystackSub?.email_token ?? null,
@@ -162,7 +169,11 @@ export async function POST(req: NextRequest) {
       break;
     }
 
-    // Real cancel event — downgrade to free.
+    // Cancel signal — soft-cancel only. DO NOT downgrade plan / clear
+    // plan_expires_at here. The user paid for time they haven't used yet
+    // (e.g., bought an annual plan on day 1, cancelled day 2 — they still
+    // get 363 more days of access). The expire-daily cron is the only
+    // thing that downgrades, when plan_expires_at falls into the past.
     case 'subscription.disable': {
       const userId = event.data?.metadata?.user_id;
       if (!userId) break;
@@ -174,16 +185,11 @@ export async function POST(req: NextRequest) {
       if (profile?.role === 'admin') break;
 
       await supabase
-        .from('profiles')
-        .update({ plan: 'free', plan_expires_at: null, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-
-      await supabase
         .from('subscriptions')
         .update({ status: 'cancelled', updated_at: new Date().toISOString() })
         .eq('user_id', userId);
 
-      console.log('[webhook] subscription.disable: downgraded ' + userId + ' to free');
+      console.log('[webhook] subscription.disable: ' + userId + ' marked cancelled (plan stays until current_period_end)');
       break;
     }
 

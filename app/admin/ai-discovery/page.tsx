@@ -10,6 +10,7 @@ import {
   BarChart2, List, LayoutGrid, Loader2, KeyRound, Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isSafeOpenUrl } from '@/lib/safe-url';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -840,7 +841,7 @@ export default function AIDiscoveryPage() {
                       title={`Discovered by ${job.provider}`}>
                       {PROVIDERS.find(p => p.id === job.provider)?.logo}
                     </span>
-                    {job.applyUrl && (
+                    {isSafeOpenUrl(job.applyUrl) && (
                       <a href={job.applyUrl} target="_blank" rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-stone-400 hover:text-brand-700 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors">
                         <ExternalLink className="w-3.5 h-3.5" />

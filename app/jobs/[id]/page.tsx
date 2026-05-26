@@ -7,6 +7,7 @@ import { jobsApi, applicationsApi } from '@/lib/api';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
+import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -97,10 +98,12 @@ export default function JobDetailPage() {
       addApplication(app);
       setCompanyRevealed(true);
       toast('Application submitted! 🎉 Opening application page…', 'success');
-      // Redirect to the actual company application URL
-      const applyTarget = job!.applyUrl || (job!.applyEmail && `mailto:${job!.applyEmail}`);
-      if (applyTarget) {
-        setTimeout(() => window.open(applyTarget, '_blank', 'noopener,noreferrer'), 800);
+      // Redirect to the actual company application URL — gated by
+      // isSafeOpenUrl to refuse javascript:/data: schemes from compromised
+      // ATS feeds.
+      const applyTargetRaw = job!.applyUrl || (job!.applyEmail && `mailto:${job!.applyEmail}`);
+      if (isSafeOpenUrl(applyTargetRaw)) {
+        setTimeout(() => safeWindowOpen(applyTargetRaw), 800);
       }
     } catch (err: any) {
       toast(err.message, 'error');

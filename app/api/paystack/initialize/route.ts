@@ -1,16 +1,9 @@
 // app/api/paystack/initialize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
-
-// Amounts in kobo (1 Naira = 100 kobo). Match what's configured on Paystack
-// Dashboard → Subscriptions → Plans for pro / pro_annual.
-const PLAN_AMOUNTS: Record<string, number> = {
-  daily:      50000,    // ₦500
-  pro:        299900,   // ₦2,999
-  pro_annual: 2999900,  // ₦29,999
-};
 
 // Plan codes set in Paystack Dashboard → Subscriptions → Plans
 // For 'daily' we use a one-time charge, not a subscription plan

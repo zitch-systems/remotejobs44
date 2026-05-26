@@ -6,6 +6,7 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
+import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -58,12 +59,15 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
     }
     if (applied) { toast('Already applied to this job', 'info'); return; }
 
-    const applyTarget = job.applyUrl || (job.applyEmail ? `mailto:${job.applyEmail}` : null);
+    // Treat any non-http(s)/mailto applyUrl as missing — `javascript:` URLs
+    // from a compromised ATS feed must not reach window.open.
+    const applyTargetRaw = job.applyUrl || (job.applyEmail ? `mailto:${job.applyEmail}` : null);
+    const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
 
     // If this is a mock/preview job (non-UUID ID), skip DB tracking and go directly to company site
     if (!isRealJobId(job.id)) {
       if (applyTarget) {
-        window.open(applyTarget, '_blank', 'noopener,noreferrer');
+        safeWindowOpen(applyTarget);
         toast('Redirecting to company application page 🚀', 'success', 3000);
       } else {
         toast('No application link available for this job', 'error');
@@ -77,12 +81,12 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
       if (isDaily) incrementDailyApp();
       toast('Application tracked! Opening company site 🎉', 'success');
       if (applyTarget) {
-        window.open(applyTarget, '_blank', 'noopener,noreferrer');
+        safeWindowOpen(applyTarget);
       }
     } catch (err: any) {
       // If DB tracking fails but we have a URL, still let them apply
       if (applyTarget && err.message?.includes('not found')) {
-        window.open(applyTarget, '_blank', 'noopener,noreferrer');
+        safeWindowOpen(applyTarget);
         toast('Opening application page 🚀', 'success', 2000);
       } else {
         toast(err.message, 'error');

@@ -4,23 +4,11 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentSuccessEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import {
+  isValidPlan, chargeMatchesPlan, getPlanTier, getBilling, getPlanExpiry,
+} from '@/lib/paystack/plans';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
-
-function getPlanExpiry(plan: string): Date {
-  const now = new Date();
-  if (plan === 'daily')      { now.setHours(now.getHours() + 24); return now; }
-  if (plan === 'pro')        { now.setMonth(now.getMonth() + 1);  return now; }
-  if (plan === 'pro_annual') { now.setFullYear(now.getFullYear() + 1); return now; }
-  return now;
-}
-
-function getPlanTier(plan: string): string {
-  if (plan === 'daily')      return 'daily';
-  if (plan === 'pro')        return 'pro';
-  if (plan === 'pro_annual') return 'pro';
-  return 'free';
-}
 
 export async function GET(req: NextRequest) {
   const APP_URL   = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
@@ -45,13 +33,35 @@ export async function GET(req: NextRequest) {
     const { metadata, customer, amount, currency } = data.data;
     const { user_id, plan } = metadata ?? {};
 
-    if (!user_id || !plan) {
+    if (!user_id || !plan || !isValidPlan(plan)) {
       return NextResponse.redirect(`${APP_URL}/pricing?error=invalid_metadata`);
+    }
+
+    // Validate the Paystack-verified amount matches the expected price for
+    // the metadata plan. Stops "metadata says pro_annual but the charge is
+    // only ₦500" tampering attacks (and accidental price drift between
+    // initialize and the Paystack dashboard).
+    if (!chargeMatchesPlan(plan, amount, currency)) {
+      console.warn(`[verify] amount mismatch — plan=${plan} got=${amount}${currency}`);
+      return NextResponse.redirect(`${APP_URL}/pricing?error=amount_mismatch`);
     }
 
     const supabase  = createAdminSupabaseClient();
     const planTier  = getPlanTier(plan);
     const expiresAt = getPlanExpiry(plan);
+
+    // Idempotency: if this paystack_reference is already recorded, the
+    // user has already been credited for this charge — short-circuit so a
+    // refresh of the callback URL doesn't extend their period again.
+    // Same check is in the webhook; whichever ran first wins.
+    const { data: existingRef } = await supabase
+      .from('subscriptions')
+      .select('user_id')
+      .eq('paystack_reference', reference)
+      .maybeSingle();
+    if (existingRef) {
+      return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${planTier}&upgraded=1`);
+    }
 
     // Update user plan — but never overwrite an admin's special 'admin' plan tag.
     const { data: existing } = await supabase
@@ -75,12 +85,16 @@ export async function GET(req: NextRequest) {
       ? null
       : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
 
-    // Upsert subscription record
+    // Upsert by user_id (one active sub per user). The unique-on-
+    // paystack_reference idempotency check above means we only get here
+    // once per real charge; subsequent retries short-circuit at the
+    // existingRef branch.
     await supabase.from('subscriptions').upsert({
       user_id,
       plan: planTier,
-      billing:     plan === 'daily' ? 'daily' : plan === 'pro_annual' ? 'annually' : 'monthly',
+      billing:     getBilling(plan),
       status:      'active',
+      paystack_reference:         reference,
       paystack_customer_code:     customer?.customer_code ?? null,
       paystack_subscription_code: paystackSub?.subscription_code ?? null,
       paystack_email_token:       paystackSub?.email_token ?? null,

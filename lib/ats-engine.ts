@@ -523,13 +523,23 @@ function candidateSlugsFromUrl(url: string): string[] {
 }
 
 // Probe a small set of slug candidates against the 6 most reliable public
-// ATS APIs. Returns the first {platform, slug} that responds 2xx. All
-// requests fire in parallel and we race the first success.
+// ATS APIs. Returns the FIRST hit in (slug, ATS) priority order — so for
+// ambiguous slugs like "bird" we'll consistently pick Greenhouse over
+// Lever rather than racing them. Without ordering, two different
+// companies that happen to share a slug would non-deterministically map
+// onto whichever ATS responded first, corrupting the captured data.
+//
+// Each slug × ATS probe still runs in parallel within its (slug) tier;
+// we just don't let a slower-but-higher-priority tier lose to a faster
+// lower-priority one.
 async function probeKnownATSes(slugs: string[]): Promise<{ platform: ATSPlatform; slug: string } | null> {
+  // Priority order. Greenhouse first because (a) it has the largest
+  // public-board customer base and (b) slugs there are owner-defined
+  // (less collision-prone than Lever's, which uses normalised names).
   const targets: Array<{ platform: ATSPlatform; url: (s: string) => string; init?: RequestInit }> = [
     { platform: 'greenhouse',      url: s => `https://boards-api.greenhouse.io/v1/boards/${s}/jobs?content=true` },
-    { platform: 'lever',           url: s => `https://api.lever.co/v0/postings/${s}?mode=json` },
     { platform: 'ashby',           url: s => `https://api.ashbyhq.com/posting-api/job-board/${s}` },
+    { platform: 'lever',           url: s => `https://api.lever.co/v0/postings/${s}?mode=json` },
     { platform: 'workable',        url: s => `https://apply.workable.com/api/v3/accounts/${s}/jobs`,
       init: { method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ query: '', department: [], location: [], workplace: [], remote: [] }) } },
@@ -537,26 +547,21 @@ async function probeKnownATSes(slugs: string[]): Promise<{ platform: ATSPlatform
     { platform: 'smartrecruiters', url: s => `https://api.smartrecruiters.com/v1/companies/${s}/postings?limit=1` },
   ];
 
-  const attempts: Array<Promise<{ platform: ATSPlatform; slug: string } | null>> = [];
+  async function probe(slug: string, t: typeof targets[number]): Promise<{ platform: ATSPlatform; slug: string } | null> {
+    try {
+      const res = await fetch(t.url(slug), { ...t.init, signal: AbortSignal.timeout(5_000) });
+      if (res.ok) return { platform: t.platform, slug };
+    } catch {}
+    return null;
+  }
+
+  // Walk slug candidates in order (most-likely first). Within a slug,
+  // walk ATSes in priority order and short-circuit on the first hit.
   for (const slug of slugs) {
     for (const t of targets) {
-      attempts.push((async () => {
-        try {
-          const res = await fetch(t.url(slug), {
-            ...t.init,
-            signal: AbortSignal.timeout(5_000),
-          });
-          if (res.ok) return { platform: t.platform, slug };
-        } catch {}
-        return null;
-      })());
+      const hit = await probe(slug, t);
+      if (hit) return hit;
     }
-  }
-  // Race for the first success. Promise.any rejects only when ALL reject,
-  // so we wrap with allSettled and pick the first fulfilled non-null.
-  const results = await Promise.allSettled(attempts);
-  for (const r of results) {
-    if (r.status === 'fulfilled' && r.value) return r.value;
   }
   return null;
 }

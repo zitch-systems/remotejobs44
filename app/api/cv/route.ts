@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const filename = `${user.id}/cv.${ext}`;
     const buffer   = Buffer.from(await file.arrayBuffer());
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('cvs')
       .upload(filename, buffer, {
         contentType: file.type,
@@ -41,15 +41,60 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    const { data: { publicUrl } } = supabase.storage.from('cvs').getPublicUrl(filename);
+    // The `cvs` bucket is private (see supabase/setup.sql) — `getPublicUrl`
+    // returns a URL that will 401 when fetched. Use a signed URL with a
+    // 1-hour TTL instead; client re-requests when it expires. We store only
+    // the storage path on the profile so future fetches can re-sign without
+    // depending on the original URL's expiry.
+    const SIGNED_TTL = 60 * 60; // 1 hour
+    const { data: signed, error: signErr } = await supabase.storage
+      .from('cvs').createSignedUrl(filename, SIGNED_TTL);
+    if (signErr || !signed?.signedUrl) {
+      console.error('[cv] createSignedUrl failed:', signErr?.message);
+      return NextResponse.json({ error: 'Upload succeeded but signing the URL failed' }, { status: 500 });
+    }
+    const signedUrl = signed.signedUrl;
 
-    // Save URL to profile
+    // Save the *path* on the profile (so we can re-sign later) and return
+    // the signed URL for the immediate client redirect.
     await supabase.from('profiles').update({
-      cv_url: publicUrl,
+      cv_url: filename,
       profile_completion: 80,
     }).eq('id', user.id);
 
-    return NextResponse.json({ success: true, url: publicUrl });
+    return NextResponse.json({ success: true, url: signedUrl, path: filename });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// GET — re-sign the calling user's stored CV path. The profile page hits
+// this whenever it needs a fresh viewable URL (signed URLs expire after
+// SIGNED_TTL above). Only the row's own user can fetch theirs.
+export async function GET() {
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: profile } = await supabase
+      .from('profiles').select('cv_url').eq('id', user.id).maybeSingle();
+    const cvPath = profile?.cv_url;
+    if (!cvPath) return NextResponse.json({ url: null });
+
+    // Backward-compat: if a legacy row stored a full public URL (pre-fix)
+    // just hand it back as-is — the storage proxy will 401 it but the
+    // user can re-upload to get a working path.
+    if (typeof cvPath === 'string' && /^https?:\/\//.test(cvPath)) {
+      return NextResponse.json({ url: cvPath, legacy: true });
+    }
+
+    const { data: signed, error: signErr } = await supabase.storage
+      .from('cvs').createSignedUrl(cvPath, 60 * 60);
+    if (signErr || !signed?.signedUrl) {
+      return NextResponse.json({ error: signErr?.message ?? 'Sign failed' }, { status: 500 });
+    }
+    return NextResponse.json({ url: signed.signedUrl });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

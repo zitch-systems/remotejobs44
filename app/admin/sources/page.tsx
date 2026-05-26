@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Rss, Code2, Globe, Eye, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isSafeOpenUrl } from '@/lib/safe-url';
 
 type SourceMethod = 'rss' | 'json-api' | 'scrape' | 'greenhouse-api' | 'lever-api' | 'ashby-api' | 'workable-api' | 'detecting' | 'unknown';
 type SourceStatus = 'idle' | 'detecting' | 'ok' | 'js-only' | 'error';
@@ -319,7 +320,7 @@ export default function SourcesPage() {
                           <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>
                           <p className="text-xs text-stone-400 dark:text-stone-500">{job.company} · {job.location}</p>
                         </div>
-                        {job.applyUrl && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-700 dark:text-brand-400 hover:underline shrink-0">View ↗</a>}
+                        {isSafeOpenUrl(job.applyUrl) && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-700 dark:text-brand-400 hover:underline shrink-0">View ↗</a>}
                       </div>
                     ))}
                   </div>

@@ -69,7 +69,17 @@ function ProfileContent() {
         const plan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
         setUser({ id: authUser.id, email: authUser.email!, name: profile.name ?? '', plan, role, joinedAt: profile.created_at, profileCompletion: profile.profile_completion ?? 20 });
         setName(profile.name ?? '');
-        setCvUrl(profile.cv_url ?? null);
+        // profile.cv_url is now a storage path (post-fix). Ask /api/cv
+        // GET to mint a fresh signed URL we can drop into <a href>.
+        if (profile.cv_url) {
+          try {
+            const cvRes = await fetch('/api/cv');
+            if (cvRes.ok) {
+              const { url } = await cvRes.json();
+              setCvUrl(url ?? null);
+            }
+          } catch {}
+        }
       }
       // No profile (timeout/network): KEEP whatever was previously in the
       // store. Don't overwrite plan with 'free' just because the lookup

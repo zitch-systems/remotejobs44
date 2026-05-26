@@ -8,6 +8,7 @@ import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
+const CRON_MIN_LEN = 16;
 
 const SOURCES = [
   { name: 'Remotive', url: 'https://remotive.com/api/remote-jobs?limit=50' },
@@ -15,9 +16,16 @@ const SOURCES = [
 ];
 
 export async function GET(req: NextRequest) {
-  // Verify request is from Vercel Cron or authorized caller
+  // Fail closed when CRON_SECRET is unset/short. The previous `if (SECRET && ...)`
+  // pattern let any caller hit this endpoint when the env var was missing —
+  // and this route mass-downgrades day-pass users to `free`. Mirror the
+  // /api/cron/ingest pattern (503 when secret missing or too short).
+  if (!CRON_SECRET || CRON_SECRET.length < CRON_MIN_LEN) {
+    console.error('[cron/daily] CRON_SECRET not set or too short');
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
+  }
   const auth = req.headers.get('authorization');
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
+  if (auth !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

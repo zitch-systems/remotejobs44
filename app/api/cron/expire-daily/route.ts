@@ -4,10 +4,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
+const CRON_MIN_LEN = 16;
+
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization');
   const secret = process.env.CRON_SECRET ?? '';
-  if (secret && auth !== `Bearer ${secret}`) {
+  if (!secret || secret.length < CRON_MIN_LEN) {
+    console.error('[cron/expire-daily] CRON_SECRET not set or too short');
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
+  }
+  const auth = req.headers.get('authorization');
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
