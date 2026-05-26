@@ -17,7 +17,10 @@ function DashboardContent() {
   const { user, setUser, isPro } = useAuthStore();
   const { applications, savedJobIds } = useJobsStore();
   const { toast } = useUIStore();
-  const [loading, setLoading] = useState(true);
+  // Optimistic render: if persisted Zustand has a user, show the dashboard
+  // immediately with that data and run the profile refresh in the
+  // background. Skeleton only shows on a genuinely cold first visit.
+  const [loading, setLoading] = useState(!useAuthStore.getState().user);
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [featured, setFeatured] = useState<Job[]>([]);
 

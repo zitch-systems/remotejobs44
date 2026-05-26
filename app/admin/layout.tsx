@@ -10,6 +10,8 @@ import {
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { resolveRole } from '@/lib/auth/redirect';
+import { useAuthStore } from '@/lib/store';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 // Admin access is determined solely by the 'role' column in the profiles table.
 // To grant admin access, set role = 'admin' directly in the Supabase dashboard.
@@ -31,8 +33,19 @@ const NAV = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
-  const [ready,     setReady]     = useState(false);
-  const [adminName, setAdminName] = useState('');
+  // Optimistic render: if Zustand has a persisted user that's already known
+  // to be an admin (either by role or by hardcoded email), trust it and
+  // render the panel immediately. The background check below will redirect
+  // to /dashboard or /login if it turns out we were wrong. The previous
+  // pessimistic "Verifying access" spinner blocked the admin behind 2–7s
+  // of network on every navigation.
+  const persistedUser = useAuthStore.getState().user;
+  const persistedAdmin = persistedUser?.role === 'admin'
+    || persistedUser?.plan === 'admin'
+    || isHardcodedAdmin(persistedUser?.email ?? null);
+
+  const [ready,     setReady]     = useState(persistedAdmin);
+  const [adminName, setAdminName] = useState(persistedUser?.name ?? persistedUser?.email?.split('@')[0] ?? '');
 
   useEffect(() => {
     let cancelled = false;
