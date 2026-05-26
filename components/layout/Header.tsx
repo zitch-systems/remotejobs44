@@ -61,7 +61,7 @@ export function Header() {
     async function fetchProfile(userId: string) {
       try {
         const queryPromise = supabase
-          .from('profiles').select('name,plan,role,created_at,profile_completion')
+          .from('profiles').select('name,plan,role,created_at,profile_completion,plan_expires_at')
           .eq('id', userId).maybeSingle()
           .then(({ data }: { data: any }) => data);
         const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
@@ -71,18 +71,35 @@ export function Header() {
 
     function buildUser(authUser: { id: string; email?: string | null }, profile: any) {
       const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
-      const dbPlan = role === 'admin' ? 'admin' : (profile?.plan ?? 'free');
 
-      // Post-payment race protection: when the user is on a page that just
-      // returned from Paystack (success=1 in URL) but profile.plan hasn't
-      // been updated by the webhook yet, refuse to downgrade an optimistic
-      // Pro/Day Pass back to Free. The pricing/dashboard success-handler
-      // useEffects are polling the DB and will reconcile once the webhook
-      // lands. Without this guard, any header re-sync racing the webhook
-      // produces a "subscribed → unsubscribed → subscribed" flicker.
-      const justPaid = typeof window !== 'undefined' && /[?&]success=1/.test(window.location.search);
+      // Effective plan — mirrors /api/profile so client and server agree.
+      // Without this, Header would read profile.plan directly and downgrade
+      // a user to 'free' the moment their day-pass webhook lagged by a few
+      // hundred ms (the "subscribed → unsubscribed → subscribed back"
+      // flicker users were reporting after refresh).
+      //
+      //   * admin role overrides everything
+      //   * plan_expires_at in the past → 'free' (genuine expiry; cron
+      //     downgrade lagged but plan is conceptually expired)
+      //   * plan_expires_at in the future → the user is paid; trust
+      //     profile.plan unless it's 'free' (webhook race during fresh
+      //     purchase — keep the higher persisted client plan)
+      //   * plan_expires_at null + no profile → 'free'
+      const now = Date.now();
+      const expiryMs = profile?.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
+      const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+      const expired = expiryMs !== null && expiryMs < now;
+
+      let dbPlan: 'free' | 'daily' | 'pro' | 'admin';
+      if (role === 'admin')         dbPlan = 'admin';
+      else if (expired)             dbPlan = 'free';
+      else                          dbPlan = (profile?.plan ?? 'free') as 'free' | 'daily' | 'pro' | 'admin';
+
       const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-      const plan = justPaid && dbPlan === 'free' && currentPlan !== 'free'
+      // Webhook race: profile.plan still says 'free' but plan_expires_at
+      // proves the user just paid. Keep whatever non-free plan the client
+      // already had (verify route / pricing-success handler set it).
+      const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
         ? currentPlan
         : dbPlan;
 

@@ -129,16 +129,23 @@ function DashboardContent() {
           return;
         }
 
-        // Post-payment race: if the user just landed here from Paystack
-        // (?success=1&plan=...), the webhook may not have updated profile.plan
-        // yet. The dedicated success-handler useEffect below is polling for
-        // the real plan; don't overwrite its optimistic upgrade with a stale
-        // DB read here.
-        const justPaid = searchParams.get('success') === '1' || searchParams.get('subscribed') === '1';
-        const dbPlan = profile.plan ?? 'free';
+        // Effective plan — same rules as Header.buildUser and /api/profile
+        // so all three sources of truth agree. The old version only protected
+        // against downgrade when ?success=1 was in the URL, so a refresh
+        // of any other page during a webhook lag would flicker a paid user
+        // back to 'free'. Now we use plan_expires_at as the proof:
+        //   * expiry in past → 'free' (real expiry, cron just hasn't run yet)
+        //   * expiry in future + profile.plan='free' → webhook race, keep
+        //     the higher persisted client plan
+        //   * otherwise → trust profile.plan
+        const now = Date.now();
+        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
+        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+        const expired = expiryMs !== null && expiryMs < now;
+        const dbPlan = expired ? 'free' : (profile.plan ?? 'free');
         const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-        const plan = justPaid && dbPlan === 'free' && currentPlan !== 'free'
-          ? currentPlan   // keep optimistic Pro/Day Pass while polling
+        const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
+          ? currentPlan
           : dbPlan;
 
         setUser({
