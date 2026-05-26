@@ -28,11 +28,13 @@ const POPULAR = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps', 
 
 export function HeroSection() {
   const router = useRouter();
-  const { user, hydrated } = useAuthStore();
-  // Treat as unauthed only AFTER a confirmed sync; before that, show a
-  // neutral primary CTA so we don't briefly flash "Get Started" to a
-  // logged-in user (or vice versa).
-  const isUnauthed = hydrated && !user;
+  const { user } = useAuthStore();
+  // Default to unauthed during hydration. Landing-page visitors are
+  // overwhelmingly NOT logged in — gating Sign Up / Log In behind a
+  // confirmed sync meant unauthed visitors saw "Browse Jobs / View Plans"
+  // until Zustand hydrated, hiding the primary conversion CTAs entirely.
+  // Brief flicker for the smaller authed-user cohort is the right trade.
+  const isUnauthed = !user;
   const [q, setQ] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
