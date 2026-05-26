@@ -31,8 +31,17 @@ function DashboardContent() {
     async function loadSession() {
       try {
         // getAuthedUserSafe retries a 401 once so a stale-token-mid-refresh
-        // doesn't redirect a logged-in user to /login on first load.
-        const { user: authUser, status } = await getAuthedUserSafe(supabase);
+        // doesn't redirect a logged-in user to /login on first load. If the
+        // first call reports unauthed but Zustand has a persisted user,
+        // give Supabase ~2s to recover via background token refresh before
+        // bouncing — that absorbs the post-API-call session-refresh race
+        // that was logging users out after an apply.
+        let attempt = await getAuthedUserSafe(supabase);
+        if (attempt.status === 'unauthed' && useAuthStore.getState().user) {
+          await new Promise(r => setTimeout(r, 2000));
+          attempt = await getAuthedUserSafe(supabase);
+        }
+        const { user: authUser, status } = attempt;
         if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
         if (status === 'transient') { setLoading(false); return; } // stay on page
         if (!authUser)              { router.replace('/login?next=/dashboard'); return; }

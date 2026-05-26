@@ -150,16 +150,30 @@ export function Header() {
         return;
       }
       if (event === 'SIGNED_OUT') {
-        if (ignoreNextSignedOut) return; // spurious event during token refresh
-        // Confirm the logout with a fresh getUser. Only clear local state when
-        // we're CERTAIN (401/403, or no user with no error). A network blip
-        // here previously caused random logouts.
-        try {
-          const { data: { user: stillAuthed }, error } = await supabase.auth.getUser();
-          if (stillAuthed) return;
-          if (error && error.status !== 401 && error.status !== 403) return; // transient
-        } catch {
-          return; // network exception — keep session, don't log out
+        // Do NOT auto-logout from the auth event listener. Supabase can
+        // fire SIGNED_OUT during a brief token-refresh race after a normal
+        // API call (e.g., right after submitting an application), and a
+        // single getUser() check at that moment may legitimately return
+        // 401 even though the session is about to recover via the next
+        // TOKEN_REFRESHED event.
+        //
+        // The user's own logout buttons (Header / dashboard / profile)
+        // explicitly call setUser(null) + signOut() + redirect — those
+        // are the only places that should drop local state. Cross-tab
+        // logouts will reconcile on the next page load via syncAuth.
+        if (ignoreNextSignedOut) return;
+        // Wait a moment for any in-flight TOKEN_REFRESHED to land. If
+        // session is genuinely gone AND no auth cookie remains, then
+        // log out — otherwise keep state and let the next syncAuth /
+        // page nav resolve.
+        await new Promise(r => setTimeout(r, 2500));
+        const { data: { session: stillSession } } = await supabase.auth.getSession();
+        if (stillSession?.user) return; // recovered
+        // Final defense: keep persisted state if any sb-* cookie still
+        // exists in document.cookie — only log out when storage is
+        // truly empty.
+        if (typeof document !== 'undefined' && /(?:^|;\s*)sb-[^=]+-auth-token/.test(document.cookie)) {
+          return;
         }
         setUser(null);
         return;
