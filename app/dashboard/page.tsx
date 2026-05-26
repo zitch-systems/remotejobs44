@@ -48,8 +48,14 @@ function DashboardContent() {
 
         let profile: any = null;
         try {
+          // Enumerated columns instead of select('*'): paystack_*_code
+          // and paystack_email_token are server-only state — no need to
+          // ship them to the browser even for the owning user.
           const queryPromise = supabase
-            .from('profiles').select('*').eq('id', authUser.id).maybeSingle()
+            .from('profiles')
+            .select('id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason, cv_url')
+            .eq('id', authUser.id)
+            .maybeSingle()
             .then(({ data }) => data);
           const timeoutPromise = new Promise<null>(res => setTimeout(() => res(null), 5000));
           profile = await Promise.race([queryPromise, timeoutPromise]);

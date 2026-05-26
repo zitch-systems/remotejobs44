@@ -1,6 +1,6 @@
 // app/api/cv/route.ts — CV upload to Supabase Storage
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,7 +57,13 @@ export async function POST(req: NextRequest) {
 
     // Save the *path* on the profile (so we can re-sign later) and return
     // the signed URL for the immediate client redirect.
-    await supabase.from('profiles').update({
+    //
+    // Use the service-role admin client for the write: migration_v9 revokes
+    // UPDATE privileges on `cv_url` + `profile_completion` from the
+    // `authenticated` role to block client-side privilege escalation. We
+    // still scope by user.id (authoritatively validated via getUser above),
+    // so this stays an own-row-only write.
+    await createAdminSupabaseClient().from('profiles').update({
       cv_url: filename,
       profile_completion: 80,
     }).eq('id', user.id);

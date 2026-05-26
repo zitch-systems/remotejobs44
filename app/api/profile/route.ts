@@ -12,7 +12,7 @@ import { welcomeEmail } from '@/lib/email/templates';
 // (customer_code, subscription_code, email_token) are intentionally EXCLUDED
 // from the response — the client never needs them, and they're best kept
 // off-wire to limit exposure via logs, extensions, and crash reports.
-const SAFE_PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason';
+const SAFE_PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason, cv_url';
 
 // Compute the user's effective plan: if plan_expires_at is in the past, treat
 // them as 'free' regardless of what profiles.plan says. The expire-pass cron
