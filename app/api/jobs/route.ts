@@ -8,18 +8,23 @@ export const revalidate = 60;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const id      = searchParams.get('id');
-  const q       = searchParams.get('q') ?? '';
-  const category= searchParams.get('category') ?? '';
-  const type    = searchParams.get('type') ?? '';
-  const level   = searchParams.get('level') ?? '';
-  const region  = searchParams.get('region') ?? '';
+  const id       = searchParams.get('id');
+  const q        = searchParams.get('q') ?? '';
+  const category = searchParams.get('category') ?? '';
+  const type     = searchParams.get('type') ?? '';
+  const level    = searchParams.get('level') ?? '';
+  const region   = searchParams.get('region') ?? '';
+  const country  = searchParams.get('country') ?? '';
   // remote=true (string from URL) → filter to remote-only roles.
   // Anything else (including unset) means "don't filter on remote".
-  const remote  = searchParams.get('remote') === 'true';
-  const sort    = searchParams.get('sort') ?? 'newest';
-  const page    = parseInt(searchParams.get('page') ?? '1');
-  const perPage = parseInt(searchParams.get('perPage') ?? '12');
+  const remote   = searchParams.get('remote') === 'true';
+  // Advanced filters — previously parsed by the page but never sent.
+  const salary   = searchParams.get('salary') ?? '';
+  const timezone = searchParams.get('timezone') ?? '';
+  const posted   = searchParams.get('posted') ?? '';
+  const sort     = searchParams.get('sort') ?? 'newest';
+  const page     = parseInt(searchParams.get('page') ?? '1');
+  const perPage  = parseInt(searchParams.get('perPage') ?? '12');
 
   const REGION_TERMS: Record<string, string[]> = {
     africa:        ['africa','nigeria','ghana','kenya','south africa','egypt','ethiopia','cameroon','senegal'],
@@ -75,11 +80,35 @@ export async function GET(req: NextRequest) {
         'location.ilike.%wfh%',
       ].join(','));
     }
-    if (region && REGION_TERMS[region]) {
-      const orTerms = REGION_TERMS[region].map(t => `location.ilike.%${t}%`).join(',');
+    // Country takes priority over region (more specific). Both fall through
+    // to a location ILIKE substring match if not in the REGION_TERMS map.
+    const locFilter = country || region;
+    if (locFilter && REGION_TERMS[locFilter]) {
+      const orTerms = REGION_TERMS[locFilter].map(t => `location.ilike.%${t}%`).join(',');
       query = query.or(orTerms);
-    } else if (region) {
-      query = query.ilike('location', `%${region}%`);
+    } else if (locFilter) {
+      // Escape % and _ wildcards to prevent unintended broad matches.
+      const safe = locFilter.replace(/[\\%_]/g, '\\$&').slice(0, 100);
+      query = query.ilike('location', `%${safe}%`);
+    }
+    // Salary range key like "60-100" → salary_max between 60k–100k USD.
+    // Empty string is "any salary" — skip.
+    if (salary && /^\d+-\d+$/.test(salary)) {
+      const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
+      if (Number.isFinite(lo) && Number.isFinite(hi)) {
+        query = query.gte('salary_max', lo).lte('salary_max', hi);
+      }
+    }
+    if (timezone) {
+      const safeTz = timezone.replace(/[\\%_]/g, '\\$&').slice(0, 50);
+      query = query.ilike('timezone', `%${safeTz}%`);
+    }
+    if (posted && /^\d+$/.test(posted)) {
+      const days = parseInt(posted, 10);
+      if (days > 0 && days <= 365) {
+        const since = new Date(Date.now() - days * 86_400_000).toISOString();
+        query = query.gte('posted_at', since);
+      }
     }
     if (sort === 'salary') query = query.order('salary_max', { ascending: false, nullsFirst: false });
     else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });

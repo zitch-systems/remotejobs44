@@ -25,9 +25,15 @@ function LoginForm() {
       setSuccess(true);
       setErrorMsg('');
     }
-    // Pre-fill email if passed (e.g. from "already registered" redirect)
+    // Pre-fill email if passed (e.g. from "already registered" redirect).
+    // decodeURIComponent throws on malformed % sequences ("foo%" etc.) —
+    // wrap so a bad email param doesn't kill the entire useEffect (which
+    // would also block the already-logged-in redirect just below).
     const emailParam = searchParams.get('email');
-    if (emailParam) setEmail(decodeURIComponent(emailParam));
+    if (emailParam) {
+      try { setEmail(decodeURIComponent(emailParam)); }
+      catch { setEmail(emailParam); }
+    }
 
     // If someone is already logged in and lands on /login, send them straight
     // to their home. Without this, signing in as a different account briefly

@@ -21,12 +21,37 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {}
   const company = (body.company ?? '').trim();
   if (!company) return NextResponse.json({ error: 'company is required' }, { status: 400 });
+  // Reject lone-wildcard "company" values like "%", "%%", "_" that would
+  // match every row. Any legit company name has at least one alphanumeric.
+  if (!/[a-z0-9]/i.test(company)) {
+    return NextResponse.json({ error: 'company must contain at least one alphanumeric character' }, { status: 400 });
+  }
+  // Escape SQL-LIKE wildcards so an admin (or compromised admin session)
+  // can't pass company="%" and deactivate every active job. ilike treats
+  // %/_ as wildcards; backslash-escape both. Postgres also requires
+  // doubling backslashes if escaped in a string literal — Supabase
+  // parameterises the value so a single backslash is correct here.
+  const safeCompany = company.replace(/[\\%_]/g, '\\$&');
 
   const admin = createAdminSupabaseClient();
+  // Sanity gate: count first, refuse if absurdly large. A real company
+  // never has >5,000 active jobs in our DB; anything bigger is the
+  // wildcard-escape failing silently or a typo wildcard.
+  const { count: targetCount } = await admin
+    .from('jobs')
+    .select('id', { count: 'exact', head: true })
+    .ilike('company', safeCompany)
+    .eq('is_active', true);
+  if ((targetCount ?? 0) > 5000) {
+    return NextResponse.json({
+      error: `Refusing to remove ${targetCount} jobs in one call — pass a more specific company name`,
+    }, { status: 400 });
+  }
+
   const { error, count } = await admin
     .from('jobs')
     .update({ is_active: false, updated_at: new Date().toISOString() }, { count: 'exact' })
-    .ilike('company', company)
+    .ilike('company', safeCompany)
     .eq('is_active', true);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

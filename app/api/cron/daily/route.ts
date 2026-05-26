@@ -66,9 +66,11 @@ export async function GET(req: NextRequest) {
 
       if (!jobs.length) { ingestResults[source.name] = 0; continue; }
 
+      // migration_v5 dropped the unique apply_url index; upsert(onConflict)
+      // would error. Plain insert matches ingest-pipeline.ts behaviour.
       const { data: inserted } = await supabase
         .from('jobs')
-        .upsert(jobs, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .insert(jobs)
         .select('id');
 
       ingestResults[source.name] = inserted?.length ?? 0;

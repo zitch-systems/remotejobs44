@@ -258,7 +258,8 @@ function JobsContent() {
       const res = await jobsApi.getJobs({
         q, category, type: type as JobType, level: level as JobLevel,
         sort: sort as 'newest' | 'salary' | 'relevant', page, perPage: 12,
-        region, remote: remoteOnly,
+        region, country, remote: remoteOnly,
+        salary, timezone, posted, companySize,
       });
       if (res.jobs.length > 0) {
         setJobs(res.jobs);
@@ -669,16 +670,38 @@ function JobsContent() {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] disabled:opacity-40 transition-colors">
                 <ChevronLeft className="w-4 h-4" />Previous
               </button>
-              {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
-                const p = pages <= 5 ? i + 1 : i === 0 ? 1 : i === 4 ? pages : page - 1 + i;
-                return (
+              {(() => {
+                // Build a deduplicated 1..5 page-number window. The previous
+                // version computed `page - 1 + i` which produced 0 on page 1
+                // (invalid), duplicated 1, and overshot `pages` on the last
+                // page. Use a clamped sliding window centred on `page`.
+                const totalSlots = Math.min(pages, 5);
+                let start = page - 2;
+                if (start < 2) start = 2;                  // always show first page
+                if (start + (totalSlots - 2) > pages - 1) start = pages - 1 - (totalSlots - 2);
+                if (start < 2) start = 2;
+                const numbers: number[] = [];
+                if (pages <= 5) {
+                  for (let i = 1; i <= pages; i++) numbers.push(i);
+                } else {
+                  numbers.push(1);
+                  for (let i = 0; i < totalSlots - 2; i++) numbers.push(start + i);
+                  numbers.push(pages);
+                }
+                // Dedupe in case start lands on 2 or N-1 (overlap with the
+                // pinned first/last slots).
+                const seen = new Set<number>();
+                return numbers.filter(n => {
+                  if (seen.has(n) || n < 1 || n > pages) return false;
+                  seen.add(n); return true;
+                }).map(p => (
                   <button key={p} onClick={() => setPage(p)}
                     className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all',
                       p === page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628]')}>
                     {p}
                   </button>
-                );
-              })}
+                ));
+              })()}
               <button onClick={() => setPage(page + 1)} disabled={page >= pages}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] disabled:opacity-40 transition-colors">
                 Next<ChevronRight className="w-4 h-4" />

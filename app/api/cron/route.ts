@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
+const CRON_MIN_LEN = 16;
 
 const SOURCES = [
   { name: 'Remotive', url: 'https://remotive.com/api/remote-jobs?limit=50', type: 'json-api' },
@@ -11,8 +12,16 @@ const SOURCES = [
 ];
 
 export async function GET(req: NextRequest) {
+  // Fail closed when CRON_SECRET is unset/short. The previous
+  // `if (SECRET && ...)` pattern let any caller hit this endpoint when
+  // the env var was missing — and this route inflates the jobs table.
+  // Mirror /api/cron/daily + /api/cron/expire-daily.
+  if (!CRON_SECRET || CRON_SECRET.length < CRON_MIN_LEN) {
+    console.error('[cron/ingest-legacy] CRON_SECRET not set or too short');
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
+  }
   const auth = req.headers.get('authorization');
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
+  if (auth !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -50,9 +59,12 @@ export async function GET(req: NextRequest) {
 
       if (!jobs.length) { results[source.name] = 0; continue; }
 
+      // migration_v5 dropped the unique apply_url index, so the prior
+      // upsert(onConflict='apply_url') would error at runtime. Insert
+      // unconditionally — matches the behaviour of cron/daily + ingest.
       const { data: inserted } = await supabase
         .from('jobs')
-        .upsert(jobs, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .insert(jobs)
         .select('id');
 
       results[source.name] = inserted?.length ?? 0;

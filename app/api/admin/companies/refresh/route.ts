@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
 
   const company = (body.company ?? '').trim();
   if (!company) return NextResponse.json({ error: 'company is required' }, { status: 400 });
+  if (!/[a-z0-9]/i.test(company)) {
+    return NextResponse.json({ error: 'company must contain at least one alphanumeric character' }, { status: 400 });
+  }
 
   // Two ways to identify the source: explicit platform+slug (preferred), or
   // re-detect from an example apply_url. Callers from the admin UI send

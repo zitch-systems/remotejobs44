@@ -23,10 +23,20 @@ export async function requireAdmin(): Promise<RequireAdminResult> {
   if (error || !user) {
     return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, suspended')
+    .eq('id', user.id)
+    .maybeSingle();
   const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
   if (!isAdmin) {
     return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  // Suspended admins are denied EVEN IF in the hardcoded admin list. Without
+  // this kill-switch, a compromised admin account couldn't be revoked short
+  // of a redeploy. migration_v4 introduced the `suspended` column for this.
+  if (profile?.suspended === true) {
+    return { ok: false, res: NextResponse.json({ error: 'Account suspended' }, { status: 403 }) };
   }
   return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
 }

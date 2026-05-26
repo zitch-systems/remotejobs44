@@ -20,8 +20,11 @@ export default function CompaniesPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Fetch all active jobs and derive companies from them
-        const res = await fetch('/api/jobs?perPage=200&sort=newest');
+        // Fetch all active jobs and derive companies from them. Pass
+        // remote=false explicitly so companies that only post on-site
+        // (e.g. Adyen, some UK firms) still appear in the directory —
+        // /api/jobs defaults to remote-only otherwise.
+        const res = await fetch('/api/jobs?perPage=200&sort=newest&remote=false');
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
         const jobs: any[] = data.jobs ?? [];

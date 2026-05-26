@@ -143,11 +143,17 @@ export interface SearchFilters {
   level?: JobLevel | '';
   location?: string;
   region?: string;
+  country?: string;
   source?: string | '';
   sort?: 'newest' | 'salary' | 'relevant';
   page?: number;
   perPage?: number;
   remote?: boolean;
+  // Optional advanced filters — forwarded to /api/jobs and applied server-side.
+  salary?: string;     // range key like "60-100" (means salary_max between 60k–100k)
+  timezone?: string;   // matches jobs.timezone column substring
+  posted?: string;     // "1" | "7" | "14" | "30" — days since posted_at
+  companySize?: string;// startup | mid | large
 }
 
 export interface PaginatedJobs {

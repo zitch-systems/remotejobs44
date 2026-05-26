@@ -10,7 +10,7 @@
 //   - We use the `subscriptions` table itself for idempotency, not a separate
 //     `transactions` table (which doesn't exist in the schema).
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
@@ -62,7 +62,11 @@ export async function POST(req: NextRequest) {
   }
 
   const hash = createHmac('sha512', PAYSTACK_SECRET).update(body).digest('hex');
-  if (!signature || hash !== signature) {
+  // Use constant-time comparison to prevent timing-attack signature leak.
+  // Both sides are hex strings of identical length (128 chars for SHA-512);
+  // bail before timingSafeEqual otherwise (which throws on length mismatch).
+  if (!signature || signature.length !== hash.length ||
+      !timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(signature, 'hex'))) {
     console.warn('[webhook] Invalid signature');
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }

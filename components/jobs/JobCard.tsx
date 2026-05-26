@@ -49,6 +49,15 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
     toast(nowSaved ? 'Job saved!' : 'Removed from saved', 'success', 2000);
   }
 
+  // Cancel the parent <Link>'s native middle-click → new-tab behaviour so
+  // middle-clicking Apply / Save actually fires the button handler instead
+  // of opening the detail page. (onAuxClick runs for middle + right click;
+  // we only care about middle but preventDefault is harmless on right.)
+  function cancelAux(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   async function handleApply(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
@@ -120,7 +129,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
         </div>
         {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
         <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
-        <button onClick={handleApply}
+        <button onClick={handleApply} onAuxClick={cancelAux}
           className={cn(
             'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
@@ -129,7 +138,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
           )}>
           {applied ? '✓' : isPro() ? 'Apply' : '🔒'}
         </button>
-        <button onClick={handleSave} aria-label={saved ? 'Unsave' : 'Save job'}
+        <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
@@ -170,7 +179,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
             <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>
           )}
         </div>
-        <button onClick={handleSave} aria-label={saved ? 'Unsave' : 'Save job'}
+        <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0f1e38]')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
@@ -215,7 +224,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
           )}
           <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{formatRelativeDate(job.posted)}</p>
         </div>
-        <button onClick={handleApply}
+        <button onClick={handleApply} onAuxClick={cancelAux}
           className={cn(
             'shrink-0 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150 flex items-center gap-1',
             applied

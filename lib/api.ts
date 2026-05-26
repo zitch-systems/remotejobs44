@@ -42,8 +42,14 @@ export const jobsApi = {
         if (filters.type)     params.set('type', filters.type);
         if (filters.level)    params.set('level', filters.level);
         if (filters.sort)     params.set('sort', filters.sort);
-        if (filters.region)   params.set('region', filters.region);
-        if (filters.remote)   params.set('remote', 'true');
+        if (filters.region)      params.set('region', filters.region);
+        if (filters.country)     params.set('country', filters.country);
+        if (filters.remote)      params.set('remote', 'true');
+        // Advanced filters — see /api/jobs route for how each is applied.
+        if (filters.salary)      params.set('salary', filters.salary);
+        if (filters.timezone)    params.set('timezone', filters.timezone);
+        if (filters.posted)      params.set('posted', filters.posted);
+        if (filters.companySize) params.set('companySize', filters.companySize);
         params.set('page',    String(filters.page ?? 1));
         params.set('perPage', String(filters.perPage ?? 12));
         const res = await fetch(`/api/jobs?${params.toString()}`);

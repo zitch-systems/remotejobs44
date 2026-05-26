@@ -90,13 +90,18 @@ export default function JobDetailPage() {
       toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
     }
-    if (isDaily) { setCompanyRevealed(true); incrementDailyApp(); }
+    // Important: this guard runs BEFORE incrementDailyApp() now. Previously
+    // a duplicate-click on an already-applied job still bumped the daily
+    // counter — a Day Pass user could hit 10/10 with zero new applications.
     if (applied) { toast('Already applied', 'info'); return; }
     setApplying(true);
     try {
       const app = await applicationsApi.apply(job!.id);
       addApplication(app);
+      // Only after the apply actually succeeds: reveal company + count this
+      // toward the Day Pass quota.
       setCompanyRevealed(true);
+      if (isDaily) incrementDailyApp();
       toast('Application submitted! 🎉 Opening application page…', 'success');
       // Redirect to the actual company application URL — gated by
       // isSafeOpenUrl to refuse javascript:/data: schemes from compromised

@@ -77,6 +77,19 @@ export default function BillingPage() {
     if (!res.ok) { toast(data.error ?? 'Cancellation failed', 'error'); return; }
     setShowCancel(false);
     setSub(s => s ? { ...s, status: 'cancelled' } : s);
+    // Refresh the global user object so the Header badge + dashboard
+    // reflect the new status. Without this, the cancel succeeds but
+    // the rest of the UI keeps showing "Pro" until next reload.
+    // The subscription downgrades to 'free' when plan_expires_at passes
+    // (handled by the expire-daily cron) — until then, plan stays the
+    // same. We still re-fetch to pick up any other server-side state.
+    try {
+      const profRes = await fetch('/api/profile');
+      if (profRes.ok && user) {
+        const profile = await profRes.json();
+        setUser({ ...user, ...(profile?.user ?? profile ?? {}) });
+      }
+    } catch {}
     toast(
       data.access_until
         ? `Cancelled. You keep access until ${new Date(data.access_until).toLocaleDateString()}.`
