@@ -1,5 +1,11 @@
 // lib/email/templates.ts — Email HTML templates
 
+// Normalize once at module load. A trailing slash on NEXT_PUBLIC_APP_URL
+// would produce `https://remotejobs44.com//logo-white.png` after our
+// `${APP_URL}/path` interpolation — most clients tolerate but Outlook
+// mangles. Strip it here so all template strings just concat safely.
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com').replace(/\/+$/, '');
+
 export function welcomeEmail(name: string) {
   return {
     subject: 'Welcome to RemoteJobs44 🌍',
@@ -10,7 +16,7 @@ export function welcomeEmail(name: string) {
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${APP_URL}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
@@ -29,9 +35,9 @@ export function welcomeEmail(name: string) {
         <li>Explore company profiles</li>
       </ul>
     </div>
-    <a href="${process.env.NEXT_PUBLIC_APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Browse Jobs →</a>
+    <a href="${APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Browse Jobs →</a>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
-    <p style="margin:0 0 8px;color:#a8a29e;font-size:13px">To apply to any job, upgrade from <strong>₦500</strong>. <a href="${process.env.NEXT_PUBLIC_APP_URL}/pricing" style="color:#2563eb">See plans →</a></p>
+    <p style="margin:0 0 8px;color:#a8a29e;font-size:13px">To apply to any job, upgrade from <strong>₦500</strong>. <a href="${APP_URL}/pricing" style="color:#2563eb">See plans →</a></p>
     <p style="margin:0;color:#a8a29e;font-size:13px">Follow us for daily job drops: <a href="https://instagram.com/remotejobs_44" style="color:#2563eb">@remotejobs_44 on Instagram</a></p>
   </div>
 </div>
@@ -50,7 +56,7 @@ export function paymentSuccessEmail(name: string, plan: string, amount: string) 
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${APP_URL}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
@@ -73,9 +79,9 @@ export function paymentSuccessEmail(name: string, plan: string, amount: string) 
         <span style="color:#1c1917;font-weight:600;font-size:14px">${amount}</span>
       </div>
     </div>
-    <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Go to Dashboard →</a>
+    <a href="${APP_URL}/dashboard" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Go to Dashboard →</a>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
-    <p style="margin:0;color:#a8a29e;font-size:13px">Need help? <a href="${process.env.NEXT_PUBLIC_APP_URL}/contact" style="color:#2563eb">Contact us</a></p>
+    <p style="margin:0;color:#a8a29e;font-size:13px">Need help? <a href="${APP_URL}/contact" style="color:#2563eb">Contact us</a></p>
   </div>
 </div>
 </body></html>`,
@@ -86,7 +92,7 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
   const jobRows = jobs.slice(0, 5).map(j => `
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid #f5f5f4">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/jobs/${j.id}" style="color:#2563eb;font-weight:600;text-decoration:none;font-size:14px">${j.title}</a>
+        <a href="${APP_URL}/jobs/${j.id}" style="color:#2563eb;font-weight:600;text-decoration:none;font-size:14px">${j.title}</a>
         <div style="color:#78716c;font-size:13px;margin-top:2px">${j.company} · ${j.location}</div>
       </td>
     </tr>`).join('');
@@ -100,7 +106,7 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${APP_URL}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
@@ -113,10 +119,10 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
     <p style="margin:0 0 24px;color:#57534e">${jobs.length} new remote jobs were posted that match your interests:</p>
     <table style="width:100%;border-collapse:collapse">${jobRows}</table>
     <div style="margin-top:24px">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">View All Jobs →</a>
+      <a href="${APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">View All Jobs →</a>
     </div>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
-    <p style="margin:0;color:#a8a29e;font-size:12px">You're receiving this because you have job alerts enabled. <a href="${process.env.NEXT_PUBLIC_APP_URL}/profile" style="color:#2563eb">Manage alerts</a></p>
+    <p style="margin:0;color:#a8a29e;font-size:12px">You're receiving this because you have job alerts enabled. <a href="${APP_URL}/profile" style="color:#2563eb">Manage alerts</a></p>
   </div>
 </div>
 </body></html>`,

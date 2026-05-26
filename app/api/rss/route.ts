@@ -5,11 +5,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeJob } from '@/lib/ingestion';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { requireAdmin } from '@/lib/admin/auth';
 
-export const runtime = 'edge';
+// Note: this route is admin-gated, so the Node runtime (default) is required
+// — requireAdmin reads cookies + makes a Supabase query. Drop the previous
+// `runtime = 'edge'` since edge can't host the admin client.
 export const revalidate = 300; // 5 minutes
 
 export async function GET(req: NextRequest) {
+  // Admin-only. The SSRF guard below already blocks internal IPs, but the
+  // route is still a generic outbound fetcher — gating prevents anonymous
+  // abuse as a relay against third-party sites.
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+
   const raw = req.nextUrl.searchParams.get('url');
   if (!raw) return NextResponse.json({ error: 'url required' }, { status: 400 });
 

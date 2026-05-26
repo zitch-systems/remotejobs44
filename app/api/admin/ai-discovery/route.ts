@@ -3,8 +3,9 @@
 // falls back to a server-stored key (ai_provider_configs table) when the
 // client doesn't ship one. Admin-only.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -50,18 +51,35 @@ const PROVIDER_CONFIGS: Record<string, { defaultModel: string; baseUrl?: string 
   together: { defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', baseUrl: 'https://api.together.xyz/v1' },
 };
 
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
+// Local rate-limit helper — counts how many AI discovery calls the authed
+// admin has logged via recordAdminAction in the last 24h. Hard cap at
+// AI_DISCOVERY_DAILY_LIMIT to prevent a compromised admin session from
+// burning unbounded amounts on OpenAI / Claude / etc.
+const AI_DISCOVERY_DAILY_LIMIT = 200;
+async function checkAiDiscoveryQuota(adminId: string): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-      return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+    const admin = createAdminSupabaseClient();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await admin
+      .from('admin_actions')
+      .select('id', { count: 'exact', head: true })
+      .eq('admin_id', adminId)
+      .eq('action', 'ai.discovery_query')
+      .gte('created_at', since);
+    if ((count ?? 0) >= AI_DISCOVERY_DAILY_LIMIT) {
+      return {
+        ok: false,
+        res: NextResponse.json(
+          { error: `AI discovery quota reached (${AI_DISCOVERY_DAILY_LIMIT}/24h). Try again tomorrow.` },
+          { status: 429 }
+        ),
+      };
     }
     return { ok: true };
   } catch {
-    return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+    // If audit table can't be queried (migration pending), fail-open so
+    // the admin isn't locked out by infrastructure issues.
+    return { ok: true };
   }
 }
 
@@ -231,6 +249,11 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
 
+  // Per-admin daily quota — a compromised admin session could otherwise rack
+  // up tens of thousands of dollars in calls to paid LLM APIs.
+  const quota = await checkAiDiscoveryQuota(auth.adminId);
+  if (!quota.ok) return quota.res;
+
   let body: ProviderRequest;
   try {
     body = await req.json();
@@ -242,6 +265,17 @@ export async function POST(req: NextRequest) {
   if (!providerId || !query) {
     return NextResponse.json({ error: 'providerId and query are required' }, { status: 400 });
   }
+
+  // Log every successful discovery call so the daily quota check above can
+  // count them. Fire-and-forget — audit failures shouldn't break the call.
+  recordAdminAction({
+    adminId:    auth.adminId,
+    adminEmail: auth.adminEmail,
+    action:     'ai.discovery_query',
+    targetType: 'ai_provider',
+    targetId:   providerId,
+    metadata:   { query: query.slice(0, 200), maxJobs },
+  }).catch(() => {});
 
   const config = PROVIDER_CONFIGS[providerId];
   if (!config) {

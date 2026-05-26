@@ -76,9 +76,22 @@ export async function POST(req: NextRequest) {
       }
 
       // Row missing → webhook race after fresh purchase. Allow the apply,
-      // skip the count check (no period_start to count from). Trust the
-      // profile.plan='daily' — verify route or webhook set it.
-      if (sub) {
+      // but enforce a soft 10/hour cap so a webhook outage can't be
+      // exploited for unlimited applies. Trust profile.plan='daily' — the
+      // verify route or webhook set it.
+      if (!sub) {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { count: recentCount } = await supabase
+          .from('applications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('applied_at', oneHourAgo);
+        if ((recentCount ?? 0) >= 10) {
+          return NextResponse.json({
+            error: 'Rate limit reached. Please wait a few minutes — your subscription is still syncing.',
+          }, { status: 429 });
+        }
+      } else {
         const { count: appCount } = await supabase
           .from('applications')
           .select('id', { count: 'exact', head: true })

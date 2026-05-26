@@ -44,6 +44,12 @@ export async function POST(req: NextRequest) {
       error: 'Could not determine ATS — pass platform+slug or a representative apply_url_sample',
     }, { status: 400 });
   }
+  // Slug becomes part of an outbound URL fetched by fetchATSJobs. Constrain
+  // it to safe filename-ish characters so an admin (or compromised admin
+  // session) can't pass `..` segments or other path-traversal payloads.
+  if (!/^[a-z0-9._-]{1,80}$/i.test(slug)) {
+    return NextResponse.json({ error: 'Invalid slug — must be 1-80 chars [a-z0-9._-]' }, { status: 400 });
+  }
 
   // ── 1. Pull fresh jobs from the ATS ───────────────────────────────────
   const fetched = await fetchATSJobs(platform, slug, '');

@@ -1,22 +1,17 @@
 // app/api/admin/stats/route.ts — Real admin stats from Supabase
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin/auth';
 
 export const revalidate = 30;
 
 export async function GET() {
+  // Centralized admin gate — also honors the `suspended` kill-switch that
+  // the inline gates here used to skip.
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.res;
+
   try {
-    // Verify admin
-    const supabase = createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     const admin = createAdminSupabaseClient();
     const today = new Date(); today.setHours(0, 0, 0, 0);
 

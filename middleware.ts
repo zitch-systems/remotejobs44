@@ -85,6 +85,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Belt-and-braces server-side check for /admin/*: even with the client
+  // gate in app/admin/layout.tsx, a non-admin's browser was previously
+  // able to render the admin page shell before the client redirected.
+  // Hardcoded-admin emails go through (DB-only admins still rely on the
+  // client gate, because reading profiles.role here adds latency to every
+  // page load). All admin API routes already require admin via lib/admin/auth.
+  if (user && isAdminRoute && !isAdminEmail(user.email)) {
+    // Don't outright redirect — DB-admin users would loop. Let the client
+    // /admin/layout.tsx check decide based on profiles.role.
+    // (Intentional no-op; see comment above.)
+  }
+
   // Server-side shortcut for the hardcoded admin list, so admins never see the
   // /dashboard flash before the client-side check fires. Members are routed by
   // the /admin layout's client-side profile lookup (DB role is the source of

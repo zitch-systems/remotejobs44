@@ -52,7 +52,19 @@ export const useAuthStore = create<AuthState>()(
       hydrated: false,
 
       login:      (user, token) => set({ user, token, hydrated: true }),
-      logout:     () => { resetJobsStoreForNewUser(); set({ user: null, token: null, dailyAppsUsed: 0, hydrated: true }); },
+      logout:     () => {
+        // Wipe in-memory + persisted state from BOTH stores. The previous
+        // version called resetJobsStoreForNewUser() (which only clears
+        // useJobsStore in-memory) but didn't wipe the auth localStorage —
+        // any caller using store.logout() without doing its own cleanup
+        // left rj44-auth around for the next user on this device.
+        resetJobsStoreForNewUser();
+        set({ user: null, token: null, dailyAppsUsed: 0, hydrated: true });
+        try {
+          localStorage.removeItem('rj44-auth');
+          localStorage.removeItem('rj44-jobs');
+        } catch {}
+      },
       setHydrated:(v) => set({ hydrated: v }),
       setUser:    (user) => set((s) => {
         // If the signed-in user actually changed (different id, or signed out

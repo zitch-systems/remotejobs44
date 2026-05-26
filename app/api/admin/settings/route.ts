@@ -2,23 +2,8 @@
 // Persists admin settings to Supabase (requires a site_settings table, see migration below)
 // Falls back gracefully if table doesn't exist yet.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
-
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
-  try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-      return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  }
-}
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin/auth';
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();

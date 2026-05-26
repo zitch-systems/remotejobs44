@@ -175,9 +175,13 @@ export default function AIDiscoveryPage() {
             for (const row of data.configs) {
               const id = row.provider_id;
               if (!next[id]) continue;
+              // Server now masks api_key over the wire (api_key_masked +
+              // has_key). Stage the masked form in the input so the admin
+              // sees "saved" UI without the plaintext ever round-tripping.
+              const masked = row.api_key_masked ?? row.api_key ?? '';
               next[id] = {
-                apiKey:  row.api_key ?? '',
-                enabled: !!row.enabled && !!row.api_key,
+                apiKey:  masked,
+                enabled: !!row.enabled && !!(row.has_key ?? row.api_key),
                 model:   row.model ?? next[id].model,
               };
             }
@@ -199,10 +203,17 @@ export default function AIDiscoveryPage() {
     setSavedStatus(prev => ({ ...prev, [providerId]: 'saving' }));
     saveTimers.current[providerId] = setTimeout(async () => {
       try {
+        // The apiKey field may still hold a masked placeholder ("••••XXXX")
+        // when the admin only toggled enabled/model. Detect and strip it so
+        // we don't overwrite the real stored key with the mask.
+        const body: Record<string, unknown> = { providerId, ...partial };
+        if (typeof partial.apiKey === 'string' && partial.apiKey.startsWith('••••')) {
+          delete body.apiKey;
+        }
         const res = await fetch('/api/admin/ai-discovery/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providerId, ...partial }),
+          body: JSON.stringify(body),
         });
         setSavedStatus(prev => ({ ...prev, [providerId]: res.ok ? 'saved' : 'error' }));
         if (res.ok) {

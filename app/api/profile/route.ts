@@ -8,6 +8,25 @@ import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 
+// Columns safe to expose to the owning user. Paystack identifiers
+// (customer_code, subscription_code, email_token) are intentionally EXCLUDED
+// from the response — the client never needs them, and they're best kept
+// off-wire to limit exposure via logs, extensions, and crash reports.
+const SAFE_PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason';
+
+// Compute the user's effective plan: if plan_expires_at is in the past, treat
+// them as 'free' regardless of what profiles.plan says. The expire-pass cron
+// runs once daily at 6 UTC (Vercel Hobby quota), so a Day Pass purchased at
+// 7am UTC would otherwise show as 'daily' until ~6 UTC the next day — a
+// ~23h window where the UI lies. /api/applications still gates correctly
+// off subscriptions.current_period_end, so applies are already blocked.
+function effectivePlan(profile: { plan?: string | null; plan_expires_at?: string | null; role?: string | null }): string {
+  if (profile.role === 'admin') return 'admin';
+  if (!profile.plan_expires_at) return profile.plan ?? 'free';
+  if (new Date(profile.plan_expires_at) < new Date()) return 'free';
+  return profile.plan ?? 'free';
+}
+
 // GET /api/profile — Fetch current user's profile (creates if missing)
 export async function GET() {
   try {
@@ -19,19 +38,16 @@ export async function GET() {
 
     const admin = createAdminSupabaseClient();
 
-    // Try to fetch existing profile
     const { data: profile, error } = await admin
       .from('profiles')
-      .select('*')
+      .select(SAFE_PROFILE_COLS)
       .eq('id', user.id)
       .maybeSingle();
 
     if (profile) {
-      // If user is a hardcoded admin but their DB row says 'user', upgrade the response (does not write to DB)
-      if (profile.role !== 'admin' && isHardcodedAdmin(user.email)) {
-        return NextResponse.json({ profile: { ...profile, role: 'admin', plan: 'admin' } });
-      }
-      return NextResponse.json({ profile });
+      const plan = effectivePlan(profile);
+      const role = (profile.role !== 'admin' && isHardcodedAdmin(user.email)) ? 'admin' : (profile.role ?? 'user');
+      return NextResponse.json({ profile: { ...profile, plan: role === 'admin' ? 'admin' : plan, role } });
     }
 
     // Profile missing — create it now (handles users who signed up before trigger was added)
