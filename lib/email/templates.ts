@@ -38,7 +38,7 @@ export function welcomeEmail(name: string) {
     <a href="${APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Browse Jobs →</a>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
     <p style="margin:0 0 8px;color:#a8a29e;font-size:13px">To apply to any job, upgrade from <strong>₦500</strong>. <a href="${APP_URL}/pricing" style="color:#2563eb">See plans →</a></p>
-    <p style="margin:0;color:#a8a29e;font-size:13px">Follow us for daily job drops: <a href="https://instagram.com/remotejobs_44" style="color:#2563eb">@remotejobs_44 on Instagram</a></p>
+    <p style="margin:0;color:#a8a29e;font-size:13px">Follow us for daily job drops: <a href="https://instagram.com/remotejob_44" style="color:#2563eb">@remotejob_44 on Instagram</a></p>
   </div>
 </div>
 </body></html>`,
