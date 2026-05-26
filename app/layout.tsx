@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { Analytics }      from '@vercel/analytics/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';
 import { Header }         from '@/components/layout/Header';
 import { Footer }         from '@/components/layout/Footer';
@@ -125,6 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastContainer />
           <ModalRoot />
           <PWAInstall />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
