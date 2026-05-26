@@ -18,6 +18,7 @@ import { cookies } from 'next/headers';
 import { destinationForRole, type Role } from '@/lib/auth/redirect';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { waitUntil } from '@vercel/functions';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -83,27 +84,30 @@ export async function GET(request: NextRequest) {
   if (isFirstLogin) {
     const name = (authUser.user_metadata?.name as string | undefined)
       ?? authUser.email.split('@')[0];
-    // Fire-and-forget — no .catch needed since sendEmail already absorbs
-    // its own errors and returns false on failure.
-    sendEmail({ to: authUser.email, subject: welcomeEmail(name).subject, html: welcomeEmail(name).html })
-      .catch(() => {});
-    // Same — profile upsert via service-role client, ignoreDuplicates so
-    // the auth.users → profiles trigger isn't fighting us.
-    (async () => {
-      try {
-        const admin = createAdminSupabaseClient();
-        await admin.from('profiles').upsert({
-          id:   authUser.id,
-          email: authUser.email,
-          name,
-          plan: 'free',
-          role: 'user',
-          profile_completion: 20,
-        }, { onConflict: 'id', ignoreDuplicates: true });
-      } catch (err) {
-        console.error('[auth/callback] background profile upsert failed:', err);
-      }
-    })();
+    // waitUntil keeps the lambda alive past the redirect response so these
+    // tasks actually complete. Without it, Vercel suspends the function
+    // immediately and the welcome email + profile upsert silently die.
+    waitUntil(
+      sendEmail({ to: authUser.email, subject: welcomeEmail(name).subject, html: welcomeEmail(name).html })
+        .catch(() => {})
+    );
+    waitUntil(
+      (async () => {
+        try {
+          const admin = createAdminSupabaseClient();
+          await admin.from('profiles').upsert({
+            id:   authUser.id,
+            email: authUser.email,
+            name,
+            plan: 'free',
+            role: 'user',
+            profile_completion: 20,
+          }, { onConflict: 'id', ignoreDuplicates: true });
+        } catch (err) {
+          console.error('[auth/callback] background profile upsert failed:', err);
+        }
+      })()
+    );
   }
 
   return NextResponse.redirect(`${origin}${dest}`);

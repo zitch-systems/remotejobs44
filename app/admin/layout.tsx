@@ -33,36 +33,47 @@ const NAV = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
-  // Optimistic render: if Zustand has a persisted user that's already known
-  // to be an admin (either by role or by hardcoded email), trust it and
-  // render the panel immediately. The background check below will redirect
-  // to /dashboard or /login if it turns out we were wrong. The previous
-  // pessimistic "Verifying access" spinner blocked the admin behind 2–7s
-  // of network on every navigation.
-  const persistedUser = useAuthStore.getState().user;
-  const persistedAdmin = persistedUser?.role === 'admin'
+  // Subscribe to the store (not getState() — that returns the initial null
+  // before Zustand persist rehydrates, defeating the optimistic path on cold
+  // loads). With the hook, this component re-renders when persist finishes
+  // pulling from localStorage and we get the real user.
+  const persistedUser = useAuthStore(s => s.user);
+  const persistedAdmin = !!(persistedUser?.role === 'admin'
     || persistedUser?.plan === 'admin'
-    || isHardcodedAdmin(persistedUser?.email ?? null);
+    || isHardcodedAdmin(persistedUser?.email ?? null));
 
-  const [ready,     setReady]     = useState(persistedAdmin);
+  const [verifiedReady, setVerifiedReady] = useState(false);
+  // ready is true as soon as EITHER the persisted user looks like an admin
+  // (instant render after rehydration) OR the background check confirms.
+  // If the persisted guess is wrong, the background check redirects away.
+  const ready = persistedAdmin || verifiedReady;
   const [adminName, setAdminName] = useState(persistedUser?.name ?? persistedUser?.email?.split('@')[0] ?? '');
 
   useEffect(() => {
+    if (!adminName && persistedUser) {
+      setAdminName(persistedUser.name ?? persistedUser.email?.split('@')[0] ?? '');
+    }
+  }, [persistedUser, adminName]);
+
+  useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function check() {
       const supabase = createClient();
-      // getAuthedUserSafe absorbs the 401-then-refresh race that would
-      // otherwise bounce the admin to /login (and right back to /admin once
-      // Supabase finished refreshing) — visible as the admin panel "tab
-      // glitch" on first load after a long idle.
       const { user, status } = await getAuthedUserSafe(supabase);
 
+      if (cancelled) return;
       if (status === 'unauthed') { router.replace('/login?next=/admin'); return; }
-      if (status === 'transient') return; // network blip — retry on next render
+      if (status === 'transient') {
+        // Network blip — retry once after 2s rather than silently giving up.
+        // Without this, an offline-flap leaves us stuck on the optimistic
+        // path if persistedAdmin was true, or on the spinner if it was false.
+        retryTimer = setTimeout(() => { if (!cancelled) check(); }, 2000);
+        return;
+      }
       if (!user) { router.replace('/login?next=/admin'); return; }
 
-      // Profile lookup is best-effort (5s cap). On failure, fall back to hardcoded admin list.
       let profile: { role?: string; name?: string; plan?: string } | null = null;
       try {
         const queryPromise = supabase
@@ -84,10 +95,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       setAdminName(profile?.name ?? user.email?.split('@')[0] ?? 'Admin');
-      setReady(true);
+      setVerifiedReady(true);
     }
     check();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   async function handleLogout() {

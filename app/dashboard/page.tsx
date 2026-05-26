@@ -20,7 +20,10 @@ function DashboardContent() {
   // Optimistic render: if persisted Zustand has a user, show the dashboard
   // immediately with that data and run the profile refresh in the
   // background. Skeleton only shows on a genuinely cold first visit.
-  const [loading, setLoading] = useState(!useAuthStore.getState().user);
+  // Use `user` from the hook subscription (above) — getState() reads the
+  // pre-hydration null and would force the skeleton on every cold load.
+  const [loading, setLoading] = useState(!user);
+  useEffect(() => { if (user && loading) setLoading(false); }, [user, loading]);
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [featured, setFeatured] = useState<Job[]>([]);
 
