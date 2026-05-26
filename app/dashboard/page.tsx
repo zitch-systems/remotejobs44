@@ -46,12 +46,58 @@ function DashboardContent() {
           profile = await Promise.race([queryPromise, timeoutPromise]);
         } catch {}
 
-        // If the profile fetch failed or timed out, DO NOT overwrite the
-        // persisted user with plan='free' — that's how a paying user on a
-        // slow connection would falsely appear unsubscribed. Just keep
-        // whatever we had, and try again on next page load.
+        // Profile missing — common right after a fresh Google OAuth signup:
+        // the auth/callback profile upsert runs in waitUntil (background)
+        // and may not have finished before the browser lands here. Also
+        // covers the case where the on_auth_user_created trigger hasn't
+        // committed yet. Render a skeleton user from the auth session so
+        // the page is never blank, then retry the profile fetch a few
+        // times to upgrade the state once the row appears.
         if (!profile) {
+          const persisted = useAuthStore.getState().user;
+          if (!persisted) {
+            // Use the full auth user (not just id+email) so we can pick up
+            // user_metadata.name / full_name from Google.
+            const { data: { user: fullUser } } = await supabase.auth.getUser();
+            const meta = (fullUser?.user_metadata ?? {}) as Record<string, any>;
+            const fallbackName = meta.name ?? meta.full_name ?? authUser.email!.split('@')[0];
+            setUser({
+              id: authUser.id,
+              email: authUser.email!,
+              name: fallbackName,
+              plan: 'free',
+              role: 'user',
+              joinedAt: new Date().toISOString(),
+              profileCompletion: 20,
+            });
+          }
           setLoading(false);
+          // Background retry: poll for the profile row up to 5x at 1s
+          // intervals. Once it lands, replace the skeleton user with the
+          // real one. This is what catches up to the trigger / waitUntil
+          // upsert without blocking the first paint.
+          let tries = 0;
+          const retry = async () => {
+            tries++;
+            const { data: row } = await supabase
+              .from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+            if (row) {
+              const r = resolveRole({ profileRole: row.role, email: authUser.email });
+              if (r === 'admin') { router.replace('/admin'); return; }
+              setUser({
+                id: authUser.id,
+                email: authUser.email!,
+                name: row.name ?? authUser.email!.split('@')[0],
+                plan: row.plan ?? 'free',
+                role: r,
+                joinedAt: row.created_at ?? new Date().toISOString(),
+                profileCompletion: row.profile_completion ?? 20,
+              });
+              return;
+            }
+            if (tries < 5) setTimeout(retry, 1000);
+          };
+          setTimeout(retry, 800);
           return;
         }
 
