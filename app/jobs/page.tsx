@@ -40,6 +40,12 @@ const LEVELS: { value: JobLevel|''; label: string }[] = [
   { value:'lead',      label:'Lead / Staff'  },
   { value:'executive', label:'Executive / VP'},
 ];
+// Flip to true once enough jobs in the DB publish salary info to make the
+// filter meaningful (see comment near the FilterSelect render site for
+// context). The /api/jobs route honours ?salary=lo-hi regardless, so
+// bookmarked URLs keep working.
+const SALARY_FILTER_ENABLED = false;
+
 const SALARY_RANGES = [
   { value:'',        label:'Any salary'    },
   { value:'0-30',    label:'Under $30k'   },
@@ -554,7 +560,14 @@ function JobsContent() {
               <FilterSelect label="Region"       value={region}      onChange={v => setParam('region', v)}      options={REGIONS}       icon={<Flag className="w-3 h-3" />}        />
               <FilterSelect label="Job Type"     value={type}        onChange={v => setParam('type', v)}        options={TYPES}         icon={<Briefcase className="w-3 h-3" />}    />
               <FilterSelect label="Level"        value={level}       onChange={v => setParam('level', v)}       options={LEVELS}        icon={<TrendingUp className="w-3 h-3" />}   />
-              <FilterSelect label="Salary"       value={salary}      onChange={v => setParam('salary', v)}      options={SALARY_RANGES} icon={<Banknote className="w-3 h-3" />}     />
+              {/* Salary filter — hidden until enough jobs publish salary
+                  info (currently ~0% of the 27k+ in DB). Flip
+                  SALARY_FILTER_ENABLED near the top of this file to
+                  re-enable. The /api/jobs route always supports
+                  ?salary=lo-hi so bookmarked URLs keep working. */}
+              {SALARY_FILTER_ENABLED && (
+                <FilterSelect label="Salary"     value={salary}      onChange={v => setParam('salary', v)}      options={SALARY_RANGES} icon={<Banknote className="w-3 h-3" />}     />
+              )}
               <FilterSelect label="Timezone"     value={timezone}    onChange={v => setParam('timezone', v)}    options={TIMEZONES}     icon={<Timer className="w-3 h-3" />}        />
               <FilterSelect label="Posted"       value={posted}      onChange={v => setParam('posted', v)}      options={POSTED_WITHIN} icon={<Clock className="w-3 h-3" />}        />
               {/* Remote filter moved to the top-of-page prominent toggle. */}
