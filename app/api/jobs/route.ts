@@ -91,12 +91,25 @@ export async function GET(req: NextRequest) {
       const safe = locFilter.replace(/[\\%_]/g, '\\$&').slice(0, 100);
       query = query.ilike('location', `%${safe}%`);
     }
-    // Salary range key like "60-100" → salary_max between 60k–100k USD.
-    // Empty string is "any salary" — skip.
+    // Salary range key like "60-100" → user wants jobs paying within
+    // $60k-$100k. Most scraped jobs have no salary info (`salary_max IS
+    // NULL`) so a strict BETWEEN filter would return 0 results on real
+    // data — the page showed "0 jobs found" even when 5,000+ jobs
+    // existed that the user might be interested in.
+    //
+    // New behaviour: a job matches the range if EITHER
+    //   (a) we don't know its salary (salary_max IS NULL) — can't
+    //       responsibly exclude it, OR
+    //   (b) its salary range overlaps the user's range:
+    //         salary_max >= lo AND (salary_min <= hi OR salary_min IS NULL)
+    // This correctly handles jobs with only a min, only a max, or both.
     if (salary && /^\d+-\d+$/.test(salary)) {
       const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
       if (Number.isFinite(lo) && Number.isFinite(hi)) {
-        query = query.gte('salary_max', lo).lte('salary_max', hi);
+        query = query.or([
+          'salary_max.is.null',
+          `and(salary_max.gte.${lo},or(salary_min.lte.${hi},salary_min.is.null))`,
+        ].join(','));
       }
     }
     if (timezone) {
