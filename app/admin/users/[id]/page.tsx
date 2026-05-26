@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Shield, Zap, User, Mail, Calendar, CreditCard,
   Briefcase, RefreshCw, Trash2, KeyRound, Save, AlertTriangle,
-  Ban, CheckCircle as Unsuspend,
+  Ban, CheckCircle as Unsuspend, RotateCw,
 } from 'lucide-react';
 import { useUIStore } from '@/lib/store';
 import { cn, formatRelativeDate } from '@/lib/utils';
@@ -52,6 +52,7 @@ export default function AdminUserDetailPage() {
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -125,6 +126,29 @@ export default function AdminUserDetailPage() {
     } : p);
     if (!nextSuspended) setSuspendReason('');
     toast(nextSuspended ? 'User suspended' : 'User unsuspended', 'success');
+  }
+
+  async function handleRestore(plan: 'daily' | 'pro' | 'pro_annual') {
+    if (!profile) return;
+    if (!confirm(`Restore "${plan}" for ${profile.email}? This sets profile.plan, plan_expires_at, and the subscriptions row to a fresh ${plan === 'daily' ? '24-hour' : plan === 'pro_annual' ? '1-year' : '30-day'} window.`)) return;
+    setRestoring(plan);
+    const res = await fetch(`/api/admin/users/${id}/restore-subscription`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan }),
+    });
+    const data = await res.json();
+    setRestoring(null);
+    if (!res.ok) { toast(data.error ?? 'Restore failed', 'error'); return; }
+    toast(`Restored ${plan} — expires ${new Date(data.expires_at).toLocaleString()}`, 'success', 6000);
+    // Refresh page state so the subscription card + plan badge update.
+    const refetch = await fetch(`/api/admin/users/${id}`);
+    if (refetch.ok) {
+      const refreshed = await refetch.json();
+      setProfile(refreshed.profile);
+      setSubscription(refreshed.subscription);
+      setPlan(refreshed.profile.plan);
+    }
   }
 
   async function handleDelete() {
@@ -262,7 +286,7 @@ export default function AdminUserDetailPage() {
           <CreditCard className="w-4 h-4 text-brand-600" /> Subscription
         </h2>
         {subscription ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
             <Meta label="Plan"           value={subscription.plan} />
             <Meta label="Billing"        value={subscription.billing} />
             <Meta label="Status"         value={subscription.status} />
@@ -271,7 +295,38 @@ export default function AdminUserDetailPage() {
             <Meta label="Period end"     value={subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString() : '—'} />
           </div>
         ) : (
-          <p className="text-sm text-stone-400">No subscription on record.</p>
+          <p className="text-sm text-stone-400 mb-4">No subscription on record.</p>
+        )}
+
+        {/* Restore controls — use when a user's plan got wiped by the legacy
+            auto-downgrade bug or a failed webhook. Sets profile + subscription
+            row to a fresh window so they have everything a fresh purchase would. */}
+        {profile.role !== 'admin' && (
+          <div className="border-t border-stone-100 dark:border-[#1e3a5f] pt-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1.5">
+              <RotateCw className="w-3 h-3" /> Restore subscription
+            </p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+              Use after a webhook failure or to comp a user. Audit-logged.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => handleRestore('daily')} disabled={restoring !== null}
+                className="flex items-center gap-2 px-3 py-1.5 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/10 disabled:opacity-50 transition-colors">
+                {restoring === 'daily' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                Day Pass (24h)
+              </button>
+              <button onClick={() => handleRestore('pro')} disabled={restoring !== null}
+                className="flex items-center gap-2 px-3 py-1.5 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10 disabled:opacity-50 transition-colors">
+                {restoring === 'pro' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                Pro Monthly (30d)
+              </button>
+              <button onClick={() => handleRestore('pro_annual')} disabled={restoring !== null}
+                className="flex items-center gap-2 px-3 py-1.5 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10 disabled:opacity-50 transition-colors">
+                {restoring === 'pro_annual' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                Pro Annual (1yr)
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
