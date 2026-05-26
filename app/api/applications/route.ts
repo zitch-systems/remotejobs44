@@ -50,7 +50,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Active subscription required to apply for jobs' }, { status: 403 });
     }
 
-    // For daily plan users: enforce the 10-application limit per day-pass period
+    // For daily plan users: enforce the 10-application limit per day-pass period.
+    //
+    // CRITICAL: this branch USED to auto-downgrade profile.plan to 'free' whenever
+    // we couldn't find a matching subscriptions row. That's a footgun — it wiped
+    // a paying user's plan on their first apply whenever there was even a brief
+    // webhook race (Paystack redirect lands before the subscriptions row is
+    // upserted). The dedicated /api/cron/daily expire-pass is the ONLY place
+    // that should ever write plan='free'. Here we just gate the apply.
     if (plan === 'daily') {
       const adminSupabase = createAdminSupabaseClient();
       const { data: sub } = await adminSupabase
@@ -61,30 +68,37 @@ export async function POST(req: NextRequest) {
         .eq('status', 'active')
         .maybeSingle();
 
-      // Subscription row not found or already expired — downgrade gracefully
-      if (!sub || new Date(sub.current_period_end) < new Date()) {
-        // Downgrade the profile so UI reflects reality — don't error out with 500
+      // Row exists AND genuinely expired → downgrade is correct here (the cron
+      // runs only once a day, so we'd otherwise let an expired pass spend more
+      // applications until 6am UTC).
+      if (sub && new Date(sub.current_period_end) < new Date()) {
         await adminSupabase.from('profiles').update({ plan: 'free' }).eq('id', user.id);
-        if (sub) {
-          await adminSupabase.from('subscriptions')
-            .update({ status: 'expired' })
-            .eq('user_id', user.id)
-            .eq('billing', 'daily');
-        }
+        await adminSupabase.from('subscriptions')
+          .update({ status: 'expired' })
+          .eq('user_id', user.id)
+          .eq('billing', 'daily');
         return NextResponse.json({ error: 'Your day pass has expired. Please renew to continue applying.' }, { status: 403 });
       }
 
-      // Count applications made during this day-pass window
-      const { count: appCount } = await supabase
-        .from('applications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('applied_at', sub.current_period_start);
+      // Row missing entirely → almost always a webhook race after a fresh
+      // Day Pass purchase. The user paid (profile.plan='daily' proves it via
+      // either webhook or verify-route path), the subscriptions table is just
+      // catching up. Allow the apply; skip the count check since we have no
+      // period_start. The cron will reconcile within 24h.
+      if (!sub) {
+        console.warn(`[applications] day pass user ${user.id} has no active subscriptions row — allowing apply (probable webhook race)`);
+      } else {
+        const { count: appCount } = await supabase
+          .from('applications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('applied_at', sub.current_period_start);
 
-      if ((appCount ?? 0) >= 10) {
-        return NextResponse.json({
-          error: 'You have reached the 10-application limit for your day pass. Upgrade to Pro for unlimited access.'
-        }, { status: 403 });
+        if ((appCount ?? 0) >= 10) {
+          return NextResponse.json({
+            error: 'You have reached the 10-application limit for your day pass. Upgrade to Pro for unlimited access.'
+          }, { status: 403 });
+        }
       }
     }
 
