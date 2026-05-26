@@ -102,13 +102,13 @@ export default function JobDetailPage() {
       // toward the Day Pass quota.
       setCompanyRevealed(true);
       if (isDaily) incrementDailyApp();
-      toast('Application submitted! 🎉 Opening application page…', 'success');
-      // Redirect to the actual company application URL — gated by
-      // isSafeOpenUrl to refuse javascript:/data: schemes from compromised
-      // ATS feeds.
+      // Open the company's application page immediately in a new tab.
+      // No celebratory toast — users found it noisy and false-positive when
+      // they hadn't actually finished the application on the company's site.
+      // The "Applied" badge in the sidebar is the only feedback now.
       const applyTargetRaw = job!.applyUrl || (job!.applyEmail && `mailto:${job!.applyEmail}`);
       if (isSafeOpenUrl(applyTargetRaw)) {
-        setTimeout(() => safeWindowOpen(applyTargetRaw), 800);
+        safeWindowOpen(applyTargetRaw);
       }
     } catch (err: any) {
       toast(err.message, 'error');
@@ -202,9 +202,7 @@ export default function JobDetailPage() {
 
             <div className="job-prose">
               {job.description && job.description.trim().length > 40 ? (
-                job.description.split('\n\n').map((para, i) => (
-                  <p key={i} className="mb-4 text-stone-600 dark:text-stone-300 leading-relaxed">{para}</p>
-                ))
+                renderJobDescription(job.description)
               ) : (
                 <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-4 text-sm text-stone-500 dark:text-stone-400">
                   <p>
@@ -354,4 +352,69 @@ export default function JobDetailPage() {
       </div>
     </div>
   );
+}
+
+// Render a scraped job description as structured blocks. ATS feeds give us
+// plaintext with line breaks; we infer paragraphs / bullet lists / section
+// headers from punctuation patterns so the preview reads cleanly without
+// requiring a markdown parser dep.
+function renderJobDescription(raw: string): React.ReactNode {
+  const lines = raw.split('\n').map(l => l.trimEnd());
+  const blocks: React.ReactNode[] = [];
+  let bulletBuf: string[] = [];
+  let paraBuf: string[] = [];
+
+  const flushBullets = () => {
+    if (bulletBuf.length === 0) return;
+    blocks.push(
+      <ul key={`u-${blocks.length}`} className="list-disc pl-5 mb-4 space-y-1.5 text-stone-600 dark:text-stone-300">
+        {bulletBuf.map((b, i) => <li key={i}>{b}</li>)}
+      </ul>
+    );
+    bulletBuf = [];
+  };
+  const flushPara = () => {
+    if (paraBuf.length === 0) return;
+    const text = paraBuf.join(' ').trim();
+    if (text) {
+      blocks.push(
+        <p key={`p-${blocks.length}`} className="mb-4 text-stone-600 dark:text-stone-300 leading-relaxed">{text}</p>
+      );
+    }
+    paraBuf = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushBullets();
+      flushPara();
+      continue;
+    }
+    const bulletMatch = line.match(/^[-*•·●]\s+(.+)$/) || line.match(/^\d+[.)]\s+(.+)$/);
+    if (bulletMatch) {
+      flushPara();
+      bulletBuf.push(bulletMatch[1]);
+      continue;
+    }
+    const isHeading = line.length <= 60 && (
+      /[:：]$/.test(line) ||
+      (line === line.toUpperCase() && /[A-Z]/.test(line) && line.split(' ').length <= 6)
+    );
+    if (isHeading) {
+      flushBullets();
+      flushPara();
+      blocks.push(
+        <h3 key={`h-${blocks.length}`} className="font-bold text-base text-stone-900 dark:text-stone-100 mt-5 mb-2">
+          {line.replace(/[:：]$/, '')}
+        </h3>
+      );
+      continue;
+    }
+    flushBullets();
+    paraBuf.push(line);
+  }
+  flushBullets();
+  flushPara();
+  return <>{blocks}</>;
 }

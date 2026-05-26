@@ -152,7 +152,7 @@ function ApplicationsContent() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate">{app.jobTitle}</p>
-                      <p className="text-xs text-stone-400">{app.company}</p>
+                      <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                     </div>
                     <span className="badge bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">🎉 Offer received</span>
                   </div>
@@ -177,7 +177,7 @@ function ApplicationsContent() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-stone-600 dark:text-stone-400 truncate">{app.jobTitle}</p>
-                        <p className="text-xs text-stone-400">{app.company}</p>
+                        <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                       </div>
                       <span className={`badge ${cfg.color}`}>{cfg.label}</span>
                     </div>

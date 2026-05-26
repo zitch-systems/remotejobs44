@@ -4,10 +4,6 @@
 // profiles table directly in the Supabase dashboard.
 export const ADMIN_EMAILS: readonly string[] = [
   'admin@remotejobs44.com',
-  'admin@remotejobs4.com',
-  'zitchinfo@gmail.com',
-  'teyokensax1@gmail.com',
-  'mallamplacid@gmail.com',
 ] as const;
 
 export function isHardcodedAdmin(email: string | null | undefined): boolean {

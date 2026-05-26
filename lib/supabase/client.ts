@@ -28,6 +28,24 @@ export async function getAuthedUserSafe(
   const delayMs  = opts.delayMs  ?? 400;
   const timeoutMs = opts.timeoutMs ?? 6000;
 
+  // Cheap local check first: if there is no Supabase session at all in
+  // localStorage, the user really is logged out — no point hitting the
+  // network. If there IS a session, treat 401s as transient rather than
+  // unauthed. Random logouts from cold-lambda / slow-network refreshes
+  // were the #1 user complaint; this guard absorbs them.
+  let hasLocalSession = false;
+  try {
+    const { data } = await supabase.auth.getSession();
+    hasLocalSession = !!data.session;
+  } catch {
+    // getSession() reads from localStorage — should never throw, but
+    // if it does, assume there's a session so we don't false-logout.
+    hasLocalSession = true;
+  }
+  if (!hasLocalSession) {
+    return { user: null, status: 'unauthed' };
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     let result: Awaited<ReturnType<typeof supabase.auth.getUser>> | null = null;
     try {
@@ -45,16 +63,17 @@ export async function getAuthedUserSafe(
 
     const code = (error as any)?.status;
     if (code === 401 || code === 403) {
-      // Likely a stale access token mid-refresh — wait briefly and retry.
-      // If we've exhausted retries the session really is gone.
+      // Stale access token mid-refresh — wait briefly and retry.
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, delayMs));
         continue;
       }
-      return { user: null, status: 'unauthed' };
+      // After retries: local session still exists, server says 401.
+      // Return 'transient' rather than 'unauthed' — Supabase's auto-refresh
+      // may still complete in the background and fire TOKEN_REFRESHED.
+      // The Header's auth listener will re-sync once it lands.
+      return { user: null, status: 'transient' };
     }
-    // Some other error (network, 5xx). Don't log the user out — let the caller
-    // keep whatever they had and retry on the next render.
     return { user: null, status: 'transient' };
   }
   return { user: null, status: 'transient' };
