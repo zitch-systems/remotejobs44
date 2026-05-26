@@ -652,7 +652,17 @@ function JobsContent() {
         <div className="bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-2xl p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
           <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">No jobs found</h2>
-          <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
+          {salary ? (
+            // Specific empty-state for the salary filter — most ATS feeds
+            // don't expose salary, so this filter often returns 0 even
+            // when there are thousands of relevant jobs in the DB.
+            <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-md mx-auto text-sm">
+              Most jobs on the site don't publish a salary range, so the salary filter
+              excludes them. <button onClick={() => setParam('salary', '')} className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Clear the salary filter</button> to see all matching jobs.
+            </p>
+          ) : (
+            <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
+          )}
           <button onClick={clearAll} className="px-6 py-2.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors">
             Show all jobs
           </button>

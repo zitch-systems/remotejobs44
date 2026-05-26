@@ -92,23 +92,27 @@ export async function GET(req: NextRequest) {
       query = query.ilike('location', `%${safe}%`);
     }
     // Salary range key like "60-100" → user wants jobs paying within
-    // $60k-$100k. Most scraped jobs have no salary info (`salary_max IS
-    // NULL`) so a strict BETWEEN filter would return 0 results on real
-    // data — the page showed "0 jobs found" even when 5,000+ jobs
-    // existed that the user might be interested in.
+    // $60k-$100k. A job matches if its listed salary range overlaps the
+    // user's, evaluated three ways so we don't miss any valid overlap:
     //
-    // New behaviour: a job matches the range if EITHER
-    //   (a) we don't know its salary (salary_max IS NULL) — can't
-    //       responsibly exclude it, OR
-    //   (b) its salary range overlaps the user's range:
-    //         salary_max >= lo AND (salary_min <= hi OR salary_min IS NULL)
-    // This correctly handles jobs with only a min, only a max, or both.
+    //   1) salary_max falls inside user range  (e.g. job pays "up to 90k", user 60-100k)
+    //   2) salary_min falls inside user range  (e.g. job pays "from 80k", user 60-100k)
+    //   3) job range fully contains user range (e.g. job pays 50-200k, user 60-100k)
+    //
+    // Jobs with NO salary info (salary_max IS NULL) are excluded — they
+    // can't be evaluated. The earlier "include nulls" attempt swallowed
+    // 99% of our data because most ATS feeds don't expose salary, making
+    // the filter visibly do nothing. Strict-but-honest is the right
+    // semantic: if user picks a salary band and gets 0 results, that
+    // truthfully reflects how little of our data has salary info; the
+    // empty state nudges them to clear the filter.
     if (salary && /^\d+-\d+$/.test(salary)) {
       const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
       if (Number.isFinite(lo) && Number.isFinite(hi)) {
         query = query.or([
-          'salary_max.is.null',
-          `and(salary_max.gte.${lo},or(salary_min.lte.${hi},salary_min.is.null))`,
+          `and(salary_max.gte.${lo},salary_max.lte.${hi})`,
+          `and(salary_min.gte.${lo},salary_min.lte.${hi})`,
+          `and(salary_min.lte.${lo},salary_max.gte.${hi})`,
         ].join(','));
       }
     }
