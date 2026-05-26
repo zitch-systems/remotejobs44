@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { Search, ArrowRight, ArrowDownToLine, LogIn, UserPlus } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { Search, ArrowRight, LogIn, UserPlus } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 
@@ -39,47 +39,27 @@ export function HeroSection() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [showIosTooltip, setShowIosTooltip] = useState(false);
-  const iosTooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Detect iOS
     const ua = navigator.userAgent;
     const ios = /iphone|ipad|ipod/i.test(ua);
     const standalone = ('standalone' in navigator) && (navigator as { standalone?: boolean }).standalone === true;
     setIsIos(ios && !standalone);
 
-    // Listen for PWA install prompt (Chrome/Edge on Android & Desktop)
     function onBeforeInstall(e: BeforeInstallPromptEvent) {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstall(true);
     }
-
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
-
-    // Hide if already installed
     window.addEventListener('appinstalled', () => {
       setShowInstall(false);
       setDeferredPrompt(null);
     });
-
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener);
     };
   }, []);
-
-  // Close iOS tooltip when clicking outside
-  useEffect(() => {
-    if (!showIosTooltip) return;
-    function handleOutside(e: MouseEvent) {
-      if (iosTooltipRef.current && !iosTooltipRef.current.contains(e.target as Node)) {
-        setShowIosTooltip(false);
-      }
-    }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [showIosTooltip]);
 
   async function handleInstall() {
     if (!deferredPrompt) return;
@@ -175,43 +155,46 @@ export function HeroSection() {
               </Link>
             </>
           )}
-          {/* PWA Install button — shown only when browser supports it and app isn't installed */}
-          {showInstall && (
-            <button
-              onClick={handleInstall}
-              className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
-              <ArrowDownToLine className="w-4 h-4" /> Install App
-            </button>
-          )}
-          {/* iOS install hint */}
-          {isIos && (
-            <div className="relative" ref={iosTooltipRef}>
-              <button
-                onClick={() => setShowIosTooltip(v => !v)}
-                className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
-                <ArrowDownToLine className="w-4 h-4" /> Install App
-              </button>
-              {showIosTooltip && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 w-64 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-lg p-4 text-left">
-                  {/* Arrow */}
-                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-white dark:bg-[#0a1628] border-r border-b border-stone-200 dark:border-[#1e3a5f] rotate-45" />
-                  <p className="text-xs font-bold text-stone-900 dark:text-stone-100 mb-1">📲 Add to Home Screen</p>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-                    Tap the <span className="font-bold text-brand-700 dark:text-brand-400">Share</span> button in Safari, then choose <span className="font-bold text-brand-700 dark:text-brand-400">&quot;Add to Home Screen&quot;</span> to install this app.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* iOS add-to-homescreen chip (always visible on iOS, below CTA row) */}
-        {isIos && (
-          <button
-            onClick={() => setShowIosTooltip(v => !v)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-400 dark:text-stone-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors -mt-2">
-            📲 Add to home screen
-          </button>
+        {/* Install icons — quiet platform badges below the main CTAs. No
+            popup tooltip; iOS users get inline instructions below the row
+            so the affordance is always discoverable without a click. */}
+        {(showInstall || isIos) && (
+          <div className="flex flex-col items-center gap-2 -mt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 dark:text-stone-500">Install:</span>
+              {showInstall && (
+                <button
+                  onClick={handleInstall}
+                  aria-label="Install RemoteJobs44 app"
+                  title="Install app"
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                    <path d="M3 20.5v-17C3 2.12 4.12 1 5.5 1S8 2.12 8 3.5v17l-2.5-1.5L3 20.5zm12.5-19L12 4l-3.5-2.5L7 3l5 3.5L17 3l-1.5-1.5zm6 17v-17c0-1.38-1.12-2.5-2.5-2.5S16.5 2.12 16.5 3.5v17l2.5-1.5 2.5 1.5z"/>
+                  </svg>
+                </button>
+              )}
+              {isIos && (
+                <a
+                  href="#ios-install"
+                  aria-label="Install on iOS — instructions below"
+                  title="Add to home screen"
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                </a>
+              )}
+            </div>
+            {isIos && (
+              <p id="ios-install" className="text-[11px] text-stone-400 dark:text-stone-500 max-w-xs text-center leading-relaxed">
+                Tap <span className="font-semibold text-brand-700 dark:text-brand-400">Share</span> in Safari, then <span className="font-semibold text-brand-700 dark:text-brand-400">&ldquo;Add to Home Screen&rdquo;</span>.
+              </p>
+            )}
+          </div>
         )}
 
         {/* Support email + Instagram follow chip */}
