@@ -147,6 +147,7 @@ export interface SearchFilters {
   sort?: 'newest' | 'salary' | 'relevant';
   page?: number;
   perPage?: number;
+  remote?: boolean;
 }
 
 export interface PaginatedJobs {

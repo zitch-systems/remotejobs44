@@ -55,14 +55,25 @@ test.describe('Job Detail Page', () => {
   test('save job button is present', async ({ page }) => {
     await page.goto('/jobs');
     await page.waitForTimeout(2000);
-    const firstJobLink = page.locator('a[href^="/jobs/"]').first();
+    // Job-detail links are UUIDs — match them explicitly so we don't pick a
+    // /jobs/category/X chip. Cards now navigate to the internal detail page
+    // rather than external apply URLs.
+    const firstJobLink = page.locator('a[href^="/jobs/"]')
+      .filter({ hasNot: page.locator(':scope[href*="/category/"]') })
+      .filter({ hasNot: page.locator(':scope[href*="/country/"]') })
+      .filter({ hasNot: page.locator(':scope[href*="/region/"]') })
+      .filter({ hasNot: page.locator(':scope[href*="/skill/"]') })
+      .filter({ hasNot: page.locator(':scope[href*="/timezone/"]') })
+      .first();
     if (await firstJobLink.isVisible()) {
-      await firstJobLink.click();
-      await page.waitForTimeout(1500);
-      const saveBtn = page.getByRole('button', { name: /save/i });
-      if (await saveBtn.isVisible()) {
-        await expect(saveBtn).toBeEnabled();
-      }
+      await Promise.all([
+        page.waitForURL(/\/jobs\/[a-f0-9-]{36}/, { timeout: 15000 }),
+        firstJobLink.click(),
+      ]);
+      // Sidebar Save toggle is uniquely named — narrow to that to avoid the
+      // 12 "Save job" buttons on the listing page if navigation didn't take.
+      const saveBtn = page.getByRole('button', { name: /^(save|saved)$/i }).first();
+      await expect(saveBtn).toBeEnabled({ timeout: 5000 });
     }
   });
 

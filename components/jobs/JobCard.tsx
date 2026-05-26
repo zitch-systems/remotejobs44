@@ -13,11 +13,12 @@ function isRealJobId(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
-// Resolve the URL a card click should navigate to
+// Resolve the URL a card click should navigate to.
+// We always send users to the internal detail page first so they can read
+// the job description on remotejobs44 before deciding to redirect. The
+// Apply button on the detail page is the only place that opens the
+// external apply URL.
 function cardHref(job: Job) {
-  // If there's an external apply URL, clicking the card goes straight there
-  if (job.applyUrl) return job.applyUrl;
-  // Otherwise fall back to the internal detail page
   return `/jobs/${job.id}`;
 }
 

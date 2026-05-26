@@ -236,21 +236,30 @@ function JobsContent() {
   const salary      = searchParams.get('salary')      ?? '';
   const timezone    = searchParams.get('timezone')    ?? '';
   const posted      = searchParams.get('posted')      ?? '';
-  const remoteOnly  = searchParams.get('remote')      ?? '';
+  // Remote-only is the *default* — opt-out with ?remote=false in the URL so
+  // first-time visitors immediately see remote roles (the whole point of the
+  // site). The dedicated toggle in the search row mirrors this state.
+  const remoteOnly  = (searchParams.get('remote') ?? 'true') !== 'false';
   const companySize = searchParams.get('companySize') ?? '';
   const region      = searchParams.get('region')      ?? '';
   const country     = searchParams.get('country')     ?? '';
   const sort        = searchParams.get('sort')        ?? 'newest';
   const page        = parseInt(searchParams.get('page') ?? '1');
 
-  const activeFilterCount = [type, level, salary, timezone, posted, remoteOnly, companySize, region, country].filter(Boolean).length;
+  // Remote-only is ON by default — don't count it as an "applied filter"
+  // unless the user explicitly opted out (which we surface separately).
+  const activeFilterCount = [type, level, salary, timezone, posted, companySize, region, country].filter(Boolean).length;
 
   useEffect(() => { setSearchInput(q); }, [q]);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await jobsApi.getJobs({ q, category, type: type as JobType, level: level as JobLevel, sort: sort as 'newest' | 'salary' | 'relevant', page, perPage: 12, region });
+      const res = await jobsApi.getJobs({
+        q, category, type: type as JobType, level: level as JobLevel,
+        sort: sort as 'newest' | 'salary' | 'relevant', page, perPage: 12,
+        region, remote: remoteOnly,
+      });
       if (res.jobs.length > 0) {
         setJobs(res.jobs);
         setTotal(res.total);
@@ -264,6 +273,7 @@ function JobsContent() {
         if (category && category !== 'all') mocks = mocks.filter(j => j.category === category);
         if (type)  mocks = mocks.filter(j => j.type  === type);
         if (level) mocks = mocks.filter(j => j.level === level);
+        if (remoteOnly) mocks = mocks.filter(j => j.remote === true);
 
         // Resolve filter term — country takes priority over region
         const locationFilter = country || region;
@@ -347,7 +357,7 @@ function JobsContent() {
 
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
   const hasActive = q || category !== 'all' || activeFilterCount > 0;
-  const hasActiveChips = category !== 'all' || type || level || country || posted || remoteOnly;
+  const hasActiveChips = category !== 'all' || type || level || country || posted;
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-5 py-6">
@@ -401,6 +411,30 @@ function JobsContent() {
 
         {/* Quick filter pill row — always visible */}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
+
+          {/* Remote-only toggle — prominent and ON by default. This is the
+              defining filter for the whole site, so it deserves the first
+              slot in the pill row and a colour-filled state when active. */}
+          <button
+            onClick={() => setParam('remote', remoteOnly ? 'false' : 'true')}
+            aria-pressed={remoteOnly}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all shadow-sm',
+              remoteOnly
+                ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600 hover:bg-brand-800'
+                : 'bg-white dark:bg-[#0a1628] text-stone-600 dark:text-stone-300 border-stone-200 dark:border-[#1e3a5f] hover:border-brand-600 dark:hover:border-brand-500'
+            )}
+            title={remoteOnly ? 'Showing remote-only roles — click to include on-site jobs' : 'Click to filter to remote-only roles'}
+          >
+            <Globe2 className="w-3.5 h-3.5" />
+            {remoteOnly ? 'Remote only · ON' : 'Remote only · OFF'}
+            {remoteOnly && (
+              <span className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-white/25">
+                <X className="w-2.5 h-2.5" />
+              </span>
+            )}
+          </button>
+
           {/* Type pill */}
           <div className="relative">
             <select
@@ -464,18 +498,9 @@ function JobsContent() {
             </select>
           </div>
 
-          {/* Remote only toggle pill */}
-          <button
-            onClick={() => setParam('remote', remoteOnly === 'true' ? '' : 'true')}
-            className={cn(
-              'text-xs font-semibold border rounded-full px-3 py-1.5 transition-all cursor-pointer',
-              remoteOnly === 'true'
-                ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
-                : 'border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-600 dark:text-stone-300 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400'
-            )}
-          >
-            {remoteOnly === 'true' ? '✓ Remote only' : 'Remote only'}
-          </button>
+          {/* The prominent Remote toggle that used to sit here moved to the
+              first slot of the quick-filter pill row above so it's the first
+              thing visitors see. */}
         </div>
 
         {/* Active filter chips */}
@@ -531,7 +556,7 @@ function JobsContent() {
               <FilterSelect label="Salary"       value={salary}      onChange={v => setParam('salary', v)}      options={SALARY_RANGES} icon={<Banknote className="w-3 h-3" />}     />
               <FilterSelect label="Timezone"     value={timezone}    onChange={v => setParam('timezone', v)}    options={TIMEZONES}     icon={<Timer className="w-3 h-3" />}        />
               <FilterSelect label="Posted"       value={posted}      onChange={v => setParam('posted', v)}      options={POSTED_WITHIN} icon={<Clock className="w-3 h-3" />}        />
-              <FilterSelect label="Remote"       value={remoteOnly}  onChange={v => setParam('remote', v)}      options={REMOTE_OPTIONS}icon={<Globe2 className="w-3 h-3" />}       />
+              {/* Remote filter moved to the top-of-page prominent toggle. */}
               <FilterSelect label="Company Size" value={companySize} onChange={v => setParam('companySize', v)} options={COMPANY_SIZES} icon={<Building2 className="w-3 h-3" />}    />
               <div className="flex items-end">
                 {activeFilterCount > 0 && (

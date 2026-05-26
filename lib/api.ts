@@ -43,6 +43,7 @@ export const jobsApi = {
         if (filters.level)    params.set('level', filters.level);
         if (filters.sort)     params.set('sort', filters.sort);
         if (filters.region)   params.set('region', filters.region);
+        if (filters.remote)   params.set('remote', 'true');
         params.set('page',    String(filters.page ?? 1));
         params.set('perPage', String(filters.perPage ?? 12));
         const res = await fetch(`/api/jobs?${params.toString()}`);

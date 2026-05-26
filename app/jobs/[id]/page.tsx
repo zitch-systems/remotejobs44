@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Clock, ArrowLeft, Bookmark, BookmarkCheck, Share2, Zap, ExternalLink, Copy, CheckCheck } from 'lucide-react';
+import { MapPin, Clock, ArrowLeft, Bookmark, BookmarkCheck, Share2, Zap, ExternalLink, Copy, CheckCheck, Trash2, Shield } from 'lucide-react';
 import { jobsApi, applicationsApi } from '@/lib/api';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { modalService } from '@/components/ui/Modal';
@@ -26,7 +26,7 @@ export default function JobDetailPage() {
       setTimeout(() => setCopiedField(null), 2000);
     });
   }
-  const { user, isPro, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
+  const { user, isPro, isAdmin, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
   const isDaily = user?.plan === 'daily';
   const isFree = !isLoggedIn() || user?.plan === 'free';
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
@@ -37,21 +37,10 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!id) return;
     jobsApi.getJob(id).then(j => {
-      // If the job exists but has no real description (often the case for
-      // scraped/aggregated postings where we only got title + link), send
-      // the user straight to the company's vacancy page in a new tab and
-      // back to /jobs so they don't see a blank detail screen.
-      if (j) {
-        const hasUsefulDescription = j.description && j.description.trim().length > 40;
-        if (!hasUsefulDescription) {
-          const target = j.applyUrl || j.sourceUrl || (j.applyEmail ? `mailto:${j.applyEmail}` : null);
-          if (target) {
-            window.open(target, '_blank', 'noopener,noreferrer');
-            router.replace('/jobs');
-            return;
-          }
-        }
-      }
+      // Always render the detail page — even when the scraped description
+      // is sparse — so users can preview the role on remotejobs44 before
+      // clicking through. Apply button on the right-hand sidebar is the
+      // only thing that opens the external URL.
       setJob(j);
       setLoading(false);
     });
@@ -80,6 +69,18 @@ export default function JobDetailPage() {
   const salary = formatSalary(job.salaryMin, job.salaryMax, job.currency);
   const saved = job ? isSaved(job.id) : false;
   const applied = job ? hasApplied(job.id) : false;
+
+  async function handleAdminDelete() {
+    if (!job) return;
+    if (!confirm(`Delete "${job.title}" at ${job.company}?\n\nThis is permanent — the row is removed from the jobs table.`)) return;
+    try {
+      await jobsApi.deleteJob(job.id);
+      toast('Job deleted', 'success');
+      router.replace('/jobs');
+    } catch (err: any) {
+      toast(err.message ?? 'Delete failed', 'error');
+    }
+  }
 
   async function handleApply() {
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
@@ -190,9 +191,20 @@ export default function JobDetailPage() {
             )}
 
             <div className="job-prose">
-              {job.description.split('\n\n').map((para, i) => (
-                <p key={i} className="mb-4 text-stone-600 dark:text-stone-300 leading-relaxed">{para}</p>
-              ))}
+              {job.description && job.description.trim().length > 40 ? (
+                job.description.split('\n\n').map((para, i) => (
+                  <p key={i} className="mb-4 text-stone-600 dark:text-stone-300 leading-relaxed">{para}</p>
+                ))
+              ) : (
+                <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-5 text-sm text-stone-500 dark:text-stone-400">
+                  <p className="mb-2">
+                    We don't have the full description on remotejobs44 — this posting came in via an aggregated feed with only basic metadata.
+                  </p>
+                  <p>
+                    Click <strong>Apply Now</strong> on the right to open the full posting and apply directly on the company's site.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -272,6 +284,19 @@ export default function JobDetailPage() {
                 <Share2 className="w-4 h-4" /> Share
               </button>
             </div>
+
+            {/* Admin-only quick-delete — handy when triaging spam / dead postings. */}
+            {isAdmin() && (
+              <div className="mt-3 pt-3 border-t border-stone-100 dark:border-[#1e3a5f]">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1.5">
+                  <Shield className="w-3 h-3" /> Admin
+                </p>
+                <button onClick={handleAdminDelete}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" /> Delete this job
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Skills */}

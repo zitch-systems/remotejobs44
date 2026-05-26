@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Building2, RefreshCw, Search, ExternalLink, Briefcase,
-  CheckCircle, AlertCircle, ArrowUpDown,
+  CheckCircle, AlertCircle, ArrowUpDown, Trash2,
 } from 'lucide-react';
 import { useUIStore } from '@/lib/store';
 import { cn, formatRelativeDate } from '@/lib/utils';
@@ -89,6 +89,7 @@ export default function AdminCompaniesPage() {
   // Track per-company refresh state — multiple can be in flight at once.
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [bulkRefreshing, setBulkRefreshing] = useState(false);
+  const [removing, setRemoving]     = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -145,6 +146,36 @@ export default function AdminCompaniesPage() {
     const res = await refreshOne(row);
     if (res) {
       toast(`${row.company}: +${res.added} new, ${res.removed} expired${res.reactivated ? `, ${res.reactivated} reactivated` : ''}`, 'success', 4500);
+    }
+  }
+
+  async function handleRemove(row: CompanyRow) {
+    if (!confirm(
+      `Remove "${row.company}" from the live job list?\n\n` +
+      `This soft-deletes ${row.active_count} active job(s) — they'll stay in the DB for user application history, ` +
+      `but won't show up in public search until you Refresh the company.`
+    )) return;
+    setRemoving(row.company);
+    try {
+      const res = await fetch('/api/admin/companies/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: row.company }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error ?? 'Remove failed', 'error'); return; }
+      // Optimistic local update — move all active rows to inactive count.
+      setCompanies(prev => prev.map(c => c.company === row.company ? {
+        ...c,
+        inactive_count: c.inactive_count + c.active_count,
+        active_count:   0,
+        last_updated:   new Date().toISOString(),
+      } : c));
+      toast(`${row.company}: removed ${data.removed} job(s)`, 'success', 4500);
+    } catch (err: any) {
+      toast(err.message ?? 'Remove failed', 'error');
+    } finally {
+      setRemoving(null);
     }
   }
 
@@ -332,7 +363,7 @@ export default function AdminCompaniesPage() {
                     )}
                     <button
                       onClick={() => handleRefreshOne(row)}
-                      disabled={isRefreshing || isManual || isUnknown || bulkRefreshing}
+                      disabled={isRefreshing || isManual || isUnknown || bulkRefreshing || removing === row.company}
                       title={
                         isManual  ? 'Manually posted — no source to refresh' :
                         isUnknown ? 'No detected ATS — open a sample apply URL to see why' :
@@ -347,6 +378,18 @@ export default function AdminCompaniesPage() {
                       {isRefreshing
                         ? <><RefreshCw className="w-3 h-3 animate-spin" /> …</>
                         : <><RefreshCw className="w-3 h-3" /> Refresh</>}
+                    </button>
+                    <button
+                      onClick={() => handleRemove(row)}
+                      disabled={removing === row.company || isRefreshing || bulkRefreshing || row.active_count === 0}
+                      title={row.active_count === 0
+                        ? 'No active jobs to remove'
+                        : 'Soft-delete all active jobs for this company (preserves user history)'}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {removing === row.company
+                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                        : <Trash2 className="w-3 h-3" />}
                     </button>
                   </div>
                 </div>

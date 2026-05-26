@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
   const type    = searchParams.get('type') ?? '';
   const level   = searchParams.get('level') ?? '';
   const region  = searchParams.get('region') ?? '';
+  // remote=true (string from URL) → filter to remote-only roles.
+  // Anything else (including unset) means "don't filter on remote".
+  const remote  = searchParams.get('remote') === 'true';
   const sort    = searchParams.get('sort') ?? 'newest';
   const page    = parseInt(searchParams.get('page') ?? '1');
   const perPage = parseInt(searchParams.get('perPage') ?? '12');
@@ -55,6 +58,7 @@ export async function GET(req: NextRequest) {
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
+    if (remote)   query = query.eq('remote', true);
     if (region && REGION_TERMS[region]) {
       const orTerms = REGION_TERMS[region].map(t => `location.ilike.%${t}%`).join(',');
       query = query.or(orTerms);
