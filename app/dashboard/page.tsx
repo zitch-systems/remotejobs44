@@ -53,9 +53,15 @@ function DashboardContent() {
         // committed yet. Render a skeleton user from the auth session so
         // the page is never blank, then retry the profile fetch a few
         // times to upgrade the state once the row appears.
+        //
+        // CRITICAL: write the skeleton whenever the persisted user's id
+        // does not match the authed user. Otherwise a previous user's
+        // localStorage state on the same device leaks into the new login —
+        // they would see the prior user's name / plan / role until the
+        // background retry caught up. That was a real security bug.
         if (!profile) {
           const persisted = useAuthStore.getState().user;
-          if (!persisted) {
+          if (!persisted || persisted.id !== authUser.id) {
             // Use the full auth user (not just id+email) so we can pick up
             // user_metadata.name / full_name from Google.
             const { data: { user: fullUser } } = await supabase.auth.getUser();

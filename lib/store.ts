@@ -56,15 +56,21 @@ export const useAuthStore = create<AuthState>()(
       setHydrated:(v) => set({ hydrated: v }),
       setUser:    (user) => set((s) => {
         // If the signed-in user actually changed (different id, or signed out
-        // entirely), wipe any cached saved-jobs/applications from the previous
-        // account so the new user doesn't see stale data.
+        // entirely), wipe ALL cached state from the previous account —
+        // saved jobs, applications, daily-apps counter. Only carrying the
+        // counter forward when the new user wasn't on a day-pass meant the
+        // counter could leak across accounts when the new user happened to
+        // be on the same plan tier.
         const prevId = s.user?.id ?? null;
         const nextId = user?.id ?? null;
-        if (prevId !== nextId) resetJobsStoreForNewUser();
+        const userChanged = prevId !== nextId;
+        if (userChanged) resetJobsStoreForNewUser();
         return {
           user,
           hydrated: true, // any explicit setUser counts as a confirmed sync
-          dailyAppsUsed: (user?.plan === 'daily' && s.user?.plan !== 'daily') ? 0 : s.dailyAppsUsed,
+          dailyAppsUsed: userChanged
+            ? 0
+            : (user?.plan === 'daily' && s.user?.plan !== 'daily' ? 0 : s.dailyAppsUsed),
         };
       }),
       updateUser: (patch) =>

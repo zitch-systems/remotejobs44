@@ -100,23 +100,40 @@ export function Header() {
     async function syncAuth() {
       const { setHydrated } = useAuthStore.getState();
       try {
-        // getAuthedUserSafe retries a 401 once so a stale access token mid
-        // auto-refresh doesn't briefly wipe the user (subscription flicker).
         const { user: authUser, status } = await getAuthedUserSafe(supabase);
         if (status === 'unauthed')  { setUser(null); return; }
-        if (status === 'transient') { setHydrated(true); return; } // keep persisted session
-        if (!authUser)              { setUser(null); return; }
-        const profile = await fetchProfile(authUser.id);
-        // Don't downgrade plan/role on a failed/null profile fetch — that
-        // would tell a paying user they're on Free. Keep persisted state
-        // and try again next render.
-        if (!profile) {
+
+        // SECURITY: if the persisted user (from localStorage) is for a
+        // different person than the live Supabase session, wipe it
+        // immediately. Same-device account switches were leaking the
+        // previous user's name/plan/role into the new session whenever the
+        // profile fetch was slow.
+        const persisted = useAuthStore.getState().user;
+        if (authUser && persisted && persisted.id !== authUser.id) {
+          setUser(null);
+        }
+
+        if (status === 'transient') {
+          // Server couldn't validate. If persisted matches the (possibly
+          // stale) authUser id from local cookies we can keep showing the
+          // persisted state; if it doesn't, we already wiped above.
           setHydrated(true);
+          return;
+        }
+        if (!authUser) { setUser(null); return; }
+
+        const profile = await fetchProfile(authUser.id);
+        if (!profile) {
+          // No profile row yet (Google OAuth race, or DB trigger lag).
+          // Persist a skeleton so a previous user's state never lingers
+          // even briefly — buildUser uses authUser.id as the source of
+          // truth, not persisted state.
+          setUser(buildUser(authUser, null));
           return;
         }
         setUser(buildUser(authUser, profile));
       } catch {
-        setHydrated(true); // network exception — keep session, mark synced so UI can render
+        setHydrated(true);
       }
     }
 
