@@ -594,7 +594,26 @@ function JobsContent() {
           </h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
             {loading ? 'Searching…' : `${total.toLocaleString()} jobs found`}
-            {!loading && total > 0 && <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400"><Zap className="w-3 h-3" />Updated daily</span>}
+            {!loading && total > 0 && (
+              <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400">
+                <Zap className="w-3 h-3" />
+                {remoteOnly ? 'Remote only' : 'All locations'}
+              </span>
+            )}
+            {/* Quick way to flip the remote filter inline — handy when the
+                user wonders why the count is lower than expected. */}
+            {!loading && remoteOnly && (
+              <button onClick={() => setParam('remote', 'false')}
+                className="ml-2 text-xs text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 underline transition-colors">
+                Show on-site jobs too →
+              </button>
+            )}
+            {!loading && !remoteOnly && (
+              <button onClick={() => setParam('remote', 'true')}
+                className="ml-2 text-xs text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 underline transition-colors">
+                Remote only →
+              </button>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

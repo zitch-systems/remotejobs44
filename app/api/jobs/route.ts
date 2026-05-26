@@ -58,7 +58,23 @@ export async function GET(req: NextRequest) {
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
-    if (remote)   query = query.eq('remote', true);
+    if (remote) {
+      // The `remote` boolean column was set during ingestion by checking
+      // /remote/i.test(location), which misses real remote roles whose
+      // locations say "Worldwide", "Anywhere", "Global", "Distributed",
+      // "WFH" or "London (Remote)". Without this OR-clause the filter
+      // drops ~90% of legitimately remote postings — the exact symptom
+      // a 32k-import → 3k-visible looks like.
+      query = query.or([
+        'remote.eq.true',
+        'location.ilike.%remote%',
+        'location.ilike.%worldwide%',
+        'location.ilike.%anywhere%',
+        'location.ilike.%global%',
+        'location.ilike.%distributed%',
+        'location.ilike.%wfh%',
+      ].join(','));
+    }
     if (region && REGION_TERMS[region]) {
       const orTerms = REGION_TERMS[region].map(t => `location.ilike.%${t}%`).join(',');
       query = query.or(orTerms);
