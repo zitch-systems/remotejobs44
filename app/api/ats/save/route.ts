@@ -23,64 +23,56 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabaseClient();
 
-    // Transform camelCase Job to snake_case DB row.
-    // Rows without apply_url cannot be deduplicated (the unique index in
-    // migration_v2.sql is partial: WHERE apply_url IS NOT NULL), so drop them
-    // up front — otherwise repeated bulk imports of the same JS-rendered page
-    // would silently pile up duplicates.
-    const rows = jobs
-      .filter(j => typeof j.applyUrl === 'string' && j.applyUrl.length > 0)
-      .map(j => ({
-        title:        j.title ?? 'Untitled',
-        company:      j.company ?? 'Unknown',
-        logo:         j.logo ?? (j.company ? j.company[0] : '?'),
-        category:     j.category ?? 'other',
-        type:         j.type ?? 'full-time',
-        level:        j.level ?? null,
-        salary_min:   j.salaryMin ?? null,
-        salary_max:   j.salaryMax ?? null,
-        currency:     j.currency ?? 'USD',
-        location:     j.location ?? 'Worldwide',
-        timezone:     j.timezone ?? null,
-        description:  j.description ?? '',
-        requirements: j.requirements ?? null,
-        skills:       j.skills ?? null,
-        benefits:     j.benefits ?? null,
-        apply_url:    j.applyUrl!,
-        apply_email:  j.applyEmail ?? null,
-        posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
-        expires_at:   j.expires ?? null,
-        featured:     false,
-        is_new:       true,
-        is_active:    true,
-        source:       j.source ?? 'api',
-        source_url:   j.sourceUrl ?? null,
-        remote:       j.remote ?? true,
-      }));
+    // Transform camelCase Job to snake_case DB row. Every fetched job lands
+    // as a NEW row — apply_url uniqueness was dropped in migration_v5 at
+    // user request, so we no longer dedup at insert time. Same posting
+    // fetched via multiple URLs will appear N times in /jobs.
+    const rows = jobs.map(j => ({
+      title:        j.title ?? 'Untitled',
+      company:      j.company ?? 'Unknown',
+      logo:         j.logo ?? (j.company ? j.company[0] : '?'),
+      category:     j.category ?? 'other',
+      type:         j.type ?? 'full-time',
+      level:        j.level ?? null,
+      salary_min:   j.salaryMin ?? null,
+      salary_max:   j.salaryMax ?? null,
+      currency:     j.currency ?? 'USD',
+      location:     j.location ?? 'Worldwide',
+      timezone:     j.timezone ?? null,
+      description:  j.description ?? '',
+      requirements: j.requirements ?? null,
+      skills:       j.skills ?? null,
+      benefits:     j.benefits ?? null,
+      apply_url:    j.applyUrl ?? null,
+      apply_email:  j.applyEmail ?? null,
+      posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
+      expires_at:   j.expires ?? null,
+      featured:     false,
+      is_new:       true,
+      is_active:    true,
+      source:       j.source ?? 'api',
+      source_url:   j.sourceUrl ?? null,
+      remote:       j.remote ?? true,
+    }));
 
-    const noUrl = jobs.length - rows.length;
-
-    // Upsert against the unique partial index on apply_url so duplicates are
-    // skipped per-row instead of failing the whole batch (the prior .insert()
-    // would mark all 100 rows skipped on a single 23505 conflict).
+    // Plain insert — no conflict handling. Each batch of 100 lands as 100
+    // new rows regardless of whether any apply_url already exists in DB.
     let inserted = 0;
-    let skipped  = noUrl;
+    let failed   = 0;
 
     for (let i = 0; i < rows.length; i += 100) {
       const batch = rows.slice(i, i + 100);
 
       const { data, error } = await supabase
         .from('jobs')
-        .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .insert(batch)
         .select('id');
 
       if (error) {
         console.error('[ats/save] batch error:', error.message);
-        skipped += batch.length;
+        failed += batch.length;
       } else {
-        const n = data?.length ?? 0;
-        inserted += n;
-        skipped  += batch.length - n;
+        inserted += data?.length ?? batch.length;
       }
     }
 
@@ -94,7 +86,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       inserted,
-      skipped,
+      // `skipped` is kept in the response shape for backward compatibility
+      // with the frontend that displays "X saved · Y skipped". With dedup
+      // disabled, "skipped" now only counts rows that failed to insert
+      // (DB error, bad shape) — duplicates no longer skip.
+      skipped: failed,
       total: jobs.length,
     });
   } catch (err: any) {

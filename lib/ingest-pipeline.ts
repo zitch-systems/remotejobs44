@@ -250,9 +250,13 @@ export async function runIngest() {
         continue;
       }
 
+      // ⚠️  Dedup-by-apply_url was removed at user request (migration_v5).
+      // Every cron run now inserts a fresh copy of every job — after a
+      // week, each posting appears ~7 times in DB. Re-enable upsert here
+      // (and re-create the unique index) if dedup is wanted again.
       const { data: inserted, error } = await supabase
         .from('jobs')
-        .upsert(jobs, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .insert(jobs)
         .select('id');
 
       if (error) {

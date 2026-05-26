@@ -48,105 +48,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `ATS fetch failed: ${fetched.error}` }, { status: 502 });
   }
 
-  // Keep only rows we can dedupe on (apply_url). Without it the unique
-  // partial index can't catch dupes and we'd silently double-insert.
-  const fetchedJobs = fetched.jobs.filter(j => typeof j.applyUrl === 'string' && j.applyUrl!.length > 0);
-  const fetchedUrls = new Set(fetchedJobs.map(j => j.applyUrl!));
-
-  // ── 2. Read what we currently have for this company ──────────────────
+  // Dedup-by-apply_url was disabled at user request (migration_v5). With
+  // no unique key, the previous "compare apply_url sets to find expired /
+  // reactivate / insert-new" reconciliation breaks: a fetched apply_url
+  // can match N existing rows, and "kept" / "removed" are no longer
+  // meaningful concepts. Simplified to: always insert every fetched row.
+  // To purge stale rows, the admin can use the existing Remove Company
+  // button on /admin/companies.
+  const fetchedJobs = fetched.jobs;
   const admin = createAdminSupabaseClient();
-  const { data: existing, error: readErr } = await admin
-    .from('jobs')
-    .select('id,apply_url,is_active')
-    .ilike('company', company)   // case-insensitive — handles "Stripe" vs "stripe"
-    .not('apply_url', 'is', null);
-  if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
 
-  const existingByUrl = new Map<string, { id: string; is_active: boolean }>();
-  for (const row of (existing ?? [])) {
-    if (row.apply_url) existingByUrl.set(row.apply_url, { id: row.id, is_active: row.is_active });
-  }
-
-  // ── 3. Inactive: rows in DB but not in the new fetch ─────────────────
-  const toExpire: string[] = [];
-  for (const [url, row] of existingByUrl) {
-    if (row.is_active && !fetchedUrls.has(url)) toExpire.push(row.id);
-  }
-  let removed = 0;
-  if (toExpire.length > 0) {
-    const { error: expErr, count } = await admin
-      .from('jobs')
-      .update({ is_active: false, updated_at: new Date().toISOString() }, { count: 'exact' })
-      .in('id', toExpire);
-    if (expErr) console.error('[companies/refresh] expire failed:', expErr.message);
-    removed = count ?? toExpire.length;
-  }
-
-  // ── 4. Insert: rows in the new fetch but not in DB ───────────────────
-  // For URLs we already have but are inactive, flip them back to active.
-  const toReactivate: string[] = [];
-  const toInsert: Array<Record<string, any>> = [];
-  for (const j of fetchedJobs) {
-    const url = j.applyUrl!;
-    const existingRow = existingByUrl.get(url);
-    if (existingRow) {
-      if (!existingRow.is_active) toReactivate.push(existingRow.id);
-    } else {
-      toInsert.push({
-        title:        j.title ?? 'Untitled',
-        company:      j.company ?? company,
-        logo:         j.logo ?? (j.company ? j.company[0] : '?'),
-        category:     j.category ?? 'other',
-        type:         j.type ?? 'full-time',
-        level:        j.level ?? null,
-        salary_min:   j.salaryMin ?? null,
-        salary_max:   j.salaryMax ?? null,
-        currency:     j.currency ?? 'USD',
-        location:     j.location ?? 'Worldwide',
-        timezone:     j.timezone ?? null,
-        description:  j.description ?? '',
-        requirements: j.requirements ?? null,
-        skills:       j.skills ?? null,
-        benefits:     j.benefits ?? null,
-        apply_url:    url,
-        apply_email:  j.applyEmail ?? null,
-        posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
-        expires_at:   j.expires ?? null,
-        featured:     false,
-        is_new:       true,
-        is_active:    true,
-        source:       j.source ?? platform,
-        source_url:   j.sourceUrl ?? null,
-        remote:       j.remote ?? true,
-      });
-    }
-  }
-
-  let reactivated = 0;
-  if (toReactivate.length > 0) {
-    const { error: reErr, count } = await admin
-      .from('jobs')
-      .update({ is_active: true, updated_at: new Date().toISOString() }, { count: 'exact' })
-      .in('id', toReactivate);
-    if (reErr) console.error('[companies/refresh] reactivate failed:', reErr.message);
-    reactivated = count ?? toReactivate.length;
-  }
+  const toInsert: Array<Record<string, any>> = fetchedJobs.map(j => ({
+    title:        j.title ?? 'Untitled',
+    company:      j.company ?? company,
+    logo:         j.logo ?? (j.company ? j.company[0] : '?'),
+    category:     j.category ?? 'other',
+    type:         j.type ?? 'full-time',
+    level:        j.level ?? null,
+    salary_min:   j.salaryMin ?? null,
+    salary_max:   j.salaryMax ?? null,
+    currency:     j.currency ?? 'USD',
+    location:     j.location ?? 'Worldwide',
+    timezone:     j.timezone ?? null,
+    description:  j.description ?? '',
+    requirements: j.requirements ?? null,
+    skills:       j.skills ?? null,
+    benefits:     j.benefits ?? null,
+    apply_url:    j.applyUrl ?? null,
+    apply_email:  j.applyEmail ?? null,
+    posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
+    expires_at:   j.expires ?? null,
+    featured:     false,
+    is_new:       true,
+    is_active:    true,
+    source:       j.source ?? platform,
+    source_url:   j.sourceUrl ?? null,
+    remote:       j.remote ?? true,
+  }));
 
   let added = 0;
   for (let i = 0; i < toInsert.length; i += 100) {
     const batch = toInsert.slice(i, i + 100);
     const { data, error: insErr } = await admin
       .from('jobs')
-      .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
+      .insert(batch)
       .select('id');
     if (insErr) {
       console.error('[companies/refresh] insert batch failed:', insErr.message);
       continue;
     }
-    added += data?.length ?? 0;
+    added += data?.length ?? batch.length;
   }
 
-  // ── 5. Revalidate the public jobs pages so users see the changes ─────
+  // No expire / reactivate phases anymore — they relied on apply_url
+  // identity which is no longer unique.
+  const removed = 0;
+  const reactivated = 0;
+
+  // ── Revalidate the public jobs pages so users see the changes ───────
   try {
     const { revalidatePath } = await import('next/cache');
     revalidatePath('/jobs');
@@ -159,9 +118,9 @@ export async function POST(req: NextRequest) {
     platform,
     slug,
     added,
-    removed,        // newly marked inactive
-    reactivated,    // were inactive, now active again
-    kept:           fetchedUrls.size - added - reactivated,
+    removed,        // always 0 now — see note above
+    reactivated,    // always 0 now — see note above
+    kept:           0,
     total_fetched:  fetched.total,
   };
 

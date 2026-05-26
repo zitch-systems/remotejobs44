@@ -1,0 +1,29 @@
+-- ============================================================
+-- RemoteJobs44 — Migration v5
+-- Run AFTER migration_v4.sql in: Supabase Dashboard → SQL Editor.
+--
+-- Drops the unique partial index on jobs.apply_url at user request.
+-- After this, the DB will accept multiple rows with the same apply_url —
+-- the bulk-import + cron paths have been switched from upsert→insert in
+-- the same commit, so the absence of this constraint is required for
+-- those endpoints to keep working.
+--
+-- ⚠️  Consequences:
+--   - /jobs will show duplicate listings when the same posting was
+--     fetched via multiple URLs (e.g., stripe.com/careers AND
+--     boards.greenhouse.io/stripe both pull the same Stripe jobs)
+--   - The daily cron will multiply rows on every run — after a week
+--     of cron runs, each job appears ~7 times
+--   - "Saved jobs" by users may have visible duplicates
+--   - The "X jobs found" counter will be inflated relative to
+--     distinct postings
+--
+-- To restore dedup later, re-run the matching CREATE in migration_v2.sql:
+--
+--   CREATE UNIQUE INDEX IF NOT EXISTS jobs_apply_url_idx
+--     ON public.jobs(apply_url)
+--     WHERE apply_url IS NOT NULL;
+--
+-- ============================================================
+
+drop index if exists public.jobs_apply_url_idx;
