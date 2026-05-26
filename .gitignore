@@ -25,3 +25,7 @@ lighthouse-report.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Supabase CLI scratch (cli-latest etc.)
+supabase/.temp/
+supabase/.branches/
