@@ -14,7 +14,7 @@ import {
   Zap, CheckCircle, XCircle, RefreshCw,
   Download, Trash2, Play, Pause, ChevronDown, ChevronRight, Search,
   Database, History, Clock, Layers,
-  CloudUpload,
+  CloudUpload, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // Import from the client-safe detection module — lib/ats-engine pulls in
@@ -430,8 +430,32 @@ export default function CompanyImportPage() {
     setSaving(true);
     setSaveResult(null);
 
-    // Collect ALL jobs from all done entries (full list, not sliced preview)
-    const allJobs = doneEntries.flatMap(e => e.jobs ?? []);
+    // Flatten + dedupe by apply_url BEFORE chunking. Without this, a pasted
+    // URL list that resolves multiple entries to the same ATS (e.g.,
+    // "stripe.com/careers" + "boards.greenhouse.io/stripe" both fetch the
+    // same jobs) sends the same row to /api/ats/save multiple times — the
+    // DB's unique-on-apply_url constraint dedupes server-side, but the
+    // user sees "32k saved" optimistic followed by "29k skipped (duplicates)"
+    // which looks like a save failure. Dedupe here so the toast reflects
+    // reality.
+    const seen = new Set<string>();
+    let cross   = 0;  // dupes across entries (same apply_url, different entry)
+    let nullUrl = 0;  // jobs missing apply_url entirely
+    const allJobs: any[] = [];
+    for (const e of doneEntries) {
+      for (const j of (e.jobs ?? [])) {
+        const u = j.applyUrl;
+        if (!u) { nullUrl++; continue; }
+        if (seen.has(u)) { cross++; continue; }
+        seen.add(u);
+        allJobs.push(j);
+      }
+    }
+    const rawCount = doneEntries.reduce((s, e) => s + (e.jobs?.length ?? 0), 0);
+    if (cross > 0 || nullUrl > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[bulk-save] ${rawCount} fetched → ${allJobs.length} unique (cross-entry dupes: ${cross}, missing apply_url: ${nullUrl})`);
+    }
 
     try {
       // Batch into SAVE_BATCH_SIZE chunks, then run SAVE_CONCURRENCY chunks
@@ -513,6 +537,26 @@ export default function CompanyImportPage() {
     a.download = 'companies-import.csv';
     a.click();
   }
+
+  // How many unique apply_urls are we actually about to insert? Without this
+  // surfaced upfront, a pasted URL list with overlap (multiple URLs resolving
+  // to the same ATS) shows "32k saved" but actually inserts a tiny fraction
+  // and skips the rest as duplicates. Now we compute this in the UI so the
+  // Save button reflects reality before the click.
+  const saveStats = useMemo(() => {
+    const seen = new Set<string>();
+    let total = 0;
+    let nullUrl = 0;
+    for (const e of entries) {
+      if (e.status !== 'done') continue;
+      for (const j of (e.jobs ?? [])) {
+        total++;
+        if (!j.applyUrl) { nullUrl++; continue; }
+        seen.add(j.applyUrl);
+      }
+    }
+    return { total, unique: seen.size, duplicates: total - seen.size - nullUrl, nullUrl };
+  }, [entries]);
 
   // Single-pass aggregation — the old version did 26 separate .filter() walks
   // over `entries` plus three more for filtered/stats/progress. At 10k rows
@@ -847,17 +891,32 @@ export default function CompanyImportPage() {
 
             {/* Save to Supabase — only shown when there are done entries with jobs */}
             {stats.jobs > 0 && !running && (
-              <button
-                onClick={saveAllToSupabase}
-                disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-brand-600 dark:bg-brand-500 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</>
-                ) : (
-                  <><Database className="w-4 h-4" /> Save {stats.jobs.toLocaleString()} Jobs to DB</>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={saveAllToSupabase}
+                  disabled={saving}
+                  title={saveStats.duplicates > 0
+                    ? `${saveStats.total.toLocaleString()} fetched · ${saveStats.duplicates.toLocaleString()} cross-entry duplicates · ${saveStats.nullUrl.toLocaleString()} without apply_url`
+                    : undefined}
+                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-brand-600 dark:bg-brand-500 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</>
+                  ) : (
+                    <><Database className="w-4 h-4" /> Save {saveStats.unique.toLocaleString()} Unique Jobs to DB</>
+                  )}
+                </button>
+                {/* Heavy duplication warning — surfaces upfront so the user
+                    doesn't think their 32k-fetch will yield 32k DB rows. */}
+                {!saving && saveStats.duplicates > 0 && saveStats.duplicates > saveStats.unique && (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      <strong>{saveStats.duplicates.toLocaleString()}</strong> of {saveStats.total.toLocaleString()} fetched are duplicates across entries (same apply_url) and won't be re-inserted.
+                    </span>
+                  </div>
                 )}
-              </button>
+              </div>
             )}
 
             {saveResult && (
