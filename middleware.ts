@@ -51,25 +51,32 @@ export async function middleware(request: NextRequest) {
   // — doing so can cause users to be randomly logged out (per Supabase docs).
   let user: { id: string; email?: string | null } | null = null;
   let confirmedUnauthed = false;
+  let serverSaid401     = false;
   try {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
-      // 401/403 = real "no session". 5xx / network = transient.
       const status = (error as any)?.status;
-      if (status === 401 || status === 403) confirmedUnauthed = true;
+      if (status === 401 || status === 403) serverSaid401 = true;
     } else {
       user = data?.user ?? null;
-      // No error and no user → also confirmed unauthed.
       if (!user) confirmedUnauthed = true;
     }
   } catch {
     // Network exception — treat as transient. Do not bounce.
   }
 
-  // If we couldn't verify but there's no auth cookie at all, treat as unauthed.
-  if (!user && !confirmedUnauthed && !hasSupabaseSessionCookie(request)) {
-    confirmedUnauthed = true;
-  }
+  // KEY CHANGE: a 401 from getUser() alone is NOT proof the user is logged
+  // out. Supabase access tokens can be briefly stale during refresh (very
+  // common right after a Paystack redirect), and middleware runs on every
+  // request — bouncing on the first 401 was the "subscribed → briefly
+  // logged out" flicker users were reporting. Only mark unauthed when the
+  // server says 401 AND there is NO sb-*-auth-token cookie at all. If the
+  // cookie exists, let the page render; the client-side `getAuthedUserSafe`
+  // has retry + recovery logic, and Supabase's auto-refresh will land
+  // within seconds.
+  const cookiePresent = hasSupabaseSessionCookie(request);
+  if (serverSaid401 && !cookiePresent) confirmedUnauthed = true;
+  if (!user && !confirmedUnauthed && !cookiePresent) confirmedUnauthed = true;
 
   const path = request.nextUrl.pathname;
   const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');

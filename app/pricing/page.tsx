@@ -133,7 +133,7 @@ function PricingContent() {
 
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('name,plan,role,created_at,profile_completion')
+          .select('name,plan,role,created_at,profile_completion,plan_expires_at')
           .eq('id', authUser.id)
           .maybeSingle();
 
@@ -148,24 +148,43 @@ function PricingContent() {
           return;
         }
 
+        // Effective plan — mirrors Header.buildUser and /api/profile. The
+        // post-payment race window is exactly when `profile.plan` is still
+        // 'free' but the verify route has already stamped a future
+        // `plan_expires_at`. Without the expiry check, the loop polled
+        // until the webhook updated `profile.plan`, and on slow webhooks
+        // it exhausted retries and downgraded the user to 'free'.
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });
-        const dbPlan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
+        const now = Date.now();
+        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
+        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+        const expired = expiryMs !== null && expiryMs < now;
+        let dbPlan: string;
+        if (role === 'admin') dbPlan = 'admin';
+        else if (expired)     dbPlan = 'free';
+        else                  dbPlan = profile.plan ?? 'free';
 
-        // Webhook hasn't caught up yet — DB still says 'free' but the user
-        // just paid for a non-free plan. Keep the optimistic Pro/Day Pass
-        // we set above and retry. If we exhaust retries, fall through and
-        // sync the DB value (better to be honest than to lie indefinitely).
-        if (dbPlan === 'free' && plan !== 'free' && attempts < maxAttempts) {
+        // Keep polling as long as the DB still says 'free' AND we don't yet
+        // have proof of payment via plan_expires_at. Once the verify route
+        // OR the webhook lands, one of those two will flip.
+        if (dbPlan === 'free' && !hasFutureExpiry && plan !== 'free' && attempts < maxAttempts) {
           attempts++;
           setTimeout(syncProfile, 1000);
           return;
         }
 
+        // Webhook race: DB plan column still 'free' but expiry is set →
+        // user is paid. Keep the optimistic plan we set in updateUser above
+        // so the UI doesn't flap back to "Upgrade" while we wait.
+        const finalPlan = (dbPlan === 'free' && hasFutureExpiry)
+          ? (plan === 'daily' ? 'daily' : 'pro')
+          : dbPlan;
+
         setUser({
           id:    authUser.id,
           email: authUser.email!,
           name:  profile.name ?? authUser.email!.split('@')[0],
-          plan:  dbPlan,
+          plan:  finalPlan as any,
           role,
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,

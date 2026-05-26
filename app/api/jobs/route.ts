@@ -9,6 +9,9 @@ export const revalidate = 60;
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const id       = searchParams.get('id');
+  // `ids=a,b,c` — batched fetch for dashboard saved-job preview.
+  // Caps at 10 to bound the IN list and the response size.
+  const idsParam = searchParams.get('ids');
   const q        = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
   const type     = searchParams.get('type') ?? '';
@@ -49,6 +52,21 @@ export async function GET(req: NextRequest) {
       if (job) return NextResponse.json({ job: transformJob(job) });
       const mock = MOCK_JOBS.find(j => j.id === id);
       return NextResponse.json({ job: mock ?? null });
+    }
+
+    if (idsParam) {
+      // Filter to non-empty UUID-ish ids, dedupe, cap at 10. Order in the
+      // response matches the request order so the client can render the
+      // saved-jobs list without re-sorting.
+      const wantedIds = Array.from(new Set(
+        idsParam.split(',').map(s => s.trim()).filter(Boolean)
+      )).slice(0, 10);
+      if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
+      const { data: rows } = await supabase
+        .from('jobs').select('*').in('id', wantedIds).eq('is_active', true);
+      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r)]));
+      const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
+      return NextResponse.json({ jobs });
     }
 
     let query = supabase.from('jobs').select('*', { count: 'exact' }).eq('is_active', true);

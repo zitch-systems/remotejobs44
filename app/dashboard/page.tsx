@@ -30,21 +30,31 @@ function DashboardContent() {
   useEffect(() => {
     async function loadSession() {
       try {
-        // getAuthedUserSafe retries a 401 once so a stale-token-mid-refresh
-        // doesn't redirect a logged-in user to /login on first load. If the
-        // first call reports unauthed but Zustand has a persisted user,
-        // give Supabase ~2s to recover via background token refresh before
-        // bouncing — that absorbs the post-API-call session-refresh race
-        // that was logging users out after an apply.
-        let attempt = await getAuthedUserSafe(supabase);
-        if (attempt.status === 'unauthed' && useAuthStore.getState().user) {
-          await new Promise(r => setTimeout(r, 2000));
-          attempt = await getAuthedUserSafe(supabase);
+        // Fast path: Header.syncAuth already validates the session on every
+        // page mount and populates Zustand. If Zustand has a user we trust
+        // it for first paint, refresh the profile data in the background,
+        // and skip the dashboard's own getAuthedUserSafe round-trip (which
+        // was duplicating middleware getUser + Header getUser on every
+        // dashboard load and adding ~2s of latency in the cold path).
+        const persistedUser = useAuthStore.getState().user;
+        let authUser: { id: string; email?: string | null } | null = persistedUser
+          ? { id: persistedUser.id, email: persistedUser.email }
+          : null;
+
+        if (!authUser) {
+          // Cold load with no persisted user — fall back to the validated
+          // path with the 2s retry to absorb token-refresh races.
+          let attempt = await getAuthedUserSafe(supabase);
+          if (attempt.status === 'unauthed' && useAuthStore.getState().user) {
+            await new Promise(r => setTimeout(r, 2000));
+            attempt = await getAuthedUserSafe(supabase);
+          }
+          const { user: u, status } = attempt;
+          if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
+          if (status === 'transient') { setLoading(false); return; }
+          if (!u)                     { router.replace('/login?next=/dashboard'); return; }
+          authUser = u;
         }
-        const { user: authUser, status } = attempt;
-        if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
-        if (status === 'transient') { setLoading(false); return; } // stay on page
-        if (!authUser)              { router.replace('/login?next=/dashboard'); return; }
 
         let profile: any = null;
         try {
@@ -179,13 +189,17 @@ function DashboardContent() {
     loadJobs();
   }, []);
 
-  // Load saved job details whenever savedJobIds change
+  // Load saved job details whenever savedJobIds change.
+  // One batched request via /api/jobs?ids=a,b,c instead of N×1 round-trips —
+  // the N×1 version was costing ~600ms of dashboard render time on slow
+  // connections even though we only render 3 cards.
   useEffect(() => {
     if (savedJobIds.length === 0) { setSavedJobs([]); return; }
     const ids = savedJobIds.slice(0, 3);
-    Promise.all(
-      ids.map(id => fetch(`/api/jobs?id=${id}`).then(r => r.ok ? r.json().then(d => d.job) : null))
-    ).then(results => setSavedJobs(results.filter(Boolean).slice(0, 3)));
+    fetch(`/api/jobs?ids=${ids.join(',')}`)
+      .then(r => r.ok ? r.json() : { jobs: [] })
+      .then((d: { jobs?: Job[] }) => setSavedJobs((d.jobs ?? []).slice(0, 3)))
+      .catch(() => setSavedJobs([]));
   }, [savedJobIds.join(',')]);
 
   // Post-payment: re-sync user plan from DB so UI updates immediately.
@@ -212,24 +226,45 @@ function DashboardContent() {
         if (!authUser) return;
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('name,plan,role,created_at,profile_completion')
+          .select('name,plan,role,created_at,profile_completion,plan_expires_at')
           .eq('id', authUser.id)
           .maybeSingle();
         if (error || !profile) {
           if (attempts < maxAttempts) { attempts++; setTimeout(sync, 1000); }
           return;
         }
-        const dbPlan = profile.role === 'admin' ? 'admin' : (profile.plan ?? 'free');
-        if (dbPlan === 'free' && plan !== 'free' && attempts < maxAttempts) {
+        // Effective plan via plan_expires_at — matches Header.buildUser and
+        // /api/profile so all three sources of truth agree. Without this,
+        // the post-payment poll only looked at profile.plan; if the webhook
+        // was slow it would exhaust retries and finally setUser({plan:'free'})
+        // even though the verify route had already stamped a future
+        // plan_expires_at proving the user was paid.
+        const now = Date.now();
+        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
+        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+        const expired = expiryMs !== null && expiryMs < now;
+        let dbPlan: string;
+        if (profile.role === 'admin') dbPlan = 'admin';
+        else if (expired)             dbPlan = 'free';
+        else                          dbPlan = profile.plan ?? 'free';
+        // Keep polling while DB still says 'free' AND we have no proof of
+        // payment via plan_expires_at. Once verify or webhook lands, the
+        // expiry timestamp or the plan column will flip.
+        if (dbPlan === 'free' && !hasFutureExpiry && plan !== 'free' && attempts < maxAttempts) {
           attempts++;
           setTimeout(sync, 1000);
           return;
         }
+        // Webhook race: column still 'free' but expiry proves payment.
+        // Use the optimistic plan so the UI doesn't flap back to "Upgrade".
+        const finalPlan = (dbPlan === 'free' && hasFutureExpiry)
+          ? (plan === 'daily' ? 'daily' : 'pro')
+          : dbPlan;
         setUser({
           id: authUser.id,
           email: authUser.email!,
           name: profile.name ?? authUser.email!.split('@')[0],
-          plan: dbPlan,
+          plan: finalPlan as any,
           role: profile.role ?? 'user',
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,
