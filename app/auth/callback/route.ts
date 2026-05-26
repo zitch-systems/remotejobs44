@@ -11,13 +11,11 @@
 // lookup) happens AFTER we know the redirect destination, either inline
 // (cheap email-based role check) or fire-and-forget (DB writes).
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
-import { cookies } from 'next/headers';
 import { destinationForRole, type Role } from '@/lib/auth/redirect';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { waitUntil } from '@vercel/functions';
 
 export async function GET(request: NextRequest) {
@@ -25,36 +23,32 @@ export async function GET(request: NextRequest) {
   const code  = searchParams.get('code');
   const next  = searchParams.get('next');
   const error = searchParams.get('error');
+  const errorDescription = searchParams.get('error_description');
 
   if (error) {
-    console.error('Auth callback error:', error, searchParams.get('error_description'));
+    console.error(`[auth/callback] provider error: ${error} — ${errorDescription ?? '(no description)'}`);
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    console.error('[auth/callback] no code param in callback URL');
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed&reason=no_code`);
   }
 
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options?: any) => { try { cookieStore.set({ name, value, ...options }); } catch {} },
-        remove: (name: string, options?: any)        => { try { cookieStore.set({ name, value: '', ...options }); } catch {} },
-      },
-    }
-  );
+  // Use the shared helper so the PKCE code_verifier cookie is read with the
+  // SAME getAll/setAll API that the browser client used to write it. The
+  // earlier inline createServerClient used the deprecated get/set/remove
+  // adapter, which fails to reassemble multi-chunk auth cookies that
+  // @supabase/ssr 0.5+ splits across sb-...-0 / sb-...-1 entries.
+  const supabase = createServerSupabaseClient();
 
-  // The single must-await — sets the session cookie. The exchange result
-  // also gives us the user object so we can skip a separate getUser() roundtrip.
   const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError) {
-    console.error('Code exchange error:', exchangeError.message);
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    console.error('[auth/callback] code exchange failed:', exchangeError.message, exchangeError);
+    return NextResponse.redirect(
+      `${origin}/login?error=auth_callback_failed&reason=${encodeURIComponent(exchangeError.message)}`
+    );
   }
 
   const authUser = data.user;
