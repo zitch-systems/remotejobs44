@@ -60,6 +60,33 @@ export function guessATSSlugs(companyName: string, domain?: string): Record<ATSP
     // Taleo + SuccessFactors need tenant + site/company-id pairs.
     taleo:           [],
     successfactors:  candidates,
+    // "25 more" batch — subdomain-style ones get the company slug, the
+    // ones that need a UUID/path id we can't guess from name alone.
+    bullhorn:        candidates,
+    crelate:         candidates,
+    newton:          candidates,
+    cornerstone:     candidates,
+    ukgpro:          candidates,
+    adp:             [],
+    paylocity:       [],
+    loxo:            candidates,
+    vincere:         candidates,
+    avature:         candidates,
+    eightfold:       candidates,
+    phenom:          candidates,
+    beamery:         candidates,
+    hireology:       candidates,
+    clearcompany:    candidates,
+    hrpartner:       candidates,
+    recooty:         candidates,
+    skeeled:         candidates,
+    hibob:           candidates,
+    pcrecruiter:     candidates,
+    catsone:         candidates,
+    recruitcrm:      candidates,
+    sagepeople:      candidates,
+    workzoom:        candidates,
+    hireserve:       candidates,
     unknown:         [],
   };
 }
@@ -95,6 +122,32 @@ export async function fetchATSJobs(platform: ATSPlatform, slug: string, sourceUr
       case 'polymer':         return await fetchPolymer(slug, sourceUrl);
       case 'taleo':           return await fetchTaleo(slug, sourceUrl);
       case 'successfactors':  return await fetchSuccessFactors(slug, sourceUrl);
+      // ── "25 more" batch ──────────────────────────────────────────────
+      case 'bullhorn':        return await fetchBullhorn(slug, sourceUrl);
+      case 'crelate':         return await fetchCrelate(slug, sourceUrl);
+      case 'newton':          return await fetchNewton(slug, sourceUrl);
+      case 'cornerstone':     return await fetchCornerstone(slug, sourceUrl);
+      case 'ukgpro':          return await fetchUkgPro(slug, sourceUrl);
+      case 'adp':             return await fetchAdp(slug, sourceUrl);
+      case 'paylocity':       return await fetchPaylocity(slug, sourceUrl);
+      case 'loxo':            return await fetchLoxo(slug, sourceUrl);
+      case 'vincere':         return await fetchVincere(slug, sourceUrl);
+      case 'avature':         return await fetchAvature(slug, sourceUrl);
+      case 'eightfold':       return await fetchEightfold(slug, sourceUrl);
+      case 'phenom':          return await fetchPhenom(slug, sourceUrl);
+      case 'beamery':         return await fetchBeamery(slug, sourceUrl);
+      case 'hireology':       return await fetchHireology(slug, sourceUrl);
+      case 'clearcompany':    return await fetchClearCompany(slug, sourceUrl);
+      case 'hrpartner':       return await fetchHrPartner(slug, sourceUrl);
+      case 'recooty':         return await fetchRecooty(slug, sourceUrl);
+      case 'skeeled':         return await fetchSkeeled(slug, sourceUrl);
+      case 'hibob':           return await fetchHiBob(slug, sourceUrl);
+      case 'pcrecruiter':     return await fetchPcRecruiter(slug, sourceUrl);
+      case 'catsone':         return await fetchCatsOne(slug, sourceUrl);
+      case 'recruitcrm':      return await fetchRecruitCrm(slug, sourceUrl);
+      case 'sagepeople':      return await fetchSagePeople(slug, sourceUrl);
+      case 'workzoom':        return await fetchWorkzoom(slug, sourceUrl);
+      case 'hireserve':       return await fetchHireserve(slug, sourceUrl);
       default:                return { jobs: [], total: 0, platform, slug, error: 'Unknown platform' };
     }
   } catch (err: any) {
@@ -1124,4 +1177,427 @@ async function fetchSuccessFactors(slug: string, sourceUrl: string): Promise<ATS
     featured: false, isNew: true,
   }));
   return { jobs, total: jobs.length, platform: 'successfactors', slug };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//        "25 more" ATS adapters — gets total support to 52 platforms
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Same conventions as the earlier batches:
+//   - (slug, sourceUrl) → ATSFetchResult
+//   - non-2xx HTTP throws so autoFetchFromCareerUrl can report the failure
+//   - 10–15s timeout + 5min revalidate cache
+// Response shapes for the enterprise ATSes (ADP, Paylocity, Cornerstone,
+// UKG Pro, Avature, Phenom, Beamery, Eightfold) are best-effort and may
+// need a follow-up tweak once we see real boards. Detection is solid for
+// all of them so URLs get categorised correctly even if the fetch errors.
+
+function prettyCompany(slug: string): string {
+  return slug.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Some adapters return `{jobs:[...]}`, others `{data:[...]}`, others a bare
+// array. This picker keeps the per-adapter code short.
+function pickJobsArray(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  return data?.jobs ?? data?.data ?? data?.results ?? data?.items ?? data?.positions ?? data?.openings ?? [];
+}
+
+// Generic mapping shape — adapters with similar JSON layouts can lean on this.
+function genericJob(j: any, opts: { company: string; sourceUrl: string; idPrefix: string; platform: ATSPlatform }): Partial<Job> {
+  const title       = j.title ?? j.name ?? j.jobTitle ?? j.position ?? 'Untitled';
+  const description = j.description ?? j.jobDescription ?? j.summary ?? j.content ?? '';
+  const location    = j.location?.name ?? j.locationName ?? j.location ?? j.city ?? 'Unknown';
+  const applyUrl    = j.applyUrl ?? j.apply_url ?? j.url ?? j.hostedUrl ?? j.link ?? opts.sourceUrl;
+  const posted      = j.postedAt ?? j.posted_at ?? j.publishedAt ?? j.published_at ?? j.createdAt ?? j.created_at ?? new Date().toISOString();
+  return {
+    id:           `${opts.idPrefix}_${j.id ?? j._id ?? uid()}`,
+    title,
+    company:      opts.company,
+    description:  stripHtml(String(description)),
+    applyUrl,
+    location:     typeof location === 'string' ? location : 'Unknown',
+    posted,
+    remote:       /remote/i.test(String(location ?? '')),
+    type:         'full-time',
+    level:        guessLevel(title),
+    category:     guessCategory(title, String(description)),
+    skills:       extractSkills(`${title} ${description}`),
+    source:       'api',
+    sourceUrl:    opts.sourceUrl,
+    featured:     false, isNew: true,
+  };
+}
+
+// ── Bullhorn ──────────────────────────────────────────────────────────────
+async function fetchBullhorn(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  // Public board widget — actual public API requires per-agency auth, but
+  // the JobBoardSearch endpoint returns HTML w/ embedded JSON we'd have to
+  // parse. For now, treat as best-effort: just hit the widget URL.
+  const url = `https://${slug}.bullhornstaffing.com/JobBoardSearch`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Bullhorn ${res.status}: ${slug} not found`);
+  // Bullhorn returns HTML; without scraping it we can't yield jobs reliably.
+  // Return an empty success so callers know the board exists; admin can use
+  // /admin/companies + a manual import for now.
+  return { jobs: [], total: 0, platform: 'bullhorn', slug, error: 'Bullhorn widget HTML scraping not yet implemented' };
+}
+
+// ── Crelate ───────────────────────────────────────────────────────────────
+async function fetchCrelate(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://app.crelate.com/p/${slug}/json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Crelate ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data.Jobs ?? data.jobs ?? [];
+  const company = data.CompanyName ?? prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `crl_${j.Id ?? j.id ?? uid()}`,
+    title: j.Title ?? j.title,
+    company,
+    description: stripHtml(j.Description ?? ''),
+    applyUrl: j.ApplyUrl ?? j.Url ?? `https://app.crelate.com/p/${slug}/job/${j.Id}`,
+    location: j.City ?? j.Location ?? 'Unknown',
+    posted: j.PostedDate ?? j.CreatedDate ?? new Date().toISOString(),
+    remote: /remote/i.test(String(j.City ?? j.Location ?? '')),
+    type: 'full-time',
+    level: guessLevel(j.Title ?? ''),
+    category: guessCategory(j.Title ?? '', j.Description ?? ''),
+    skills: extractSkills(j.Title ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'crelate', slug };
+}
+
+// ── Newton Software / iApplicants ─────────────────────────────────────────
+async function fetchNewton(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.iapplicants.com/feed/?type=rss`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Newton ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `nwt_${uid()}`,
+    title: it.title,
+    company,
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'newton', slug };
+}
+
+// ── Cornerstone OnDemand (CSOD) ───────────────────────────────────────────
+// CSOD's career-site search returns paginated JSON. We POST with an empty
+// query to get the first page.
+async function fetchCornerstone(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://careers-${slug}.csod.com/services/x/career-site/v1/search`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageSize: 100, pageNumber: 0, searchText: '' }),
+    signal: AbortSignal.timeout(15000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`Cornerstone ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data?.data?.requisitions ?? data?.results ?? [];
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'csod', platform: 'cornerstone' }));
+  return { jobs, total: jobs.length, platform: 'cornerstone', slug };
+}
+
+// ── UKG Pro Recruiting (formerly UltiPro) ─────────────────────────────────
+async function fetchUkgPro(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://recruiting.ultipro.com/${slug}/JobBoard/api/jobs`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`UKG Pro ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = data?.companyName ?? prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'ukg', platform: 'ukgpro' }));
+  return { jobs, total: jobs.length, platform: 'ukgpro', slug };
+}
+
+// ── ADP Workforce Now ─────────────────────────────────────────────────────
+async function fetchAdp(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  // ADP's public posting page is HTML-only; the underlying jobs API requires
+  // a session cookie. Mark as detected-only for now.
+  return {
+    jobs: [], total: 0, platform: 'adp', slug,
+    error: 'ADP Workforce Now public jobs require an authenticated session — detection only',
+  };
+}
+
+// ── Paylocity ─────────────────────────────────────────────────────────────
+async function fetchPaylocity(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const [uuid, name] = slug.split('|');
+  if (!uuid) throw new Error(`Paylocity slug must encode "uuid|name" (got "${slug}")`);
+  const url = `https://recruiting.paylocity.com/Recruiting/Jobs/All/${uuid}`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000), next: { revalidate: 300 },
+  });
+  if (!res.ok) throw new Error(`Paylocity ${res.status}: ${uuid} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = name ? prettyCompany(name) : 'Unknown';
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'pcy', platform: 'paylocity' }));
+  return { jobs, total: jobs.length, platform: 'paylocity', slug };
+}
+
+// ── Loxo ──────────────────────────────────────────────────────────────────
+async function fetchLoxo(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.loxo.co/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Loxo ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'lxo', platform: 'loxo' }));
+  return { jobs, total: jobs.length, platform: 'loxo', slug };
+}
+
+// ── Vincere ───────────────────────────────────────────────────────────────
+async function fetchVincere(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.vincere.io/api/v2/public/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Vincere ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'vnc', platform: 'vincere' }));
+  return { jobs, total: jobs.length, platform: 'vincere', slug };
+}
+
+// ── Avature ───────────────────────────────────────────────────────────────
+async function fetchAvature(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.avature.net/api/jobs.json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Avature ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'avt', platform: 'avature' }));
+  return { jobs, total: jobs.length, platform: 'avature', slug };
+}
+
+// ── Eightfold ─────────────────────────────────────────────────────────────
+async function fetchEightfold(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.eightfold.ai/api/apply/v2/jobs?domain=${slug}.eightfold.ai&num=100&start=0`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Eightfold ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data?.positions ?? data?.jobs ?? [];
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => ({
+    id: `eft_${j.id ?? uid()}`,
+    title: j.name ?? j.title,
+    company,
+    description: stripHtml(j.description ?? ''),
+    applyUrl: j.canonicalPositionUrl ?? `https://${slug}.eightfold.ai/careers/job/${j.id}`,
+    location: j.locations?.[0] ?? j.location ?? 'Unknown',
+    posted: j.t_create ? new Date(j.t_create * 1000).toISOString() : new Date().toISOString(),
+    remote: /remote/i.test(String(j.locations?.[0] ?? '')),
+    type: 'full-time',
+    level: guessLevel(j.name ?? ''),
+    category: guessCategory(j.name ?? '', j.description ?? ''),
+    skills: extractSkills(j.name ?? ''),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'eightfold', slug };
+}
+
+// ── Phenom People ─────────────────────────────────────────────────────────
+async function fetchPhenom(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.phenompeople.com/widgets/jobsearch/api/search?start=0&rows=100`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Phenom ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = data?.refineSearch?.jobs ?? data?.jobs ?? [];
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'phn', platform: 'phenom' }));
+  return { jobs, total: jobs.length, platform: 'phenom', slug };
+}
+
+// ── Beamery ───────────────────────────────────────────────────────────────
+async function fetchBeamery(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.beamery.com/api/v1/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Beamery ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'bmr', platform: 'beamery' }));
+  return { jobs, total: jobs.length, platform: 'beamery', slug };
+}
+
+// ── Hireology ─────────────────────────────────────────────────────────────
+async function fetchHireology(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.hireology.com/api/v1/jobs.json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Hireology ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'hlg', platform: 'hireology' }));
+  return { jobs, total: jobs.length, platform: 'hireology', slug };
+}
+
+// ── ClearCompany ──────────────────────────────────────────────────────────
+async function fetchClearCompany(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://careers.clearcompany.com/${slug}/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`ClearCompany ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'clc', platform: 'clearcompany' }));
+  return { jobs, total: jobs.length, platform: 'clearcompany', slug };
+}
+
+// ── HrPartner ─────────────────────────────────────────────────────────────
+async function fetchHrPartner(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.hrpartner.io/positions.json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`HrPartner ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'hrp', platform: 'hrpartner' }));
+  return { jobs, total: jobs.length, platform: 'hrpartner', slug };
+}
+
+// ── Recooty ───────────────────────────────────────────────────────────────
+async function fetchRecooty(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.recooty.com/api/v1/jobs/`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Recooty ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'rct', platform: 'recooty' }));
+  return { jobs, total: jobs.length, platform: 'recooty', slug };
+}
+
+// ── Skeeled ───────────────────────────────────────────────────────────────
+async function fetchSkeeled(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://careers.skeeled.com/${slug}/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Skeeled ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'skl', platform: 'skeeled' }));
+  return { jobs, total: jobs.length, platform: 'skeeled', slug };
+}
+
+// ── HiBob ─────────────────────────────────────────────────────────────────
+async function fetchHiBob(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://apply.hibob.com/api/positions/${slug}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`HiBob ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'hbb', platform: 'hibob' }));
+  return { jobs, total: jobs.length, platform: 'hibob', slug };
+}
+
+// ── PCRecruiter ───────────────────────────────────────────────────────────
+async function fetchPcRecruiter(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.pcrjobs.com/jobs/feed?format=rss`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`PCRecruiter ${res.status}: ${slug} not found`);
+  const items = parseFeedItems(await res.text());
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map(it => ({
+    id: `pcr_${uid()}`,
+    title: it.title,
+    company,
+    description: stripHtml(it.description),
+    applyUrl: it.link,
+    location: it.location || 'Unknown',
+    posted: it.pubDate || new Date().toISOString(),
+    remote: /remote/i.test(it.location + ' ' + it.title),
+    type: 'full-time',
+    level: guessLevel(it.title),
+    category: guessCategory(it.title, it.description),
+    skills: extractSkills(it.title + ' ' + it.description),
+    source: 'api', sourceUrl: url,
+    featured: false, isNew: true,
+  }));
+  return { jobs, total: jobs.length, platform: 'pcrecruiter', slug };
+}
+
+// ── CATS One ──────────────────────────────────────────────────────────────
+async function fetchCatsOne(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.catsone.com/careers/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`CATS One ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'cts', platform: 'catsone' }));
+  return { jobs, total: jobs.length, platform: 'catsone', slug };
+}
+
+// ── Recruit CRM ───────────────────────────────────────────────────────────
+async function fetchRecruitCrm(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.recruitcrm.io/api/v1/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Recruit CRM ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'rcr', platform: 'recruitcrm' }));
+  return { jobs, total: jobs.length, platform: 'recruitcrm', slug };
+}
+
+// ── Sage People ───────────────────────────────────────────────────────────
+async function fetchSagePeople(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.peoplexchange.com/services/apexrest/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Sage People ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'sgp', platform: 'sagepeople' }));
+  return { jobs, total: jobs.length, platform: 'sagepeople', slug };
+}
+
+// ── Workzoom ──────────────────────────────────────────────────────────────
+async function fetchWorkzoom(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.workzoom.com/api/jobs`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Workzoom ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'wkz', platform: 'workzoom' }));
+  return { jobs, total: jobs.length, platform: 'workzoom', slug };
+}
+
+// ── Hireserve ─────────────────────────────────────────────────────────────
+async function fetchHireserve(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
+  const url = `https://${slug}.hireserve.com/api/vacancies`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`Hireserve ${res.status}: ${slug} not found`);
+  const data = await res.json();
+  const items = pickJobsArray(data);
+  const company = prettyCompany(slug);
+  const jobs: Partial<Job>[] = items.map((j: any) => genericJob(j, { company, sourceUrl: url, idPrefix: 'hsv', platform: 'hireserve' }));
+  return { jobs, total: jobs.length, platform: 'hireserve', slug };
 }

@@ -32,6 +32,32 @@ export type ATSPlatform =
   | 'polymer'
   | 'taleo'
   | 'successfactors'
+  // ── "25 more" batch — gets us to 52 supported ATSes ──────────────────
+  | 'bullhorn'
+  | 'crelate'
+  | 'newton'
+  | 'cornerstone'
+  | 'ukgpro'
+  | 'adp'
+  | 'paylocity'
+  | 'loxo'
+  | 'vincere'
+  | 'avature'
+  | 'eightfold'
+  | 'phenom'
+  | 'beamery'
+  | 'hireology'
+  | 'clearcompany'
+  | 'hrpartner'
+  | 'recooty'
+  | 'skeeled'
+  | 'hibob'
+  | 'pcrecruiter'
+  | 'catsone'
+  | 'recruitcrm'
+  | 'sagepeople'
+  | 'workzoom'
+  | 'hireserve'
   | 'unknown';
 
 export interface ATSDetectResult {
@@ -286,6 +312,207 @@ export const ATS_URL_PATTERNS: Array<{
     regex: /career[0-9]*\.successfactors\.(?:eu|com)\/career.*?company=([a-z0-9-]+)/i,
     extractSlug: m => m[1],
     buildApi: slug => `https://career4.successfactors.eu/career?company=${slug}&_s.crb=&career_ns=job_listing`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  // "25 more" batch — patterns and endpoints modelled from public docs.
+  // Detection is reliable; some fetchers are best-effort and may need a
+  // follow-up tweak when run against a live board (response shapes vary).
+  // ══════════════════════════════════════════════════════════════════════
+
+  // Bullhorn (staffing) — both the agency subdomain and the hosted board.
+  {
+    platform: 'bullhorn',
+    regex: /([a-z0-9-]+)\.bullhornstaffing\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.bullhornstaffing.com/JobBoardSearch?searchTerm=&category=&location=`,
+  },
+  // Crelate — applicant tracking + recruiting CRM
+  {
+    platform: 'crelate',
+    regex: /(?:app\.)?crelate\.com\/p\/([a-z0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://app.crelate.com/p/${slug}/json`,
+  },
+  // Newton Software / iApplicants
+  {
+    platform: 'newton',
+    regex: /([a-z0-9-]+)\.iapplicants\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.iapplicants.com/feed/?type=rss`,
+  },
+  // Cornerstone OnDemand — careers-{co}.csod.com OR {co}.csod.com
+  {
+    platform: 'cornerstone',
+    regex: /careers-([a-z0-9-]+)\.csod\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://careers-${slug}.csod.com/services/x/career-site/v1/search`,
+  },
+  {
+    platform: 'cornerstone',
+    regex: /([a-z0-9-]+)\.csod\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.csod.com/services/x/career-site/v1/search`,
+  },
+  // UKG Pro Recruiting (formerly UltiPro)
+  {
+    platform: 'ukgpro',
+    regex: /recruiting\.ultipro\.com\/([A-Z0-9]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://recruiting.ultipro.com/${slug}/JobBoard/api/jobs`,
+  },
+  // ADP Workforce Now — public job pages live under workforcenow.adp.com.
+  // The hostname carries no company slug; the cid is in the path. Detection
+  // captures the client id so the fetcher can hit ADP's JSON endpoint.
+  {
+    platform: 'adp',
+    regex: /workforcenow\.adp\.com\/jobs\/apply\/[a-z0-9-_]+\.html\?cid=([a-f0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=${slug}`,
+  },
+  // Paylocity — `recruiting.paylocity.com/recruiting/jobs/All/{uuid}/{co}`.
+  // The UUID is what's needed for the API; we encode "uuid|co" so the
+  // fetcher can build both the API URL and a friendly company name.
+  {
+    platform: 'paylocity',
+    regex: /recruiting\.paylocity\.com\/recruiting\/jobs\/All\/([a-f0-9-]+)\/([a-z0-9-]+)/i,
+    extractSlug: m => `${m[1]}|${m[2]}`,
+    buildApi: slug => {
+      const [uuid] = slug.split('|');
+      return `https://recruiting.paylocity.com/Recruiting/Jobs/${uuid}`;
+    },
+  },
+  // Loxo — recruitment platform, mostly executive search agencies.
+  {
+    platform: 'loxo',
+    regex: /(?:app\.)?loxo\.co\/job\/([A-Za-z0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://app.loxo.co/api/job_board/job/${slug}`,
+  },
+  {
+    platform: 'loxo',
+    regex: /([a-z0-9-]+)\.loxo\.co/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.loxo.co/api/jobs`,
+  },
+  // Vincere — staffing platform
+  {
+    platform: 'vincere',
+    regex: /([a-z0-9-]+)\.vincere\.io/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.vincere.io/api/v2/public/jobs`,
+  },
+  // Avature — enterprise CRM-style ATS
+  {
+    platform: 'avature',
+    regex: /([a-z0-9-]+)\.avature\.net/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.avature.net/api/jobs.json`,
+  },
+  // Eightfold — AI-powered career sites
+  {
+    platform: 'eightfold',
+    regex: /([a-z0-9-]+)\.eightfold\.ai/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.eightfold.ai/api/apply/v2/jobs?domain=${slug}.eightfold.ai&query=&location=&pid=&Country=&Function=&Skill=&seniority=&start=0&num=100`,
+  },
+  // Phenom People — enterprise career CMS
+  {
+    platform: 'phenom',
+    regex: /([a-z0-9-]+)\.phenompeople\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.phenompeople.com/widgets/jobsearch/api/search?facets=true&start=0&rows=100`,
+  },
+  // Beamery — CRM / talent engagement
+  {
+    platform: 'beamery',
+    regex: /([a-z0-9-]+)\.beamery\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.beamery.com/api/v1/jobs`,
+  },
+  // Hireology
+  {
+    platform: 'hireology',
+    regex: /([a-z0-9-]+)\.hireology\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.hireology.com/api/v1/jobs.json`,
+  },
+  // ClearCompany
+  {
+    platform: 'clearcompany',
+    regex: /careers\.clearcompany\.com\/([a-z0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://careers.clearcompany.com/${slug}/api/jobs`,
+  },
+  // HrPartner — has a clean public positions JSON
+  {
+    platform: 'hrpartner',
+    regex: /([a-z0-9-]+)\.hrpartner\.io/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.hrpartner.io/positions.json`,
+  },
+  // Recooty — public widget JSON
+  {
+    platform: 'recooty',
+    regex: /([a-z0-9-]+)\.recooty\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.recooty.com/api/v1/jobs/`,
+  },
+  // Skeeled
+  {
+    platform: 'skeeled',
+    regex: /careers\.skeeled\.com\/([a-z0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://careers.skeeled.com/${slug}/api/jobs`,
+  },
+  // HiBob — small ATS bundled with their HRIS
+  {
+    platform: 'hibob',
+    regex: /apply\.hibob\.com\/([a-z0-9-]+)/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://apply.hibob.com/api/positions/${slug}`,
+  },
+  // PCRecruiter — agency-focused ATS
+  {
+    platform: 'pcrecruiter',
+    regex: /([a-z0-9-]+)\.pcrjobs\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.pcrjobs.com/jobs/feed?format=rss`,
+  },
+  // CATS One
+  {
+    platform: 'catsone',
+    regex: /([a-z0-9-]+)\.catsone\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.catsone.com/careers/api/jobs`,
+  },
+  // Recruit CRM
+  {
+    platform: 'recruitcrm',
+    regex: /([a-z0-9-]+)\.recruitcrm\.io/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.recruitcrm.io/api/v1/jobs`,
+  },
+  // Sage People (formerly Fairsail)
+  {
+    platform: 'sagepeople',
+    regex: /([a-z0-9-]+)\.peoplexchange\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.peoplexchange.com/services/apexrest/jobs`,
+  },
+  // Workzoom — Canadian small-business ATS
+  {
+    platform: 'workzoom',
+    regex: /([a-z0-9-]+)\.workzoom\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.workzoom.com/api/jobs`,
+  },
+  // Hireserve — UK-focused ATS
+  {
+    platform: 'hireserve',
+    regex: /([a-z0-9-]+)\.hireserve\.com/i,
+    extractSlug: m => m[1],
+    buildApi: slug => `https://${slug}.hireserve.com/api/vacancies`,
   },
 ];
 

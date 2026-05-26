@@ -96,6 +96,32 @@ const PLATFORM_META: Record<string, { label: string; color: string }> = {
   polymer:         { label: 'Polymer',         color: 'text-slate-700 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/20' },
   taleo:           { label: 'Taleo',           color: 'text-stone-700 bg-stone-50 dark:text-stone-400 dark:bg-stone-900/20' },
   successfactors:  { label: 'SuccessFactors',  color: 'text-blue-800 bg-blue-50 dark:text-blue-300 dark:bg-blue-900/20' },
+  // ── "25 more" batch ──────────────────────────────────────────────────
+  bullhorn:        { label: 'Bullhorn',        color: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-900/20' },
+  crelate:         { label: 'Crelate',         color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20' },
+  newton:          { label: 'Newton',          color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20' },
+  cornerstone:     { label: 'Cornerstone',     color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20' },
+  ukgpro:          { label: 'UKG Pro',         color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20' },
+  adp:             { label: 'ADP',             color: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20' },
+  paylocity:       { label: 'Paylocity',       color: 'text-cyan-700 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20' },
+  loxo:            { label: 'Loxo',            color: 'text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20' },
+  vincere:         { label: 'Vincere',         color: 'text-purple-700 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20' },
+  avature:         { label: 'Avature',         color: 'text-pink-700 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/20' },
+  eightfold:       { label: 'Eightfold',       color: 'text-fuchsia-700 bg-fuchsia-50 dark:text-fuchsia-400 dark:bg-fuchsia-900/20' },
+  phenom:          { label: 'Phenom',          color: 'text-teal-700 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/20' },
+  beamery:         { label: 'Beamery',         color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' },
+  hireology:       { label: 'Hireology',       color: 'text-lime-700 bg-lime-50 dark:text-lime-400 dark:bg-lime-900/20' },
+  clearcompany:    { label: 'ClearCompany',    color: 'text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-900/20' },
+  hrpartner:       { label: 'HrPartner',       color: 'text-yellow-700 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-900/20' },
+  recooty:         { label: 'Recooty',         color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
+  skeeled:         { label: 'Skeeled',         color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20' },
+  hibob:           { label: 'HiBob',           color: 'text-purple-700 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20' },
+  pcrecruiter:     { label: 'PCRecruiter',     color: 'text-stone-700 bg-stone-50 dark:text-stone-400 dark:bg-stone-900/20' },
+  catsone:         { label: 'CATS One',        color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20' },
+  recruitcrm:      { label: 'Recruit CRM',     color: 'text-blue-800 bg-blue-50 dark:text-blue-300 dark:bg-blue-900/20' },
+  sagepeople:      { label: 'Sage People',     color: 'text-green-800 bg-green-50 dark:text-green-300 dark:bg-green-900/20' },
+  workzoom:        { label: 'Workzoom',        color: 'text-indigo-800 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-900/20' },
+  hireserve:       { label: 'Hireserve',       color: 'text-emerald-800 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/20' },
   unknown:         { label: 'Unknown',         color: 'text-stone-500 bg-stone-100 dark:bg-stone-800' },
 };
 
@@ -499,7 +525,14 @@ export default function CompanyImportPage() {
       comeet: 0, jobvite: 0, icims: 0, recruiterbox: 0, jobscore: 0,
       zohorecruit: 0, teamtailor: 0, manatal: 0, pinpoint: 0, jobadder: 0,
       talentlyft: 0, heyrecruit: 0, vivahr: 0, polymer: 0, taleo: 0,
-      successfactors: 0, unknown: 0,
+      successfactors: 0,
+      // "25 more" batch
+      bullhorn: 0, crelate: 0, newton: 0, cornerstone: 0, ukgpro: 0, adp: 0,
+      paylocity: 0, loxo: 0, vincere: 0, avature: 0, eightfold: 0, phenom: 0,
+      beamery: 0, hireology: 0, clearcompany: 0, hrpartner: 0, recooty: 0,
+      skeeled: 0, hibob: 0, pcrecruiter: 0, catsone: 0, recruitcrm: 0,
+      sagepeople: 0, workzoom: 0, hireserve: 0,
+      unknown: 0,
     };
     for (const e of entries) {
       total++;
@@ -541,7 +574,7 @@ export default function CompanyImportPage() {
             Bulk Company Import
           </h1>
           <p className="text-sm text-stone-400 dark:text-stone-500">
-            Paste up to {URL_LIMIT.toLocaleString()} career page URLs — auto-detects 27 ATS platforms and pulls all jobs in parallel.
+            Paste up to {URL_LIMIT.toLocaleString()} career page URLs — auto-detects 52 ATS platforms and pulls all jobs in parallel.
           </p>
         </div>
         {/* Tab switcher */}
@@ -705,6 +738,32 @@ export default function CompanyImportPage() {
                 { platform: 'polymer',         pattern: 'polymer.co/{company}',                   example: 'polymer.co/acme',                                           count: '~200 companies' },
                 { platform: 'taleo',           pattern: '{co}.taleo.net/careersection/{site}',    example: 'oracle.taleo.net/careersection/2',                          count: 'Enterprise (Oracle)' },
                 { platform: 'successfactors',  pattern: 'career{n}.successfactors.eu/career?company={co}', example: 'career4.successfactors.eu/career?company=acme',     count: 'Enterprise (SAP)' },
+                // ── "25 more" batch ──────────────────────────────────────
+                { platform: 'bullhorn',        pattern: '{agency}.bullhornstaffing.com',          example: 'acme.bullhornstaffing.com',                                 count: '~5,000 agencies' },
+                { platform: 'crelate',         pattern: 'app.crelate.com/p/{slug}',               example: 'app.crelate.com/p/acme',                                    count: '~3,000 companies' },
+                { platform: 'newton',          pattern: '{co}.iapplicants.com',                   example: 'acme.iapplicants.com',                                      count: '~2,000 companies' },
+                { platform: 'cornerstone',     pattern: 'careers-{co}.csod.com',                  example: 'careers-acme.csod.com',                                     count: 'Enterprise (CSOD)' },
+                { platform: 'ukgpro',          pattern: 'recruiting.ultipro.com/{co}',            example: 'recruiting.ultipro.com/ACM1001',                            count: 'Enterprise (UKG)' },
+                { platform: 'adp',             pattern: 'workforcenow.adp.com/jobs/apply/...',    example: 'workforcenow.adp.com/jobs/apply/posting.html?cid=…',        count: 'Enterprise (ADP)' },
+                { platform: 'paylocity',       pattern: 'recruiting.paylocity.com/recruiting/jobs/All/{uuid}/{co}', example: 'recruiting.paylocity.com/recruiting/jobs/All/abc-…/acme', count: 'Enterprise' },
+                { platform: 'loxo',            pattern: '{agency}.loxo.co',                       example: 'acme.loxo.co',                                              count: 'Executive search' },
+                { platform: 'vincere',         pattern: '{co}.vincere.io',                        example: 'acme.vincere.io',                                           count: '~1,500 agencies' },
+                { platform: 'avature',         pattern: '{co}.avature.net',                       example: 'acme.avature.net',                                          count: 'Enterprise' },
+                { platform: 'eightfold',       pattern: '{co}.eightfold.ai',                      example: 'acme.eightfold.ai',                                         count: 'AI-powered' },
+                { platform: 'phenom',          pattern: '{co}.phenompeople.com',                  example: 'acme.phenompeople.com',                                     count: 'Enterprise' },
+                { platform: 'beamery',         pattern: '{co}.beamery.com',                       example: 'acme.beamery.com',                                          count: 'Enterprise' },
+                { platform: 'hireology',       pattern: '{co}.hireology.com',                     example: 'acme.hireology.com',                                        count: '~3,000 companies' },
+                { platform: 'clearcompany',    pattern: 'careers.clearcompany.com/{co}',          example: 'careers.clearcompany.com/acme',                             count: '~2,000 companies' },
+                { platform: 'hrpartner',       pattern: '{co}.hrpartner.io',                      example: 'acme.hrpartner.io',                                         count: '~500 companies' },
+                { platform: 'recooty',         pattern: '{co}.recooty.com',                       example: 'acme.recooty.com',                                          count: '~1,000 companies' },
+                { platform: 'skeeled',         pattern: 'careers.skeeled.com/{co}',               example: 'careers.skeeled.com/acme',                                  count: '~500 companies' },
+                { platform: 'hibob',           pattern: 'apply.hibob.com/{slug}',                 example: 'apply.hibob.com/acme',                                      count: '~2,000 companies' },
+                { platform: 'pcrecruiter',     pattern: '{co}.pcrjobs.com',                       example: 'acme.pcrjobs.com',                                          count: '~1,500 agencies' },
+                { platform: 'catsone',         pattern: '{co}.catsone.com',                       example: 'acme.catsone.com',                                          count: '~1,000 companies' },
+                { platform: 'recruitcrm',      pattern: '{co}.recruitcrm.io',                     example: 'acme.recruitcrm.io',                                        count: '~2,000 agencies' },
+                { platform: 'sagepeople',      pattern: '{co}.peoplexchange.com',                 example: 'acme.peoplexchange.com',                                    count: 'Enterprise (Sage)' },
+                { platform: 'workzoom',        pattern: '{co}.workzoom.com',                      example: 'acme.workzoom.com',                                         count: 'Small business (CA)' },
+                { platform: 'hireserve',       pattern: '{co}.hireserve.com',                     example: 'acme.hireserve.com',                                        count: '~500 companies (UK)' },
               ].map(p => {
                 const pm = PLATFORM_META[p.platform];
                 return (
