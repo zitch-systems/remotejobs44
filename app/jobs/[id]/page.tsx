@@ -157,45 +157,47 @@ export default function JobDetailPage() {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-5">
           <div className="card p-6">
-            <div className="flex items-start gap-4 mb-5">
+            <div className="flex items-center gap-4 mb-4">
               <div className="w-16 h-16 shrink-0 rounded-xl bg-stone-100 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400">
                 {job.logo}
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="font-display font-extrabold text-xl text-stone-900 dark:text-stone-100 tracking-tight mb-1">{job.title}</h1>
+                <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight leading-tight mb-1">{job.title}</h1>
                 {isFree ? (
-                  <p className="text-base font-semibold flex items-center gap-2 text-stone-400">
-                    <span className="text-sm">🔒</span>
+                  <p className="text-sm font-semibold flex items-center gap-1.5 text-stone-400">
                     <span className="blur-[4px] select-none">Hidden Company</span>
-                    <span className="no-blur text-xs font-normal text-stone-400 ml-1">(upgrade to reveal)</span>
+                    <span className="no-blur text-xs font-normal text-stone-400">· upgrade to reveal</span>
                   </p>
                 ) : isDaily && !companyRevealed ? (
-                  <p className="text-base font-semibold flex items-center gap-2 text-stone-400">
-                    <span className="text-sm">🔒</span>
+                  <p className="text-sm font-semibold flex items-center gap-1.5 text-stone-400">
                     <span className="blur-[4px] select-none">{job.company}</span>
-                    <span className="text-xs font-normal text-stone-400">(revealed on apply)</span>
+                    <span className="text-xs font-normal text-stone-400">· revealed on apply</span>
                   </p>
                 ) : (
-                  <p className="text-base text-stone-500 dark:text-stone-400 font-semibold">{job.company}</p>
+                  <p className="text-sm text-stone-500 dark:text-stone-400 font-semibold truncate">{job.company}</p>
                 )}
-                <div className="flex flex-wrap gap-3 mt-2 text-sm text-stone-400 dark:text-stone-500">
-                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{job.location}</span>
-                  {job.timezone && <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
-                  <span>{formatRelativeDate(job.posted)}</span>
-                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-5">
-              {job.isNew && <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">✨ New</span>}
-              {job.featured && <span className="badge bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">⭐ Featured</span>}
-              <span className={cn('badge', catMeta.color)}>{catMeta.icon} {catMeta.label}</span>
-              <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500">{job.type}</span>
-              {job.level && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500">{job.level}</span>}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-stone-500 dark:text-stone-400 mb-4">
+              <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{job.location}</span>
+              {job.timezone && <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
+              <span className="text-stone-400">{formatRelativeDate(job.posted)}</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {job.isNew && <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">New</span>}
+              {job.featured && <span className="badge bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">Featured</span>}
+              <span className={cn('badge', catMeta.color)}>{catMeta.label}</span>
+              <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.type}</span>
+              {job.level && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.level}</span>}
             </div>
 
             {salary && (
-              <div className="font-display font-extrabold text-2xl text-brand-700 dark:text-brand-400 mb-5">{salary}</div>
+              <div className="mb-5 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-0.5">Salary</p>
+                <p className="font-display font-extrabold text-xl text-brand-700 dark:text-brand-400">{salary}</p>
+              </div>
             )}
 
             <div className="job-prose">
@@ -204,12 +206,9 @@ export default function JobDetailPage() {
                   <p key={i} className="mb-4 text-stone-600 dark:text-stone-300 leading-relaxed">{para}</p>
                 ))
               ) : (
-                <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-5 text-sm text-stone-500 dark:text-stone-400">
-                  <p className="mb-2">
-                    We don't have the full description on remotejobs44 — this posting came in via an aggregated feed with only basic metadata.
-                  </p>
+                <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-4 text-sm text-stone-500 dark:text-stone-400">
                   <p>
-                    Click <strong>Apply Now</strong> on the right to open the full posting and apply directly on the company's site.
+                    Full description is on the company&rsquo;s site. Click <strong>Apply Now</strong> on the right to view and apply.
                   </p>
                 </div>
               )}
