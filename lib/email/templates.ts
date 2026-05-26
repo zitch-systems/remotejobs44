@@ -10,7 +10,7 @@ export function welcomeEmail(name: string) {
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/icons/icon-192.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
@@ -50,7 +50,7 @@ export function paymentSuccessEmail(name: string, plan: string, amount: string) 
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/icons/icon-192.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
@@ -100,7 +100,7 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
   <div style="background:#2563eb;padding:32px 40px">
     <table style="border-collapse:collapse"><tr>
       <td style="padding:0 12px 0 0;vertical-align:middle">
-        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/icons/icon-192.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
+        <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com'}/logo-white.png" alt="" width="36" height="36" style="display:block;border-radius:8px"/>
       </td>
       <td style="vertical-align:middle">
         <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;line-height:1">RemoteJobs44</h1>
