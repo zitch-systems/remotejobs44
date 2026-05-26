@@ -468,12 +468,97 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
     console.error('[autoFetchFromCareerUrl render-js failed]', renderError, err?.stack?.slice(0, 500));
   }
 
+  // 4. Final fallback: extract a candidate slug from the URL host and probe
+  //    the big public ATS APIs (Greenhouse, Lever, Ashby, Workable, Recruitee,
+  //    SmartRecruiters) in parallel. Most company.com/careers pages are SPAs
+  //    that load the ATS dynamically — the chromium fallback above SHOULD
+  //    catch those but often times out or misses the embed. This is the
+  //    pragmatic catchall: just try the company's name as a slug and see if
+  //    any of the supported ATSes recognise it. First 2xx response wins.
+  const slugs = candidateSlugsFromUrl(url);
+  if (slugs.length > 0) {
+    const probed = await probeKnownATSes(slugs);
+    if (probed) {
+      console.log('[autoFetchFromCareerUrl] slug-guess hit:', probed.platform, probed.slug);
+      const result = await fetchATSJobs(probed.platform, probed.slug, url);
+      if (result.total > 0 || !result.error) {
+        return {
+          ...result,
+          detected: {
+            platform:    probed.platform,
+            slug:        probed.slug,
+            apiEndpoint: '',   // unknown — the probe doesn't track which URL hit
+            confidence:  'low' as const,
+          },
+        };
+      }
+    }
+  }
+
   return {
     jobs: [], total: 0, platform: 'unknown', slug: '', detected: null,
     error: renderError
-      ? `Could not detect ATS (HTML scrape + JS render both failed: ${renderError})`
+      ? `Could not detect ATS (HTML scrape + JS render + slug probe all failed: ${renderError})`
       : 'Could not detect ATS from this URL',
   };
+}
+
+// Turn a URL host into a small set of candidate ATS slugs. For
+// "https://www.bird.co/careers/" we try "bird", "bird-co", "bird.co".
+// Stripping the leading www./careers./jobs. prefix is critical — without
+// it we'd probe "wwwbird" which never matches.
+function candidateSlugsFromUrl(url: string): string[] {
+  let host: string;
+  try { host = new URL(url).hostname; }
+  catch { return []; }
+  host = host.replace(/^(www\.|careers\.|jobs\.|join\.|apply\.|hire\.)+/i, '').toLowerCase();
+  if (!host) return [];
+  // Common TLDs to strip — keep the meaningful name only.
+  const noTld = host
+    .replace(/\.(com|io|co|ai|app|org|net|dev|so|tech|inc|me|xyz)(\.[a-z]{2})?$/, '')
+    .replace(/\.(eu|uk|de|fr|nl|us|in|jp|au|ca)$/, '');
+  const base = noTld.split('.')[0]; // first segment if dots remain
+  const dashed = host.replace(/\./g, '-');
+  return Array.from(new Set([base, noTld, dashed].filter(s => s && s.length >= 2)));
+}
+
+// Probe a small set of slug candidates against the 6 most reliable public
+// ATS APIs. Returns the first {platform, slug} that responds 2xx. All
+// requests fire in parallel and we race the first success.
+async function probeKnownATSes(slugs: string[]): Promise<{ platform: ATSPlatform; slug: string } | null> {
+  const targets: Array<{ platform: ATSPlatform; url: (s: string) => string; init?: RequestInit }> = [
+    { platform: 'greenhouse',      url: s => `https://boards-api.greenhouse.io/v1/boards/${s}/jobs?content=true` },
+    { platform: 'lever',           url: s => `https://api.lever.co/v0/postings/${s}?mode=json` },
+    { platform: 'ashby',           url: s => `https://api.ashbyhq.com/posting-api/job-board/${s}` },
+    { platform: 'workable',        url: s => `https://apply.workable.com/api/v3/accounts/${s}/jobs`,
+      init: { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: '', department: [], location: [], workplace: [], remote: [] }) } },
+    { platform: 'recruitee',       url: s => `https://${s}.recruitee.com/api/offers` },
+    { platform: 'smartrecruiters', url: s => `https://api.smartrecruiters.com/v1/companies/${s}/postings?limit=1` },
+  ];
+
+  const attempts: Array<Promise<{ platform: ATSPlatform; slug: string } | null>> = [];
+  for (const slug of slugs) {
+    for (const t of targets) {
+      attempts.push((async () => {
+        try {
+          const res = await fetch(t.url(slug), {
+            ...t.init,
+            signal: AbortSignal.timeout(5_000),
+          });
+          if (res.ok) return { platform: t.platform, slug };
+        } catch {}
+        return null;
+      })());
+    }
+  }
+  // Race for the first success. Promise.any rejects only when ALL reject,
+  // so we wrap with allSettled and pick the first fulfilled non-null.
+  const results = await Promise.allSettled(attempts);
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) return r.value;
+  }
+  return null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
