@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Analytics }      from '@vercel/analytics/next';
+import { SpeedInsights }  from '@vercel/speed-insights/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';
 import { Header }         from '@/components/layout/Header';
 import { Footer }         from '@/components/layout/Footer';
@@ -127,6 +128,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ModalRoot />
           <PWAInstall />
           <Analytics />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
