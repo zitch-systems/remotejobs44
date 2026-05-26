@@ -40,6 +40,12 @@ const LEVELS: { value: JobLevel|''; label: string }[] = [
   { value:'lead',      label:'Lead / Staff'  },
   { value:'executive', label:'Executive / VP'},
 ];
+// Per-page job count for the /jobs listing. Bumped from 12 → 50 so users
+// can scan more roles before paginating. The DB query + JSON payload
+// scale linearly; 50 jobs is ~150 KB transferred — still snappy on the
+// 200 KB-ish budget the rest of the page uses.
+const JOBS_PER_PAGE = 50;
+
 // Flip to true once enough jobs in the DB publish salary info to make the
 // filter meaningful (see comment near the FilterSelect render site for
 // context). The /api/jobs route honours ?salary=lo-hi regardless, so
@@ -263,7 +269,7 @@ function JobsContent() {
     try {
       const res = await jobsApi.getJobs({
         q, category, type: type as JobType, level: level as JobLevel,
-        sort: sort as 'newest' | 'salary' | 'relevant', page, perPage: 12,
+        sort: sort as 'newest' | 'salary' | 'relevant', page, perPage: JOBS_PER_PAGE,
         region, country, remote: remoteOnly,
         salary, timezone, posted, companySize,
       });
@@ -325,7 +331,7 @@ function JobsContent() {
           const terms = regionMap[locationFilter] ?? [locationFilter];
           mocks = mocks.filter(j => terms.some(t => j.location.toLowerCase().includes(t)));
         }
-        const perPage = 12;
+        const perPage = JOBS_PER_PAGE;
         const totalCount = mocks.length;
         const start = (page - 1) * perPage;
         setJobs(mocks.slice(start, start + perPage));
