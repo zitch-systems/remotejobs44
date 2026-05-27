@@ -94,28 +94,52 @@ export async function GET(req: NextRequest) {
     { onConflict: 'url' }
   );
 
-  // ── TASK 2: Expire day passes ─────────────────────────────────────────
-  const now = new Date().toISOString();
+  // ── TASK 2: Expire subscriptions (all tiers) ──────────────────────────
+  // Mirrors /api/cron/expire-daily so either cron alone can reconcile
+  // state — see that route for the rationale on the 24h pro grace window.
+  const now       = new Date().toISOString();
+  const PRO_GRACE_MS = 24 * 60 * 60 * 1000;
+  const proCutoff = new Date(Date.now() - PRO_GRACE_MS).toISOString();
 
-  const { data: expired } = await supabase
+  // Day Pass — hard expiry
+  const { data: expiredDaily } = await supabase
     .from('subscriptions')
     .select('user_id')
     .eq('billing', 'daily')
     .eq('status', 'active')
     .lt('current_period_end', now);
 
-  let expiredCount = 0;
-  if (expired && expired.length > 0) {
-    const ids = expired.map((s: { user_id: string }) => s.user_id);
+  let expiredDayPasses = 0;
+  if (expiredDaily && expiredDaily.length > 0) {
+    const ids = expiredDaily.map((s: { user_id: string }) => s.user_id);
     await supabase.from('profiles').update({ plan: 'free' }).in('id', ids);
     await supabase.from('subscriptions')
       .update({ status: 'expired' })
       .in('user_id', ids)
       .eq('billing', 'daily');
-    expiredCount = ids.length;
+    expiredDayPasses = ids.length;
   }
 
-  log.expiry = { expiredDayPasses: expiredCount };
+  // Pro Monthly / Annual — 24h grace
+  const { data: expiredPro } = await supabase
+    .from('subscriptions')
+    .select('user_id')
+    .in('billing', ['monthly', 'annually'])
+    .in('status', ['active', 'cancelled'])
+    .lt('current_period_end', proCutoff);
+
+  let expiredPro_n = 0;
+  if (expiredPro && expiredPro.length > 0) {
+    const ids = expiredPro.map((s: { user_id: string }) => s.user_id);
+    await supabase.from('profiles').update({ plan: 'free' }).in('id', ids);
+    await supabase.from('subscriptions')
+      .update({ status: 'expired' })
+      .in('user_id', ids)
+      .in('billing', ['monthly', 'annually']);
+    expiredPro_n = ids.length;
+  }
+
+  log.expiry = { expiredDayPasses, expiredPro: expiredPro_n };
 
   // ── TASK 3: Mark old jobs as not new (> 7 days) ───────────────────────
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
