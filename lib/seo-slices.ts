@@ -33,6 +33,22 @@ export const COUNTRIES = [
   { slug: 'mexico',        label: 'Mexico',         blurb: 'Remote roles open to Mexican applicants worldwide.' },
   { slug: 'argentina',     label: 'Argentina',      blurb: 'Remote roles open to Argentine applicants worldwide.' },
   { slug: 'worldwide',     label: 'Worldwide',      blurb: 'Fully-remote jobs open to candidates anywhere on Earth.' },
+  // Expanded country catalogue
+  { slug: 'tunisia',       label: 'Tunisia',        blurb: 'Remote roles open to Tunisian applicants worldwide.' },
+  { slug: 'algeria',       label: 'Algeria',        blurb: 'Remote roles open to Algerian applicants worldwide.' },
+  { slug: 'senegal',       label: 'Senegal',        blurb: 'Remote roles open to Senegalese applicants worldwide.' },
+  { slug: 'ethiopia',      label: 'Ethiopia',       blurb: 'Remote roles open to Ethiopian applicants worldwide.' },
+  { slug: 'ivory-coast',   label: 'Ivory Coast',    blurb: 'Remote roles open to Ivorian applicants worldwide.' },
+  { slug: 'tanzania',      label: 'Tanzania',       blurb: 'Remote roles open to Tanzanian applicants worldwide.' },
+  { slug: 'zimbabwe',      label: 'Zimbabwe',       blurb: 'Remote roles open to Zimbabwean applicants worldwide.' },
+  { slug: 'zambia',        label: 'Zambia',         blurb: 'Remote roles open to Zambian applicants worldwide.' },
+  { slug: 'cameroon',      label: 'Cameroon',       blurb: 'Remote roles open to Cameroonian applicants worldwide.' },
+  { slug: 'botswana',      label: 'Botswana',       blurb: 'Remote roles open to Botswanan applicants worldwide.' },
+  { slug: 'mauritius',     label: 'Mauritius',      blurb: 'Remote roles open to Mauritian applicants worldwide.' },
+  { slug: 'usa',           label: 'United States',  blurb: 'Remote roles open to United States-based applicants.' },
+  { slug: 'uk',            label: 'United Kingdom', blurb: 'Remote roles open to UK-based applicants.' },
+  { slug: 'canada',        label: 'Canada',         blurb: 'Remote roles open to Canadian applicants.' },
+  { slug: 'germany',       label: 'Germany',        blurb: 'Remote roles open to German-based applicants.' },
 ] as const;
 
 export const SKILLS = [
@@ -60,6 +76,27 @@ export const SKILLS = [
   { slug: 'content',       label: 'Content',        blurb: 'Remote content writer, editor, and strategist jobs.' },
   { slug: 'copywriting',   label: 'Copywriting',    blurb: 'Remote copywriting and conversion-writing jobs.' },
   { slug: 'sales-dev',     label: 'Sales Dev',      blurb: 'Remote sales development and BDR jobs.' },
+  // Expanded skill catalogue for SEO breadth
+  { slug: 'vue',           label: 'Vue.js',         blurb: 'Remote Vue.js frontend engineering jobs.' },
+  { slug: 'angular',       label: 'Angular',        blurb: 'Remote Angular frontend engineering jobs.' },
+  { slug: 'svelte',        label: 'Svelte',         blurb: 'Remote Svelte / SvelteKit frontend engineering jobs.' },
+  { slug: 'nextjs',        label: 'Next.js',        blurb: 'Remote Next.js / React full-stack engineering jobs.' },
+  { slug: 'nestjs',        label: 'NestJS',         blurb: 'Remote NestJS / Node.js backend engineering jobs.' },
+  { slug: 'fastapi',       label: 'FastAPI',        blurb: 'Remote FastAPI / Python backend engineering jobs.' },
+  { slug: 'scala',         label: 'Scala',          blurb: 'Remote Scala / JVM backend and data engineering jobs.' },
+  { slug: 'elixir',        label: 'Elixir',         blurb: 'Remote Elixir / Phoenix backend engineering jobs.' },
+  { slug: 'csharp',        label: 'C# / .NET',      blurb: 'Remote C# and .NET engineering jobs.' },
+  { slug: 'ruby',          label: 'Ruby',           blurb: 'Remote Ruby backend engineering jobs.' },
+  { slug: 'php',           label: 'PHP',            blurb: 'Remote PHP / Laravel backend engineering jobs.' },
+  { slug: 'graphql',       label: 'GraphQL',        blurb: 'Remote GraphQL API engineering jobs.' },
+  { slug: 'mongodb',       label: 'MongoDB',        blurb: 'Remote MongoDB backend and data engineering jobs.' },
+  { slug: 'redis',         label: 'Redis',          blurb: 'Remote Redis / caching backend engineering jobs.' },
+  { slug: 'docker',        label: 'Docker',         blurb: 'Remote Docker / container platform engineering jobs.' },
+  { slug: 'gcp',           label: 'GCP',            blurb: 'Remote Google Cloud Platform engineering jobs.' },
+  { slug: 'azure',         label: 'Azure',          blurb: 'Remote Azure cloud engineering jobs.' },
+  { slug: 'data-engineering',label: 'Data Engineering', blurb: 'Remote data engineering, ETL, and warehousing jobs.' },
+  { slug: 'machine-learning',label: 'Machine Learning', blurb: 'Remote machine learning and applied-AI engineering jobs.' },
+  { slug: 'cybersecurity', label: 'Cybersecurity',  blurb: 'Remote security engineering, AppSec, and infosec jobs.' },
 ] as const;
 
 export const TIMEZONES = [

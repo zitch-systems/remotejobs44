@@ -21,10 +21,15 @@ RemoteJobs44 (https://remotejobs44.com) is a subscription-based remote job board
 - **AI interview prep** — type a role + level, get behavioural / technical / remote-specific questions with answer skeletons and red-flag mistakes
 - Filter by category, job type, experience level, salary, country, region, timezone, skill
 - Category landing pages: /jobs/category/{engineering,design,marketing,finance,sales,data,hr,product,legal,operations}
-- Country landing pages: /jobs/country/{nigeria,kenya,south-africa,ghana,egypt,morocco,rwanda,uganda,india,philippines,pakistan,brazil,mexico,argentina,worldwide}
-- Skill landing pages: /jobs/skill/{react,typescript,node,python,django,rails,go,rust,java,kotlin,swift,flutter,react-native,devops,aws,kubernetes,terraform,sql,postgres,figma,seo,content,copywriting,sales-dev}
+- Country landing pages: /jobs/country/{nigeria,kenya,south-africa,ghana,egypt,morocco,rwanda,uganda,tunisia,algeria,senegal,ethiopia,ivory-coast,tanzania,zimbabwe,zambia,cameroon,botswana,mauritius,india,philippines,pakistan,brazil,mexico,argentina,usa,uk,canada,germany,worldwide}
+- Skill landing pages: /jobs/skill/{react,typescript,node,python,django,rails,go,rust,java,kotlin,swift,flutter,react-native,devops,aws,kubernetes,terraform,sql,postgres,figma,seo,content,copywriting,sales-dev,vue,angular,svelte,nextjs,nestjs,fastapi,scala,elixir,csharp,ruby,php,graphql,mongodb,redis,docker,gcp,azure,data-engineering,machine-learning,cybersecurity}
 - Timezone landing pages: /jobs/timezone/{wat,eat,sast,gmt,cet,est,pst}
 - Region landing pages: /jobs/region/{africa,europe,americas,asia,middle-east,worldwide}
+- Industry landing pages: /jobs/industry/{fintech,crypto,ai,saas,ecommerce,healthtech,edtech,climate,gaming,agency}
+- City landing pages: /jobs/city/{lagos,abuja,port-harcourt,nairobi,mombasa,cape-town,johannesburg,durban,accra,cairo,casablanca,kampala,kigali,addis-ababa,dar-es-salaam}
+- Salary benchmark pages: /salary-guide/{frontend-engineer,backend-engineer,fullstack-engineer,mobile-engineer,devops-engineer,data-engineer,data-scientist,product-manager,product-designer,growth-marketer,content-marketer,customer-success,sales-development,account-executive,recruiter}
+- Comparison pages: /compare/{remote-co,flexjobs,weworkremotely,remoteok,indeed}
+- Help & info: /faq, /how-it-works, /for-employers, /salary-guide, /compare
 
 ## Who is it for?
 
