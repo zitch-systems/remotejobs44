@@ -33,14 +33,22 @@ function ApplicationsContent() {
     (async () => {
       const { user: authUser, status } = await getAuthedUserSafe(supabase);
       if (cancelled) return;
-      if (status === 'transient') { setChecked(true); return; } // stay on page; use zustand cache
-      if (status === 'unauthed' || !authUser) { router.replace('/login?next=/applications'); return; }
+      // Only redirect to /login when we're CERTAIN the user is logged out
+      // (no local session). Transient → stay on page, render whatever data
+      // we have. Either way we always try the /api/applications fetch
+      // because it uses cookies directly and will 401 itself if the
+      // session is really gone.
+      if (status === 'unauthed' && !authUser) { router.replace('/login?next=/applications'); return; }
       setChecked(true);
 
-      // Fetch the canonical list from the server. Without this, a user who
-      // applied on another device or browser sees zero applications here.
-      // Failures fall back to the zustand-cached list so the page never
-      // looks empty when the network is briefly down.
+      // Always fetch the canonical list from /api/applications, even on
+      // transient auth status — the endpoint uses cookies and will 401
+      // itself if the session is gone. This is the source of truth; the
+      // zustand cache is just for first-paint while the network is in
+      // flight. Previously we skipped this fetch on transient, so any
+      // page where the local jobs store had been wiped (by a spurious
+      // setUser(null) earlier) showed "No applications yet" even though
+      // the DB had data.
       try {
         const res = await fetch('/api/applications');
         if (cancelled) return;

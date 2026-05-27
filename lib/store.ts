@@ -67,20 +67,28 @@ export const useAuthStore = create<AuthState>()(
       },
       setHydrated:(v) => set({ hydrated: v }),
       setUser:    (user) => set((s) => {
-        // If the signed-in user actually changed (different id, or signed out
-        // entirely), wipe ALL cached state from the previous account —
-        // saved jobs, applications, daily-apps counter. Only carrying the
-        // counter forward when the new user wasn't on a day-pass meant the
-        // counter could leak across accounts when the new user happened to
-        // be on the same plan tier.
+        // Only reset jobs / dailyAppsUsed when the user GENUINELY switched
+        // accounts (both prev AND next are non-null, AND ids differ). The
+        // previous version also reset on (prev=A, next=null) and
+        // (prev=null, next=A) which wiped applications every time a
+        // transient auth blip caused setUser(null) — that's why users
+        // reported "applied 10 jobs then upgraded → counter shows 0".
+        //
+        // Real account switches (user A logs out → user B logs in on the
+        // same device) are handled by login/register's explicit
+        // localStorage.removeItem('rj44-jobs') call BEFORE setUser, AND
+        // by the prev=A → next=B branch below.
+        //
+        // The pure logout path (setUser(null)) does NOT reset here — it
+        // goes through handleLogout which clears localStorage explicitly.
         const prevId = s.user?.id ?? null;
         const nextId = user?.id ?? null;
-        const userChanged = prevId !== nextId;
-        if (userChanged) resetJobsStoreForNewUser();
+        const realAccountSwitch = !!(prevId && nextId && prevId !== nextId);
+        if (realAccountSwitch) resetJobsStoreForNewUser();
         return {
           user,
           hydrated: true, // any explicit setUser counts as a confirmed sync
-          dailyAppsUsed: userChanged
+          dailyAppsUsed: realAccountSwitch
             ? 0
             : (user?.plan === 'daily' && s.user?.plan !== 'daily' ? 0 : s.dailyAppsUsed),
         };

@@ -7,7 +7,7 @@ import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { formatRelativeDate } from '@/lib/utils';
-import type { Job } from '@/lib/types';
+import type { Job, Application } from '@/lib/types';
 
 // Inner component — uses useSearchParams, so must be inside <Suspense>
 function DashboardContent() {
@@ -204,8 +204,27 @@ function DashboardContent() {
       } catch {}
     }
 
+    async function loadApplications() {
+      // Server is source of truth for applications. Backfill the local
+      // zustand store with any rows we haven't seen yet — self-heals
+      // dashboards that lost their local cache (e.g., users hit by the
+      // pre-fix spurious-reset-on-setUser(null) bug).
+      try {
+        const res = await fetch('/api/applications');
+        if (!res.ok) return;
+        const json = await res.json();
+        const list: Application[] = Array.isArray(json.applications) ? json.applications : [];
+        const current = useJobsStore.getState();
+        const knownIds = new Set(current.applications.map(a => a.id));
+        for (const a of list) {
+          if (!knownIds.has(a.id)) current.addApplication(a);
+        }
+      } catch {}
+    }
+
     loadSession();
     loadJobs();
+    loadApplications();
   }, []);
 
   // Load saved job details whenever savedJobIds change.
