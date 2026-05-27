@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // profiles are officially ours, so they link to the right ones
               // in Knowledge Panels and answer snippets.
               sameAs: [
-                'https://instagram.com/remotejob_44',
+                'https://instagram.com/remotejobs_44',
                 'https://x.com/remotejobs44',
                 'https://facebook.com/remotejobs44',
                 'https://linkedin.com/company/remotejobs44',

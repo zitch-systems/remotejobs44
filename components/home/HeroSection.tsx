@@ -218,7 +218,7 @@ export function HeroSection() {
               </svg>
             </a>
             <a
-              href="https://instagram.com/remotejob_44"
+              href="https://instagram.com/remotejobs_44"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="RemoteJobs44 on Instagram"

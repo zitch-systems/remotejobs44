@@ -25,7 +25,7 @@ const SOCIAL = [
   },
   {
     name: 'Instagram',
-    href: 'https://instagram.com/remotejob_44',
+    href: 'https://instagram.com/remotejobs_44',
     color: '#E4405F',
     svg: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
