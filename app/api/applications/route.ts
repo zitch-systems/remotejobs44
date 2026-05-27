@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Check user has an active plan (pro, daily, or admin)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, role')
+      .select('plan, role, plan_expires_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -48,6 +48,25 @@ export async function POST(req: NextRequest) {
 
     if (!allowedPlans.includes(plan) && role !== 'admin') {
       return NextResponse.json({ error: 'Active subscription required to apply for jobs' }, { status: 403 });
+    }
+
+    // Pro Monthly / Pro Annual revenue leak: `/api/cron/expire-daily` and
+    // `/api/cron/daily` only downgrade subscriptions where billing='daily'.
+    // If a Pro user's Paystack subscription stops renewing (card decline,
+    // cancellation), `profile.plan` stays 'pro' indefinitely even though
+    // `plan_expires_at` is in the past. Block applies in that window —
+    // the client UI already shows 'free' via the effective-plan logic in
+    // Header.buildUser / /api/profile, so this just makes the server agree.
+    // Admins are exempt (their plan_expires_at may be null).
+    if (
+      plan === 'pro' &&
+      role !== 'admin' &&
+      profile?.plan_expires_at &&
+      new Date(profile.plan_expires_at) < new Date()
+    ) {
+      return NextResponse.json({
+        error: 'Your subscription has expired. Please renew to continue applying.',
+      }, { status: 403 });
     }
 
     // For daily plan users: enforce the 10-application limit per day-pass period.
