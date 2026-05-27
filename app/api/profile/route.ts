@@ -44,6 +44,16 @@ export async function GET() {
       .eq('id', user.id)
       .maybeSingle();
 
+    // CRITICAL: if SELECT errored (network blip, transient Supabase issue),
+    // `profile` is null but the row may actually exist with plan='daily' /
+    // 'pro'. Without this guard we'd fall through to the upsert path
+    // which writes plan='free' onConflict — clobbering a paying user.
+    // Return 500 so the client can retry rather than mis-creating state.
+    if (error) {
+      console.error('[GET /api/profile] select error:', error.message);
+      return NextResponse.json({ error: 'Failed to read profile' }, { status: 500 });
+    }
+
     if (profile) {
       const plan = effectivePlan(profile);
       const role = (profile.role !== 'admin' && isHardcodedAdmin(user.email)) ? 'admin' : (profile.role ?? 'user');

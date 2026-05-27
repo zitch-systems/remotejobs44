@@ -216,6 +216,14 @@ export function Header() {
         return;
       }
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        // Same 3s guard as TOKEN_REFRESHED — Supabase v2 can emit a
+        // transient SIGNED_OUT immediately after a fresh SIGNED_IN on
+        // flaky connections, and the SIGNED_OUT handler's 2.5s wait
+        // + cookie regex isn't sufficient on Safari ITP. Suppress the
+        // next SIGNED_OUT for 3s so a sign-in event can't be cancelled
+        // out by a spurious sign-out right after it.
+        ignoreNextSignedOut = true;
+        setTimeout(() => { ignoreNextSignedOut = false; }, 3000);
         const profile = await fetchProfile(session.user.id);
         if (!profile) {
           const stillPersisted = useAuthStore.getState().user;
