@@ -111,15 +111,34 @@ function DashboardContent() {
           const retry = async () => {
             tries++;
             const { data: row } = await supabase
-              .from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+              .from('profiles')
+              .select('id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason, cv_url')
+              .eq('id', authUser.id)
+              .maybeSingle();
             if (row) {
               const r = resolveRole({ profileRole: row.role, email: authUser.email });
               if (r === 'admin') { router.replace('/admin'); return; }
+              // Same effective-plan + persisted-plan guard as the cold
+              // path above. Without this, a fresh signup who pays before
+              // the on_auth_user_created trigger commits would have the
+              // post-payment optimistic 'daily'/'pro' overwritten with
+              // row.plan='free' by this retry (narrow race window, but
+              // matches the exact symptom users were reporting).
+              const now = Date.now();
+              const expiryMs = row.plan_expires_at ? new Date(row.plan_expires_at).getTime() : null;
+              const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+              const expired = expiryMs !== null && expiryMs < now;
+              // r was narrowed to 'user' by the early-return above.
+              const dbPlan: string = expired ? 'free' : (row.plan ?? 'free');
+              const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
+              const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
+                ? currentPlan
+                : dbPlan;
               setUser({
                 id: authUser.id,
                 email: authUser.email!,
                 name: row.name ?? authUser.email!.split('@')[0],
-                plan: row.plan ?? 'free',
+                plan: plan as any,
                 role: r,
                 joinedAt: row.created_at ?? new Date().toISOString(),
                 profileCompletion: row.profile_completion ?? 20,
