@@ -51,11 +51,10 @@ function DashboardContent() {
           }
           const { user: u, status } = attempt;
           if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
-          // Transient with no persisted user → effectively unauthed for
-          // rendering purposes. Bounce to login rather than letting the
-          // page render `if (!user) return null` (blank screen).
+          // Transient — DON'T redirect. Mobile slow networks legitimately
+          // hit this with valid sessions. Render the page; the
+          // sign-in fallback at the bottom covers genuine logged-out.
           if (status === 'transient') {
-            if (!useAuthStore.getState().user) { router.replace('/login?next=/dashboard'); return; }
             setLoading(false);
             return;
           }

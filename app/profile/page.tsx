@@ -57,15 +57,12 @@ function ProfileContent() {
       const { user: authUser, status } = attempt;
       if (cancelled) return;
       if (status === 'unauthed')  { router.replace('/login?next=/profile'); return; }
-      // Transient / no authUser branch — if Zustand also has no persisted
-      // user the page would render `if (!user) return null` (blank screen,
-      // which users saw as "profile not loading"). Treat that combination
-      // as effectively unauthed and bounce to login.
+      // Transient (network blip) / no authUser — DON'T redirect. Mobile
+      // users on slow networks legitimately hit this state with valid
+      // sessions; redirecting them to /login was the "profile not
+      // showing on mobile" symptom. Render the page; the sign-in prompt
+      // fallback below covers the genuinely-logged-out case.
       if (status === 'transient' || !authUser) {
-        if (!useAuthStore.getState().user) {
-          router.replace('/login?next=/profile');
-          return;
-        }
         setLoading(false);
         return;
       }

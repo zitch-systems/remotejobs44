@@ -30,8 +30,12 @@ function SettingsContent() {
     (async () => {
       const { status } = await getAuthedUserSafe(supabase);
       if (cancelled) return;
-      if (status === 'unauthed') {
-        if (!useAuthStore.getState().user) { router.replace('/login?next=/settings'); return; }
+      // Only redirect on truly unauthed (no local session) AND no
+      // persisted Zustand user. Transient or persisted-only → render
+      // the page; the fallback below handles null user gracefully.
+      if (status === 'unauthed' && !useAuthStore.getState().user) {
+        router.replace('/login?next=/settings');
+        return;
       }
       setLoading(false);
     })();
