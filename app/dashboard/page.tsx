@@ -51,7 +51,14 @@ function DashboardContent() {
           }
           const { user: u, status } = attempt;
           if (status === 'unauthed')  { router.replace('/login?next=/dashboard'); return; }
-          if (status === 'transient') { setLoading(false); return; }
+          // Transient with no persisted user → effectively unauthed for
+          // rendering purposes. Bounce to login rather than letting the
+          // page render `if (!user) return null` (blank screen).
+          if (status === 'transient') {
+            if (!useAuthStore.getState().user) { router.replace('/login?next=/dashboard'); return; }
+            setLoading(false);
+            return;
+          }
           if (!u)                     { router.replace('/login?next=/dashboard'); return; }
           authUser = u;
         }
@@ -342,7 +349,16 @@ function DashboardContent() {
     );
   }
 
-  if (!user) return null;
+  // Fallback prompt instead of `return null` so a transient auth state
+  // never presents as a blank "dashboard not loading" page.
+  if (!user) return (
+    <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+      <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your dashboard.</p>
+      <Link href="/login?next=/dashboard" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+        Sign in
+      </Link>
+    </div>
+  );
 
   const recentApps = applications.slice(0, 3);
   const planLabel  = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';

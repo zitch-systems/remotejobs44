@@ -57,7 +57,18 @@ function ProfileContent() {
       const { user: authUser, status } = attempt;
       if (cancelled) return;
       if (status === 'unauthed')  { router.replace('/login?next=/profile'); return; }
-      if (status === 'transient' || !authUser) { setLoading(false); return; }
+      // Transient / no authUser branch — if Zustand also has no persisted
+      // user the page would render `if (!user) return null` (blank screen,
+      // which users saw as "profile not loading"). Treat that combination
+      // as effectively unauthed and bounce to login.
+      if (status === 'transient' || !authUser) {
+        if (!useAuthStore.getState().user) {
+          router.replace('/login?next=/profile');
+          return;
+        }
+        setLoading(false);
+        return;
+      }
 
       // Use /api/profile — it handles effective-plan, safe columns, and
       // the hardcoded-admin upgrade in one place. Avoids drift between
@@ -226,7 +237,18 @@ function ProfileContent() {
       <div className="skeleton h-48 rounded-lg" />
     </div>
   );
-  if (!user) return null;
+  // Defensive fallback: if `user` is null here we hit a transient auth
+  // state that loadSession returned from. Render a clear prompt instead
+  // of `return null` (which presented as a blank "profile not loading"
+  // page to users).
+  if (!user) return (
+    <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+      <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your profile.</p>
+      <Link href="/login?next=/profile" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+        Sign in
+      </Link>
+    </div>
+  );
 
   const planLabel = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';
   const planColor =
