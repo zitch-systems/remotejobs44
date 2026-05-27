@@ -141,10 +141,21 @@ export function Header() {
 
         const profile = await fetchProfile(authUser.id);
         if (!profile) {
-          // No profile row yet (Google OAuth race, or DB trigger lag).
-          // Persist a skeleton so a previous user's state never lingers
-          // even briefly — buildUser uses authUser.id as the source of
-          // truth, not persisted state.
+          // Profile fetch returned null. Two distinct cases:
+          //   (a) Fetch timed out / errored (5s cap in fetchProfile). Common
+          //       on mobile / cold lambda. If Zustand already has a user
+          //       for THIS authUser.id, the persisted plan is more reliable
+          //       than a freshly-built skeleton — DO NOT call setUser, just
+          //       mark hydrated. Otherwise the persisted 'daily' / 'pro'
+          //       gets clobbered to 'free' for the rest of the session.
+          //       This was the "Subscribe-button flash after payment" bug.
+          //   (b) Cold load, no row yet (fresh Google OAuth, etc.) — write
+          //       a skeleton from authUser so downstream code has a user.
+          const stillPersisted = useAuthStore.getState().user;
+          if (stillPersisted && stillPersisted.id === authUser.id) {
+            setHydrated(true);
+            return;
+          }
           setUser(buildUser(authUser, null));
           return;
         }
@@ -162,6 +173,13 @@ export function Header() {
         setTimeout(() => { ignoreNextSignedOut = false; }, 3000);
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
+          // Same guard as syncAuth: if profile fetch failed but Zustand
+          // already has a paid user for THIS id, keep the persisted plan
+          // rather than overwriting with a plan='free' skeleton.
+          if (!profile) {
+            const stillPersisted = useAuthStore.getState().user;
+            if (stillPersisted && stillPersisted.id === session.user.id) return;
+          }
           setUser(buildUser(session.user, profile));
         }
         return;
@@ -197,6 +215,10 @@ export function Header() {
       }
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
         const profile = await fetchProfile(session.user.id);
+        if (!profile) {
+          const stillPersisted = useAuthStore.getState().user;
+          if (stillPersisted && stillPersisted.id === session.user.id) return;
+        }
         setUser(buildUser(session.user, profile));
       }
     });
