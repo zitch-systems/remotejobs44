@@ -20,7 +20,11 @@ function ApplicationsContent() {
   const router   = useRouter();
   const supabase = createClient();
   const { applications: localApps, addApplication } = useJobsStore();
-  const [checked, setChecked] = useState(false);
+  // Render the page immediately if we already have data in Zustand (from
+  // previous sessions / dashboard prefetch). Background fetch refreshes.
+  // Cold first visit shows skeleton until server responds (capped at 10s
+  // by the failsafe below).
+  const [checked, setChecked] = useState(() => localApps.length > 0);
   // Server applications fetched from /api/applications. Source of truth — local
   // zustand applications are kept only as a fallback for the first paint
   // while the network call is in flight.

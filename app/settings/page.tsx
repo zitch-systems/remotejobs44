@@ -22,7 +22,10 @@ function SettingsContent() {
   const logoutStore = useAuthStore(s => s.logout);
   const { toast } = useUIStore();
 
-  const [loading, setLoading] = useState(true);
+  // Render immediately if we have persisted Zustand user (no first-paint
+  // skeleton). Cold first visit shows skeleton until the auth check
+  // resolves (capped at 10s by the failsafe in useEffect).
+  const [loading, setLoading] = useState(() => !useAuthStore.getState().user);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {

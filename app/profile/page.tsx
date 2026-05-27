@@ -33,7 +33,12 @@ function ProfileContent() {
   const fileRef  = useRef<HTMLInputElement>(null);
 
   const [name,       setName]       = useState('');
-  const [loading,    setLoading]    = useState(true);
+  // Initial loading state is based on whether Zustand already has the user
+  // from the last session. If we do, render the page immediately with the
+  // persisted data and refresh in the background — never block first paint
+  // on a network round-trip. If we don't, briefly show a skeleton while
+  // the load runs.
+  const [loading,    setLoading]    = useState(() => !useAuthStore.getState().user);
   const [saving,     setSaving]     = useState(false);
   const [uploading,  setUploading]  = useState(false);
   const [cvUrl,      setCvUrl]      = useState<string | null>(null);
