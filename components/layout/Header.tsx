@@ -121,19 +121,21 @@ export function Header() {
         if (status === 'unauthed')  { setUser(null); return; }
 
         // SECURITY: if the persisted user (from localStorage) is for a
-        // different person than the live Supabase session, wipe it
-        // immediately. Same-device account switches were leaking the
-        // previous user's name/plan/role into the new session whenever the
-        // profile fetch was slow.
+        // different person than the live Supabase session, wipe it. ONLY
+        // wipe here when we're about to return without a follow-up
+        // setUser — otherwise the next setUser(buildUser(...)) below
+        // overwrites atomically (setUser already wipes the jobs store on
+        // user-id change via resetJobsStoreForNewUser). Calling
+        // setUser(null) before setUser(buildUser) caused a one-frame
+        // logged-out flash visible in components subscribed to `user`.
         const persisted = useAuthStore.getState().user;
-        if (authUser && persisted && persisted.id !== authUser.id) {
-          setUser(null);
-        }
+        const crossAccount = !!(authUser && persisted && persisted.id !== authUser.id);
 
         if (status === 'transient') {
           // Server couldn't validate. If persisted matches the (possibly
-          // stale) authUser id from local cookies we can keep showing the
-          // persisted state; if it doesn't, we already wiped above.
+          // stale) authUser id we keep showing the persisted state. If
+          // it doesn't, wipe now (no follow-up setUser this turn).
+          if (crossAccount) setUser(null);
           setHydrated(true);
           return;
         }

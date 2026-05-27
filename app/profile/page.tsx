@@ -77,12 +77,28 @@ function ProfileContent() {
 
       if (profile) {
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });
-        const plan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
+        // Defense in depth: even though /api/profile applies effectivePlan
+        // server-side, mirror the persisted-plan guard used in Header /
+        // dashboard / pricing so a transient server-side race that returns
+        // plan='free' with a future plan_expires_at can't downgrade an
+        // already-paid user.
+        const now = Date.now();
+        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
+        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
+        const expired = expiryMs !== null && expiryMs < now;
+        let dbPlan: string;
+        if (role === 'admin')   dbPlan = 'admin';
+        else if (expired)       dbPlan = 'free';
+        else                    dbPlan = profile.plan ?? 'free';
+        const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
+        const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
+          ? currentPlan
+          : dbPlan;
         setUser({
           id: authUser.id,
           email: authUser.email!,
           name: profile.name ?? '',
-          plan,
+          plan: plan as any,
           role,
           joinedAt: profile.created_at,
           profileCompletion: profile.profile_completion ?? 20,
