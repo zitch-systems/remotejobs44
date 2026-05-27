@@ -30,14 +30,18 @@ function ApplicationsContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // setChecked AFTER 10s no matter what so the loading skeleton can't
+    // hang forever if the fetch stalls. The page then renders with
+    // whatever zustand cache exists.
+    const failsafe = setTimeout(() => { if (!cancelled) setChecked(true); }, 10000);
     (async () => {
-      // Skip getAuthedUserSafe entirely — it relies on supabase.auth.getUser()
-      // which can stall 5+s on throttled / slow networks, leaving the page
-      // stuck on the loading skeleton. /api/applications already
-      // authenticates via cookies and 401s itself if the session is gone,
-      // so we use it as both the data source AND the auth gate.
+      // /api/applications is both the auth gate and the data source.
+      // 8s timeout so we don't stall the page when functions are throttled.
       try {
-        const res = await fetch('/api/applications');
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch('/api/applications', { signal: ctrl.signal });
+        clearTimeout(t);
         if (cancelled) return;
         if (res.status === 401) {
           router.replace('/login?next=/applications');
@@ -47,9 +51,6 @@ function ApplicationsContent() {
           const json = await res.json();
           const list = Array.isArray(json.applications) ? json.applications : [];
           setServerApps(list);
-          // Backfill the local zustand store with any server rows we hadn't
-          // seen locally yet, so other pages (dashboard recent-apps) stay
-          // in sync with the server.
           const knownIds = new Set(localApps.map(a => a.id));
           for (const a of list) {
             if (!knownIds.has(a.id)) addApplication(a);
@@ -58,7 +59,7 @@ function ApplicationsContent() {
       } catch {}
       if (!cancelled) setChecked(true);
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(failsafe); };
   }, []);
 
   if (!checked) return (

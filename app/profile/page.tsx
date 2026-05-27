@@ -74,17 +74,18 @@ function ProfileContent() {
         return;
       }
 
-      // Best-effort grab of the authed user id for setUser. If this also
-      // stalls/fails, fall back to whatever Zustand already has.
-      let authUser: { id: string; email?: string | null } | null = null;
-      try {
-        const { data: { user: u } } = await supabase.auth.getUser();
-        if (u) authUser = { id: u.id, email: u.email };
-      } catch {}
-      if (!authUser) {
-        const persisted = useAuthStore.getState().user;
-        if (persisted) authUser = { id: persisted.id, email: persisted.email };
-      }
+      // Use profile.id / profile.email directly — /api/profile already
+      // includes those in SAFE_PROFILE_COLS. Skip supabase.auth.getUser()
+      // which can stall indefinitely on throttled functions and leave
+      // the page stuck on the loading skeleton (no timeout on that call).
+      // Persisted Zustand is the fallback when /api/profile didn't return.
+      const persisted = useAuthStore.getState().user;
+      const authUser: { id: string; email?: string | null } | null =
+        profile
+          ? { id: profile.id, email: profile.email }
+          : persisted
+          ? { id: persisted.id, email: persisted.email }
+          : null;
 
       if (profile && authUser) {
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });

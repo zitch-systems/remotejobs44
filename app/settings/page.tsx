@@ -27,25 +27,27 @@ function SettingsContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // Failsafe: render after 10s even if the auth check stalls.
+    const failsafe = setTimeout(() => { if (!cancelled) setLoading(false); }, 10000);
     (async () => {
-      // Use /api/profile as both auth gate and data source — bypasses
-      // supabase.auth.getUser() which can stall on throttled networks.
+      // 8s timeout so a throttled function can't stall the page.
       try {
-        const res = await fetch('/api/profile');
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch('/api/profile', { signal: ctrl.signal });
+        clearTimeout(t);
         if (cancelled) return;
         if (res.status === 401 && !useAuthStore.getState().user) {
           router.replace('/login?next=/settings');
           return;
         }
-        // /settings doesn't need profile data — it just needs to know
-        // the user is authed. Any non-401 response is good enough.
       } catch {}
       if (!cancelled) setLoading(false);
     })();
     if (typeof document !== 'undefined') {
       setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
     }
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(failsafe); };
   }, []);
 
   function toggleTheme() {
