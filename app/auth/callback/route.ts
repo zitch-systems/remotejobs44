@@ -11,6 +11,7 @@
 // lookup) happens AFTER we know the redirect destination, either inline
 // (cheap email-based role check) or fire-and-forget (DB writes).
 import { NextRequest, NextResponse } from 'next/server';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 import { destinationForRole, type Role } from '@/lib/auth/redirect';
@@ -21,6 +22,11 @@ import { waitUntil } from '@vercel/functions';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code  = searchParams.get('code');
+  // Email-confirm / password-reset / magic-link templates can use the
+  // token_hash variant (recommended) so the user can click the link from
+  // any device — no PKCE code_verifier needed.
+  const tokenHash = searchParams.get('token_hash');
+  const tokenType = searchParams.get('type') as EmailOtpType | null;
   const next  = searchParams.get('next');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
@@ -30,28 +36,47 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 
-  if (!code) {
-    console.error('[auth/callback] no code param in callback URL');
+  if (!code && !(tokenHash && tokenType)) {
+    console.error('[auth/callback] no code OR token_hash+type param in callback URL');
     return NextResponse.redirect(`${origin}/login?error=auth_callback_failed&reason=no_code`);
   }
 
   // Use the shared helper so the PKCE code_verifier cookie is read with the
-  // SAME getAll/setAll API that the browser client used to write it. The
-  // earlier inline createServerClient used the deprecated get/set/remove
-  // adapter, which fails to reassemble multi-chunk auth cookies that
-  // @supabase/ssr 0.5+ splits across sb-...-0 / sb-...-1 entries.
+  // SAME getAll/setAll API that the browser client used to write it.
   const supabase = createServerSupabaseClient();
 
-  const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  // Branch on which flow we're in:
+  //   * `code`            → PKCE OAuth / magic-link from the SAME device
+  //                         that initiated. Needs the code_verifier cookie.
+  //   * `token_hash+type` → Email-confirm / password-reset / magic-link
+  //                         from ANY device. Doesn't need a verifier.
+  //
+  // Email-confirm via PKCE was failing for users who opened the email on
+  // a different browser/device than the one that signed up — the
+  // code_verifier cookie isn't there. Supporting the token_hash flow
+  // here (and pointing the email templates at it) fixes that.
+  let authError: { message: string } | null = null;
+  let authUser: { id: string; email?: string | null; created_at?: string; last_sign_in_at?: string; user_metadata?: Record<string, any> } | null = null;
 
-  if (exchangeError) {
-    console.error('[auth/callback] code exchange failed:', exchangeError.message, exchangeError);
-    return NextResponse.redirect(
-      `${origin}/login?error=auth_callback_failed&reason=${encodeURIComponent(exchangeError.message)}`
-    );
+  if (code) {
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) authError = exchangeError;
+    else               authUser  = data.user as any;
+  } else if (tokenHash && tokenType) {
+    const { data, error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: tokenType,
+    });
+    if (otpError) authError = otpError;
+    else          authUser  = data.user as any;
   }
 
-  const authUser = data.user;
+  if (authError) {
+    console.error('[auth/callback] auth verification failed:', authError.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=auth_callback_failed&reason=${encodeURIComponent(authError.message)}`
+    );
+  }
   if (!authUser?.email) {
     return NextResponse.redirect(`${origin}${destinationForRole('user', next)}`);
   }

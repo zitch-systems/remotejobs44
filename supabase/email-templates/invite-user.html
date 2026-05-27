@@ -10,11 +10,11 @@
       Someone invited <b>{{ .Email }}</b> to join RemoteJobs44. Tap the button below to accept and set up your account.
     </p>
     <p style="margin:0 0 24px;text-align:center;">
-      <a href="{{ .ConfirmationURL }}" style="background-color:#2563eb;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">Accept Invitation</a>
+      <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite" style="background-color:#2563eb;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;display:inline-block;">Accept Invitation</a>
     </p>
     <p style="margin:0 0 24px;color:#78716c;font-size:13px;line-height:1.6;">
       Or copy this link into your browser:<br>
-      <a href="{{ .ConfirmationURL }}" style="color:#2563eb;word-break:break-all;">{{ .ConfirmationURL }}</a>
+      <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite" style="color:#2563eb;word-break:break-all;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite</a>
     </p>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:24px 0;">
     <p style="margin:0;color:#a8a29e;font-size:13px;">
