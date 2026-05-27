@@ -31,39 +31,32 @@ function ApplicationsContent() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { user: authUser, status } = await getAuthedUserSafe(supabase);
-      if (cancelled) return;
-      // Only redirect to /login when we're CERTAIN the user is logged out
-      // (no local session). Transient → stay on page, render whatever data
-      // we have. Either way we always try the /api/applications fetch
-      // because it uses cookies directly and will 401 itself if the
-      // session is really gone.
-      if (status === 'unauthed' && !authUser) { router.replace('/login?next=/applications'); return; }
-      setChecked(true);
-
-      // Always fetch the canonical list from /api/applications, even on
-      // transient auth status — the endpoint uses cookies and will 401
-      // itself if the session is gone. This is the source of truth; the
-      // zustand cache is just for first-paint while the network is in
-      // flight. Previously we skipped this fetch on transient, so any
-      // page where the local jobs store had been wiped (by a spurious
-      // setUser(null) earlier) showed "No applications yet" even though
-      // the DB had data.
+      // Skip getAuthedUserSafe entirely — it relies on supabase.auth.getUser()
+      // which can stall 5+s on throttled / slow networks, leaving the page
+      // stuck on the loading skeleton. /api/applications already
+      // authenticates via cookies and 401s itself if the session is gone,
+      // so we use it as both the data source AND the auth gate.
       try {
         const res = await fetch('/api/applications');
         if (cancelled) return;
-        if (!res.ok) return;
-        const json = await res.json();
-        const list = Array.isArray(json.applications) ? json.applications : [];
-        setServerApps(list);
-        // Backfill the local zustand store with any server rows we hadn't
-        // seen locally yet, so other pages (dashboard recent-apps) stay
-        // in sync with the server.
-        const knownIds = new Set(localApps.map(a => a.id));
-        for (const a of list) {
-          if (!knownIds.has(a.id)) addApplication(a);
+        if (res.status === 401) {
+          router.replace('/login?next=/applications');
+          return;
+        }
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json.applications) ? json.applications : [];
+          setServerApps(list);
+          // Backfill the local zustand store with any server rows we hadn't
+          // seen locally yet, so other pages (dashboard recent-apps) stay
+          // in sync with the server.
+          const knownIds = new Set(localApps.map(a => a.id));
+          for (const a of list) {
+            if (!knownIds.has(a.id)) addApplication(a);
+          }
         }
       } catch {}
+      if (!cancelled) setChecked(true);
     })();
     return () => { cancelled = true; };
   }, []);

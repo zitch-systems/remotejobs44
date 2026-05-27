@@ -28,18 +28,20 @@ function SettingsContent() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { status } = await getAuthedUserSafe(supabase);
-      if (cancelled) return;
-      // Only redirect on truly unauthed (no local session) AND no
-      // persisted Zustand user. Transient or persisted-only → render
-      // the page; the fallback below handles null user gracefully.
-      if (status === 'unauthed' && !useAuthStore.getState().user) {
-        router.replace('/login?next=/settings');
-        return;
-      }
-      setLoading(false);
+      // Use /api/profile as both auth gate and data source — bypasses
+      // supabase.auth.getUser() which can stall on throttled networks.
+      try {
+        const res = await fetch('/api/profile');
+        if (cancelled) return;
+        if (res.status === 401 && !useAuthStore.getState().user) {
+          router.replace('/login?next=/settings');
+          return;
+        }
+        // /settings doesn't need profile data — it just needs to know
+        // the user is authed. Any non-401 response is good enough.
+      } catch {}
+      if (!cancelled) setLoading(false);
     })();
-    // Initialise theme from <html class>
     if (typeof document !== 'undefined') {
       setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
     }

@@ -47,43 +47,46 @@ function ProfileContent() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Anti-glitch retry: a slow token refresh shouldn't kick the user
-      // out of /profile. Give Supabase a chance to recover before redirect.
-      let attempt = await getAuthedUserSafe(supabase);
-      if (attempt.status === 'unauthed' && useAuthStore.getState().user) {
-        await new Promise(r => setTimeout(r, 2000));
-        attempt = await getAuthedUserSafe(supabase);
-      }
-      const { user: authUser, status } = attempt;
-      if (cancelled) return;
-      if (status === 'unauthed')  { router.replace('/login?next=/profile'); return; }
-      // Transient (network blip) / no authUser — DON'T redirect. Mobile
-      // users on slow networks legitimately hit this state with valid
-      // sessions; redirecting them to /login was the "profile not
-      // showing on mobile" symptom. Render the page; the sign-in prompt
-      // fallback below covers the genuinely-logged-out case.
-      if (status === 'transient' || !authUser) {
-        setLoading(false);
-        return;
-      }
-
-      // Use /api/profile — it handles effective-plan, safe columns, and
-      // the hardcoded-admin upgrade in one place. Avoids drift between
-      // pages that read profile directly with different rules.
+      // Use /api/profile as the source of truth — it authenticates via
+      // cookies and returns the safe-columns + effective-plan view. This
+      // is MUCH more reliable on mobile than supabase.auth.getUser(),
+      // which can stall 5+s on slow networks / throttled functions and
+      // leave the page in a "transient" state with no data. The page now
+      // renders as soon as /api/profile responds, with no dependency on
+      // a successful getUser() round-trip first.
       let profile: any = null;
+      let unauthorized = false;
       try {
         const ctrl = new AbortController();
-        const timeout = setTimeout(() => ctrl.abort(), 5000);
+        const timeout = setTimeout(() => ctrl.abort(), 8000);
         const res = await fetch('/api/profile', { signal: ctrl.signal });
         clearTimeout(timeout);
-        if (res.ok) {
+        if (res.status === 401) unauthorized = true;
+        else if (res.ok) {
           const json = await res.json();
           profile = json.profile ?? null;
         }
       } catch {}
       if (cancelled) return;
 
-      if (profile) {
+      if (unauthorized) {
+        router.replace('/login?next=/profile');
+        return;
+      }
+
+      // Best-effort grab of the authed user id for setUser. If this also
+      // stalls/fails, fall back to whatever Zustand already has.
+      let authUser: { id: string; email?: string | null } | null = null;
+      try {
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (u) authUser = { id: u.id, email: u.email };
+      } catch {}
+      if (!authUser) {
+        const persisted = useAuthStore.getState().user;
+        if (persisted) authUser = { id: persisted.id, email: persisted.email };
+      }
+
+      if (profile && authUser) {
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });
         // Defense in depth: even though /api/profile applies effectivePlan
         // server-side, mirror the persisted-plan guard used in Header /
@@ -126,10 +129,10 @@ function ProfileContent() {
             }
           } catch {}
         }
-      } else if (!useAuthStore.getState().user) {
-        // /api/profile failed AND there's no persisted user. Render a
-        // skeleton from authUser so the page isn't blank — pre-existing
-        // persisted state takes precedence when it exists.
+      } else if (authUser && !useAuthStore.getState().user) {
+        // /api/profile failed (network) AND there's no persisted user.
+        // Render a skeleton from authUser so the page isn't blank.
+        // Existing persisted state takes precedence when it exists.
         setUser({
           id: authUser.id,
           email: authUser.email!,
