@@ -28,6 +28,12 @@ function DashboardContent() {
   const [featured, setFeatured] = useState<Job[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+    // HARD failsafe: clear the loading skeleton after 10s no matter what.
+    // Without this, any stall in loadSession (e.g., a hanging Supabase
+    // call with no timeout) leaves the dashboard spinning forever on
+    // throttled Vercel functions.
+    const failsafe = setTimeout(() => { if (!cancelled) setLoading(false); }, 10000);
     async function loadSession() {
       try {
         // Fast path: Header.syncAuth already validates the session on every
@@ -228,9 +234,14 @@ function DashboardContent() {
       } catch {}
     }
 
-    loadSession();
+    // Wrap loadSession in try/finally so setLoading(false) always fires
+    // even if an inner await throws unexpectedly.
+    (async () => {
+      try { await loadSession(); } finally { if (!cancelled) setLoading(false); }
+    })();
     loadJobs();
     loadApplications();
+    return () => { cancelled = true; clearTimeout(failsafe); };
   }, []);
 
   // Load saved job details whenever savedJobIds change.

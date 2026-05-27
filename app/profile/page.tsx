@@ -46,14 +46,11 @@ function ProfileContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // HARD failsafe: render after 10s no matter what. If anything inside
+    // load() throws or hangs (including the CV signed-URL fetch that has
+    // no timeout), this ensures the skeleton clears.
+    const failsafe = setTimeout(() => { if (!cancelled) setLoading(false); }, 10000);
     async function load() {
-      // Use /api/profile as the source of truth — it authenticates via
-      // cookies and returns the safe-columns + effective-plan view. This
-      // is MUCH more reliable on mobile than supabase.auth.getUser(),
-      // which can stall 5+s on slow networks / throttled functions and
-      // leave the page in a "transient" state with no data. The page now
-      // renders as soon as /api/profile responds, with no dependency on
-      // a successful getUser() round-trip first.
       let profile: any = null;
       let unauthorized = false;
       try {
@@ -145,10 +142,13 @@ function ProfileContent() {
         });
         setName(authUser.email!.split('@')[0]);
       }
-      setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
+    // Wrapped in a try/finally so setLoading(false) ALWAYS fires, even
+    // if load() throws unexpectedly (e.g., a sync error from setUser).
+    (async () => {
+      try { await load(); } finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; clearTimeout(failsafe); };
   }, []);
 
   async function handleSave(e: React.FormEvent) {
