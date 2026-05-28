@@ -1,4 +1,5 @@
-'use client';
+// Server component — pure markup, no hooks. Was 'use client' for no reason,
+// shipping ~3KB of client JS that did nothing on hydration.
 import Link from 'next/link';
 import {
   Code2, Palette, TrendingUp, DollarSign, Handshake,
@@ -26,11 +27,11 @@ const CAT_META: Partial<Record<JobCategory, CatMeta>> = {
   operations:  { label: 'Operations',   icon: <Settings2 className="w-5 h-5" />,    bg: 'bg-zinc-50 dark:bg-zinc-800/60',    text: 'text-zinc-600 dark:text-zinc-300' },
 };
 
-const JOB_COUNTS: Partial<Record<JobCategory, number>> = {
-  engineering: 18420, design: 4180, marketing: 3890, finance: 2640,
-  sales: 2720, data: 3980, hr: 1430, product: 2560, legal: 1210, operations: 1380,
-};
-
+// Per-category counts removed. The previous hardcoded values were
+// fabricated (e.g. "18,420 engineering jobs") and the audit specifically
+// called out homepage stats matching this pattern as a trust-killer.
+// Could be repopulated later from a daily-refreshed materialized view,
+// but until then "Engineering jobs →" with no number is honest UX.
 const SHOW_CATS: JobCategory[] = [
   'engineering','design','marketing','finance','sales','data','hr','product','legal','operations'
 ];
@@ -50,26 +51,23 @@ export function CategoriesSection() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {SHOW_CATS.map(cat => {
-            const meta  = CAT_META[cat];
-            const count = JOB_COUNTS[cat] ?? 0;
+            const meta = CAT_META[cat];
             if (!meta) return null;
             return (
               <Link
                 key={cat}
-                href={`/jobs?category=${cat}`}
+                // Link to the indexable /jobs/category/[slug] landing page,
+                // not the faceted /jobs?category= URL — same reason the
+                // Footer + JobCard chips got rewritten.
+                href={`/jobs/category/${cat}`}
                 className="group flex flex-col items-center gap-3 p-4 rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] hover:border-brand-500 dark:hover:border-brand-600 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${meta.bg} ${meta.text} group-hover:scale-110 transition-transform duration-200`}>
                   {meta.icon}
                 </div>
-                <div className="text-center">
-                  <p className="font-semibold text-sm text-stone-700 dark:text-stone-300 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors leading-snug">
-                    {meta.label}
-                  </p>
-                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                    {count.toLocaleString()} jobs
-                  </p>
-                </div>
+                <p className="text-center font-semibold text-sm text-stone-700 dark:text-stone-300 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors leading-snug">
+                  {meta.label}
+                </p>
               </Link>
             );
           })}

@@ -1,23 +1,74 @@
-'use client';
-import { useState, useEffect } from 'react';
+// Server component — fetches the 6 most recent jobs directly from
+// Supabase so the homepage HTML carries real job cards (good for AI
+// crawlers + first paint). Was a `'use client'` component that ran a
+// useEffect → fetch /api/jobs → setState round-trip on every load,
+// showing a skeleton until hydration.
 import Link from 'next/link';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { jobsApi } from '@/lib/api';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { JobCard } from '@/components/jobs/JobCard';
 import type { Job } from '@/lib/types';
 
-export function FeaturedJobs() {
-  const [jobs,    setJobs]    = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+// Re-fetch hourly. Featured-job rotation doesn't need to be live.
+export const revalidate = 3600;
 
-  useEffect(() => {
-    jobsApi.getJobs({ perPage: 6, sort: 'newest' }).then(r => {
-      // Prefer featured, fallback to newest
-      const featured = r.jobs.filter(j => j.featured);
-      setJobs(featured.length >= 3 ? featured.slice(0, 6) : r.jobs.slice(0, 6));
-      setLoading(false);
-    });
-  }, []);
+function transform(j: any): Job {
+  return {
+    id:           j.id,
+    title:        j.title,
+    company:      j.company,
+    logo:         j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?'),
+    category:     j.category ?? 'other',
+    type:         j.type ?? 'full-time',
+    level:        j.level ?? 'mid',
+    salaryMin:    j.salary_min ?? undefined,
+    salaryMax:    j.salary_max ?? undefined,
+    currency:     j.currency ?? 'USD',
+    location:     j.location ?? 'Worldwide',
+    timezone:     j.timezone ?? undefined,
+    description:  j.description ?? '',
+    requirements: j.requirements ?? undefined,
+    skills:       j.skills ?? [],
+    benefits:     j.benefits ?? undefined,
+    applyUrl:     j.apply_url ?? undefined,
+    applyEmail:   j.apply_email ?? undefined,
+    posted:       j.posted_at ?? j.created_at ?? new Date().toISOString(),
+    expires:      j.expires_at ?? undefined,
+    featured:     j.featured ?? false,
+    isNew:        j.is_new ?? false,
+    source:       j.source ?? 'manual',
+    sourceUrl:    j.source_url ?? undefined,
+    remote:       j.remote ?? true,
+  };
+}
+
+async function fetchFeatured(): Promise<Job[]> {
+  try {
+    const supabase = createAdminSupabaseClient();
+    // Featured first, fall back to newest. 12 rows then filter down to 6
+    // so if no featured rows exist we still have content.
+    const { data } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
+      .order('featured', { ascending: false })
+      .order('posted_at', { ascending: false })
+      .limit(12);
+    const rows = data ?? [];
+    const featured = rows.filter((r: any) => r.featured);
+    const chosen = featured.length >= 3 ? featured.slice(0, 6) : rows.slice(0, 6);
+    return chosen.map(transform);
+  } catch {
+    return [];
+  }
+}
+
+export async function FeaturedJobs() {
+  const jobs = await fetchFeatured();
+  if (jobs.length === 0) return null;
 
   return (
     <section className="py-16 bg-white dark:bg-[#0f1e38]">
@@ -43,23 +94,9 @@ export function FeaturedJobs() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] p-5 animate-pulse">
-                <div className="flex gap-3 mb-4">
-                  <div className="skeleton w-12 h-12 rounded-xl shrink-0" />
-                  <div className="flex-1"><div className="skeleton h-4 rounded mb-2" /><div className="skeleton h-3 w-2/3 rounded" /></div>
-                </div>
-                <div className="skeleton h-3 rounded mb-2" /><div className="skeleton h-3 w-3/4 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {jobs.map(job => <JobCard key={job.id} job={job} />)}
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {jobs.map(job => <JobCard key={job.id} job={job} />)}
+        </div>
       </div>
     </section>
   );

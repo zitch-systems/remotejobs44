@@ -1,9 +1,13 @@
-'use client';
 // components/home/PricingPreview.tsx
+//
+// Server component — the prices, features, and copy ship in the SSR
+// HTML. Each card's "Pay" button is a tiny client island
+// (PricingPreviewPayButton) that handles the usePaystack + auth-store
+// check. The whole section was 'use client' previously, shipping ~6 KB
+// of inert client JS for content that doesn't change after hydration.
 import Link from 'next/link';
 import { Check } from 'lucide-react';
-import { usePaystack } from '@/hooks/usePaystack';
-import { useAuthStore } from '@/lib/store';
+import { PricingPreviewPayButton } from './PricingPreviewPayButton';
 
 const PLANS = [
   {
@@ -42,17 +46,6 @@ const PLANS = [
 ];
 
 export function PricingPreview() {
-  const { pay, loading } = usePaystack();
-  const { isLoggedIn }   = useAuthStore();
-
-  async function handlePay(planId: 'daily' | 'pro' | 'pro_annual') {
-    if (!isLoggedIn()) {
-      window.location.href = '/register';
-      return;
-    }
-    await pay({ plan: planId });
-  }
-
   return (
     <section className="py-20 bg-stone-50 dark:bg-[#0f1e38]">
       <div className="max-w-[1440px] mx-auto px-5">
@@ -122,22 +115,7 @@ export function PricingPreview() {
                 ))}
               </ul>
 
-              <button
-                onClick={() => handlePay(plan.id)}
-                disabled={loading}
-                className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-150 disabled:opacity-60 ${
-                  plan.highlight
-                    ? 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 dark:hover:bg-brand-400'
-                    : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'
-                }`}
-              >
-                {loading ? (
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                    Processing…
-                  </span>
-                ) : plan.cta}
-              </button>
+              <PricingPreviewPayButton planId={plan.id} label={plan.cta} highlight={plan.highlight} />
             </div>
           ))}
         </div>
