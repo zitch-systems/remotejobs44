@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel older runs on the same branch when a new push lands. Saves
+# CI minutes when a contributor pushes a fix on top of a still-running
+# build.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: type-check · lint · unit tests · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Next.js 14 supports Node 18+; 20 is LTS as of this commit
+          # and matches Vercel's default for production deploys.
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Lint
+        # `--max-warnings 0` would force the existing react-hooks /
+        # entity-escape warnings to block CI. Until those are cleaned
+        # up we run lint without that flag so it surfaces them as
+        # informational output without failing the build.
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # Build last — it's the slowest step and only matters if the
+      # cheaper checks above pass.
+      - name: Build (Next.js)
+        env:
+          # The build calls into app/api/* metadata generators which
+          # try to read Supabase env vars. Provide harmless placeholders
+          # so the build doesn't fail on missing env. Real values live
+          # in Vercel's project settings for production.
+          NEXT_PUBLIC_SUPABASE_URL:      'https://placeholder.supabase.co'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
+          SUPABASE_SERVICE_ROLE_KEY:     'ci-placeholder-service-role-key'
+          NEXT_PUBLIC_APP_URL:           'https://remotejobs44.com'
+          PAYSTACK_SECRET_KEY:           'ci-placeholder-paystack-secret'
+          CRON_SECRET:                   'ci-placeholder-cron-secret-min-16-chars'
+        run: npm run build
