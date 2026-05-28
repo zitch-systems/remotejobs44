@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Clock, Calendar } from 'lucide-react';
 import { ARTICLES, findArticle } from '@/lib/resources';
+import { ArticleJsonLd } from '@/components/seo/ArticleJsonLd';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
 const BASE = 'https://remotejobs44.com';
 
@@ -11,16 +13,34 @@ export function generateStaticParams() {
   return ARTICLES.map(a => ({ slug: a.slug }));
 }
 
+// Author byline. The audit flagged Organization-as-author as an E-E-A-T
+// weakness — Google + AI engines weight named human authors as more
+// citation-worthy. "RemoteJobs44 Editorial" is fine for a team byline
+// without inventing fake names; the matching authorUrl links to /about
+// where the team's mission is described.
+const AUTHOR_NAME = 'RemoteJobs44 Editorial';
+const AUTHOR_URL  = `${BASE}/about`;
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const a = findArticle(params.slug);
   if (!a) return {};
   const url = `${BASE}/resources/${a.slug}`;
+  // Per-article OG image — was sharing the generic site OG before.
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(a.title)}&subtitle=${encodeURIComponent('RemoteJobs44 Resources')}`;
   return {
     title: `${a.title} | RemoteJobs44`,
     description: a.description,
     alternates: { canonical: url },
-    openGraph: { title: a.title, description: a.description, url, type: 'article' },
-    twitter: { card: 'summary_large_image', title: a.title, description: a.description },
+    openGraph: {
+      title: a.title,
+      description: a.description,
+      url,
+      type: 'article',
+      publishedTime: a.updated,
+      authors: [AUTHOR_NAME],
+      images: [{ url: ogImage, width: 1200, height: 630 }],
+    },
+    twitter: { card: 'summary_large_image', title: a.title, description: a.description, images: [ogImage] },
   };
 }
 
@@ -28,32 +48,39 @@ export default function ArticlePage({ params }: { params: { slug: string } }) {
   const a = findArticle(params.slug);
   if (!a) notFound();
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: a.title,
-    description: a.description,
-    datePublished: a.updated,
-    dateModified: a.updated,
-    author: { '@type': 'Organization', name: 'RemoteJobs44' },
-    publisher: { '@type': 'Organization', name: 'RemoteJobs44', url: BASE },
-    mainEntityOfPage: { '@type': 'WebPage', '@id': `${BASE}/resources/${a.slug}` },
-  };
+  const url = `${BASE}/resources/${a.slug}`;
 
   return (
     <div className="max-w-[760px] mx-auto px-5 py-10">
-      {/* Escape </script> sequences so a future article body containing one
-          can't break out of the JSON-LD block. */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
+      <ArticleJsonLd
+        url={url}
+        title={a.title}
+        description={a.description}
+        datePublished={a.updated}
+        dateModified={a.updated}
+        authorName={AUTHOR_NAME}
+        authorUrl={AUTHOR_URL}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home',      href: '/'           },
+          { name: 'Resources', href: '/resources'  },
+          { name: a.title,     href: `/resources/${a.slug}` },
+        ]}
+      />
       <Link href="/resources" className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 dark:text-brand-400 hover:underline mb-5">
         <ArrowLeft className="w-3 h-3" /> All resources
       </Link>
 
       <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight leading-tight mb-3">{a.title}</h1>
       <p className="text-stone-500 dark:text-stone-400 leading-relaxed mb-4">{a.description}</p>
-      <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500 mb-8">
+      <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500 mb-8 flex-wrap">
+        <span>By <span className="text-stone-600 dark:text-stone-300 font-semibold">{AUTHOR_NAME}</span></span>
         <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {a.readMinutes} min read</span>
-        <span className="inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> Updated {new Date(a.updated).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+        <span className="inline-flex items-center gap-1">
+          <Calendar className="w-3 h-3" />
+          Updated <time dateTime={a.updated}>{new Date(a.updated).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</time>
+        </span>
       </div>
 
       <article className="space-y-7 prose prose-stone dark:prose-invert max-w-none">

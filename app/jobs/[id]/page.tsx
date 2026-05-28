@@ -179,9 +179,19 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   // JSON-LD structured data — server-rendered so AI/non-JS crawlers (Bing,
   // Perplexity, ClaudeBot, GPTBot) actually receive it. Schema reference:
   // https://developers.google.com/search/docs/appearance/structured-data/job-posting
+  //
+  // validThrough: prefer the upstream's real expires_at when present
+  // (Google rewards accurate expiry signals with better crawl
+  // prioritisation). Fall back to posted+30d when the ATS feed didn't
+  // ship one — most don't. The staleness pass in /api/cron/daily hides
+  // jobs older than 60 days from listing pages, so a 30-day fallback
+  // here is conservative and matches Google Jobs' expectation that
+  // postings expire within a reasonable window.
   const POSTING_TTL_DAYS = 30;
   const postedMs = job.posted ? new Date(job.posted).getTime() : Date.now();
-  const validThrough = new Date(postedMs + POSTING_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const validThrough = job.expires
+    ? new Date(job.expires).toISOString()
+    : new Date(postedMs + POSTING_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com';
 
   const jsonLd: Record<string, any> = {
