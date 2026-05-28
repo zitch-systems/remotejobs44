@@ -20,6 +20,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
 import { runIngest } from '@/lib/ingest-pipeline';
+import { logError } from '@/lib/log';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
 const CRON_MIN_LEN = 16;
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   // and this route mass-downgrades day-pass users to `free`. Mirror the
   // /api/cron/ingest pattern (503 when secret missing or too short).
   if (!CRON_SECRET || CRON_SECRET.length < CRON_MIN_LEN) {
-    console.error('[cron/daily] CRON_SECRET not set or too short');
+    logError({ event: 'cron.daily.misconfigured', detail: 'CRON_SECRET missing or too short' });
     return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
   }
   const auth = req.headers.get('authorization');
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
       paused:     ingest.paused,
     };
   } catch (err: any) {
-    console.error('[cron/daily] ingest failed:', err.message);
+    logError({ event: 'cron.daily.ingest_failed', error: err.message });
     log.ingest = { error: err.message };
   }
 
@@ -174,7 +175,7 @@ export async function GET(req: NextRequest) {
       }
     }
   } catch (err: any) {
-    console.error('Alert emails error:', err.message);
+    logError({ event: 'cron.daily.alert_emails_failed', error: err.message });
   }
 
   log.completedAt = new Date().toISOString();

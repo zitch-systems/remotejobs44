@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectMagicMime } from '@/lib/file-magic';
+import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     const { data: signed, error: signErr } = await supabase.storage
       .from('cvs').createSignedUrl(filename, SIGNED_TTL);
     if (signErr || !signed?.signedUrl) {
-      console.error('[cv] createSignedUrl failed:', signErr?.message);
+      logError({ event: 'cv.signed_url_failed', error: signErr?.message ?? 'unknown', user_id: user.id });
       return NextResponse.json({ error: 'Upload succeeded but signing the URL failed' }, { status: 500 });
     }
     const signedUrl = signed.signedUrl;

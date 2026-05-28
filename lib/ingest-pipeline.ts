@@ -15,6 +15,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
 import { parseFeed } from '@/lib/feed-parser';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { logInfo, logWarn, logError } from '@/lib/log';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
 const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
@@ -277,9 +278,9 @@ export async function runIngest(): Promise<IngestResult> {
     if (lockErr) {
       // Function missing (migration not applied yet) — log and continue
       // rather than block ingest entirely. Logged so it's noisy in ops.
-      console.warn('[ingest] lock RPC failed, proceeding without lock:', lockErr.message);
+      logWarn({ event: 'ingest.lock_rpc_unavailable', error: lockErr.message });
     } else if (acquired === false) {
-      console.log('[ingest] skipped: another runner holds the lock');
+      logInfo({ event: 'ingest.skipped', reason: 'lock_held' });
       return {
         success:    true,
         totalAdded: 0,
@@ -291,7 +292,7 @@ export async function runIngest(): Promise<IngestResult> {
       };
     }
   } catch (err: any) {
-    console.warn('[ingest] lock acquire threw, proceeding without lock:', err.message);
+    logWarn({ event: 'ingest.lock_acquire_threw', error: err.message });
   }
 
   // From here on, we hold the lock (or the lock layer was unavailable).
@@ -311,7 +312,7 @@ export async function runIngest(): Promise<IngestResult> {
     pausedUrls = new Set((paused ?? []).map((r: { url: string }) => r.url));
   } catch (err: any) {
     // Don't block the run if job_sources is unreadable for any reason.
-    console.warn('[ingest] could not read paused sources:', err.message);
+    logWarn({ event: 'ingest.paused_sources_read_failed', error: err.message });
   }
   const pausedNames: string[] = [];
 
@@ -364,7 +365,7 @@ export async function runIngest(): Promise<IngestResult> {
         await recordSourceRun(supabase, source, n, 'ok');
       }
     } catch (err: any) {
-      console.error(`Ingest ${source.name}:`, err.message);
+      logError({ event: 'ingest.source_failed', source: source.name, error: err.message });
       results[source.name] = `error: ${err.message}`;
       await recordSourceRun(supabase, source, 0, 'error');
     }
@@ -442,13 +443,13 @@ export async function runIngest(): Promise<IngestResult> {
           await markSourceStatus(supabase, row.id, 'active', n);
         }
       } catch (err: any) {
-        console.error(`Ingest user-source ${label}:`, err.message);
+        logError({ event: 'ingest.user_source_failed', source: label, error: err.message });
         results[label] = `error: ${err.message}`;
         await markSourceStatus(supabase, row.id, 'error', 0);
       }
     }
   } catch (err: any) {
-    console.warn('[ingest] reading user-added sources failed:', err.message);
+    logWarn({ event: 'ingest.user_sources_read_failed', error: err.message });
   }
 
     return {
@@ -466,7 +467,7 @@ export async function runIngest(): Promise<IngestResult> {
     try {
       await supabase.rpc('release_cron_lock', { lock_name: INGEST_LOCK_NAME });
     } catch (err: any) {
-      console.warn('[ingest] release_cron_lock RPC failed:', err.message);
+      logWarn({ event: 'ingest.lock_release_failed', error: err.message });
     }
   }
 }

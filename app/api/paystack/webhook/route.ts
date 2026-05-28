@@ -16,6 +16,7 @@ import { sendEmail } from '@/lib/email/send';
 import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 import { extractPaystackId } from '@/lib/paystack/event-id';
+import { logInfo, logWarn, logError } from '@/lib/log';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
   getBilling as billingShared, getPlanExpiry as planExpiryShared,
@@ -43,7 +44,7 @@ function notifyOrphanCharge(reference: string, userId: string, plan: string, amo
         <li><strong>Amount:</strong> ₦${naira}</li>
       </ul>
       <p>Action: either refund the customer in the Paystack dashboard, or (if the user just deleted their account and re-signed up) manually upgrade the new profile and re-link the subscription row.</p>`,
-  }).catch(err => console.error('[webhook orphan-charge email]', err));
+  }).catch(err => logError({ event: 'webhook.orphan_charge_email_failed', error: err?.message ?? String(err), reference }));
 }
 
 // Plan helpers (getPlanTier, getBilling, getExpiresAt, isValidPlan) moved
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get('x-paystack-signature');
 
   if (!PAYSTACK_SECRET) {
-    console.error('[webhook] PAYSTACK_SECRET_KEY not configured');
+    logError({ event: 'webhook.misconfigured', detail: 'PAYSTACK_SECRET_KEY missing' });
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
   // bail before timingSafeEqual otherwise (which throws on length mismatch).
   if (!signature || signature.length !== hash.length ||
       !timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(signature, 'hex'))) {
-    console.warn('[webhook] Invalid signature');
+    logWarn({ event: 'webhook.invalid_signature' });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
@@ -103,12 +104,12 @@ export async function POST(req: NextRequest) {
     if (dedupError) {
       // 23505 = unique_violation. Treat as "already processed".
       if (dedupError.code === '23505') {
-        console.log(`[webhook] dedup hit: ${event.event} ${paystackId}`);
+        logInfo({ event: 'webhook.dedup_hit', event_type: event.event, paystack_id: paystackId });
         return NextResponse.json({ received: true, deduplicated: true });
       }
       // Any other insert error → log and proceed (don't block the
       // event just because the audit log failed).
-      console.error('[webhook] dedup log insert failed:', dedupError.message);
+      logError({ event: 'webhook.dedup_log_insert_failed', error: dedupError.message, event_type: event.event, paystack_id: paystackId });
     }
   }
 
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
 
       if (!userId || !plan) break;
       if (!isValidPlan(plan)) {
-        console.warn('[webhook] invalid plan: ' + plan);
+        logWarn({ event: 'webhook.invalid_plan', plan, user_id: userId });
         notifyOrphanCharge(reference ?? 'unknown', userId, plan ?? 'unknown', amount ?? 0);
         break;
       }
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
       // attack: if the verified amount doesn't match what we expect for
       // the plan, refuse to credit anything.
       if (!chargeMatchesPlan(plan, amount, currency)) {
-        console.warn(`[webhook] amount mismatch — plan=${plan} got=${amount}${currency}`);
+        logWarn({ event: 'webhook.amount_mismatch', plan, amount, currency, user_id: userId });
         notifyOrphanCharge(reference ?? 'unknown', userId, plan, amount ?? 0);
         break;
       }
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
         // Money was charged but the user no longer exists. Fire an alert
         // email so ops can refund or hand-fix instead of silently dropping
         // the payment.
-        console.warn('[webhook] orphan charge — user not found: ' + userId);
+        logWarn({ event: 'webhook.orphan_charge', user_id: userId, plan, amount });
         notifyOrphanCharge(reference ?? 'unknown', userId, plan, amount ?? 0);
         break;
       }
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
           .eq('paystack_reference', reference)
           .maybeSingle();
         if (refRow) {
-          console.log('[webhook] charge.success: skipped duplicate reference ' + reference);
+          logInfo({ event: 'webhook.charge_success.duplicate', reference, user_id: userId });
           break;
         }
       }
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', userId);
         if (updateError) {
-          console.error('[webhook] profile update failed for ' + userId + ':', updateError.message);
+          logError({ event: 'webhook.profile_update_failed', user_id: userId, error: updateError.message });
         }
       }
 
@@ -199,9 +200,9 @@ export async function POST(req: NextRequest) {
         currency:                   currency ?? 'NGN',
         price:                      (amount ?? 0) / 100,
       }, { onConflict: 'user_id' });
-      if (subError) console.error('[webhook] subscription upsert failed:', subError.message);
+      if (subError) logError({ event: 'webhook.subscription_upsert_failed', user_id: userId, error: subError.message });
 
-      console.log('[webhook] charge.success: ' + userId + ' upgraded to ' + tier + ' (ref ' + reference + ')');
+      logInfo({ event: 'webhook.charge_success', user_id: userId, tier, reference });
       break;
     }
 
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
         .update({ status: 'cancelled', updated_at: new Date().toISOString() })
         .eq('user_id', userId);
 
-      console.log('[webhook] subscription.disable: ' + userId + ' marked cancelled (plan stays until current_period_end)');
+      logInfo({ event: 'webhook.subscription_disable', user_id: userId });
       break;
     }
 
@@ -235,7 +236,7 @@ export async function POST(req: NextRequest) {
     // active until subscription.disable fires (if at all).
     case 'subscription.expiring_cards': {
       const userId = event.data?.metadata?.user_id;
-      console.log('[webhook] subscription.expiring_cards (warning, no plan change): ' + (userId ?? 'unknown'));
+      logInfo({ event: 'webhook.expiring_cards', user_id: userId ?? null });
       break;
     }
 
@@ -273,7 +274,7 @@ export async function POST(req: NextRequest) {
       }
       if (!userId) userId = subData.metadata?.user_id ?? null;
       if (!userId) {
-        console.warn('[webhook] invoice.payment_failed without resolvable user');
+        logWarn({ event: 'webhook.payment_failed.unresolvable_user', subscription_code: subCode });
         break;
       }
 
@@ -284,7 +285,7 @@ export async function POST(req: NextRequest) {
         .eq('id', userId)
         .maybeSingle();
       if (profile?.role === 'admin') {
-        console.log('[webhook] invoice.payment_failed: admin user, ignoring');
+        logInfo({ event: 'webhook.payment_failed.admin_skip', user_id: userId });
         break;
       }
 
@@ -304,11 +305,11 @@ export async function POST(req: NextRequest) {
         const planLabel = profile.plan === 'pro' ? 'Pro' : profile.plan === 'daily' ? 'Day Pass' : 'subscription';
         const { subject, html } = paymentFailedEmail(profile.name ?? 'there', planLabel);
         sendEmail({ to: profile.email, subject, html }).catch(err =>
-          console.error('[webhook] payment-failed email send failed:', err)
+          logError({ event: 'webhook.payment_failed.email_send_failed', error: err?.message ?? String(err), user_id: userId })
         );
       }
 
-      console.log('[webhook] invoice.payment_failed: ' + userId + ' marked payment_failed, period_end set to now');
+      logInfo({ event: 'webhook.payment_failed', user_id: userId });
       break;
     }
 
