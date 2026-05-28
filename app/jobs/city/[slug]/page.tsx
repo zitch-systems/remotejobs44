@@ -25,13 +25,14 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const c = find(params.slug);
   if (!c) return {};
   const title = `Remote Jobs in ${c.label} | Work from Home for Global Companies`;
-  const description = `${c.blurb} 50,000+ remote roles open to ${c.label}-based talent on RemoteJobs44 — paid in USD, GBP, EUR.`;
+  const description = `${c.blurb} Remote roles open to ${c.label}-based talent on RemoteJobs44 — paid in USD, GBP, EUR.`;
   const url = `${BASE}/jobs/city/${c.slug}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${c.label}`)}&subtitle=${encodeURIComponent('Work for global companies · RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

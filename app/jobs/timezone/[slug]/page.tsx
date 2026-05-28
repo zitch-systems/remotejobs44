@@ -21,10 +21,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `Remote Jobs — ${tz.label} | RemoteJobs44`;
   const description = `${tz.blurb} Updated every few hours.`;
   const url = `${BASE}/jobs/timezone/${tz.slug}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote jobs — ${tz.label.split(' (')[0]}`)}&subtitle=${encodeURIComponent('Timezone-friendly roles on RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

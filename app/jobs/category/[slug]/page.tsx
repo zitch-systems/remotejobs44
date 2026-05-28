@@ -23,11 +23,14 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `Remote ${cat.label} Jobs | RemoteJobs44`;
   const description = `${cat.blurb} Browse open positions and apply from Africa and anywhere in the world.`;
   const url = `${BASE}/jobs/category/${cat.slug}`;
+  // Dynamic OG so the social card matches the page subject — previously
+  // every category/skill/country shared the same generic remotejobs44 OG.
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote ${cat.label} Jobs`)}&subtitle=${encodeURIComponent('Browse on RemoteJobs44 — Day Pass from ₦500')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

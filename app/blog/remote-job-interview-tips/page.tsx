@@ -1,9 +1,24 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ArticleJsonLd } from '@/components/seo/ArticleJsonLd';
+
+const POST = {
+  slug:          'remote-job-interview-tips',
+  title:         '12 Remote Job Interview Tips That Actually Work',
+  description:   'Prepare for remote job interviews with proven tips — from technical setup to answering async communication questions.',
+  datePublished: '2025-01-10',
+  author:        'RemoteJobs44 Editorial',
+  category:      'Interviews',
+  readingTime:   '6 min read',
+} as const;
+
+const URL = `https://remotejobs44.com/blog/${POST.slug}`;
 
 export const metadata: Metadata = {
-  title: '12 Remote Job Interview Tips That Actually Work | RemoteJobs44',
-  description: 'Prepare for remote job interviews with proven tips — from technical setup to answering async communication questions.',
+  title: `${POST.title} | RemoteJobs44`,
+  description: POST.description,
+  alternates: { canonical: URL },
+  openGraph: { title: POST.title, description: POST.description, url: URL, type: 'article', publishedTime: POST.datePublished },
 };
 
 export default function Post() {
@@ -18,11 +33,23 @@ export default function Post() {
 
   return (
     <div className="max-w-[720px] mx-auto px-5 py-14">
+      <ArticleJsonLd
+        url={URL}
+        title={POST.title}
+        description={POST.description}
+        datePublished={POST.datePublished}
+        authorName={POST.author}
+        authorUrl="https://remotejobs44.com/about"
+      />
       <Link href="/blog" className="text-sm text-stone-400 hover:text-brand-700 transition-colors mb-8 inline-block">← Back to Blog</Link>
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-bold">Interviews</span>
-          <span className="text-xs text-stone-400">January 10, 2025 · 6 min read</span>
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <span className="px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-bold">{POST.category}</span>
+          <span className="text-xs text-stone-400">
+            By <span className="text-stone-600 dark:text-stone-300 font-semibold">{POST.author}</span>
+            {' · '}<time dateTime={POST.datePublished}>{new Date(POST.datePublished).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>
+            {' · '}{POST.readingTime}
+          </span>
         </div>
         <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-4">
           12 Remote Job Interview Tips That Actually Work

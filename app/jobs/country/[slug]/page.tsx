@@ -24,10 +24,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `Remote Jobs in ${country.label} | RemoteJobs44`;
   const description = `${country.blurb} Updated daily — apply from ${country.label} to global companies.`;
   const url = `${BASE}/jobs/country/${country.slug}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${country.label}`)}&subtitle=${encodeURIComponent('Apply from anywhere · RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

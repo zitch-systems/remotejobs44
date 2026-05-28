@@ -27,11 +27,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `Remote ${i.label} Jobs | RemoteJobs44`;
   const description = `${i.blurb} Apply from Nigeria, Kenya, South Africa, and anywhere globally — 50,000+ remote jobs on RemoteJobs44.`;
   const url = `${BASE}/jobs/industry/${i.slug}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote ${i.label} Jobs`)}&subtitle=${encodeURIComponent('Industry-specific roles on RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

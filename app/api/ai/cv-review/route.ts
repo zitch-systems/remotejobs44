@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
-import { rateLimit } from '@/lib/rate-limit';
+import { rateLimit, getIP } from '@/lib/rate-limit';
 
 const SYSTEM = `You are a senior remote-hiring recruiter who reviews CVs for engineers, designers, marketers and operators applying to global remote roles from Africa. Be honest, specific, and brief. Output valid JSON only — no preface, no markdown fences.
 
@@ -60,6 +60,21 @@ export async function POST(req: NextRequest) {
           retryAt: rl.resetAt,
         },
         { status: 429 }
+      );
+    }
+    // Second gate: IP-keyed cap on top of the user-id gate. Without this,
+    // a bot can register N fresh accounts (1 free CV review each) from
+    // one IP and burn LLM credits unbounded. 30 reviews/day/IP allows a
+    // small office sharing an IP, blocks the churn pattern. (When the
+    // rate-limiter moves to KV this gate becomes truly enforceable
+    // across instances — the in-memory store is best-effort for now,
+    // but the wiring is in place.)
+    const ipRl = rateLimit(`ai:cv:ip:${getIP(req)}`, 30, 24 * 60 * 60 * 1000);
+    if (!ipRl.success) {
+      console.warn('[ai/cv-review] IP cap hit:', getIP(req));
+      return NextResponse.json(
+        { error: 'Too many CV reviews from this network. Please try again tomorrow.', retryAt: ipRl.resetAt },
+        { status: 429 },
       );
     }
 

@@ -30,10 +30,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `Remote Jobs in ${region.label} | RemoteJobs44`;
   const description = `${region.blurb} Browse and apply — updated daily.`;
   const url = `${BASE}/jobs/region/${region.slug}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${region.label}`)}&subtitle=${encodeURIComponent('Browse on RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
+    openGraph: { title, description, url, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 

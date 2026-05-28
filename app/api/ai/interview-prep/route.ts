@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
-import { rateLimit } from '@/lib/rate-limit';
+import { rateLimit, getIP } from '@/lib/rate-limit';
 
 const SYSTEM = `You are a senior interviewer at a global remote-first company who has interviewed hundreds of candidates from Africa, Asia, Europe and the Americas. Produce useful, specific interview prep. Output valid JSON only — no preface, no markdown fences.
 
@@ -68,6 +68,17 @@ export async function POST(req: NextRequest) {
           retryAt: rl.resetAt,
         },
         { status: 429 }
+      );
+    }
+    // IP-keyed cap on top of the per-user gate. Stops the
+    // "register N fresh accounts → 1 free prep each → burn credits"
+    // abuse pattern. See cv-review/route.ts for the same gate.
+    const ipRl = rateLimit(`ai:prep:ip:${getIP(req)}`, 30, 24 * 60 * 60 * 1000);
+    if (!ipRl.success) {
+      console.warn('[ai/interview-prep] IP cap hit:', getIP(req));
+      return NextResponse.json(
+        { error: 'Too many interview preps from this network. Please try again tomorrow.', retryAt: ipRl.resetAt },
+        { status: 429 },
       );
     }
 
