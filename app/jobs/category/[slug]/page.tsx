@@ -3,7 +3,7 @@
 // per-slug metadata so Google / Bing / AI search engines can index each one.
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { CATEGORIES, findCategory } from '@/lib/seo-slices';
+import { CATEGORIES, findCategory, SKILLS } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -49,6 +49,16 @@ export default async function CategoryPage({ params }: { params: { slug: string 
     total = count ?? jobs.length;
   } catch {}
 
+  // 5 sibling categories + 4 skills, so PageRank flows back into the SEO
+  // surface. Skills are sampled from the top of the catalogue (the most
+  // searched-for ones); over time we could tailor per category.
+  const siblings = CATEGORIES.filter(c => c.slug !== cat.slug).slice(0, 5);
+  const topSkills = SKILLS.slice(0, 4);
+  const relatedLinks = [
+    ...siblings.map(c => ({ label: `Remote ${c.label}`, href: `/jobs/category/${c.slug}` })),
+    ...topSkills.map(s => ({ label: s.label, href: `/jobs/skill/${s.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote ${cat.label} Jobs`}
@@ -56,6 +66,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?category=${cat.slug}`}
+      relatedLinks={relatedLinks}
     />
   );
 }

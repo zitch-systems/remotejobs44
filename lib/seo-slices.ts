@@ -123,3 +123,31 @@ export function findCountry(slug: string)   { return COUNTRIES.find(c => c.slug 
 export function findSkill(slug: string)     { return SKILLS.find(c => c.slug === slug); }
 export function findTimezone(slug: string)  { return TIMEZONES.find(c => c.slug === slug); }
 export function findRegion(slug: string)    { return REGIONS.find(c => c.slug === slug); }
+
+// Map a freeform skill name (from a job's skills[] array) to its canonical
+// SKILLS slug, or null if no match. Used by JobCard/job-detail to link skill
+// chips to the indexable /jobs/skill/[slug] page — unknown skills fall back
+// to /jobs?q=… because hitting /jobs/skill/unknown-slug 404s.
+const SKILL_LABEL_TO_SLUG: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const s of SKILLS) {
+    map[s.label.toLowerCase()] = s.slug;
+    map[s.slug] = s.slug;
+  }
+  // Common aliases & casing variants the scraped data uses
+  map['next.js']      = 'nextjs';
+  map['nest.js']      = 'nestjs';
+  map['c#']           = 'csharp';
+  map['c sharp']      = 'csharp';
+  map['.net']         = 'csharp';
+  map['vue.js']       = 'vue';
+  map['node.js']      = 'node';
+  map['ml']           = 'machine-learning';
+  map['ai']           = 'machine-learning';
+  return map;
+})();
+
+export function skillSlug(name: string): string | null {
+  if (!name) return null;
+  return SKILL_LABEL_TO_SLUG[name.trim().toLowerCase()] ?? null;
+}

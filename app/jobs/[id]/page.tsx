@@ -10,6 +10,7 @@ import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
+import { skillSlug } from '@/lib/seo-slices';
 import type { Job } from '@/lib/types';
 
 
@@ -118,20 +119,68 @@ export default function JobDetailPage() {
     }
   }
 
-  // JSON-LD structured data for Google Jobs & AI search
+  // JSON-LD structured data for Google Jobs & AI search.
+  //
+  // Required by Google Jobs (per
+  // https://developers.google.com/search/docs/appearance/structured-data/job-posting):
+  //   - datePosted, title, description, hiringOrganization
+  //   - validThrough (postings without it get demoted or dropped)
+  //   - jobLocation OR applicantLocationRequirements
+  //
+  // Previously emitted jsonLocationType=TELECOMMUTE +
+  // applicantLocationRequirements=Worldwide, which Google penalises when
+  // the role is actually region-locked. We now express the eligible
+  // applicant locations honestly from `job.location` when possible.
+  const POSTING_TTL_DAYS = 30;
+  const postedMs = job.posted ? new Date(job.posted).getTime() : Date.now();
+  const validThrough = new Date(postedMs + POSTING_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  // applicantLocationRequirements — if the location mentions a country/region,
+  // express it; otherwise fall back to Worldwide.
+  function inferApplicantLocations(location: string | undefined) {
+    if (!location) return [{ '@type': 'Country', name: 'Worldwide' }];
+    const l = location.toLowerCase();
+    const hits: Array<{ '@type': string; name: string }> = [];
+    const KNOWN = [
+      ['united states', 'United States'], ['us only', 'United States'], ['usa', 'United States'],
+      ['canada', 'Canada'], ['uk', 'United Kingdom'], ['united kingdom', 'United Kingdom'],
+      ['germany', 'Germany'], ['france', 'France'], ['spain', 'Spain'],
+      ['netherlands', 'Netherlands'], ['poland', 'Poland'], ['portugal', 'Portugal'],
+      ['nigeria', 'Nigeria'], ['kenya', 'Kenya'], ['south africa', 'South Africa'],
+      ['ghana', 'Ghana'], ['egypt', 'Egypt'], ['india', 'India'],
+      ['australia', 'Australia'], ['brazil', 'Brazil'], ['mexico', 'Mexico'],
+      ['europe', 'Europe'], ['emea', 'Europe'], ['latam', 'Latin America'],
+      ['apac', 'Asia-Pacific'], ['africa', 'Africa'],
+    ] as const;
+    for (const [needle, name] of KNOWN) if (l.includes(needle)) hits.push({ '@type': 'Country', name });
+    if (hits.length === 0 && (l.includes('remote') || l.includes('worldwide') || l.includes('anywhere'))) {
+      hits.push({ '@type': 'Country', name: 'Worldwide' });
+    }
+    return hits.length > 0 ? hits : [{ '@type': 'Country', name: 'Worldwide' }];
+  }
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
     description: normalizeJobDescription(job.description ?? ''),
     datePosted: job.posted,
+    validThrough,
+    identifier: {
+      '@type': 'PropertyValue',
+      name: job.company,
+      value: job.id,
+    },
     employmentType: job.type === 'full-time' ? 'FULL_TIME' : job.type === 'part-time' ? 'PART_TIME' : job.type === 'contract' ? 'CONTRACTOR' : job.type === 'freelance' ? 'TEMPORARY' : 'OTHER',
     jobLocationType: 'TELECOMMUTE',
-    applicantLocationRequirements: { '@type': 'Country', name: 'Worldwide' },
+    applicantLocationRequirements: inferApplicantLocations(job.location),
+    directApply: false,
     hiringOrganization: {
       '@type': 'Organization',
+      // Drop the bogus `sameAs: job.applyUrl` — that's the apply link, not
+      // the company homepage. Wrong entity reference confuses Google's
+      // hiringOrganization disambiguation.
       name: job.company,
-      sameAs: job.applyUrl ?? undefined,
     },
     baseSalary: job.salaryMin ? {
       '@type': 'MonetaryAmount',
@@ -313,12 +362,21 @@ export default function JobDetailPage() {
             <div className="card p-5">
               <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-3">Skills</h3>
               <div className="flex flex-wrap gap-2">
-                {job.skills.map(s => (
-                  <Link key={s} href={`/jobs?q=${encodeURIComponent(s)}`}
-                    className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-[#162033] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
-                    {s}
-                  </Link>
-                ))}
+                {job.skills.map(s => {
+                  // Link to the indexable /jobs/skill/[slug] landing page if
+                  // the skill is in our SEO catalogue; otherwise fall back to
+                  // the faceted /jobs?q= (which doesn't 404 on arbitrary
+                  // skill names). Either way PageRank now flows into the
+                  // SEO surface for known skills.
+                  const slug = skillSlug(s);
+                  const href = slug ? `/jobs/skill/${slug}` : `/jobs?q=${encodeURIComponent(s)}`;
+                  return (
+                    <Link key={s} href={href}
+                      className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-[#162033] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
+                      {s}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

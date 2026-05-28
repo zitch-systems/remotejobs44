@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { INDUSTRIES } from '@/lib/seo-extra';
+import { CATEGORIES, SKILLS } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -69,6 +70,15 @@ export default async function IndustryPage({ params }: { params: { slug: string 
     total = count ?? jobs.length;
   } catch {}
 
+  const siblings = INDUSTRIES.filter(x => x.slug !== i.slug).slice(0, 5);
+  const topCategories = CATEGORIES.slice(0, 3);
+  const topSkills = SKILLS.slice(0, 3);
+  const relatedLinks = [
+    ...siblings.map(x => ({ label: `Remote ${x.label}`, href: `/jobs/industry/${x.slug}` })),
+    ...topCategories.map(c => ({ label: `Remote ${c.label}`, href: `/jobs/category/${c.slug}` })),
+    ...topSkills.map(s => ({ label: s.label, href: `/jobs/skill/${s.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote ${i.label} Jobs`}
@@ -76,6 +86,7 @@ export default async function IndustryPage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(i.label.toLowerCase())}`}
+      relatedLinks={relatedLinks}
     />
   );
 }

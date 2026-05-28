@@ -1,7 +1,7 @@
 // app/jobs/skill/[slug]/page.tsx — Per-skill SEO landing page.
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { SKILLS, findSkill } from '@/lib/seo-slices';
+import { SKILLS, CATEGORIES, findSkill } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -47,6 +47,15 @@ export default async function SkillPage({ params }: { params: { slug: string } }
     total = count ?? jobs.length;
   } catch {}
 
+  // Sibling skills + 3 top categories — feed PageRank back into the SEO
+  // surface so each skill page isn't an internal-link dead-end.
+  const siblings = SKILLS.filter(s => s.slug !== skill.slug).slice(0, 6);
+  const topCategories = CATEGORIES.slice(0, 3);
+  const relatedLinks = [
+    ...siblings.map(s => ({ label: s.label, href: `/jobs/skill/${s.slug}` })),
+    ...topCategories.map(c => ({ label: `Remote ${c.label}`, href: `/jobs/category/${c.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote ${skill.label} Jobs`}
@@ -54,6 +63,7 @@ export default async function SkillPage({ params }: { params: { slug: string } }
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(skill.label)}`}
+      relatedLinks={relatedLinks}
     />
   );
 }

@@ -21,12 +21,20 @@ export function SliceListing({
   jobs,
   total,
   browseHref,
+  relatedLinks,
 }: {
   title: string;
   blurb: string;
   jobs: Job[];
   total: number;
   browseHref: string;
+  /**
+   * Internal links to sibling landing pages — same category, same skill
+   * family, neighbouring region/timezone, etc. Recirculates PageRank
+   * across the programmatic SEO surface so the 200+ landing pages stop
+   * being orphans of the global nav.
+   */
+  relatedLinks?: Array<{ label: string; href: string }>;
 }) {
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-10">
@@ -73,6 +81,25 @@ export function SliceListing({
           See all {total.toLocaleString()} jobs <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
+
+      {relatedLinks && relatedLinks.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-stone-200 dark:border-[#1e3a5f]">
+          <h2 className="font-display font-bold text-sm uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-4">
+            Browse related
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {relatedLinks.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-[#162033] text-stone-600 dark:text-stone-300 text-sm font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

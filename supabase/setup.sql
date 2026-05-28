@@ -16,9 +16,17 @@ create table if not exists public.profiles (
                         check (role in ('user','admin')),
   profile_completion  int  not null default 20,
   cv_url              text,
+  -- When the user's current paid plan lapses. Null means free forever (or
+  -- admin with no expiry). resolvePlan() in lib/auth/plan.ts compares this
+  -- against now() to compute the effective plan during webhook races.
+  plan_expires_at     timestamptz,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
+
+create index if not exists profiles_plan_expires_at_idx
+  on public.profiles(plan_expires_at)
+  where plan_expires_at is not null;
 
 alter table public.profiles enable row level security;
 

@@ -85,14 +85,18 @@ const SOCIAL = [
   },
 ];
 
+// Point to the indexable programmatic landing pages
+// (`/jobs/category/[slug]`), not the faceted `/jobs?category=` query —
+// the latter is client-rendered and not separately indexed, so PageRank
+// arriving on the canonical pages had nowhere to flow back to.
 const FOOTER_LINKS = {
   Jobs: [
-    { label: 'Engineering',    href: '/jobs?category=engineering' },
-    { label: 'Design',         href: '/jobs?category=design' },
-    { label: 'Marketing',      href: '/jobs?category=marketing' },
-    { label: 'Finance',        href: '/jobs?category=finance' },
-    { label: 'Data & Analytics', href: '/jobs?category=data' },
-    { label: 'Product',        href: '/jobs?category=product' },
+    { label: 'Engineering',      href: '/jobs/category/engineering' },
+    { label: 'Design',           href: '/jobs/category/design' },
+    { label: 'Marketing',        href: '/jobs/category/marketing' },
+    { label: 'Finance',          href: '/jobs/category/finance' },
+    { label: 'Data & Analytics', href: '/jobs/category/data' },
+    { label: 'Product',          href: '/jobs/category/product' },
   ],
   Company: [
     { label: 'About',      href: '/about' },

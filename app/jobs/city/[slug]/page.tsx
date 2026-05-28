@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { CITIES } from '@/lib/seo-extra';
+import { COUNTRIES, CATEGORIES } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -55,6 +56,15 @@ export default async function CityPage({ params }: { params: { slug: string } })
     total = count ?? jobs.length;
   } catch {}
 
+  const siblings = CITIES.filter(x => x.slug !== c.slug).slice(0, 5);
+  const topCountries = COUNTRIES.slice(0, 4);
+  const topCategories = CATEGORIES.slice(0, 3);
+  const relatedLinks = [
+    ...siblings.map(x => ({ label: `Jobs in ${x.label}`, href: `/jobs/city/${x.slug}` })),
+    ...topCountries.map(co => ({ label: `Jobs in ${co.label}`, href: `/jobs/country/${co.slug}` })),
+    ...topCategories.map(cat => ({ label: `Remote ${cat.label}`, href: `/jobs/category/${cat.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote Jobs in ${c.label}`}
@@ -62,6 +72,7 @@ export default async function CityPage({ params }: { params: { slug: string } })
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(c.label)}`}
+      relatedLinks={relatedLinks}
     />
   );
 }

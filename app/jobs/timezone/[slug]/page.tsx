@@ -1,7 +1,7 @@
 // app/jobs/timezone/[slug]/page.tsx — Per-timezone SEO landing page.
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { TIMEZONES, findTimezone } from '@/lib/seo-slices';
+import { TIMEZONES, REGIONS, CATEGORIES, findTimezone } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -48,6 +48,15 @@ export default async function TimezonePage({ params }: { params: { slug: string 
     total = count ?? jobs.length;
   } catch {}
 
+  const siblings = TIMEZONES.filter(t => t.slug !== tz.slug).slice(0, 5);
+  const topRegions = REGIONS.slice(0, 3);
+  const topCategories = CATEGORIES.slice(0, 3);
+  const relatedLinks = [
+    ...siblings.map(t => ({ label: t.label.split(' (')[0], href: `/jobs/timezone/${t.slug}` })),
+    ...topRegions.map(r => ({ label: `Jobs in ${r.label}`, href: `/jobs/region/${r.slug}` })),
+    ...topCategories.map(c => ({ label: `Remote ${c.label}`, href: `/jobs/category/${c.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote Jobs — ${tz.label}`}
@@ -55,6 +64,7 @@ export default async function TimezonePage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(tz.label.split(' (')[0])}`}
+      relatedLinks={relatedLinks}
     />
   );
 }

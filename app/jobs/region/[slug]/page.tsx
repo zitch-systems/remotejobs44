@@ -1,7 +1,7 @@
 // app/jobs/region/[slug]/page.tsx — Per-region SEO landing page.
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { REGIONS, findRegion } from '@/lib/seo-slices';
+import { REGIONS, COUNTRIES, CATEGORIES, findRegion } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -57,6 +57,15 @@ export default async function RegionPage({ params }: { params: { slug: string } 
     total = count ?? jobs.length;
   } catch {}
 
+  const siblings = REGIONS.filter(r => r.slug !== region.slug).slice(0, 5);
+  const topCountries = COUNTRIES.slice(0, 4);
+  const topCategories = CATEGORIES.slice(0, 3);
+  const relatedLinks = [
+    ...siblings.map(r => ({ label: `Jobs in ${r.label}`, href: `/jobs/region/${r.slug}` })),
+    ...topCountries.map(c => ({ label: `Jobs in ${c.label}`, href: `/jobs/country/${c.slug}` })),
+    ...topCategories.map(c => ({ label: `Remote ${c.label}`, href: `/jobs/category/${c.slug}` })),
+  ];
+
   return (
     <SliceListing
       title={`Remote Jobs in ${region.label}`}
@@ -64,6 +73,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(region.label)}`}
+      relatedLinks={relatedLinks}
     />
   );
 }
