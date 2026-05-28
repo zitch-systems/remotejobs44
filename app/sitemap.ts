@@ -3,11 +3,23 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { CATEGORIES, COUNTRIES, SKILLS, TIMEZONES, REGIONS } from '@/lib/seo-slices';
 import { INDUSTRIES, CITIES, SALARY_ROLES, COMPETITORS } from '@/lib/seo-extra';
 import { ARTICLES } from '@/lib/resources';
+import { companySlug } from '@/lib/company-slug';
 
 const BASE = 'https://remotejobs44.com';
 
+// Daily granularity for lastModified. Previously every URL shared the
+// exact `new Date()` instant, which Google treats as "no real freshness
+// signal" and ignores entirely. Rounding to today's date gives a stable
+// per-day value that Google can use to detect when a section actually
+// changed — particularly useful for the static-shell pages.
+function today() {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
+  const now = today();
 
   // Static "shell" routes — includes new SEO landing pages
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -62,23 +74,59 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...COMPETITORS .map(c => ({ url: `${BASE}/compare/${c.slug}`,      lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7  })),
   ];
 
-  // Real active job postings (capped to 5000 to keep the sitemap under Google's
-  // 50k-URL / 50MB limit even at scale).
+  // Real active job postings (capped to 5000 to keep the sitemap under
+  // Google's 50k-URL / 50MB limit even at scale). lastModified is derived
+  // from posted_at so freshness signals don't all collapse into "today".
   let jobRoutes: MetadataRoute.Sitemap = [];
+  // Per-company landing pages (derived from jobs.company). One sitemap
+  // entry per unique slug; capped to 1000 employers by total job count.
+  let companyRoutes: MetadataRoute.Sitemap = [];
   try {
     const admin = createAdminSupabaseClient();
     const { data: jobs } = await admin
       .from('jobs')
-      .select('id')
+      .select('id, company, posted_at')
       .eq('is_active', true)
+      .order('posted_at', { ascending: false })
       .limit(5000);
+
     if (jobs) {
-      jobRoutes = jobs.map((job: { id: string }) => ({
+      jobRoutes = jobs.map((job: { id: string; posted_at: string | null }) => ({
         url: `${BASE}/jobs/${job.id}`,
-        lastModified: now,
+        lastModified: job.posted_at ? new Date(job.posted_at) : now,
         changeFrequency: 'weekly' as const,
         priority: 0.65,
       }));
+
+      // Aggregate companies — pick the most recent posted_at per slug as
+      // the company page's lastModified so the sitemap reflects the
+      // freshest hiring activity at that employer.
+      const companyMap = new Map<string, { name: string; latest: Date; count: number }>();
+      for (const j of jobs as Array<{ company: string | null; posted_at: string | null }>) {
+        const name = (j.company ?? '').trim();
+        if (!name) continue;
+        const slug = companySlug(name);
+        if (!slug) continue;
+        const posted = j.posted_at ? new Date(j.posted_at) : now;
+        const existing = companyMap.get(slug);
+        if (!existing) {
+          companyMap.set(slug, { name, latest: posted, count: 1 });
+        } else {
+          existing.count++;
+          if (posted > existing.latest) existing.latest = posted;
+        }
+      }
+      // Cap to 1000 most-active employers — keeps the sitemap small and
+      // focuses crawler attention on companies with real ongoing hiring.
+      companyRoutes = Array.from(companyMap.entries())
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 1000)
+        .map(([slug, info]) => ({
+          url:             `${BASE}/companies/${slug}`,
+          lastModified:    info.latest,
+          changeFrequency: 'weekly' as const,
+          priority:        0.7,
+        }));
     }
   } catch {
     // Non-fatal — DB down at build time
@@ -89,6 +137,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...blogRoutes,
     ...resourceRoutes,
     ...sliceRoutes,
+    ...companyRoutes,
     ...jobRoutes,
   ];
 }
