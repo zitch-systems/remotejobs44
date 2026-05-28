@@ -142,41 +142,6 @@
   *,*::before,*::after { animation-duration:0.01ms!important; transition-duration:0.01ms!important; }
 }
 
-/* ===== DEEP OCEAN COLOR ENFORCEMENT =====
-   These override any cached Tailwind brand-* classes that compiled as green */
-.bg-brand-50  { background-color: #eff6ff !important; }
-.bg-brand-100 { background-color: #dbeafe !important; }
-.bg-brand-500 { background-color: #3b82f6 !important; }
-.bg-brand-600 { background-color: #2563eb !important; }
-.bg-brand-700 { background-color: #1d4ed8 !important; }
-.bg-brand-800 { background-color: #1e3a5f !important; }
-.text-brand-400 { color: #60a5fa !important; }
-.text-brand-500 { color: #3b82f6 !important; }
-.text-brand-600 { color: #2563eb !important; }
-.text-brand-700 { color: #1d4ed8 !important; }
-.border-brand-500 { border-color: #3b82f6 !important; }
-.border-brand-600 { border-color: #2563eb !important; }
-.border-brand-700 { border-color: #1d4ed8 !important; }
-.hover\:bg-brand-600:hover { background-color: #2563eb !important; }
-.hover\:bg-brand-700:hover { background-color: #1d4ed8 !important; }
-.hover\:bg-brand-800:hover { background-color: #1e3a5f !important; }
-.hover\:text-brand-700:hover { color: #1d4ed8 !important; }
-.hover\:border-brand-500:hover { border-color: #3b82f6 !important; }
-.hover\:border-brand-600:hover { border-color: #2563eb !important; }
-.focus\:ring-brand-600:focus { --tw-ring-color: #2563eb !important; }
-.shadow-md-brand { box-shadow: 0 4px 20px rgba(37,99,235,0.16) !important; }
-/* Dark mode */
-.dark .dark\:bg-brand-400 { background-color: #60a5fa !important; }
-.dark .dark\:bg-brand-500 { background-color: #3b82f6 !important; }
-.dark .dark\:bg-brand-600 { background-color: #2563eb !important; }
-.dark .dark\:text-brand-400 { color: #60a5fa !important; }
-.dark .dark\:text-brand-500 { color: #3b82f6 !important; }
-.dark .dark\:border-brand-500 { border-color: #3b82f6 !important; }
-.dark .dark\:border-brand-600 { border-color: #2563eb !important; }
-.dark .dark\:hover\:bg-brand-400:hover { background-color: #60a5fa !important; }
-.dark .dark\:hover\:text-brand-400:hover { color: #60a5fa !important; }
-.dark .dark\:hover\:border-brand-500:hover { border-color: #3b82f6 !important; }
-.dark .group-hover\:dark\:text-brand-400 { color: #60a5fa !important; }
-/* Group hover */
-.group:hover .group-hover\:text-brand-700 { color: #1d4ed8 !important; }
-.dark .group:hover .dark\:group-hover\:text-brand-400 { color: #60a5fa !important; }
+/* The 40-line !important brand-* override that used to live here is gone.
+   tailwind.config.js now declares the actual blue palette, so utilities
+   like `bg-brand-600` compile to the right colour without override. */

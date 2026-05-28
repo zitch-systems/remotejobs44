@@ -1,17 +1,54 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'About RemoteJobs44',
   description: 'RemoteJobs44 connects job seekers worldwide with the best remote opportunities from top companies.',
 };
 
-const STATS = [
-  { value: '50,000+', label: 'Remote jobs listed' },
-  { value: '8,000+',  label: 'Companies hiring' },
-  { value: '190+',    label: 'Countries reached' },
-  { value: '₦1,000',  label: 'Starting price' },
-];
+// Refresh stats hourly. Cheap counts on indexed columns, but no point
+// re-running them on every visit.
+export const revalidate = 3600;
+
+// Real DB-backed counts. The previous static "50,000+ jobs / 8,000+
+// companies / 190+ countries" was unverifiable and inflated — a savvy
+// user counting jobs in /jobs would catch the lie and lose trust. We
+// now read live numbers and round down conservatively.
+async function loadStats() {
+  try {
+    const supabase = createAdminSupabaseClient();
+    const [jobsRes, companiesRes] = await Promise.all([
+      supabase
+        .from('jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true),
+      // Distinct company count via a custom RPC is faster, but a
+      // limit-1k probe gives us a sensible cardinality estimate without
+      // requiring a new DB function. We undercount above 1k — fine for
+      // a public-facing number we'd rather not over-claim.
+      supabase
+        .from('jobs')
+        .select('company')
+        .eq('is_active', true)
+        .limit(5000),
+    ]);
+    const totalJobs = jobsRes.count ?? 0;
+    const distinctCompanies = new Set(
+      (companiesRes.data ?? []).map((r: any) => (r.company as string).trim().toLowerCase())
+    ).size;
+    return { totalJobs, distinctCompanies };
+  } catch {
+    return { totalJobs: 0, distinctCompanies: 0 };
+  }
+}
+
+function roundDown(n: number): string {
+  if (n >= 10000) return `${Math.floor(n / 1000)}k+`;
+  if (n >= 1000)  return `${Math.floor(n / 100) * 100}+`;
+  if (n >= 100)   return `${Math.floor(n / 10) * 10}+`;
+  return String(n);
+}
 
 const VALUES = [
   { icon: '🌍', title: 'Global first', desc: 'Remote work erases borders. We list jobs from every corner of the world, accessible to anyone with an internet connection.' },
@@ -20,23 +57,31 @@ const VALUES = [
   { icon: '🔒', title: 'Private by default', desc: 'We never sell your data. Your CV, applications, and profile stay private. Payments are secured by Paystack.' },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { totalJobs, distinctCompanies } = await loadStats();
+  const stats = [
+    { value: roundDown(totalJobs),         label: 'Remote jobs listed' },
+    { value: roundDown(distinctCompanies), label: 'Companies hiring'    },
+    { value: 'Every 6h',                   label: 'Listings refreshed'  },
+    { value: '₦500',                       label: 'Day Pass — start here' },
+  ];
+
   return (
     <div className="max-w-[900px] mx-auto px-5 py-16">
 
       {/* Hero */}
       <div className="text-center mb-16">
         <h1 className="font-display font-extrabold text-4xl text-stone-900 dark:text-stone-100 tracking-tight mb-4">
-          We're building the world's<br />most accessible remote job platform
+          We&rsquo;re building the world&rsquo;s<br />most accessible remote job platform
         </h1>
         <p className="text-stone-400 dark:text-stone-500 text-lg max-w-xl mx-auto leading-relaxed">
-          RemoteJobs44 was built for job seekers everywhere — especially those in markets where $50/month subscriptions aren't realistic.
+          RemoteJobs44 was built for job seekers everywhere — especially those in markets where $50/month subscriptions aren&rsquo;t realistic.
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — live from DB, refreshed hourly */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-        {STATS.map(s => (
+        {stats.map(s => (
           <div key={s.label} className="card p-5 text-center">
             <p className="font-display font-extrabold text-2xl text-brand-700 dark:text-brand-400 mb-1">{s.value}</p>
             <p className="text-xs text-stone-400 dark:text-stone-500 font-semibold uppercase tracking-wider">{s.label}</p>

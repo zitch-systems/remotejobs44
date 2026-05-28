@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
+import { detectScam } from '@/lib/scam-detect';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
 const CRON_MIN_LEN = 16;
@@ -62,7 +63,13 @@ export async function GET(req: NextRequest) {
         featured:    false,
         is_new:      true,
         is_active:   true,
-      })).filter((j: any) => j.apply_url && j.title !== 'Untitled');
+      })).filter((j: any) => j.apply_url && j.title !== 'Untitled')
+        .map((j: any) => {
+          // First-pass scam screen — flag in place rather than dropping so
+          // /admin/jobs can review false positives. See lib/scam-detect.ts.
+          const scam = detectScam(j);
+          return scam ? { ...j, flagged: true, flagged_reason: scam.flagged_reason } : j;
+        });
 
       if (!jobs.length) { ingestResults[source.name] = 0; continue; }
 
@@ -125,7 +132,10 @@ export async function GET(req: NextRequest) {
     .from('subscriptions')
     .select('user_id')
     .in('billing', ['monthly', 'annually'])
-    .in('status', ['active', 'cancelled'])
+    // payment_failed is included so users whose card declines get
+    // downgraded by the next cron pass — they were leaking ~12 free Pro
+    // days/year while only 'active'/'cancelled' were checked.
+    .in('status', ['active', 'cancelled', 'payment_failed'])
     .lt('current_period_end', proCutoff);
 
   let expiredPro_n = 0;

@@ -237,7 +237,7 @@ function PricingContent() {
           Plans for every job seeker
         </h1>
         <p className="text-stone-400 dark:text-stone-500 text-lg max-w-xl mx-auto">
-          Browse free forever. Upgrade to unlock apply links, auto-apply, and tracking. Start from just ₦1,000.
+          Browse free forever. Upgrade to unlock apply links, auto-apply, and tracking. Start from just ₦500.
         </p>
       </div>
 

@@ -56,11 +56,16 @@ export async function GET(req: NextRequest) {
     // visible until the cron flips is_active=false — which currently
     // never happens, so they live forever.
     const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
+    // Hide jobs the scam-detect heuristic flagged at ingest. Admin UI at
+    // /admin/jobs sees everything; public callers never see flagged rows.
+    // `.or('flagged.eq.false,flagged.is.null')` covers legacy rows
+    // inserted before the column existed (column default is false).
+    const notFlagged = 'flagged.eq.false,flagged.is.null';
 
     if (id) {
       const { data: job } = await supabase
         .from('jobs').select('*').eq('id', id).eq('is_active', true)
-        .or(notExpired).single();
+        .or(notExpired).or(notFlagged).single();
       if (job) return NextResponse.json({ job: transformJob(job) });
       const mock = MOCK_JOBS.find(j => j.id === id);
       return NextResponse.json({ job: mock ?? null });
@@ -76,7 +81,7 @@ export async function GET(req: NextRequest) {
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
       const { data: rows } = await supabase
         .from('jobs').select('*').in('id', wantedIds).eq('is_active', true)
-        .or(notExpired);
+        .or(notExpired).or(notFlagged);
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
@@ -84,7 +89,8 @@ export async function GET(req: NextRequest) {
 
     let query = supabase.from('jobs').select('*', { count: 'exact' })
       .eq('is_active', true)
-      .or(notExpired);
+      .or(notExpired)
+      .or(notFlagged);
     if (q) {
       // Strip characters that have meaning in a PostgREST or() filter list:
       // commas separate clauses, parentheses group, % and * are ilike wildcards,

@@ -109,12 +109,14 @@ async function fetchJobs(sp: SearchParams) {
 
   const supabase = createServerSupabaseClient();
   const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
+  const notFlagged = 'flagged.eq.false,flagged.is.null';
 
   let query = supabase
     .from('jobs')
     .select('*', { count: 'exact' })
     .eq('is_active', true)
-    .or(notExpired);
+    .or(notExpired)
+    .or(notFlagged);
 
   if (q) {
     const safe = q.replace(/[,()%*\\"']/g, ' ').trim().slice(0, 100);

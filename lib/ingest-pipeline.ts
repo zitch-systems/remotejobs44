@@ -4,6 +4,7 @@
 // /api/cron/ingest and the admin "run now" endpoint at /api/admin/ingest-now.
 import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { detectScam } from '@/lib/scam-detect';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
 const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
@@ -242,7 +243,19 @@ export async function runIngest() {
       const raw = await source.fetch();
       const jobs = raw.slice(0, 50)
         .map(source.normalise)
-        .filter((j): j is Record<string, any> => !!j && !!j.apply_url);
+        .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
+        .map(j => {
+          // First-pass scam screen — flag suspicious rows in place so an
+          // admin can sweep them at /admin/jobs. We don't drop the row;
+          // public listing queries filter `.eq('flagged', false)`. Letting
+          // legit jobs slip through with a flag is recoverable; letting
+          // scams reach paying users isn't.
+          const scam = detectScam(j);
+          if (scam) {
+            return { ...j, flagged: true, flagged_reason: scam.flagged_reason };
+          }
+          return j;
+        });
 
       if (!jobs.length) {
         results[source.name] = 0;

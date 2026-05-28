@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
@@ -204,6 +205,79 @@ export async function POST(req: NextRequest) {
     case 'subscription.expiring_cards': {
       const userId = event.data?.metadata?.user_id;
       console.log('[webhook] subscription.expiring_cards (warning, no plan change): ' + (userId ?? 'unknown'));
+      break;
+    }
+
+    // Paystack failed to charge the saved card for the next billing cycle.
+    // It will retry automatically for a few days. We:
+    //   1. Mark the subscription status as 'payment_failed' so the apply
+    //      gate and the next cron run can react.
+    //   2. Shorten current_period_end to now — the user has already
+    //      consumed the period they paid for; without this, the previous
+    //      grace window let them keep Pro access for ~12 free days/year
+    //      across the billing cycles where Paystack silently couldn't
+    //      collect (the audit's headline revenue leak).
+    //   3. Email the user a clear "update your card" CTA so they can
+    //      recover before the next cron downgrade.
+    // The /cron/daily expire pass picks up status='cancelled' OR 'active'
+    // with past current_period_end — payment_failed inherits the same
+    // sweep, so no cron change needed.
+    case 'invoice.payment_failed': {
+      const subData  = event.data ?? {};
+      const customer = subData.customer ?? {};
+      const subCode  = subData.subscription?.subscription_code
+                    ?? subData.subscription_code
+                    ?? null;
+
+      // Locate the user — prefer subscription_code (canonical), fall back to
+      // metadata.user_id (less reliable; Paystack doesn't always echo it).
+      let userId: string | null = null;
+      if (subCode) {
+        const { data } = await supabase
+          .from('subscriptions')
+          .select('user_id, plan')
+          .eq('paystack_subscription_code', subCode)
+          .maybeSingle();
+        userId = data?.user_id ?? null;
+      }
+      if (!userId) userId = subData.metadata?.user_id ?? null;
+      if (!userId) {
+        console.warn('[webhook] invoice.payment_failed without resolvable user');
+        break;
+      }
+
+      // Admins are exempt — skip downgrade flow entirely.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('name, email, role, plan')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.role === 'admin') {
+        console.log('[webhook] invoice.payment_failed: admin user, ignoring');
+        break;
+      }
+
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('subscriptions')
+        .update({
+          status:               'payment_failed',
+          current_period_end:   nowIso,
+          updated_at:           nowIso,
+        })
+        .eq('user_id', userId);
+
+      // Email the user — fire-and-forget. The .catch keeps the webhook
+      // 200 OK even if Resend is briefly down.
+      if (profile?.email) {
+        const planLabel = profile.plan === 'pro' ? 'Pro' : profile.plan === 'daily' ? 'Day Pass' : 'subscription';
+        const { subject, html } = paymentFailedEmail(profile.name ?? 'there', planLabel);
+        sendEmail({ to: profile.email, subject, html }).catch(err =>
+          console.error('[webhook] payment-failed email send failed:', err)
+        );
+      }
+
+      console.log('[webhook] invoice.payment_failed: ' + userId + ' marked payment_failed, period_end set to now');
       break;
     }
 

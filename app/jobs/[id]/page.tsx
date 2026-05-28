@@ -30,12 +30,14 @@ async function fetchJob(id: string): Promise<Job | null> {
   try {
     const supabase = createServerSupabaseClient();
     const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
+    const notFlagged = 'flagged.eq.false,flagged.is.null';
     const { data } = await supabase
       .from('jobs')
       .select('*')
       .eq('id', id)
       .eq('is_active', true)
       .or(notExpired)
+      .or(notFlagged)
       .maybeSingle();
     if (!data) return null;
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in

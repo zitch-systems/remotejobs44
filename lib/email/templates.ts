@@ -88,6 +88,36 @@ export function paymentSuccessEmail(name: string, plan: string, amount: string) 
   };
 }
 
+export function paymentFailedEmail(name: string, planLabel: string) {
+  return {
+    subject: `Action needed: your ${planLabel} renewal didn't go through`,
+    html: `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:560px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+  <div style="background:#dc2626;padding:32px 40px">
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700">Payment didn't go through</h1>
+  </div>
+  <div style="padding:40px">
+    <p style="color:#1c1917;margin:0 0 16px">Hi ${name},</p>
+    <p style="color:#57534e;margin:0 0 16px;line-height:1.6">
+      Your scheduled payment for <strong>${planLabel}</strong> couldn't be processed. This is usually a card-expiry, insufficient-funds, or bank-decline issue.
+    </p>
+    <p style="color:#57534e;margin:0 0 24px;line-height:1.6">
+      Paystack will retry automatically for a few days. To keep your access uninterrupted, please update your payment method now:
+    </p>
+    <a href="${APP_URL}/profile/billing" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">Update payment method →</a>
+    <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
+    <p style="margin:0;color:#a8a29e;font-size:13px">
+      If you no longer want to renew, no action is needed — your plan will downgrade to Free after the current period ends.
+      Need help? <a href="${APP_URL}/contact" style="color:#2563eb">Contact us</a>.
+    </p>
+  </div>
+</div>
+</body></html>`,
+  };
+}
+
 export function jobAlertEmail(name: string, jobs: Array<{ title: string; company: string; location: string; id: string }>) {
   const jobRows = jobs.slice(0, 5).map(j => `
     <tr>

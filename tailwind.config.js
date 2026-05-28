@@ -12,19 +12,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Brand palette is the actual design blue. Earlier the palette here
+        // was a green scale, the app rendered blue elsewhere, and a 40-line
+        // !important block in globals.css forcibly overrode every utility
+        // class. That's now collapsed into a single source of truth — same
+        // values the inline <style> in app/layout.tsx already exposes as
+        // CSS variables.
         brand: {
-          50:  '#edfaf2',
-          100: '#d4f3e3',
-          200: '#abe6c8',
-          300: '#72d3a7',
-          400: '#3dbb7b',
-          500: '#1ea05e',
-          600: '#0f7a48',
-          700: '#0a5c36',
-          800: '#0a4c2e',
-          900: '#083e26',
-          950: '#042314',
-          DEFAULT: '#0a5c36',
+          50:  '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e3a5f',
+          900: '#0f1e38',
+          950: '#060e1f',
+          DEFAULT: '#2563eb',
         },
         accent: {
           DEFAULT: '#F5A623',
@@ -58,10 +64,12 @@ module.exports = {
         '2xl': '32px',
       },
       boxShadow: {
-        'sm-brand': '0 1px 4px rgba(10,92,54,0.06)',
-        'md-brand': '0 4px 16px rgba(10,92,54,0.10)',
-        'lg-brand': '0 8px 32px rgba(10,92,54,0.14)',
-        'xl-brand': '0 16px 56px rgba(10,92,54,0.18)',
+        // rgba(37,99,235) = brand-600 (#2563eb). The previous values used
+        // the old green palette and silently mismatched every blue surface.
+        'sm-brand': '0 1px 4px rgba(37,99,235,0.06)',
+        'md-brand': '0 4px 16px rgba(37,99,235,0.10)',
+        'lg-brand': '0 8px 32px rgba(37,99,235,0.14)',
+        'xl-brand': '0 16px 56px rgba(37,99,235,0.18)',
       },
       animation: {
         'fade-in':  'fadeIn 0.24s ease both',

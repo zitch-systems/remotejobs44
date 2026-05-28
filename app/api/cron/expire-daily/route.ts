@@ -53,7 +53,11 @@ export async function GET(req: NextRequest) {
     .from('subscriptions')
     .select('user_id')
     .in('billing', ['monthly', 'annually'])
-    .in('status', ['active', 'cancelled'])
+    // payment_failed users are downgraded in this sweep too — Paystack
+    // marks them via invoice.payment_failed webhook, which sets
+    // current_period_end to now, so they fall past `proCutoff` on the
+    // next cron run.
+    .in('status', ['active', 'cancelled', 'payment_failed'])
     .lt('current_period_end', proCutoff);
 
   const proIds = (expiredPro ?? []).map((s: { user_id: string }) => s.user_id);

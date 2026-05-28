@@ -94,34 +94,35 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Your day pass has expired. Please renew to continue applying.' }, { status: 403 });
       }
 
-      // Row missing → webhook race after fresh purchase. Allow the apply,
-      // but enforce a soft 10/hour cap so a webhook outage can't be
-      // exploited for unlimited applies. Trust profile.plan='daily' — the
-      // verify route or webhook set it.
+      // Row missing → webhook race after fresh purchase. Previously we
+      // fell back to a "10 applies per hour" soft cap, which leaked: a
+      // user could buy a ₦500 day pass, fire 10 applies, wait an hour,
+      // fire 10 more, repeat until the webhook landed (or forever if it
+      // failed). Now we refuse with 503 + retry hint until the
+      // subscriptions row exists. The window is short (verify route runs
+      // synchronously inside the Paystack redirect; webhook lands within
+      // seconds) and a transient retry is the honest UX.
       if (!sub) {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        const { count: recentCount } = await supabase
-          .from('applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .gte('applied_at', oneHourAgo);
-        if ((recentCount ?? 0) >= 10) {
-          return NextResponse.json({
-            error: 'Rate limit reached. Please wait a few minutes — your subscription is still syncing.',
-          }, { status: 429 });
-        }
-      } else {
-        const { count: appCount } = await supabase
-          .from('applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .gte('applied_at', sub.current_period_start);
+        return NextResponse.json({
+          error: 'Your day pass is still syncing. Please try again in a moment.',
+        }, { status: 503, headers: { 'Retry-After': '5' } });
+      }
 
-        if ((appCount ?? 0) >= 10) {
-          return NextResponse.json({
-            error: 'You have reached the 10-application limit for your day pass. Upgrade to Pro for unlimited access.'
-          }, { status: 403 });
-        }
+      // Sub row present + still in period: enforce hard 10-apply cap
+      // counted from current_period_start. Server is source of truth —
+      // the dailyAppsUsed counter that used to live in Zustand was a
+      // soft UI hint, never a real gate (localStorage.clear() bypassed
+      // it). This count comes from the DB and can't be tampered with.
+      const { count: appCount } = await supabase
+        .from('applications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('applied_at', sub.current_period_start);
+
+      if ((appCount ?? 0) >= 10) {
+        return NextResponse.json({
+          error: 'You have reached the 10-application limit for your day pass. Upgrade to Pro for unlimited access.'
+        }, { status: 403 });
       }
     }
 
