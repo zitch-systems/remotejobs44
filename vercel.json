@@ -1,10 +1,6 @@
 {
   "crons": [
-    {
-      "//": "Single scheduled cron — /daily does ingest + expiry + alerts in one pass. The /ingest and /expire-daily routes remain callable manually with CRON_SECRET for debug re-runs, but scheduling them in parallel raced /daily on the shared profiles/subscriptions upserts and triple-fired the Resend alert burst.",
-      "path": "/api/cron/daily",
-      "schedule": "0 6 * * *"
-    }
+    { "path": "/api/cron/daily", "schedule": "0 6 * * *" }
   ],
   "functions": {
     "app/api/cron/daily/route.ts":        { "maxDuration": 60 },

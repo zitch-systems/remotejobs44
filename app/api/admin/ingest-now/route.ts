@@ -10,7 +10,8 @@ export async function POST() {
   if (!auth.ok) return auth.res;
 
   try {
-    return runIngest();
+    const result = await runIngest();
+    return NextResponse.json(result);
   } catch (err: any) {
     console.error('[ingest-now]', err);
     return NextResponse.json({ error: err.message ?? 'Failed' }, { status: 500 });

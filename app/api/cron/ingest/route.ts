@@ -16,5 +16,6 @@ export async function GET(req: NextRequest) {
   if (auth !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  return runIngest();
+  const result = await runIngest();
+  return NextResponse.json(result);
 }

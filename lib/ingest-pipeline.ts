@@ -1,8 +1,16 @@
 // lib/ingest-pipeline.ts
-// Pulls remote jobs from a handful of free public APIs and upserts them into
-// public.jobs (deduplicated by apply_url). Used by both the scheduled cron at
-// /api/cron/ingest and the admin "run now" endpoint at /api/admin/ingest-now.
-import { NextResponse } from 'next/server';
+// Pulls remote jobs from every active source in the in-code SOURCES list
+// (Remotive, Jobicy, RemoteOK, Arbeitnow, Findwork (if key), SerpApi (if
+// key)) and inserts them into public.jobs. Per the no-dedup decision
+// recorded in user memory we do NOT upsert by apply_url; each daily run
+// inserts fresh rows. Stale rows are downgraded by the daily cron's
+// separate staleness pass (jobs.is_active = false after 60 days), so the
+// public listings stay current without losing history.
+//
+// Called by:
+//   * /api/cron/daily       — scheduled cron, the single daily 6am UTC run
+//   * /api/cron/ingest      — manual debug re-trigger (same auth secret)
+//   * /api/admin/ingest-now — admin "run now" button
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
 
@@ -233,12 +241,42 @@ const SOURCES: Source[] = [
   } as Source)) : []),
 ];
 
-export async function runIngest() {
+export interface IngestResult {
+  success:    boolean;
+  totalAdded: number;
+  results:    Record<string, number | string>;
+  paused:     string[];
+  at:         string;
+}
+
+export async function runIngest(): Promise<IngestResult> {
   const supabase = createAdminSupabaseClient();
   const results: Record<string, number | string> = {};
   let totalAdded = 0;
 
+  // Read paused sources from job_sources. Admin can pause a misbehaving
+  // source (e.g. ATS upstream that's been returning spam) by setting
+  // its row's `status = 'paused'`. URL match is canonical because a
+  // single source may have multiple aliases in the in-code SOURCES list.
+  let pausedUrls = new Set<string>();
+  try {
+    const { data: paused } = await supabase
+      .from('job_sources')
+      .select('url')
+      .eq('status', 'paused');
+    pausedUrls = new Set((paused ?? []).map((r: { url: string }) => r.url));
+  } catch (err: any) {
+    // Don't block the run if job_sources is unreadable for any reason.
+    console.warn('[ingest] could not read paused sources:', err.message);
+  }
+  const pausedNames: string[] = [];
+
   for (const source of SOURCES) {
+    if (pausedUrls.has(source.sourceUrl)) {
+      pausedNames.push(source.name);
+      results[source.name] = 'paused';
+      continue;
+    }
     try {
       const raw = await source.fetch();
       const jobs = raw.slice(0, 50)
@@ -288,7 +326,13 @@ export async function runIngest() {
     }
   }
 
-  return NextResponse.json({ success: true, totalAdded, results, at: new Date().toISOString() });
+  return {
+    success:    true,
+    totalAdded,
+    results,
+    paused:     pausedNames,
+    at:         new Date().toISOString(),
+  };
 }
 
 async function recordSourceRun(
