@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowRight, MapPin, Building2 } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
+import { FaqJsonLd } from '@/components/seo/FaqJsonLd';
 
 interface Job {
   id: string;
@@ -23,6 +24,7 @@ export function SliceListing({
   total,
   browseHref,
   breadcrumbs,
+  faqs,
   relatedLinks,
 }: {
   title: string;
@@ -37,6 +39,12 @@ export function SliceListing({
    */
   breadcrumbs?: Array<{ name: string; href: string }>;
   /**
+   * Page-relevant Q&A items. Rendered visibly as an accordion-free FAQ
+   * block AND emitted as FAQPage JSON-LD (rich-result target). See
+   * lib/seo-faqs.ts for the per-slice templates.
+   */
+  faqs?: Array<{ q: string; a: string }>;
+  /**
    * Internal links to sibling landing pages — same category, same skill
    * family, neighbouring region/timezone, etc. Recirculates PageRank
    * across the programmatic SEO surface so the 200+ landing pages stop
@@ -47,6 +55,7 @@ export function SliceListing({
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-10">
       {breadcrumbs && breadcrumbs.length > 0 && <BreadcrumbJsonLd items={breadcrumbs} />}
+      {faqs && faqs.length > 0 && <FaqJsonLd items={faqs} />}
       <div className="mb-8">
         <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight">{title}</h1>
         <p className="text-stone-500 dark:text-stone-400 mt-2 max-w-2xl leading-relaxed">{blurb}</p>
@@ -90,6 +99,29 @@ export function SliceListing({
           See all {total.toLocaleString()} jobs <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
+
+      {/* Visible FAQ section — same Q&A pairs as the FAQPage JSON-LD
+          above. Users get the content directly; Google + Perplexity +
+          ChatGPT can extract the rich-result accordion from the schema. */}
+      {faqs && faqs.length > 0 && (
+        <section className="mt-12 pt-8 border-t border-stone-200 dark:border-[#1e3a5f]">
+          <h2 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-5">
+            Frequently asked
+          </h2>
+          <div className="space-y-5">
+            {faqs.map((faq, i) => (
+              <div key={i}>
+                <h3 className="font-display font-bold text-base text-stone-900 dark:text-stone-100 mb-1.5">
+                  {faq.q}
+                </h3>
+                <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                  {faq.a}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {relatedLinks && relatedLinks.length > 0 && (
         <div className="mt-12 pt-8 border-t border-stone-200 dark:border-[#1e3a5f]">

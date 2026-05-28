@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { CATEGORIES, findCategory, SKILLS } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
 const BASE = 'https://remotejobs44.com';
@@ -77,6 +78,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         { name: 'Jobs',     href: '/jobs' },
         { name: cat.label,  href: `/jobs/category/${cat.slug}` },
       ]}
+      faqs={buildSliceFaqs('category', cat.label)}
       relatedLinks={relatedLinks}
     />
   );

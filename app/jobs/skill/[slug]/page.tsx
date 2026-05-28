@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { SKILLS, CATEGORIES, findSkill } from '@/lib/seo-slices';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -73,6 +74,7 @@ export default async function SkillPage({ params }: { params: { slug: string } }
         { name: 'Jobs',       href: '/jobs' },
         { name: skill.label,  href: `/jobs/skill/${skill.slug}` },
       ]}
+      faqs={buildSliceFaqs('skill', skill.label)}
       relatedLinks={relatedLinks}
     />
   );

@@ -6,6 +6,7 @@ import { INDUSTRIES } from '@/lib/seo-extra';
 import { CATEGORIES, SKILLS } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
 const BASE = 'https://remotejobs44.com';
@@ -95,6 +96,7 @@ export default async function IndustryPage({ params }: { params: { slug: string 
         { name: 'Jobs',     href: '/jobs' },
         { name: i.label,    href: `/jobs/industry/${i.slug}` },
       ]}
+      faqs={buildSliceFaqs('industry', i.label)}
       relatedLinks={relatedLinks}
     />
   );

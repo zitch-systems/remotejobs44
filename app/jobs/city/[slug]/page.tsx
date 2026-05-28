@@ -6,6 +6,7 @@ import { CITIES } from '@/lib/seo-extra';
 import { COUNTRIES, CATEGORIES } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
 const BASE = 'https://remotejobs44.com';
@@ -81,6 +82,7 @@ export default async function CityPage({ params }: { params: { slug: string } })
         { name: 'Jobs',    href: '/jobs' },
         { name: c.label,   href: `/jobs/city/${c.slug}` },
       ]}
+      faqs={buildSliceFaqs('city', c.label)}
       relatedLinks={relatedLinks}
     />
   );

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TIMEZONES, REGIONS, CATEGORIES, findTimezone } from '@/lib/seo-slices';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -74,6 +75,7 @@ export default async function TimezonePage({ params }: { params: { slug: string 
         { name: 'Jobs',                          href: '/jobs' },
         { name: tz.label.split(' (')[0],         href: `/jobs/timezone/${tz.slug}` },
       ]}
+      faqs={buildSliceFaqs('timezone', tz.label.split(' (')[0])}
       relatedLinks={relatedLinks}
     />
   );

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { REGIONS, COUNTRIES, CATEGORIES, findRegion } from '@/lib/seo-slices';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { buildSliceFaqs } from '@/lib/seo-faqs';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -83,6 +84,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
         { name: 'Jobs',        href: '/jobs' },
         { name: region.label,  href: `/jobs/region/${region.slug}` },
       ]}
+      faqs={buildSliceFaqs('region', region.label)}
       relatedLinks={relatedLinks}
     />
   );
