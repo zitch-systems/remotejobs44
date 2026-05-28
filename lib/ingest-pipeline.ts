@@ -13,6 +13,8 @@
 //   * /api/admin/ingest-now — admin "run now" button
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
+import { parseFeed } from '@/lib/feed-parser';
+import { validateExternalUrl } from '@/lib/ssrf-guard';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
 const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
@@ -326,6 +328,87 @@ export async function runIngest(): Promise<IngestResult> {
     }
   }
 
+  // ── User-added sources from job_sources ──────────────────────────
+  // Anything in job_sources whose URL isn't already covered by one of
+  // the in-code SOURCES adapters above is a custom feed an admin added
+  // via the /admin/sources UI. We fetch each, run the generic
+  // RSS/JSON parser, and insert the returned jobs. The same scam screen
+  // applies, and SSRF is re-validated on every fetch (the URL was
+  // checked at POST time, but column values can be edited via the DB
+  // directly).
+  const hardcodedUrls = new Set(SOURCES.map(s => s.sourceUrl));
+  try {
+    const { data: customRows } = await supabase
+      .from('job_sources')
+      .select('id, name, url, method')
+      .eq('status', 'active');
+    const customSources = (customRows ?? []).filter(r => !hardcodedUrls.has(r.url));
+
+    for (const row of customSources) {
+      const label = row.name || row.url;
+      // Re-validate URL on every run. A row may have been inserted via
+      // SQL (bypassing the API's SSRF guard) so we can't assume it's safe.
+      const v = validateExternalUrl(row.url);
+      if (!v.ok) {
+        results[label] = `error: blocked URL (${v.error})`;
+        await markSourceStatus(supabase, row.id, 'error', 0);
+        continue;
+      }
+      try {
+        const res = await fetch(v.url.toString(), {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; RemoteJobs44/1.0; +https://remotejobs44.com)',
+            'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, application/json, */*',
+          },
+          signal: AbortSignal.timeout(15000),
+          redirect: 'error',
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+        const body = await res.text();
+        const parsed = parseFeed(body, res.headers.get('content-type') ?? '', row.url);
+        if (parsed.method === 'unknown') {
+          results[label] = `error: ${parsed.error ?? 'unrecognised format'}`;
+          await markSourceStatus(supabase, row.id, 'error', 0);
+          continue;
+        }
+
+        const jobs = parsed.jobs
+          .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
+          .map(j => {
+            const scam = detectScam(j);
+            return scam ? { ...j, flagged: true, flagged_reason: scam.flagged_reason } : j;
+          });
+
+        if (!jobs.length) {
+          results[label] = 0;
+          await markSourceStatus(supabase, row.id, 'active', 0);
+          continue;
+        }
+
+        const { data: inserted, error: insErr } = await supabase
+          .from('jobs')
+          .insert(jobs)
+          .select('id');
+        if (insErr) {
+          results[label] = `db error: ${insErr.message}`;
+          await markSourceStatus(supabase, row.id, 'error', 0);
+        } else {
+          const n = inserted?.length ?? 0;
+          results[label] = n;
+          totalAdded += n;
+          await markSourceStatus(supabase, row.id, 'active', n);
+        }
+      } catch (err: any) {
+        console.error(`Ingest user-source ${label}:`, err.message);
+        results[label] = `error: ${err.message}`;
+        await markSourceStatus(supabase, row.id, 'error', 0);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[ingest] reading user-added sources failed:', err.message);
+  }
+
   return {
     success:    true,
     totalAdded,
@@ -333,6 +416,27 @@ export async function runIngest(): Promise<IngestResult> {
     paused:     pausedNames,
     at:         new Date().toISOString(),
   };
+}
+
+// Lightweight update-by-id used for user-added sources. (recordSourceRun
+// upserts by URL which is the right shape for the hardcoded adapters,
+// but here we already have the row id so a direct UPDATE is cheaper.)
+async function markSourceStatus(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  id: string,
+  status: 'active' | 'error',
+  jobsAdded: number,
+) {
+  try {
+    await supabase
+      .from('job_sources')
+      .update({
+        status,
+        last_sync_at: new Date().toISOString(),
+        jobs_added:   jobsAdded,
+      })
+      .eq('id', id);
+  } catch {}
 }
 
 async function recordSourceRun(
