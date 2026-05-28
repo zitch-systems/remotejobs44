@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError, logInfo } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -87,7 +88,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { error } = await supabase.from('profiles').update(patch).eq('id', params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  console.log(`[admin] ${auth.adminEmail} updated user ${params.id}:`, patch);
+  logInfo({ event: 'admin.user.updated', admin_email: auth.adminEmail, target_user_id: params.id, patch });
 
   // Audit-log a separate row per field so a search by action="user.suspend"
   // doesn't pick up unrelated name edits.
@@ -144,10 +145,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const { error } = await supabase.auth.admin.deleteUser(params.id);
   if (error) {
-    console.error('[admin] deleteUser failed:', error.message);
+    logError({ event: 'admin.user.delete_failed', admin_email: auth.adminEmail, target_user_id: params.id, error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  console.log(`[admin] ${auth.adminEmail} deleted user ${params.id}`);
+  logInfo({ event: 'admin.user.deleted', admin_email: auth.adminEmail, target_user_id: params.id });
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
     action: 'user.delete', targetType: 'user', targetId: params.id,

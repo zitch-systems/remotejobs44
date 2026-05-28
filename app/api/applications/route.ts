@@ -1,6 +1,7 @@
 // app/api/applications/route.ts — Persist job applications to Supabase
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError, logInfo } from '@/lib/log';
 
 // ── GET /api/applications — List current user's applications ─────────────
 export async function GET() {
@@ -21,7 +22,7 @@ export async function GET() {
 
     return NextResponse.json({ applications: (applications ?? []).map(transformApplication) });
   } catch (err: any) {
-    console.error('[GET /api/applications]', err);
+    logError({ event: 'applications.get_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to load applications' }, { status: 500 });
   }
 }
@@ -86,7 +87,12 @@ export async function POST(req: NextRequest) {
         .eq('status', 'active')
         .maybeSingle();
 
-      console.log(`[applications] day pass apply by ${user.id}: sub=${sub ? `status=${sub.status} end=${sub.current_period_end}` : 'NONE'}`);
+      logInfo({
+        event:   'applications.daypass_apply',
+        user_id: user.id,
+        sub_status: sub?.status ?? null,
+        sub_end:    sub?.current_period_end ?? null,
+      });
 
       // Genuinely past current_period_end → reject this apply but DO NOT
       // touch profiles.plan. The cron handles the plan flip; we just gate.
@@ -178,7 +184,7 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       // Surface a clear error — don't expose raw DB messages
-      console.error('[POST /api/applications] insert error:', insertError);
+      logError({ event: 'applications.insert_failed', user_id: user.id, error: insertError.message });
       return NextResponse.json(
         { error: 'Failed to save your application. Please try again.' },
         { status: 500 }
@@ -192,7 +198,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ application: transformApplication(application) }, { status: 201 });
   } catch (err: any) {
-    console.error('[POST /api/applications]', err);
+    logError({ event: 'applications.post_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to submit application. Please try again.' }, { status: 500 });
   }
 }

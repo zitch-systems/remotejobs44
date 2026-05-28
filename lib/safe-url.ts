@@ -27,6 +27,9 @@ export function isSafeOpenUrl(url: string | null | undefined): url is string {
 // directly to surface an error to the user instead.
 export function safeWindowOpen(url: string | null | undefined): boolean {
   if (!isSafeOpenUrl(url)) {
+    // Stay on console.warn here: this module is imported into client
+    // components and the structured logger isn't worth the extra
+    // bundle bytes for a single dev-time warning that fires per-click.
     console.warn('[safeWindowOpen] refused unsafe url:', url);
     return false;
   }

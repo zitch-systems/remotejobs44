@@ -3,6 +3,7 @@
 // mutation. Failures here are swallowed (and logged) so an audit-table
 // outage never breaks the actual admin operation.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 export interface AdminActionInput {
   adminId:    string;
@@ -28,6 +29,6 @@ export async function recordAdminAction(input: AdminActionInput): Promise<void> 
     // Audit log is best-effort. If admin_actions doesn't exist yet
     // (migration_v4 not applied) we still want the underlying admin
     // operation to succeed.
-    console.error('[audit] recordAdminAction failed:', err);
+    logError({ event: 'audit.record_failed', error: (err as Error)?.message ?? String(err) });
   }
 }

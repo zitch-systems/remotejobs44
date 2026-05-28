@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { logError } from '@/lib/log';
 
 type SourceMethod = 'rss' | 'json-api' | 'scrape' | 'auto' | 'unknown';
 type SourceStatus = 'active' | 'paused' | 'error';
@@ -38,7 +39,7 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) {
-    console.error('[admin/sources GET]', error.message);
+    logError({ event: 'admin.sources.list_failed', error: error.message });
     return NextResponse.json({ error: error.message, sources: [] }, { status: 500 });
   }
   return NextResponse.json({ sources: (data ?? []) as SourceRow[] });
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
     .select('id, name, url, method, status, last_sync_at, jobs_added, created_at')
     .single();
   if (error || !data) {
-    console.error('[admin/sources POST]', error?.message);
+    logError({ event: 'admin.sources.create_failed', error: error?.message ?? 'unknown' });
     return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
   }
   return NextResponse.json({ source: data as SourceRow }, { status: 201 });

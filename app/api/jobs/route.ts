@@ -4,6 +4,7 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/sup
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { logError } from '@/lib/log';
 
 export const revalidate = 60;
 
@@ -272,7 +273,7 @@ export async function POST(req: NextRequest) {
     if (error) throw new Error('insert_failed');
     return NextResponse.json({ job: transformJob(job) }, { status: 201 });
   } catch (err: any) {
-    console.error('[POST /api/jobs]', err);
+    logError({ event: 'jobs.post_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to create job. Please try again.' }, { status: 500 });
   }
 }
@@ -314,7 +315,7 @@ export async function PATCH(req: NextRequest) {
     if (error) throw new Error('update_failed');
     return NextResponse.json({ job: transformJob(job) });
   } catch (err: any) {
-    console.error('[PATCH /api/jobs]', err);
+    logError({ event: 'jobs.patch_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to update job. Please try again.' }, { status: 500 });
   }
 }
@@ -332,7 +333,7 @@ export async function DELETE(req: NextRequest) {
     if (error) throw new Error('delete_failed');
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[DELETE /api/jobs]', err);
+    logError({ event: 'jobs.delete_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to delete job. Please try again.' }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@
 // cohere) and Anthropic Claude. Picks the first enabled config; if more than
 // one is enabled, Claude wins, otherwise OpenAI, otherwise first found.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 export interface AiConfig {
   providerId: string;
@@ -155,6 +156,6 @@ async function callOpenAiCompatible(cfg: AiConfig, system: string, prompt: strin
 // an API key, partial prompt, or other sensitive content the provider may
 // include in its own error responses.
 function aiError(provider: string, r: Response, body: string): Error {
-  console.error(`[ai/${provider}] HTTP ${r.status} ${r.statusText}: ${body.slice(0, 1500)}`);
+  logError({ event: 'ai.provider.http_error', provider, status: r.status, status_text: r.statusText, body_excerpt: body.slice(0, 1500) });
   return new Error(`${provider} API returned ${r.status}. Try again or contact support.`);
 }

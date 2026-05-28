@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 
 const SUPPORTED_PROVIDERS = new Set([
   'claude', 'openai', 'gemini', 'groq', 'kimi', 'mistral', 'cohere', 'together',
@@ -45,7 +46,7 @@ export async function GET() {
     });
     return NextResponse.json({ configs: safe });
   } catch (err: any) {
-    console.error('[ai-discovery/settings GET]', err);
+    logError({ event: 'admin.ai_discovery_settings.get_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
   }
 }
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[ai-discovery/settings POST]', err);
+    logError({ event: 'admin.ai_discovery_settings.post_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
   }
 }
@@ -133,7 +134,7 @@ export async function DELETE(req: NextRequest) {
     if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[ai-discovery/settings DELETE]', err);
+    logError({ event: 'admin.ai_discovery_settings.delete_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to delete settings' }, { status: 500 });
   }
 }

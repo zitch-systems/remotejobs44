@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { runIngest } from '@/lib/ingest-pipeline';
+import { logError } from '@/lib/log';
 
 export async function POST() {
   const auth = await requireAdmin();
@@ -13,7 +14,7 @@ export async function POST() {
     const result = await runIngest();
     return NextResponse.json(result);
   } catch (err: any) {
-    console.error('[ingest-now]', err);
+    logError({ event: 'admin.ingest_now.failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: err.message ?? 'Failed' }, { status: 500 });
   }
 }

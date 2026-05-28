@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 
 export const revalidate = 30;
 
@@ -38,7 +39,7 @@ export async function GET() {
       revenue:       0, // Revenue data comes from Paystack webhooks
     });
   } catch (err: any) {
-    console.error('[admin/stats]', err);
+    logError({ event: 'admin.stats.failed', error: err?.message ?? String(err) });
     return NextResponse.json({ totalJobs: 0, newToday: 0, activeUsers: 0, subscriptions: 0, sources: 0, revenue: 0 });
   }
 }

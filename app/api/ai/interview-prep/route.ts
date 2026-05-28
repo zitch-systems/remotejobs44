@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { logError, logWarn } from '@/lib/log';
 
 const SYSTEM = `You are a senior interviewer at a global remote-first company who has interviewed hundreds of candidates from Africa, Asia, Europe and the Americas. Produce useful, specific interview prep. Output valid JSON only — no preface, no markdown fences.
 
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
     // abuse pattern. See cv-review/route.ts for the same gate.
     const ipRl = rateLimit(`ai:prep:ip:${getIP(req)}`, 30, 24 * 60 * 60 * 1000);
     if (!ipRl.success) {
-      console.warn('[ai/interview-prep] IP cap hit:', getIP(req));
+      logWarn({ event: 'ai.interview_prep.ip_cap_hit', ip: getIP(req) });
       return NextResponse.json(
         { error: 'Too many interview preps from this network. Please try again tomorrow.', retryAt: ipRl.resetAt },
         { status: 429 },
@@ -99,13 +100,13 @@ export async function POST(req: NextRequest) {
 
     const json = safeParseJson(raw);
     if (!json) {
-      console.error('[ai/interview-prep] unparseable response:', raw.slice(0, 1000));
+      logError({ event: 'ai.interview_prep.unparseable_response', raw_excerpt: raw.slice(0, 1000) });
       return NextResponse.json({ error: 'AI returned malformed output. Please try again in a moment.' }, { status: 502 });
     }
 
     return NextResponse.json({ prep: json });
   } catch (err: any) {
-    console.error('[ai/interview-prep]', err);
+    logError({ event: 'ai.interview_prep.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: err.message ?? 'Interview prep failed' }, { status: 500 });
   }
 }

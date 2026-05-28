@@ -2,6 +2,8 @@
 // Helper for looking up a customer's active subscription on Paystack and
 // pulling the email_token from it. The token is needed for the official
 // /subscription/disable call when a user later cancels.
+import { logError } from '@/lib/log';
+
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
 export interface PaystackSubInfo {
@@ -37,7 +39,7 @@ export async function fetchActiveSubscriptionForCustomer(
       status:            active.status ?? null,
     };
   } catch (err) {
-    console.error('[paystack] fetchActiveSubscriptionForCustomer failed:', err);
+    logError({ event: 'paystack.fetch_active_subscription_failed', error: (err as Error)?.message ?? String(err) });
     return null;
   }
 }

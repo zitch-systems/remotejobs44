@@ -7,6 +7,7 @@
 import type { Job, JobCategory, JobLevel } from './types';
 import { uid } from './utils';
 import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
+import { logInfo, logError } from './log';
 
 // Re-export so existing imports of `from '@/lib/ats-engine'` still work.
 export { detectATSFromUrl, detectATSFromHtml };
@@ -444,28 +445,28 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
   //    SPAs, custom React boards, Sequoia/a16z-style portfolio pages).
   //    Expensive — ~5-8s and ~512MB RAM — so only attempt after the
   //    cheap HTML scrape in step 2 found nothing.
-  console.log('[autoFetchFromCareerUrl] step-3 chromium fallback for', url);
+  logInfo({ event: 'ats.auto_fetch.chromium_fallback', url });
   let renderError: string | undefined;
   try {
     const t0 = Date.now();
     const { renderHtml } = await import('@/lib/render-js');
-    console.log('[autoFetchFromCareerUrl] render-js loaded in', Date.now() - t0, 'ms');
+    logInfo({ event: 'ats.auto_fetch.renderjs_loaded', url, elapsed_ms: Date.now() - t0 });
     const rendered = await renderHtml(url, { timeoutMs: 25_000 });
-    console.log('[autoFetchFromCareerUrl] rendered', rendered.length, 'bytes in', Date.now() - t0, 'ms');
+    logInfo({ event: 'ats.auto_fetch.rendered', url, bytes: rendered.length, elapsed_ms: Date.now() - t0 });
     const renderedDetect = detectATSFromHtml(rendered, url);
     if (renderedDetect) {
-      console.log('[autoFetchFromCareerUrl] chromium found ATS:', renderedDetect.platform, renderedDetect.slug);
+      logInfo({ event: 'ats.auto_fetch.chromium_found', url, platform: renderedDetect.platform, slug: renderedDetect.slug });
       const result = await fetchATSJobs(renderedDetect.platform, renderedDetect.slug, url);
       return { ...result, detected: renderedDetect };
     }
     renderError = 'rendered HTML had no ATS link either';
-    console.log('[autoFetchFromCareerUrl] chromium found no ATS link in', rendered.length, 'bytes of rendered HTML');
+    logInfo({ event: 'ats.auto_fetch.chromium_no_ats', url, rendered_bytes: rendered.length });
   } catch (err: any) {
     // Render path is best-effort. If chromium fails to launch (e.g. local
     // dev without the binary), we just report the original "could not
     // detect" error rather than crashing the whole request.
     renderError = err?.message ?? String(err);
-    console.error('[autoFetchFromCareerUrl render-js failed]', renderError, err?.stack?.slice(0, 500));
+    logError({ event: 'ats.auto_fetch.renderjs_failed', url, error: renderError, stack: err?.stack?.slice(0, 500) });
   }
 
   // 4. Final fallback: extract a candidate slug from the URL host and probe
@@ -479,7 +480,7 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
   if (slugs.length > 0) {
     const probed = await probeKnownATSes(slugs);
     if (probed) {
-      console.log('[autoFetchFromCareerUrl] slug-guess hit:', probed.platform, probed.slug);
+      logInfo({ event: 'ats.auto_fetch.slug_guess_hit', platform: probed.platform, slug: probed.slug });
       const result = await fetchATSJobs(probed.platform, probed.slug, url);
       if (result.total > 0 || !result.error) {
         return {

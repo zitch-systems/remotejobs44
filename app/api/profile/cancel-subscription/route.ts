@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import { logError } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
@@ -51,7 +52,7 @@ export async function POST() {
         });
         paystackDisabled = disableRes.ok;
       } catch (err) {
-        console.error('[cancel-subscription] paystack disable failed:', err);
+        logError({ event: 'subscription.cancel.paystack_disable_failed', user_id: user.id, error: (err as Error)?.message ?? String(err) });
       }
     }
   }

@@ -10,6 +10,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
 import { isValidPlan, getPlanTier, getBilling, getPlanExpiry, PLAN_AMOUNTS_KOBO } from '@/lib/paystack/plans';
+import { logError, logInfo } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,11 +70,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     updated_at:           nowIso,
   }, { onConflict: 'user_id' });
   if (subError) {
-    console.error('[admin/restore-subscription] sub upsert failed:', subError.message);
+    logError({ event: 'admin.restore_subscription.sub_upsert_failed', admin_email: auth.adminEmail, target_user_id: params.id, error: subError.message });
     // Profile was already updated — don't error out, the user is functional.
   }
 
-  console.log(`[admin] ${auth.adminEmail} restored ${plan} for user ${params.id} (${profile.email})`);
+  logInfo({ event: 'admin.subscription_restored', admin_email: auth.adminEmail, target_user_id: params.id, target_email: profile.email, plan });
   await recordAdminAction({
     adminId:    auth.adminId,
     adminEmail: auth.adminEmail,

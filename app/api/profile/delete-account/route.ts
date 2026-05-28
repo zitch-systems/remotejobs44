@@ -7,6 +7,7 @@
 // they'd disappear from their own admin panel mid-action.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseClient();
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
   if (delErr) {
-    console.error('[delete-account] failed:', delErr.message);
+    logError({ event: 'account.delete_failed', user_id: user.id, error: delErr.message });
     return NextResponse.json({ error: delErr.message }, { status: 500 });
   }
 

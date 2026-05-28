@@ -8,6 +8,7 @@ import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 import { resolvePlan } from '@/lib/auth/plan';
+import { logError } from '@/lib/log';
 
 // Columns safe to expose to the owning user. Paystack identifiers
 // (customer_code, subscription_code, email_token) are intentionally EXCLUDED
@@ -45,7 +46,7 @@ export async function GET() {
     // which writes plan='free' onConflict — clobbering a paying user.
     // Return 500 so the client can retry rather than mis-creating state.
     if (error) {
-      console.error('[GET /api/profile] select error:', error.message);
+      logError({ event: 'profile.select_failed', user_id: user.id, error: error.message });
       return NextResponse.json({ error: 'Failed to read profile' }, { status: 500 });
     }
 
@@ -85,12 +86,12 @@ export async function GET() {
     if (!insertError && user.email) {
       const { subject, html } = welcomeEmail(name);
       sendEmail({ to: user.email, subject, html }).catch(err =>
-        console.error('[welcome email]', err)
+        logError({ event: 'profile.welcome_email_failed', user_id: user.id, error: err?.message ?? String(err) })
       );
     }
 
     if (insertError) {
-      console.error('[GET /api/profile] insert error:', insertError.message);
+      logError({ event: 'profile.insert_failed', user_id: user.id, error: insertError.message });
       // Return a safe fallback profile even if DB write fails
       return NextResponse.json({
         profile: {
@@ -105,7 +106,7 @@ export async function GET() {
 
     return NextResponse.json({ profile: newProfile });
   } catch (err: any) {
-    console.error('[GET /api/profile]', err);
+    logError({ event: 'profile.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
 }

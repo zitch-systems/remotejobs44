@@ -7,6 +7,7 @@ import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription'
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier, getBilling, getPlanExpiry,
 } from '@/lib/paystack/plans';
+import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   // could land on an unexpected origin if envs are misconfigured.
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
   if (!APP_URL) {
-    console.error('[paystack/verify] NEXT_PUBLIC_APP_URL is required for safe post-payment redirect');
+    logError({ event: 'paystack.verify.misconfigured', detail: 'NEXT_PUBLIC_APP_URL missing' });
     return NextResponse.json(
       { error: 'Server misconfigured: NEXT_PUBLIC_APP_URL not set' },
       { status: 500 },
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     // only ₦500" tampering attacks (and accidental price drift between
     // initialize and the Paystack dashboard).
     if (!chargeMatchesPlan(plan, amount, currency)) {
-      console.warn(`[verify] amount mismatch — plan=${plan} got=${amount}${currency}`);
+      logWarn({ event: 'paystack.verify.amount_mismatch', plan, amount, currency });
       return NextResponse.redirect(`${APP_URL}/pricing?error=amount_mismatch`);
     }
 
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
         .from('profiles')
         .update({ plan: planTier, plan_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() })
         .eq('id', user_id);
-      if (planErr) console.error('[verify] profile plan update failed:', planErr.message);
+      if (planErr) logError({ event: 'paystack.verify.profile_update_failed', user_id, error: planErr.message });
     }
 
     // Look up the actual Paystack subscription so we can persist its
@@ -138,7 +139,7 @@ export async function GET(req: NextRequest) {
     );
 
   } catch (err: any) {
-    console.error('Verify error:', err);
+    logError({ event: 'paystack.verify.unhandled', error: err?.message ?? String(err) });
     return NextResponse.redirect(`${APP_URL}/pricing?error=server_error`);
   }
 }

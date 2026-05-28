@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
+import { logError } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
 
     if (!data.status) {
-      console.error('Paystack error:', data);
+      logError({ event: 'paystack.initialize.upstream_error', upstream_data: data });
       return NextResponse.json({ error: data.message ?? 'Payment initialization failed' }, { status: 500 });
     }
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
       reference: data.data.reference,
     });
   } catch (err: any) {
-    console.error('Initialize error:', err);
+    logError({ event: 'paystack.initialize.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

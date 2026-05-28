@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { logError, logWarn } from '@/lib/log';
 
 const SYSTEM = `You are a senior remote-hiring recruiter who reviews CVs for engineers, designers, marketers and operators applying to global remote roles from Africa. Be honest, specific, and brief. Output valid JSON only — no preface, no markdown fences.
 
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     // but the wiring is in place.)
     const ipRl = rateLimit(`ai:cv:ip:${getIP(req)}`, 30, 24 * 60 * 60 * 1000);
     if (!ipRl.success) {
-      console.warn('[ai/cv-review] IP cap hit:', getIP(req));
+      logWarn({ event: 'ai.cv_review.ip_cap_hit', ip: getIP(req) });
       return NextResponse.json(
         { error: 'Too many CV reviews from this network. Please try again tomorrow.', retryAt: ipRl.resetAt },
         { status: 429 },
@@ -98,13 +99,13 @@ export async function POST(req: NextRequest) {
     const json = safeParseJson(raw);
     if (!json) {
       // Don't leak raw LLM output to the client — log it server-side instead.
-      console.error('[ai/cv-review] unparseable response:', raw.slice(0, 1000));
+      logError({ event: 'ai.cv_review.unparseable_response', raw_excerpt: raw.slice(0, 1000) });
       return NextResponse.json({ error: 'AI returned malformed output. Please try again in a moment.' }, { status: 502 });
     }
 
     return NextResponse.json({ review: json });
   } catch (err: any) {
-    console.error('[ai/cv-review]', err);
+    logError({ event: 'ai.cv_review.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: err.message ?? 'CV review failed' }, { status: 500 });
   }
 }

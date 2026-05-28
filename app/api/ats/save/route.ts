@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 import type { Job } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
         .select('id');
 
       if (error) {
-        console.error('[ats/save] batch error:', error.message);
+        logError({ event: 'ats.save.batch_failed', error: error.message });
         failed += batch.length;
       } else {
         inserted += data?.length ?? batch.length;
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
       total: jobs.length,
     });
   } catch (err: any) {
-    console.error('[ats/save]', err);
+    logError({ event: 'ats.save.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: err.message ?? 'Failed to save jobs' }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError, logWarn } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -22,13 +23,13 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       // Table probably doesn't exist — not a fatal error
-      console.warn('[admin/settings] site_settings table not found:', error.message);
+      logWarn({ event: 'admin.settings.table_missing', error: error.message });
       return NextResponse.json({ success: true, note: 'Saved locally (Supabase table not configured)' });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[admin/settings]', err);
+    logError({ event: 'admin.settings.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
   }
 }

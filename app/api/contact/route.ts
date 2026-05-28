@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email/send';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const ip = getIP(req);
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[contact]', err);
+    logError({ event: 'contact.unhandled', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
   }
 }

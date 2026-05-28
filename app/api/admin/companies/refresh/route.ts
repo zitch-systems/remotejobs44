@@ -13,6 +13,7 @@ import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
       .insert(batch)
       .select('id');
     if (insErr) {
-      console.error('[companies/refresh] insert batch failed:', insErr.message);
+      logError({ event: 'admin.companies_refresh.insert_failed', error: insErr.message });
       continue;
     }
     added += data?.length ?? batch.length;
