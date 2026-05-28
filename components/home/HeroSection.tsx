@@ -1,81 +1,34 @@
-'use client';
+// components/home/HeroSection.tsx
+//
+// Server-rendered hero. Was a 258-line 'use client' tree where the LCP
+// element (the descriptive paragraph after the H1) waited for hydration
+// before being styled — Lighthouse blamed this for ~half of the 3.9s LCP.
+// Now the eyebrow + headline + paragraph + popular-search chips + social
+// + stats ship in the initial HTML. Three small client islands carry
+// the auth-aware bits:
+//
+//   * <HeroSearchBox />     — search input + Enter handler
+//   * <HeroCTAs />          — Get Started/Log In vs Browse Jobs/View Plans
+//   * <HeroInstallButton /> — beforeinstallprompt + iOS instructions
 import Link from 'next/link';
-import { Search, ArrowRight, LogIn, UserPlus } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/store';
-
-// Extend WindowEventMap for beforeinstallprompt
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-  prompt(): Promise<void>;
-}
-
-declare global {
-  interface WindowEventMap {
-    beforeinstallprompt: BeforeInstallPromptEvent;
-  }
-}
-
-const STATS = [
-  { value: '50,000+', label: 'Active Jobs'  },
-  { value: '8,000+',  label: 'Companies'    },
-  { value: '190+',    label: 'Countries'    },
-];
+import { HeroSearchBox } from './HeroSearchBox';
+import { HeroCTAs } from './HeroCTAs';
+import { HeroInstallButton } from './HeroInstallButton';
 
 const POPULAR = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps', 'Product'];
 
+// Honest, directional copy in place of the previous hard-coded
+// "50,000+ jobs / 8,000+ companies / 190+ countries" numbers. /about
+// has real DB-backed counts for visitors who want the exact figure;
+// the hero's stat row stays static so it doesn't add a DB hit to the
+// homepage LCP path.
+const HERO_STATS = [
+  { value: 'Daily',     label: 'Fresh listings'      },
+  { value: 'Global',    label: 'Companies hiring'    },
+  { value: 'From ₦500', label: 'Day Pass access'     },
+];
+
 export function HeroSection() {
-  const router = useRouter();
-  const { user } = useAuthStore();
-  // Default to unauthed during hydration. Landing-page visitors are
-  // overwhelmingly NOT logged in — gating Sign Up / Log In behind a
-  // confirmed sync meant unauthed visitors saw "Browse Jobs / View Plans"
-  // until Zustand hydrated, hiding the primary conversion CTAs entirely.
-  // Brief flicker for the smaller authed-user cohort is the right trade.
-  const isUnauthed = !user;
-  const [q, setQ] = useState('');
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showInstall, setShowInstall] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-
-  useEffect(() => {
-    const ua = navigator.userAgent;
-    const ios = /iphone|ipad|ipod/i.test(ua);
-    const standalone = ('standalone' in navigator) && (navigator as { standalone?: boolean }).standalone === true;
-    setIsIos(ios && !standalone);
-
-    function onBeforeInstall(e: BeforeInstallPromptEvent) {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstall(true);
-    }
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', () => {
-      setShowInstall(false);
-      setDeferredPrompt(null);
-    });
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall as EventListener);
-    };
-  }, []);
-
-  async function handleInstall() {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowInstall(false);
-      setDeferredPrompt(null);
-    }
-  }
-
-  function search(term?: string) {
-    const val = (term ?? q).trim();
-    router.push(val ? `/jobs?q=${encodeURIComponent(val)}` : '/jobs');
-  }
-
   return (
     <section className="relative overflow-hidden hero-glow pt-6 pb-12 sm:pt-8 sm:pb-14">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-5 flex flex-col items-center text-center gap-6">
@@ -83,7 +36,7 @@ export function HeroSection() {
         {/* Eyebrow */}
         <div className="animate-fade-in inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest"
           style={{ background:'rgba(37,99,235,0.08)', borderColor:'rgba(37,99,235,0.25)', color:'#2563eb' }}>
-          🌍 50,000+ remote jobs worldwide
+          🌍 Remote jobs worldwide
         </div>
 
         {/* Headline */}
@@ -93,6 +46,7 @@ export function HeroSection() {
           <span className="text-highlight">starts here</span>
         </h1>
 
+        {/* LCP element — server-rendered so it lands without waiting for JS. */}
         <p className="text-stone-500 dark:text-stone-400 max-w-lg leading-relaxed"
           style={{ fontSize:'clamp(1rem,2vw,1.1rem)' }}>
           Connect with top companies hiring remotely across engineering, design, marketing and more.
@@ -100,104 +54,33 @@ export function HeroSection() {
           (10 applications) or go Pro for unlimited access.
         </p>
 
-        {/* Search bar */}
+        {/* Search bar — input lives in a small client island. */}
         <div className="w-full max-w-2xl">
-          <div className="flex flex-col sm:flex-row gap-2 p-2 bg-white dark:bg-[#0a1628] rounded-2xl border border-stone-200 dark:border-[#1e3a5f] shadow-md-brand focus-within:border-brand-500 dark:focus-within:border-brand-600 focus-within:shadow-glow transition-all duration-200">
-            <div className="flex items-center gap-3 flex-1 px-3">
-              <Search className="w-4 h-4 text-stone-400 shrink-0" />
-              <input
-                type="text" value={q} onChange={e => setQ(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && search()}
-                placeholder="Job title, skill, or company…"
-                className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 py-2"
-              />
-            </div>
-            <button onClick={() => search()}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shrink-0">
-              <Search className="w-4 h-4" /> Search Jobs
-            </button>
-          </div>
+          <HeroSearchBox />
 
-          {/* Popular searches */}
+          {/* Popular searches — plain <Link>s, no JS needed. Land on
+              /jobs?q=… (the filter-driven search), since these terms
+              are generic prompts rather than catalogued skills. */}
           <div className="flex items-center gap-2 mt-3 flex-wrap justify-center">
             <span className="text-xs text-stone-400 dark:text-stone-500">Popular:</span>
             {POPULAR.map(term => (
-              <button key={term} onClick={() => search(term)}
-                className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-all">
+              <Link key={term} href={`/jobs?q=${encodeURIComponent(term)}`}
+                className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-all">
                 {term}
-              </button>
+              </Link>
             ))}
           </div>
         </div>
 
-        {/* CTAs */}
+        {/* Auth-aware CTAs */}
         <div className="flex gap-3 flex-wrap justify-center">
-          {isUnauthed ? (
-            <>
-              <Link href="/register"
-                className="flex items-center gap-2 px-7 py-3.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors text-sm shadow-md-brand">
-                <UserPlus className="w-4 h-4" /> Get Started Free <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link href="/login"
-                className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
-                <LogIn className="w-4 h-4" /> Log In
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/jobs"
-                className="flex items-center gap-2 px-7 py-3.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors text-sm shadow-md-brand">
-                Browse All Jobs <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link href="/pricing"
-                className="flex items-center gap-2 px-7 py-3.5 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors text-sm">
-                View Plans
-              </Link>
-            </>
-          )}
+          <HeroCTAs />
         </div>
 
-        {/* Install icons — quiet platform badges below the main CTAs. No
-            popup tooltip; iOS users get inline instructions below the row
-            so the affordance is always discoverable without a click. */}
-        {(showInstall || isIos) && (
-          <div className="flex flex-col items-center gap-2 -mt-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400 dark:text-stone-500">Install:</span>
-              {showInstall && (
-                <button
-                  onClick={handleInstall}
-                  aria-label="Install RemoteJobs44 app"
-                  title="Install app"
-                  className="w-9 h-9 flex items-center justify-center rounded-full border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
-                    <path d="M3 20.5v-17C3 2.12 4.12 1 5.5 1S8 2.12 8 3.5v17l-2.5-1.5L3 20.5zm12.5-19L12 4l-3.5-2.5L7 3l5 3.5L17 3l-1.5-1.5zm6 17v-17c0-1.38-1.12-2.5-2.5-2.5S16.5 2.12 16.5 3.5v17l2.5-1.5 2.5 1.5z"/>
-                  </svg>
-                </button>
-              )}
-              {isIos && (
-                <a
-                  href="#ios-install"
-                  aria-label="Install on iOS — instructions below"
-                  title="Add to home screen"
-                  className="w-9 h-9 flex items-center justify-center rounded-full border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
-                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                  </svg>
-                </a>
-              )}
-            </div>
-            {isIos && (
-              <p id="ios-install" className="text-[11px] text-stone-400 dark:text-stone-500 max-w-xs text-center leading-relaxed">
-                Tap <span className="font-semibold text-brand-700 dark:text-brand-400">Share</span> in Safari, then <span className="font-semibold text-brand-700 dark:text-brand-400">&ldquo;Add to Home Screen&rdquo;</span>.
-              </p>
-            )}
-          </div>
-        )}
+        {/* PWA install (client — feature-detects + hides when not available) */}
+        <HeroInstallButton />
 
-        {/* Support email + Instagram follow chip */}
+        {/* Support email + social row */}
         <div className="-mt-2 flex flex-col items-center gap-2">
           <p className="text-xs text-stone-400 dark:text-stone-500">
             Need help?{' '}
@@ -242,9 +125,9 @@ export function HeroSection() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — honest, directional copy (real numbers live on /about). */}
         <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap pt-6 border-t border-stone-200 dark:border-[#1e3a5f] w-full max-w-lg">
-          {STATS.map(s => (
+          {HERO_STATS.map(s => (
             <div key={s.label} className="text-center">
               <div className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100">{s.value}</div>
               <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mt-0.5">{s.label}</div>
