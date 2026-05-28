@@ -13,6 +13,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, Clock, ArrowLeft } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -29,15 +30,13 @@ async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
     const supabase = createServerSupabaseClient();
-    const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
-    const notFlagged = 'flagged.eq.false,flagged.is.null';
     const { data } = await supabase
       .from('jobs')
       .select('*')
       .eq('id', id)
       .eq('is_active', true)
-      .or(notExpired)
-      .or(notFlagged)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .maybeSingle();
     if (!data) return null;
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in

@@ -3,12 +3,24 @@ import type { NextRequest } from 'next/server';
 
 export const runtime = 'edge';
 
+// Cap input string lengths so an attacker can't burn Edge image-compute
+// by hammering this with megabyte-long querystrings. Combined with the
+// immutable Cache-Control below, the same querystring renders once at
+// the CDN and then serves the same PNG for a year — a flood of unique
+// inputs still costs (one render per unique URL), but each PNG is
+// guaranteed to be cached after the first hit.
+const MAX_LEN = 120;
+function clamp(s: string | null, fallback: string): string {
+  if (!s) return fallback;
+  return s.length > MAX_LEN ? s.slice(0, MAX_LEN) : s;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const title   = searchParams.get('title')    ?? 'Find Remote Jobs';
-  const company = searchParams.get('company')  ?? '';
-  const salary  = searchParams.get('salary')   ?? '';
-  const sub     = searchParams.get('subtitle') ?? '50,000+ remote jobs • remotejobs44.com';
+  const title   = clamp(searchParams.get('title'),    'Find Remote Jobs');
+  const company = clamp(searchParams.get('company'),  '');
+  const salary  = clamp(searchParams.get('salary'),   '');
+  const sub     = clamp(searchParams.get('subtitle'), '50,000+ remote jobs • remotejobs44.com');
 
   return new ImageResponse(
     (
@@ -68,6 +80,16 @@ export async function GET(req: NextRequest) {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: 1200,
+      height: 630,
+      // Immutable + long max-age — same querystring → same PNG forever.
+      // Each unique (title, company, salary, subtitle) combination is
+      // rendered once at the CDN and reused. Without this header every
+      // crawler hit re-rendered.
+      headers: {
+        'Cache-Control': 'public, immutable, no-transform, max-age=31536000, s-maxage=31536000',
+      },
+    }
   );
 }

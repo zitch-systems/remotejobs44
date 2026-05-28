@@ -10,6 +10,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -108,15 +109,13 @@ async function fetchJobs(sp: SearchParams) {
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
   const supabase = createServerSupabaseClient();
-  const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
-  const notFlagged = 'flagged.eq.false,flagged.is.null';
 
   let query = supabase
     .from('jobs')
     .select('*', { count: 'exact' })
     .eq('is_active', true)
-    .or(notExpired)
-    .or(notFlagged);
+    .or(notExpired())
+    .or(NOT_FLAGGED);
 
   if (q) {
     const safe = q.replace(/[,()%*\\"']/g, ' ').trim().slice(0, 100);

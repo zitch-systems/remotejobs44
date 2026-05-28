@@ -67,6 +67,27 @@ export interface ATSDetectResult {
   confidence: 'high' | 'medium' | 'low';
 }
 
+// Allowlist of every ATSPlatform string. Exported so the /api/ats route
+// can validate a user-supplied `platform=` query parameter against the
+// enum — without it, an admin (or admin-XSS) could pass
+// `platform=internal.example.com/x?#` and coerce an outbound fetch.
+export const ATS_PLATFORMS: readonly ATSPlatform[] = [
+  'greenhouse', 'lever', 'ashby', 'workable', 'recruitee', 'workday',
+  'smartrecruiters', 'personio', 'bamboohr', 'jazzhr', 'breezy', 'comeet',
+  'jobvite', 'icims', 'recruiterbox', 'jobscore', 'zohorecruit', 'teamtailor',
+  'manatal', 'pinpoint', 'jobadder', 'talentlyft', 'heyrecruit', 'vivahr',
+  'polymer', 'taleo', 'successfactors', 'bullhorn', 'crelate', 'newton',
+  'cornerstone', 'ukgpro', 'adp', 'paylocity', 'loxo', 'vincere', 'avature',
+  'eightfold', 'phenom', 'beamery', 'hireology', 'clearcompany', 'hrpartner',
+  'recooty', 'skeeled', 'hibob', 'pcrecruiter', 'catsone', 'recruitcrm',
+  'sagepeople', 'workzoom', 'hireserve', 'unknown',
+] as const;
+
+const ATS_PLATFORM_SET: Set<string> = new Set(ATS_PLATFORMS);
+export function isValidATSPlatform(s: string | null | undefined): s is ATSPlatform {
+  return !!s && ATS_PLATFORM_SET.has(s);
+}
+
 // Path segments that look like company slugs but aren't — these come from
 // embed widgets / API routes / static assets. Without this guard, a careers
 // page that embeds `boards.greenhouse.io/embed/job_board?for=noom` would be

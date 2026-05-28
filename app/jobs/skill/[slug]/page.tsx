@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { SKILLS, CATEGORIES, findSkill } from '@/lib/seo-slices';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -40,6 +41,8 @@ export default async function SkillPage({ params }: { params: { slug: string } }
       .from('jobs')
       .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .or(`title.ilike.%${skill.label}%,skills.cs.{${skill.label}}`)
       .order('posted_at', { ascending: false })
       .limit(30);

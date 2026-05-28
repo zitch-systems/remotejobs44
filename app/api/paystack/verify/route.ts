@@ -11,7 +11,19 @@ import {
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
 export async function GET(req: NextRequest) {
-  const APP_URL   = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+  // Hard-fail when NEXT_PUBLIC_APP_URL is unset. The previous fallback to
+  // `new URL(req.url).origin` would use whatever Host header the request
+  // carried — fine on Vercel (the proxy strips it) but a footgun on any
+  // self-hosted deployment, and it also means the post-payment redirect
+  // could land on an unexpected origin if envs are misconfigured.
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
+  if (!APP_URL) {
+    console.error('[paystack/verify] NEXT_PUBLIC_APP_URL is required for safe post-payment redirect');
+    return NextResponse.json(
+      { error: 'Server misconfigured: NEXT_PUBLIC_APP_URL not set' },
+      { status: 500 },
+    );
+  }
   const reference = req.nextUrl.searchParams.get('reference')
     ?? req.nextUrl.searchParams.get('trxref');
 

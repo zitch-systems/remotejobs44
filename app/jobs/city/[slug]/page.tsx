@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { CITIES } from '@/lib/seo-extra';
 import { COUNTRIES, CATEGORIES } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
 const BASE = 'https://remotejobs44.com';
@@ -49,6 +50,8 @@ export default async function CityPage({ params }: { params: { slug: string } })
       .from('jobs')
       .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .or(`location.ilike.%${c.label}%,location.ilike.%remote%,location.ilike.%worldwide%`)
       .order('posted_at', { ascending: false })
       .limit(30);

@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TIMEZONES, REGIONS, CATEGORIES, findTimezone } from '@/lib/seo-slices';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -41,6 +42,8 @@ export default async function TimezonePage({ params }: { params: { slug: string 
       .from('jobs')
       .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .or(`timezone.ilike.%${tag}%,location.ilike.%${tag}%,location.ilike.%worldwide%,location.ilike.%anywhere%`)
       .order('posted_at', { ascending: false })
       .limit(30);

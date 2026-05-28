@@ -1,6 +1,7 @@
 // app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
+import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 
@@ -51,16 +52,11 @@ export async function GET(req: NextRequest) {
     // regressions that might accidentally surface inactive/private rows.
     const supabase = createServerSupabaseClient();
 
-    // Filter out jobs whose explicit expires_at has passed. Without this,
-    // stale postings (months old, marker set by the ATS upstream) stay
-    // visible until the cron flips is_active=false — which currently
-    // never happens, so they live forever.
-    const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
-    // Hide jobs the scam-detect heuristic flagged at ingest. Admin UI at
-    // /admin/jobs sees everything; public callers never see flagged rows.
-    // `.or('flagged.eq.false,flagged.is.null')` covers legacy rows
-    // inserted before the column existed (column default is false).
-    const notFlagged = 'flagged.eq.false,flagged.is.null';
+    // Visibility gates — see lib/jobs-visibility.ts. Filters out expired
+    // postings (cron currently doesn't flip is_active=false on expiry) and
+    // rows the scam-detect heuristic flagged at ingest.
+    const notExpired = visibilityNotExpired();
+    const notFlagged = NOT_FLAGGED;
 
     if (id) {
       const { data: job } = await supabase

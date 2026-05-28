@@ -5,6 +5,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { COUNTRIES, REGIONS, CATEGORIES, findCountry } from '@/lib/seo-slices';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { SliceListing } from '@/components/jobs/SliceListing';
 
@@ -42,6 +43,8 @@ export default async function CountryPage({ params }: { params: { slug: string }
       .from('jobs')
       .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .or(`location.ilike.%${country.label}%,location.ilike.%worldwide%,location.ilike.%anywhere%,location.ilike.%global%`)
       .order('posted_at', { ascending: false })
       .limit(30);
