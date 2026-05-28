@@ -8,6 +8,7 @@ import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { resolveRole } from '@/lib/auth/redirect';
+import { resolvePlan } from '@/lib/auth/plan';
 
 const NAV_LINKS = [
   { href: '/jobs',      label: 'Jobs'      },
@@ -71,37 +72,12 @@ export function Header() {
 
     function buildUser(authUser: { id: string; email?: string | null }, profile: any) {
       const role = resolveRole({ profileRole: profile?.role, email: authUser.email });
-
-      // Effective plan — mirrors /api/profile so client and server agree.
-      // Without this, Header would read profile.plan directly and downgrade
-      // a user to 'free' the moment their day-pass webhook lagged by a few
-      // hundred ms (the "subscribed → unsubscribed → subscribed back"
-      // flicker users were reporting after refresh).
-      //
-      //   * admin role overrides everything
-      //   * plan_expires_at in the past → 'free' (genuine expiry; cron
-      //     downgrade lagged but plan is conceptually expired)
-      //   * plan_expires_at in the future → the user is paid; trust
-      //     profile.plan unless it's 'free' (webhook race during fresh
-      //     purchase — keep the higher persisted client plan)
-      //   * plan_expires_at null + no profile → 'free'
-      const now = Date.now();
-      const expiryMs = profile?.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
-      const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-      const expired = expiryMs !== null && expiryMs < now;
-
-      let dbPlan: 'free' | 'daily' | 'pro' | 'admin';
-      if (role === 'admin')         dbPlan = 'admin';
-      else if (expired)             dbPlan = 'free';
-      else                          dbPlan = (profile?.plan ?? 'free') as 'free' | 'daily' | 'pro' | 'admin';
-
-      const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-      // Webhook race: profile.plan still says 'free' but plan_expires_at
-      // proves the user just paid. Keep whatever non-free plan the client
-      // already had (verify route / pricing-success handler set it).
-      const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
-        ? currentPlan
-        : dbPlan;
+      const plan = resolvePlan({
+        role,
+        dbPlan: profile?.plan,
+        planExpiresAt: profile?.plan_expires_at,
+        currentClientPlan: useAuthStore.getState().user?.plan,
+      });
 
       return {
         id:    authUser.id,
@@ -117,24 +93,27 @@ export function Header() {
     async function syncAuth() {
       const { setHydrated } = useAuthStore.getState();
       try {
-        const { user: authUser, status } = await getAuthedUserSafe(supabase);
+        const { user: authUser, status, sessionUserId } = await getAuthedUserSafe(supabase);
         if (status === 'unauthed')  { setUser(null); return; }
 
         // SECURITY: if the persisted user (from localStorage) is for a
-        // different person than the live Supabase session, wipe it. ONLY
-        // wipe here when we're about to return without a follow-up
+        // different person than the live Supabase session, wipe it. Use
+        // sessionUserId (from the local session, not the network call)
+        // so the wipe also fires on `transient` — without that, a
+        // logged-out user whose first validation comes back transient
+        // would keep seeing the previous user's name/plan/role from
+        // Zustand until a non-transient call eventually succeeded.
+        //
+        // ONLY wipe here when we're about to return without a follow-up
         // setUser — otherwise the next setUser(buildUser(...)) below
         // overwrites atomically (setUser already wipes the jobs store on
         // user-id change via resetJobsStoreForNewUser). Calling
         // setUser(null) before setUser(buildUser) caused a one-frame
         // logged-out flash visible in components subscribed to `user`.
         const persisted = useAuthStore.getState().user;
-        const crossAccount = !!(authUser && persisted && persisted.id !== authUser.id);
+        const crossAccount = !!(persisted && sessionUserId && persisted.id !== sessionUserId);
 
         if (status === 'transient') {
-          // Server couldn't validate. If persisted matches the (possibly
-          // stale) authUser id we keep showing the persisted state. If
-          // it doesn't, wipe now (no follow-up setUser this turn).
           if (crossAccount) setUser(null);
           setHydrated(true);
           return;

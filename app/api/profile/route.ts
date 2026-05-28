@@ -7,6 +7,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
+import { resolvePlan } from '@/lib/auth/plan';
 
 // Columns safe to expose to the owning user. Paystack identifiers
 // (customer_code, subscription_code, email_token) are intentionally EXCLUDED
@@ -14,20 +15,14 @@ import { welcomeEmail } from '@/lib/email/templates';
 // off-wire to limit exposure via logs, extensions, and crash reports.
 const SAFE_PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_reason, cv_url';
 
-// Compute the user's effective plan: if plan_expires_at is in the past, treat
-// them as 'free' regardless of what profiles.plan says. The expire-pass cron
-// runs once daily at 6 UTC (Vercel Hobby quota), so a Day Pass purchased at
-// 7am UTC would otherwise show as 'daily' until ~6 UTC the next day — a
-// ~23h window where the UI lies. /api/applications still gates correctly
-// off subscriptions.current_period_end, so applies are already blocked.
-function effectivePlan(profile: { plan?: string | null; plan_expires_at?: string | null; role?: string | null }): string {
-  if (profile.role === 'admin') return 'admin';
-  if (!profile.plan_expires_at) return profile.plan ?? 'free';
-  if (new Date(profile.plan_expires_at) < new Date()) return 'free';
-  return profile.plan ?? 'free';
-}
-
 // GET /api/profile — Fetch current user's profile (creates if missing)
+//
+// The expire-pass cron runs once daily at 6 UTC (Vercel Hobby quota), so a
+// Day Pass purchased at 7am UTC would otherwise show as 'daily' until ~6
+// UTC the next day. We surface the *effective* plan computed from
+// plan_expires_at via resolvePlan() so the UI doesn't lie during that
+// ~23h window. /api/applications still gates correctly off
+// subscriptions.current_period_end, so applies are already blocked.
 export async function GET() {
   try {
     const supabase = createServerSupabaseClient();
@@ -55,9 +50,13 @@ export async function GET() {
     }
 
     if (profile) {
-      const plan = effectivePlan(profile);
       const role = (profile.role !== 'admin' && isHardcodedAdmin(user.email)) ? 'admin' : (profile.role ?? 'user');
-      return NextResponse.json({ profile: { ...profile, plan: role === 'admin' ? 'admin' : plan, role } });
+      const plan = resolvePlan({
+        role,
+        dbPlan: profile.plan,
+        planExpiresAt: profile.plan_expires_at,
+      });
+      return NextResponse.json({ profile: { ...profile, plan, role } });
     }
 
     // Profile missing — create it now (handles users who signed up before trigger was added)
@@ -74,7 +73,9 @@ export async function GET() {
         role:               isAdmin ? 'admin' : 'user',
         profile_completion: 20,
       }, { onConflict: 'id' })
-      .select()
+      // Re-select via SAFE_PROFILE_COLS so the response shape matches the
+      // happy path and we don't leak paystack_* columns.
+      .select(SAFE_PROFILE_COLS)
       .single();
 
     // First profile creation — fire-and-forget welcome email.

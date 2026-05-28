@@ -6,6 +6,7 @@ import { Briefcase, BookmarkCheck, FileText, TrendingUp, ArrowRight, Star, Zap }
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
+import { resolvePlan } from '@/lib/auth/plan';
 import { formatRelativeDate } from '@/lib/utils';
 import type { Job, Application } from '@/lib/types';
 
@@ -130,27 +131,18 @@ function DashboardContent() {
             if (row) {
               const r = resolveRole({ profileRole: row.role, email: authUser.email });
               if (r === 'admin') { router.replace('/admin'); return; }
-              // Same effective-plan + persisted-plan guard as the cold
-              // path above. Without this, a fresh signup who pays before
-              // the on_auth_user_created trigger commits would have the
-              // post-payment optimistic 'daily'/'pro' overwritten with
-              // row.plan='free' by this retry (narrow race window, but
-              // matches the exact symptom users were reporting).
-              const now = Date.now();
-              const expiryMs = row.plan_expires_at ? new Date(row.plan_expires_at).getTime() : null;
-              const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-              const expired = expiryMs !== null && expiryMs < now;
               // r was narrowed to 'user' by the early-return above.
-              const dbPlan: string = expired ? 'free' : (row.plan ?? 'free');
-              const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-              const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
-                ? currentPlan
-                : dbPlan;
+              const plan = resolvePlan({
+                role: r,
+                dbPlan: row.plan,
+                planExpiresAt: row.plan_expires_at,
+                currentClientPlan: useAuthStore.getState().user?.plan,
+              });
               setUser({
                 id: authUser.id,
                 email: authUser.email!,
                 name: row.name ?? authUser.email!.split('@')[0],
-                plan: plan as any,
+                plan,
                 role: r,
                 joinedAt: row.created_at ?? new Date().toISOString(),
                 profileCompletion: row.profile_completion ?? 20,
@@ -170,24 +162,12 @@ function DashboardContent() {
           return;
         }
 
-        // Effective plan — same rules as Header.buildUser and /api/profile
-        // so all three sources of truth agree. The old version only protected
-        // against downgrade when ?success=1 was in the URL, so a refresh
-        // of any other page during a webhook lag would flicker a paid user
-        // back to 'free'. Now we use plan_expires_at as the proof:
-        //   * expiry in past → 'free' (real expiry, cron just hasn't run yet)
-        //   * expiry in future + profile.plan='free' → webhook race, keep
-        //     the higher persisted client plan
-        //   * otherwise → trust profile.plan
-        const now = Date.now();
-        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
-        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-        const expired = expiryMs !== null && expiryMs < now;
-        const dbPlan = expired ? 'free' : (profile.plan ?? 'free');
-        const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-        const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
-          ? currentPlan
-          : dbPlan;
+        const plan = resolvePlan({
+          role,
+          dbPlan: profile.plan,
+          planExpiresAt: profile.plan_expires_at,
+          currentClientPlan: useAuthStore.getState().user?.plan,
+        });
 
         setUser({
           id:    authUser.id,
@@ -277,8 +257,15 @@ function DashboardContent() {
     const maxAttempts = 10;
     async function sync() {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser) return;
+        // Use getAuthedUserSafe so a transient 401 during a token refresh
+        // doesn't silently kill the poll and leave the user stuck on the
+        // optimistic plan with no DB reconciliation.
+        const { user: authUser, status } = await getAuthedUserSafe(supabase);
+        if (status === 'unauthed' || !authUser) return;
+        if (status === 'transient') {
+          if (attempts < maxAttempts) { attempts++; setTimeout(sync, 1000); }
+          return;
+        }
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('name,plan,role,created_at,profile_completion,plan_expires_at')
@@ -288,39 +275,32 @@ function DashboardContent() {
           if (attempts < maxAttempts) { attempts++; setTimeout(sync, 1000); }
           return;
         }
-        // Effective plan via plan_expires_at — matches Header.buildUser and
-        // /api/profile so all three sources of truth agree. Without this,
-        // the post-payment poll only looked at profile.plan; if the webhook
-        // was slow it would exhaust retries and finally setUser({plan:'free'})
-        // even though the verify route had already stamped a future
-        // plan_expires_at proving the user was paid.
-        const now = Date.now();
+        const role = resolveRole({ profileRole: profile.role, email: authUser.email });
         const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
-        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-        const expired = expiryMs !== null && expiryMs < now;
-        let dbPlan: string;
-        if (profile.role === 'admin') dbPlan = 'admin';
-        else if (expired)             dbPlan = 'free';
-        else                          dbPlan = profile.plan ?? 'free';
+        const hasFutureExpiry = expiryMs !== null && expiryMs >= Date.now();
         // Keep polling while DB still says 'free' AND we have no proof of
         // payment via plan_expires_at. Once verify or webhook lands, the
         // expiry timestamp or the plan column will flip.
-        if (dbPlan === 'free' && !hasFutureExpiry && plan !== 'free' && attempts < maxAttempts) {
+        const rawDbPlan = role === 'admin' ? 'admin' : (profile.plan ?? 'free');
+        if (rawDbPlan === 'free' && !hasFutureExpiry && plan !== 'free' && attempts < maxAttempts) {
           attempts++;
           setTimeout(sync, 1000);
           return;
         }
-        // Webhook race: column still 'free' but expiry proves payment.
-        // Use the optimistic plan so the UI doesn't flap back to "Upgrade".
-        const finalPlan = (dbPlan === 'free' && hasFutureExpiry)
-          ? (plan === 'daily' ? 'daily' : 'pro')
-          : dbPlan;
+        const finalPlan = resolvePlan({
+          role,
+          dbPlan: profile.plan,
+          planExpiresAt: profile.plan_expires_at,
+          // During the webhook-race window, keep the optimistic plan we set
+          // before this poll started (paystack callback hint).
+          currentClientPlan: optimisticPlan,
+        });
         setUser({
           id: authUser.id,
           email: authUser.email!,
           name: profile.name ?? authUser.email!.split('@')[0],
-          plan: finalPlan as any,
-          role: profile.role ?? 'user',
+          plan: finalPlan,
+          role,
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,
         });

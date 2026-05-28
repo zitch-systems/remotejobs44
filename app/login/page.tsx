@@ -6,6 +6,7 @@ import { Eye, EyeOff, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
+import { resolvePlan } from '@/lib/auth/plan';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -149,28 +150,17 @@ function LoginForm() {
       const resolvedRole = resolveRole({ profileRole: profile?.role, email: data.user.email });
 
       if (profile) {
-        // Same effective-plan + persisted-plan guard used elsewhere — if
-        // the freshly-fetched profile has plan='free' but plan_expires_at
-        // is in the future (webhook race), prefer the higher persisted
-        // plan over writing 'free'. Defensive; /api/profile usually applies
-        // effectivePlan already.
-        const now = Date.now();
-        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
-        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-        const expired = expiryMs !== null && expiryMs < now;
-        let dbPlan: string;
-        if (resolvedRole === 'admin') dbPlan = 'admin';
-        else if (expired)             dbPlan = 'free';
-        else                          dbPlan = profile.plan ?? 'free';
-        const currentPlan = (typeof window !== 'undefined' && useAuthStore.getState().user?.plan) || 'free';
-        const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
-          ? currentPlan
-          : dbPlan;
+        const plan = resolvePlan({
+          role: resolvedRole,
+          dbPlan: profile.plan,
+          planExpiresAt: profile.plan_expires_at,
+          currentClientPlan: typeof window !== 'undefined' ? useAuthStore.getState().user?.plan : null,
+        });
         setUser({
           id:    data.user.id,
           email: data.user.email!,
           name:  profile.name ?? data.user.email!.split('@')[0],
-          plan:  plan as any,
+          plan,
           role:  resolvedRole,
           joinedAt: profile.created_at ?? new Date().toISOString(),
           profileCompletion: profile.profile_completion ?? 20,

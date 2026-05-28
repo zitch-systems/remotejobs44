@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Settings as SettingsIcon, CreditCard, Bell, User, FileText, LogOut,
   Trash2, Moon, Sun, Shield, ChevronRight, Mail,
 } from 'lucide-react';
-import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 
 // /settings — central hub for account / billing / preferences.
@@ -216,14 +216,5 @@ function Row({ href, icon, title, sub, highlight }: {
 }
 
 export default function SettingsPage() {
-  return (
-    <Suspense fallback={
-      <div className="max-w-[700px] mx-auto px-5 py-10 animate-pulse space-y-4">
-        <div className="skeleton h-8 w-48 rounded" />
-        <div className="skeleton h-48 rounded-lg" />
-      </div>
-    }>
-      <SettingsContent />
-    </Suspense>
-  );
+  return <SettingsContent />;
 }

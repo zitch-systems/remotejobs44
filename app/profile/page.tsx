@@ -1,33 +1,31 @@
 'use client';
-import { useEffect, useState, useRef, Suspense } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle,
   Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2,
 } from 'lucide-react';
-import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
+import { resolvePlan } from '@/lib/auth/plan';
 
 // Profile page — anti-glitch pattern:
 //   * Initial load uses /api/profile which already enumerates safe columns,
 //     computes effective plan from plan_expires_at, and upgrades hardcoded
 //     admins. One source of truth.
-//   * If getAuthedUserSafe reports unauthed but Zustand still has a
-//     persisted user, retry after a 2s pause before bouncing to /login —
-//     the same Header/dashboard refresh-race that was logging users out
-//     after an apply also fires here.
-//   * If the /api/profile call fails for any reason, fall through to a
-//     skeleton built from authUser so the page is never blank and the
-//     user is never forcibly logged out by a transient network blip.
+//   * On 401 from /api/profile, redirect to /login. On any other failure,
+//     fall through to a skeleton built from persisted Zustand so the page
+//     is never blank and the user is never forcibly logged out by a
+//     transient network blip.
 //   * Logout uses the auth store's logout() which is the single
 //     authoritative cleanup path.
 
 function ProfileContent() {
   const router   = useRouter();
   const supabase = createClient();
-  const { user, setUser, isPro, isLoggedIn } = useAuthStore();
+  const { user, setUser, isPro } = useAuthStore();
   const logoutStore = useAuthStore(s => s.logout);
   const { toast } = useUIStore();
   const fileRef  = useRef<HTMLInputElement>(null);
@@ -92,27 +90,20 @@ function ProfileContent() {
       if (profile && authUser) {
         const role = resolveRole({ profileRole: profile.role, email: authUser.email });
         // Defense in depth: even though /api/profile applies effectivePlan
-        // server-side, mirror the persisted-plan guard used in Header /
-        // dashboard / pricing so a transient server-side race that returns
-        // plan='free' with a future plan_expires_at can't downgrade an
-        // already-paid user.
-        const now = Date.now();
-        const expiryMs = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null;
-        const hasFutureExpiry = expiryMs !== null && expiryMs >= now;
-        const expired = expiryMs !== null && expiryMs < now;
-        let dbPlan: string;
-        if (role === 'admin')   dbPlan = 'admin';
-        else if (expired)       dbPlan = 'free';
-        else                    dbPlan = profile.plan ?? 'free';
-        const currentPlan = useAuthStore.getState().user?.plan ?? 'free';
-        const plan = (dbPlan === 'free' && hasFutureExpiry && currentPlan !== 'free')
-          ? currentPlan
-          : dbPlan;
+        // server-side, mirror the persisted-plan guard everywhere so a
+        // transient server-side race that returns plan='free' with a
+        // future plan_expires_at can't downgrade an already-paid user.
+        const plan = resolvePlan({
+          role,
+          dbPlan: profile.plan,
+          planExpiresAt: profile.plan_expires_at,
+          currentClientPlan: useAuthStore.getState().user?.plan,
+        });
         setUser({
           id: authUser.id,
           email: authUser.email!,
           name: profile.name ?? '',
-          plan: plan as any,
+          plan,
           role,
           joinedAt: profile.created_at,
           profileCompletion: profile.profile_completion ?? 20,
@@ -543,14 +534,5 @@ function SettingsLink({ href, icon, title, sub, danger }: {
 }
 
 export default function ProfilePage() {
-  return (
-    <Suspense fallback={
-      <div className="max-w-[860px] mx-auto px-5 py-8 animate-pulse">
-        <div className="skeleton h-8 w-48 rounded mb-6" />
-        <div className="skeleton h-64 rounded-lg" />
-      </div>
-    }>
-      <ProfileContent />
-    </Suspense>
-  );
+  return <ProfileContent />;
 }

@@ -1,9 +1,8 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Briefcase } from 'lucide-react';
-import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
 
@@ -17,8 +16,7 @@ const STATUS_CONFIG = {
 } as const;
 
 function ApplicationsContent() {
-  const router   = useRouter();
-  const supabase = createClient();
+  const router = useRouter();
   const { applications: localApps, addApplication } = useJobsStore();
   // Render the page immediately if we already have data in Zustand (from
   // previous sessions / dashboard prefetch). Background fetch refreshes.
@@ -199,9 +197,5 @@ function ApplicationsContent() {
 }
 
 export default function ApplicationsPage() {
-  return (
-    <Suspense fallback={<div className="max-w-[900px] mx-auto px-5 py-8 animate-pulse"><div className="skeleton h-8 w-48 rounded mb-6" /></div>}>
-      <ApplicationsContent />
-    </Suspense>
-  );
+  return <ApplicationsContent />;
 }

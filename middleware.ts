@@ -19,8 +19,15 @@ function isAdminEmail(email: string | null | undefined): boolean {
 // Detects presence of any Supabase auth cookie. If there's no auth cookie at
 // all, the user is truly logged out. If there IS a cookie but getUser fails,
 // it's a transient error — keep them logged in.
+//
+// Supabase/SSR chunks large sessions (Google OAuth, long JWTs) across
+// `sb-<ref>-auth-token.0`, `.1`, … cookies and deletes the base name.
+// `endsWith('-auth-token')` would miss every chunked session, which is the
+// majority of OAuth users — and the missed check is exactly what triggers
+// the random-logout bounce. Match base or chunked names.
+const SB_AUTH_COOKIE = /^sb-.+-auth-token(\.\d+)?$/;
 function hasSupabaseSessionCookie(request: NextRequest): boolean {
-  return request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'));
+  return request.cookies.getAll().some(c => SB_AUTH_COOKIE.test(c.name));
 }
 
 export async function middleware(request: NextRequest) {

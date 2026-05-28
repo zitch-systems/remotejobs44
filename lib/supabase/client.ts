@@ -17,13 +17,24 @@ export function createClient() {
 // UI would flicker subscribed → not-subscribed → subscribed (or admin → /login
 // → admin). This helper retries a 401 once with a short delay so the refresh
 // has a chance to complete first.
+export type AuthedUserResult = {
+  user: { id: string; email?: string | null } | null;
+  status: 'ok' | 'unauthed' | 'transient';
+  /**
+   * The user id from the *local* Supabase session (i.e. whatever
+   * localStorage says the signed-in user is). Available on all three
+   * statuses when a session exists locally, including transient — useful
+   * for cross-account detection: a caller can compare this against their
+   * persisted Zustand user id even when the network getUser() failed.
+   * Null only when there is no local session at all.
+   */
+  sessionUserId: string | null;
+};
+
 export async function getAuthedUserSafe(
   supabase: SupabaseClient,
   opts: { retries?: number; delayMs?: number; timeoutMs?: number } = {}
-): Promise<{
-  user: { id: string; email?: string | null } | null;
-  status: 'ok' | 'unauthed' | 'transient';
-}> {
+): Promise<AuthedUserResult> {
   const retries  = opts.retries  ?? 2;
   const delayMs  = opts.delayMs  ?? 400;
   const timeoutMs = opts.timeoutMs ?? 6000;
@@ -33,17 +44,19 @@ export async function getAuthedUserSafe(
   // network. If there IS a session, treat 401s as transient rather than
   // unauthed. Random logouts from cold-lambda / slow-network refreshes
   // were the #1 user complaint; this guard absorbs them.
+  let sessionUserId: string | null = null;
   let hasLocalSession = false;
   try {
     const { data } = await supabase.auth.getSession();
     hasLocalSession = !!data.session;
+    sessionUserId   = data.session?.user?.id ?? null;
   } catch {
     // getSession() reads from localStorage — should never throw, but
     // if it does, assume there's a session so we don't false-logout.
     hasLocalSession = true;
   }
   if (!hasLocalSession) {
-    return { user: null, status: 'unauthed' };
+    return { user: null, status: 'unauthed', sessionUserId: null };
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -54,12 +67,12 @@ export async function getAuthedUserSafe(
         new Promise<null>(res => setTimeout(() => res(null), timeoutMs)),
       ]) as any;
     } catch {
-      return { user: null, status: 'transient' };
+      return { user: null, status: 'transient', sessionUserId };
     }
-    if (!result) return { user: null, status: 'transient' }; // timeout
+    if (!result) return { user: null, status: 'transient', sessionUserId }; // timeout
 
     const { data: { user }, error } = result;
-    if (user) return { user, status: 'ok' };
+    if (user) return { user, status: 'ok', sessionUserId: user.id };
 
     const code = (error as any)?.status;
     if (code === 401 || code === 403) {
@@ -72,9 +85,9 @@ export async function getAuthedUserSafe(
       // Return 'transient' rather than 'unauthed' — Supabase's auto-refresh
       // may still complete in the background and fire TOKEN_REFRESHED.
       // The Header's auth listener will re-sync once it lands.
-      return { user: null, status: 'transient' };
+      return { user: null, status: 'transient', sessionUserId };
     }
-    return { user: null, status: 'transient' };
+    return { user: null, status: 'transient', sessionUserId };
   }
-  return { user: null, status: 'transient' };
+  return { user: null, status: 'transient', sessionUserId };
 }
