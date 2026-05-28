@@ -19,6 +19,7 @@ import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
 import { JobActionsCard } from '@/components/jobs/JobActionsCard';
 import { CompanyMask } from '@/components/jobs/CompanyMask';
+import { SourceTrustBadge } from '@/components/jobs/SourceTrustBadge';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { companySlug } from '@/lib/company-slug';
 import type { Job } from '@/lib/types';
@@ -288,6 +289,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               <span className={cn('badge', catMeta.color)}>{catMeta.label}</span>
               <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.type}</span>
               {job.level && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.level}</span>}
+              <SourceTrustBadge source={job.source} />
             </div>
 
             {salary && (

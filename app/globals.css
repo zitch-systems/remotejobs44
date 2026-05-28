@@ -74,8 +74,13 @@
   }
 
   .bottom-nav-item {
+    /* min-height 56px keeps each tap target above Apple HIG's 44x44
+       minimum even when the bottom safe-area inset collapses to 0
+       (Android, browser PWA without notch). Padding adds breathing
+       room around the icon + label without changing the visual mass. */
     display:flex; flex-direction:column; align-items:center;
-    justify-content:center; gap:2px; padding-top:8px; padding-bottom:4px;
+    justify-content:center; gap:2px;
+    min-height:56px; padding-top:10px; padding-bottom:6px;
     color:#94a3b8; transition:color 0.15s; text-decoration:none;
   }
   .bottom-nav-item.active { color:#2563eb; }

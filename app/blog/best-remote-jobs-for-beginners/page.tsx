@@ -38,14 +38,14 @@ export default function Post() {
         description={POST.description}
         datePublished={POST.datePublished}
         authorName={POST.author}
-        authorUrl="https://remotejobs44.com/about"
+        authorUrl="https://remotejobs44.com/about#editorial"
       />
       <Link href="/blog" className="text-sm text-stone-400 hover:text-brand-700 transition-colors mb-8 inline-block">← Back to Blog</Link>
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <span className="px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-bold">{POST.category}</span>
           <span className="text-xs text-stone-400">
-            By <span className="text-stone-600 dark:text-stone-300 font-semibold">{POST.author}</span>
+            By <a href="/about#editorial" className="text-stone-600 dark:text-stone-300 font-semibold hover:text-brand-700 dark:hover:text-brand-400 hover:underline">{POST.author}</a>
             {' · '}<time dateTime={POST.datePublished}>{new Date(POST.datePublished).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>
             {' · '}{POST.readingTime}
           </span>

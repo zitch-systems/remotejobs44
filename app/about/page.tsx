@@ -105,6 +105,24 @@ export default async function AboutPage() {
         </div>
       </div>
 
+      {/* Editorial section — author bylines on /blog/* and /resources/*
+          link here, so the byline lands on real context about who's
+          writing rather than a generic Organization page. */}
+      <section id="editorial" className="mb-16 scroll-mt-24">
+        <h2 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-5">RemoteJobs44 Editorial</h2>
+        <div className="card p-6 space-y-3">
+          <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+            The Editorial team writes the blog posts and resource articles you find on RemoteJobs44. We&rsquo;re Nigerian remote-work practitioners — engineers, designers, and operators who landed our own international remote jobs and now help others do the same.
+          </p>
+          <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+            Everything we publish is checked against current job-board data and our own application experience. We don&rsquo;t publish AI-generated content. When a piece is reviewed by a domain specialist (a senior engineer on the engineering-jobs guide, a recruiter on the CV review tips), we say so on the byline.
+          </p>
+          <p className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+            Spot something wrong or out-of-date? <a href="mailto:hello@remotejobs44.com" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Tell us</a> — we&rsquo;ll update the article and note the correction.
+          </p>
+        </div>
+      </section>
+
       {/* Values */}
       <div className="mb-16">
         <h2 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight mb-7">What we stand for</h2>

@@ -19,7 +19,7 @@ export function generateStaticParams() {
 // without inventing fake names; the matching authorUrl links to /about
 // where the team's mission is described.
 const AUTHOR_NAME = 'RemoteJobs44 Editorial';
-const AUTHOR_URL  = `${BASE}/about`;
+const AUTHOR_URL  = `${BASE}/about#editorial`;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const a = findArticle(params.slug);
@@ -75,7 +75,7 @@ export default function ArticlePage({ params }: { params: { slug: string } }) {
       <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight leading-tight mb-3">{a.title}</h1>
       <p className="text-stone-500 dark:text-stone-400 leading-relaxed mb-4">{a.description}</p>
       <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500 mb-8 flex-wrap">
-        <span>By <span className="text-stone-600 dark:text-stone-300 font-semibold">{AUTHOR_NAME}</span></span>
+        <span>By <a href="/about#editorial" className="text-stone-600 dark:text-stone-300 font-semibold hover:text-brand-700 dark:hover:text-brand-400 hover:underline">{AUTHOR_NAME}</a></span>
         <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {a.readMinutes} min read</span>
         <span className="inline-flex items-center gap-1">
           <Calendar className="w-3 h-3" />
