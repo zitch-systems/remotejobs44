@@ -1,45 +1,27 @@
-// app/api/scrape/route.ts — Career page scraper for bulk import (GET + POST)
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
+// app/api/scrape/route.ts — DISABLED.
+//
+// This route once held an unauthenticated career-page scraper. The real
+// handler was removed but the call sites in app/admin/sources/page.tsx
+// and lib/ingestion.ts (tryJSONApi / tryScrape) still target it. Without
+// a handler the route returns 405 Method Not Allowed today, which is
+// fine — but anyone re-adding a `export async function GET/POST` here
+// without admin gating + URL validation would immediately reintroduce
+// an open SSRF tool (it ran with `runtime = 'edge'` and accepted any
+// `?url=` query string).
+//
+// Until the route is rewritten with `requireAdmin()` + `validateExternalUrl()`
+// + a real HTML/JSON fetch + parse pipeline, return an explicit 410 Gone
+// so callers fail loudly with a structured error rather than the
+// ambiguous 405.
+import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
-export const revalidate = 300;
+const GONE = () => NextResponse.json(
+  { error: 'Scraper route is currently disabled. Admin: see app/api/scrape/route.ts.' },
+  { status: 410 }
+);
 
-const ATS_PATTERNS: Record<string, string> = {
-  'greenhouse.io':       'Greenhouse',
-  'lever.co':            'Lever',
-  'ashbyhq.com':         'Ashby',
-  'workable.com':        'Workable',
-  'bamboohr.com':        'BambooHR',
-  'myworkdayjobs.com':   'Workday',
-  'icims.com':           'iCIMS',
-  'taleo.net':           'Taleo',
-  'smartrecruiters.com': 'SmartRecruiters',
-  'rippling.com':        'Rippling',
-  'recruitee.com':       'Recruitee',
-  'personio.de':         'Personio',
-  'breezy.hr':           'Breezy HR',
-  'jobvite.com':         'Jobvite',
-};
-
-function detectATS(url: string): string {
-  const lower = url.toLowerCase();
-  for (const [pattern, name] of Object.entries(ATS_PATTERNS)) {
-    if (lower.includes(pattern)) return name;
-  }
-  return 'Custom';
-}
-
-function extractCompanyName(url: string): string {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    // boards.greenhouse.io/company → company
-    if (hostname.includes('greenhouse.io') || hostname.includes('lever.co')) {
-      const parts = new URL(url).pathname.split('/').filter(Boolean);
-      if (parts.length > 0) return parts[0].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    }
-    return hostname.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  } catch {
-    return 'Unknown';
-  }
-}
+export const GET    = GONE;
+export const POST   = GONE;
+export const PUT    = GONE;
+export const PATCH  = GONE;
+export const DELETE = GONE;

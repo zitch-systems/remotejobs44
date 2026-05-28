@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { Analytics }      from '@vercel/analytics/next';
 import { SpeedInsights }  from '@vercel/speed-insights/next';
@@ -9,6 +10,27 @@ import { BottomNav }      from '@/components/layout/BottomNav';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { ModalRoot }      from '@/components/ui/Modal';
 import { PWAInstall }     from '@/components/ui/PWAInstall';
+
+// next/font self-hosts the woff2 files at build time and inlines the
+// @font-face declarations into the document, eliminating the
+// render-blocking round trips to fonts.googleapis.com + fonts.gstatic.com
+// that were the single biggest LCP contributor (~1.6s of blocking time
+// per the Lighthouse report). `display: 'swap'` shows the system fallback
+// immediately and swaps in the web font when it lands.
+const fontSora = Sora({
+  subsets: ['latin'],
+  weight:  ['400', '500', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-sora',
+  fallback: ['system-ui', 'sans-serif'],
+});
+const fontDmSans = DM_Sans({
+  subsets: ['latin'],
+  weight:  ['300', '400', '500'],
+  display: 'swap',
+  variable: '--font-dm-sans',
+  fallback: ['system-ui', 'sans-serif'],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://remotejobs44.com'),
@@ -53,18 +75,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${fontSora.variable} ${fontDmSans.variable}`}>
       <head>
-        <link rel="canonical" href="https://remotejobs44.com" />
+        {/* Canonical is set per-page via `alternates.canonical` in each
+            page's Metadata. A hard-coded site-wide <link rel="canonical">
+            here was emitting a SECOND canonical on every page pointing at
+            the homepage — Google ignores both when they conflict. */}
         <meta name="ai-content-declaration" content="human-authored" />
         <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM reference" />
-        {/* Google Fonts via standard link — avoids next/font build failures */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
-          rel="stylesheet"
-        />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context':'https://schema.org',
           '@graph': [
@@ -101,10 +119,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }
           ]
         }).replace(/</g, '\\u003c') }} />
+        {/* --font-sora and --font-dm-sans now come from next/font on the
+            <html> className. Only brand-color vars + accent remain inline
+            so they're available before globals.css fully loads. */}
         <style dangerouslySetInnerHTML={{ __html: `
           :root {
-            --font-sora: 'Sora', system-ui, sans-serif;
-            --font-dm-sans: 'DM Sans', system-ui, sans-serif;
             --brand-50:#eff6ff; --brand-100:#dbeafe; --brand-200:#bfdbfe;
             --brand-300:#93c5fd; --brand-400:#60a5fa; --brand-500:#3b82f6;
             --brand-600:#2563eb; --brand-700:#1d4ed8; --brand-800:#1e3a5f;
@@ -113,7 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}} />
       </head>
-      <body style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }} className="min-h-dvh flex flex-col antialiased bg-[#f8faff] text-[#0f172a] dark:bg-[#0a1628] dark:text-[#e2e8f4]">
+      <body className="min-h-dvh flex flex-col antialiased bg-[#f8faff] text-[#0f172a] dark:bg-[#0a1628] dark:text-[#e2e8f4] font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
           <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-[#2563eb] focus:text-white focus:rounded-lg focus:font-semibold">
             Skip to content

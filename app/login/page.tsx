@@ -105,17 +105,23 @@ function LoginForm() {
 
       if (error) {
         setLoading(false);
-        if (error.message.toLowerCase().includes('email not confirmed')) {
-          setErrorMsg('Please confirm your email first — check your inbox.');
-        } else if (
-          error.message.toLowerCase().includes('invalid') ||
-          error.message.toLowerCase().includes('credentials') ||
-          error.message.toLowerCase().includes('password')
-        ) {
-          setErrorMsg('Wrong email or password. Please try again.');
-        } else {
-          setErrorMsg(error.message);
-        }
+        // SECURITY: collapse all auth failures to a single generic
+        // message. The previous branches distinguished "email not
+        // confirmed" (proves the email exists) from "wrong password"
+        // (also proves the email exists), making account enumeration
+        // trivial via the response text. Email-not-confirmed users
+        // already get the bounce-back from Supabase's own confirmation
+        // email; they don't need a distinct UX here.
+        const msg = error.message.toLowerCase();
+        const isCredOrConfirm =
+          msg.includes('invalid') ||
+          msg.includes('credentials') ||
+          msg.includes('password') ||
+          msg.includes('not confirmed') ||
+          msg.includes('not found');
+        setErrorMsg(isCredOrConfirm
+          ? 'Invalid email or password. Please try again.'
+          : 'Sign-in failed. Please try again.');
         return;
       }
 

@@ -6,7 +6,12 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/api/', '/dashboard', '/applications', '/profile', '/auth/'],
+        // /jobs is a CSR'd search UI; the *canonical* surface for crawlers
+        // is the programmatic landing tree at /jobs/category|skill|country|
+        // region|city|industry|timezone/[slug]. Blocking the faceted
+        // /jobs?...&page=N permutations keeps the crawl budget on the
+        // pages we actually want indexed.
+        disallow: ['/admin', '/api/', '/dashboard', '/applications', '/profile', '/auth/', '/jobs?'],
       },
       {
         userAgent: 'GPTBot',

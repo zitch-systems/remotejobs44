@@ -45,10 +45,22 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    const supabase = createAdminSupabaseClient();
+    // Public read — use the session-bound server client so RLS still
+    // governs what the public can see. Service-role was being used here
+    // as a perf shortcut, but it closes the only safety net against future
+    // regressions that might accidentally surface inactive/private rows.
+    const supabase = createServerSupabaseClient();
+
+    // Filter out jobs whose explicit expires_at has passed. Without this,
+    // stale postings (months old, marker set by the ATS upstream) stay
+    // visible until the cron flips is_active=false — which currently
+    // never happens, so they live forever.
+    const notExpired = `expires_at.is.null,expires_at.gt.${new Date().toISOString()}`;
 
     if (id) {
-      const { data: job } = await supabase.from('jobs').select('*').eq('id', id).eq('is_active', true).single();
+      const { data: job } = await supabase
+        .from('jobs').select('*').eq('id', id).eq('is_active', true)
+        .or(notExpired).single();
       if (job) return NextResponse.json({ job: transformJob(job) });
       const mock = MOCK_JOBS.find(j => j.id === id);
       return NextResponse.json({ job: mock ?? null });
@@ -63,13 +75,16 @@ export async function GET(req: NextRequest) {
       )).slice(0, 10);
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
       const { data: rows } = await supabase
-        .from('jobs').select('*').in('id', wantedIds).eq('is_active', true);
+        .from('jobs').select('*').in('id', wantedIds).eq('is_active', true)
+        .or(notExpired);
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
     }
 
-    let query = supabase.from('jobs').select('*', { count: 'exact' }).eq('is_active', true);
+    let query = supabase.from('jobs').select('*', { count: 'exact' })
+      .eq('is_active', true)
+      .or(notExpired);
     if (q) {
       // Strip characters that have meaning in a PostgREST or() filter list:
       // commas separate clauses, parentheses group, % and * are ilike wildcards,

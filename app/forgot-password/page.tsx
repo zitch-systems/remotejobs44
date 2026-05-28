@@ -2,11 +2,9 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useUIStore } from '@/lib/store';
 
 export default function ForgotPasswordPage() {
   const supabase = createClient();
-  const { toast } = useUIStore();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -14,10 +12,22 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    });
-    if (error) { toast(error.message, 'error'); setLoading(false); return; }
+    // SECURITY: always render the "check your email" confirmation,
+    // regardless of whether the address actually exists. Showing a
+    // distinct error when Supabase reports "user not found" leaks
+    // account existence to anyone willing to type an email into the
+    // form (the same enumeration vector closed on /login).
+    //
+    // Real errors (network, rate-limit) still log to console so we
+    // can debug; the user sees the same outcome either way.
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (error) console.error('[forgot-password]', error.message);
+    } catch (err) {
+      console.error('[forgot-password]', err);
+    }
     setSent(true);
     setLoading(false);
   }
