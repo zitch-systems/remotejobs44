@@ -90,6 +90,11 @@ export default async function IndustryPage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(i.label.toLowerCase())}`}
+      breadcrumbs={[
+        { name: 'Home',     href: '/'     },
+        { name: 'Jobs',     href: '/jobs' },
+        { name: i.label,    href: `/jobs/industry/${i.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

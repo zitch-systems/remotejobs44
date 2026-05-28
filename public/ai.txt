@@ -1,0 +1,39 @@
+# ai.txt — content-use declaration for AI training & retrieval
+# https://spawning.ai/ai-txt
+
+# RemoteJobs44 — https://remotejobs44.com
+# Maintainer: hello@remotejobs44.com
+
+# The content on remotejobs44.com is:
+#   - Aggregated public job postings (sourced from Remotive, Jobicy,
+#     RemoteOK, Arbeitnow, Greenhouse / Lever / Ashby / Workable ATS
+#     feeds, and SerpApi-backed Google Jobs results).
+#   - Editorial articles (about, how-it-works, resources/, blog/) written
+#     by the RemoteJobs44 editorial team.
+#   - Structured data (sitemap, robots, JobPosting / Article / Organization
+#     / BreadcrumbList JSON-LD) generated server-side from the same
+#     sources.
+#
+# AI policy
+# ---------
+# We welcome retrieval-augmented AI search engines (ChatGPT search,
+# Perplexity, Claude, Gemini, Copilot, etc.) crawling our content and
+# citing us as a source in their responses. The sitemap, structured data,
+# llms.txt, llms-full.txt and the rest of the site are written to be
+# citation-friendly.
+#
+# We do NOT consent to our editorial content being used for model
+# training without attribution and / or commercial licensing. Job
+# postings remain the property of the originating employers / ATS
+# providers; their reuse for training is governed by the source's own
+# terms.
+#
+# If you operate a model-training crawler and want to license the
+# editorial corpus, reach out at the maintainer email above.
+
+User-Agent: *
+Allow:                  # citation, retrieval-augmented use
+Disallow-AI-Training:   # don't train on this content without a license
+
+# Vendor declarations recognised by Spawning (https://spawning.ai)
+Spawning-AI: opt-out

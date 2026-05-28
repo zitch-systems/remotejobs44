@@ -84,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             the homepage — Google ignores both when they conflict. */}
         <meta name="ai-content-declaration" content="human-authored" />
         <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM reference" />
+        <link rel="alternate" type="text/plain" href="/ai.txt"   title="AI content-use policy" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context':'https://schema.org',
           '@graph': [

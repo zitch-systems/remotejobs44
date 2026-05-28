@@ -68,6 +68,11 @@ export default async function SkillPage({ params }: { params: { slug: string } }
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(skill.label)}`}
+      breadcrumbs={[
+        { name: 'Home',       href: '/'     },
+        { name: 'Jobs',       href: '/jobs' },
+        { name: skill.label,  href: `/jobs/skill/${skill.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

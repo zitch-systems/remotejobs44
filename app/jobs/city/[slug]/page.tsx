@@ -76,6 +76,11 @@ export default async function CityPage({ params }: { params: { slug: string } })
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(c.label)}`}
+      breadcrumbs={[
+        { name: 'Home',    href: '/'     },
+        { name: 'Jobs',    href: '/jobs' },
+        { name: c.label,   href: `/jobs/city/${c.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

@@ -69,6 +69,11 @@ export default async function TimezonePage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(tz.label.split(' (')[0])}`}
+      breadcrumbs={[
+        { name: 'Home',                          href: '/'     },
+        { name: 'Jobs',                          href: '/jobs' },
+        { name: tz.label.split(' (')[0],         href: `/jobs/timezone/${tz.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

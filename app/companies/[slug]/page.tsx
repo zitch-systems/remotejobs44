@@ -13,6 +13,7 @@ import { Briefcase, ExternalLink, MapPin } from 'lucide-react';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { companySlug } from '@/lib/company-slug';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { formatRelativeDate, formatSalary } from '@/lib/utils';
 
 const BASE = 'https://remotejobs44.com';
@@ -129,6 +130,13 @@ export default async function CompanyPage({ params }: { params: { slug: string }
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList).replace(/</g, '\\u003c') }}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home',      href: '/'           },
+          { name: 'Companies', href: '/companies'  },
+          { name,              href: `/companies/${params.slug}` },
+        ]}
       />
 
       <Link href="/companies" className="text-sm text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors mb-6 inline-block">

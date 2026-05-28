@@ -19,6 +19,8 @@ import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
 import { JobActionsCard } from '@/components/jobs/JobActionsCard';
 import { CompanyMask } from '@/components/jobs/CompanyMask';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
+import { companySlug } from '@/lib/company-slug';
 import type { Job } from '@/lib/types';
 
 // Cache job detail pages at the edge for 5 minutes — long enough that the
@@ -227,6 +229,16 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+      {/* Breadcrumb: Home › Jobs › <Company> › <Title>. Lets Google
+          render sitelinks under the result in SERPs. */}
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home',     href: '/'                                 },
+          { name: 'Jobs',     href: '/jobs'                             },
+          { name: job.company, href: `/companies/${companySlug(job.company)}` },
+          { name: job.title,  href: `/jobs/${job.id}`                   },
+        ]}
       />
       <Link href="/jobs" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Jobs

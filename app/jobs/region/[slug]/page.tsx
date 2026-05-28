@@ -78,6 +78,11 @@ export default async function RegionPage({ params }: { params: { slug: string } 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?q=${encodeURIComponent(region.label)}`}
+      breadcrumbs={[
+        { name: 'Home',        href: '/'     },
+        { name: 'Jobs',        href: '/jobs' },
+        { name: region.label,  href: `/jobs/region/${region.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

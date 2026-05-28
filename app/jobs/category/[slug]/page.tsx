@@ -72,6 +72,11 @@ export default async function CategoryPage({ params }: { params: { slug: string 
       jobs={jobs}
       total={total}
       browseHref={`/jobs?category=${cat.slug}`}
+      breadcrumbs={[
+        { name: 'Home',     href: '/'     },
+        { name: 'Jobs',     href: '/jobs' },
+        { name: cat.label,  href: `/jobs/category/${cat.slug}` },
+      ]}
       relatedLinks={relatedLinks}
     />
   );

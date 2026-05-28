@@ -1,29 +1,7 @@
 // app/api/cv/route.ts — CV upload to Supabase Storage
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-
-// Magic-byte signatures for the three formats we accept. Verified against
-// the *actual* file bytes — never trust the client-supplied MIME-type
-// header alone, since multipart uploads let the caller set it to anything.
-// Without this check, a user could ship `<script>...</script>` HTML with
-// Content-Type: application/pdf and have Storage serve it as a PDF (the
-// signed URL has Content-Type: application/pdf in the response header).
-function detectMagicMime(buf: Buffer): string | null {
-  if (buf.length < 4) return null;
-  // %PDF — PDF
-  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
-    return 'application/pdf';
-  }
-  // PK\x03\x04 — ZIP-family (covers .docx, which is a zipped XML bundle)
-  if (buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04) {
-    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  }
-  // \xD0\xCF\x11\xE0 — legacy MS Office compound binary (.doc)
-  if (buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0) {
-    return 'application/msword';
-  }
-  return null;
-}
+import { detectMagicMime } from '@/lib/file-magic';
 
 export async function POST(req: NextRequest) {
   try {

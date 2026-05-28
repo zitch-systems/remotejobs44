@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { ArrowRight, MapPin, Building2 } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
 interface Job {
   id: string;
@@ -21,6 +22,7 @@ export function SliceListing({
   jobs,
   total,
   browseHref,
+  breadcrumbs,
   relatedLinks,
 }: {
   title: string;
@@ -28,6 +30,12 @@ export function SliceListing({
   jobs: Job[];
   total: number;
   browseHref: string;
+  /**
+   * Breadcrumb trail for sitelinks. The page passes its own crumbs in
+   * (e.g. category page → ['Home', 'Jobs', 'Engineering']); we drop the
+   * BreadcrumbList JSON-LD here so Google renders sitelinks in SERPs.
+   */
+  breadcrumbs?: Array<{ name: string; href: string }>;
   /**
    * Internal links to sibling landing pages — same category, same skill
    * family, neighbouring region/timezone, etc. Recirculates PageRank
@@ -38,6 +46,7 @@ export function SliceListing({
 }) {
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-10">
+      {breadcrumbs && breadcrumbs.length > 0 && <BreadcrumbJsonLd items={breadcrumbs} />}
       <div className="mb-8">
         <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight">{title}</h1>
         <p className="text-stone-500 dark:text-stone-400 mt-2 max-w-2xl leading-relaxed">{blurb}</p>

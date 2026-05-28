@@ -15,6 +15,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import { extractPaystackId } from '@/lib/paystack/event-id';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
   getBilling as billingShared, getPlanExpiry as planExpiryShared,
@@ -23,24 +24,8 @@ import {
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
 
-// Build the dedup key for a Paystack event. Each event type carries its
-// canonical resource id in a different field — we pick the most
-// specific available so e.g. a `charge.success` retry with the same
-// `reference` short-circuits even if `data.id` rotated.
-function extractPaystackId(event: any): string | null {
-  const d = event?.data ?? {};
-  const candidates = [
-    d.reference,                          // charge.success
-    d.invoice_code,                       // invoice.create / invoice.update
-    d.subscription?.subscription_code,    // invoice.payment_failed (nested)
-    d.subscription_code,                  // subscription.disable / expiring_cards
-    d.id != null ? String(d.id) : null,   // generic numeric id fallback
-  ];
-  for (const c of candidates) {
-    if (typeof c === 'string' && c.length > 0) return c;
-  }
-  return null;
-}
+// extractPaystackId lives in lib/paystack/event-id.ts so it can be
+// unit-tested independently of the webhook route handler.
 
 // Fire-and-forget: tell ops a paid charge landed for a user that no longer
 // exists in the profiles table. Without this, the user is silently never
