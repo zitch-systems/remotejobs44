@@ -89,12 +89,14 @@ export async function GET(req: NextRequest) {
       .or(notExpired)
       .or(notFlagged);
     if (q) {
-      // Strip characters that have meaning in a PostgREST or() filter list:
-      // commas separate clauses, parentheses group, % and * are ilike wildcards,
-      // backslash is the escape character. Quotes (",') are also stripped to
-      // avoid breaking out of the filter string literal.
-      const safe = q.replace(/[,()%*\\"']/g, ' ').trim().slice(0, 100);
-      if (safe) query = query.or(`title.ilike.%${safe}%,company.ilike.%${safe}%,description.ilike.%${safe}%`);
+      // Full-text search via the generated `search_vector` tsvector
+      // column (migration_v15) with `websearch` semantics: handles
+      // multi-word queries with implicit AND, quoted phrases, OR, and
+      // -exclusion the way users expect from a search box. Index is a
+      // GIN on search_vector, so query cost stays milliseconds at any
+      // scale. Caps input to 200 chars to keep tsquery parse cheap.
+      const safe = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
+      if (safe) query = query.textSearch('search_vector', safe, { type: 'websearch', config: 'english' });
     }
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);

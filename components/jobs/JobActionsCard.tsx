@@ -21,7 +21,8 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { jobsApi, applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
-import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
+import { ApplyRedirectModal } from '@/components/jobs/ApplyRedirectModal';
+import { isSafeOpenUrl } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -73,9 +74,13 @@ export function JobActionsCard({ job }: { job: Job }) {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
+      // Show the "you're leaving RemoteJobs44" trust modal before the
+      // redirect. The application is already recorded above; if the
+      // user cancels the redirect, they can find the apply link again
+      // from /applications. Modal handles the actual safeWindowOpen.
       const applyTargetRaw = job.applyUrl || (job.applyEmail && `mailto:${job.applyEmail}`);
       if (isSafeOpenUrl(applyTargetRaw)) {
-        safeWindowOpen(applyTargetRaw);
+        modalService.open(<ApplyRedirectModal applyUrl={applyTargetRaw!} company={job.company} />);
       }
     } catch (err: any) {
       toast(err.message, 'error');

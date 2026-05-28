@@ -7,7 +7,8 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
-import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
+import { isSafeOpenUrl } from '@/lib/safe-url';
+import { ApplyRedirectModal } from '@/components/jobs/ApplyRedirectModal';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -91,14 +92,19 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
     const applyTargetRaw = job.applyUrl || (job.applyEmail ? `mailto:${job.applyEmail}` : null);
     const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
 
-    // If this is a mock/preview job (non-UUID ID), skip DB tracking and go directly to company site
-    if (!isRealJobId(job.id)) {
+    // Show the trust modal before the external redirect (audit
+    // recommendation). Same flow for mock and real jobs; the modal
+    // handles the actual safeWindowOpen on confirm.
+    function openWithWarning() {
       if (applyTarget) {
-        safeWindowOpen(applyTarget);
-        toast('Redirecting to company application page 🚀', 'success', 3000);
+        modalService.open(<ApplyRedirectModal applyUrl={applyTarget} company={job.company} />);
       } else {
         toast('No application link available for this job', 'error');
       }
+    }
+
+    if (!isRealJobId(job.id)) {
+      openWithWarning();
       return;
     }
 
@@ -106,15 +112,12 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
-      toast('Application tracked! Opening company site 🎉', 'success');
-      if (applyTarget) {
-        safeWindowOpen(applyTarget);
-      }
+      toast('Application tracked! 🎉', 'success');
+      openWithWarning();
     } catch (err: any) {
       // If DB tracking fails but we have a URL, still let them apply
       if (applyTarget && err.message?.includes('not found')) {
-        safeWindowOpen(applyTarget);
-        toast('Opening application page 🚀', 'success', 2000);
+        openWithWarning();
       } else {
         toast(err.message, 'error');
       }

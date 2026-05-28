@@ -118,8 +118,11 @@ async function fetchJobs(sp: SearchParams) {
     .or(NOT_FLAGGED);
 
   if (q) {
-    const safe = q.replace(/[,()%*\\"']/g, ' ').trim().slice(0, 100);
-    if (safe) query = query.or(`title.ilike.%${safe}%,company.ilike.%${safe}%,description.ilike.%${safe}%`);
+    // Full-text search via the generated search_vector tsvector column
+    // (migration_v15). websearch semantics; GIN-indexed; sub-millisecond
+    // at any scale. See /api/jobs/route.ts for the matching call.
+    const safe = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
+    if (safe) query = query.textSearch('search_vector', safe, { type: 'websearch', config: 'english' });
   }
   if (category && category !== 'all') query = query.eq('category', category);
   if (type)  query = query.eq('type', type);
