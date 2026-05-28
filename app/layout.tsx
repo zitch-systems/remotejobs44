@@ -4,6 +4,7 @@ import './globals.css';
 import { Analytics }      from '@vercel/analytics/next';
 import { SpeedInsights }  from '@vercel/speed-insights/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';
+import { AuthSyncProvider } from '@/components/providers/AuthSyncProvider';
 import { Header }         from '@/components/layout/Header';
 import { Footer }         from '@/components/layout/Footer';
 import { BottomNav }      from '@/components/layout/BottomNav';
@@ -134,18 +135,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-dvh flex flex-col antialiased bg-[#f8faff] text-[#0f172a] dark:bg-[#0a1628] dark:text-[#e2e8f4] font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
-          <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-[#2563eb] focus:text-white focus:rounded-lg focus:font-semibold">
-            Skip to content
-          </a>
-          <Header />
-          <main id="main-content" className="flex-1 pt-[68px] pb-[68px] md:pb-0">
-            {children}
-          </main>
-          <Footer />
-          <BottomNav />
-          <ToastContainer />
-          <ModalRoot />
-          <PWAInstall />
+          {/* AuthSyncProvider drives the Supabase session sync + the
+              random-logout-protection auth-state listener exactly once
+              per session. It renders {children} directly so it doesn't
+              introduce a wrapper DOM node. */}
+          <AuthSyncProvider>
+            <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-[#2563eb] focus:text-white focus:rounded-lg focus:font-semibold">
+              Skip to content
+            </a>
+            <Header />
+            <main id="main-content" className="flex-1 pt-[68px] pb-[68px] md:pb-0">
+              {children}
+            </main>
+            <Footer />
+            <BottomNav />
+            <ToastContainer />
+            <ModalRoot />
+            <PWAInstall />
+          </AuthSyncProvider>
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>
