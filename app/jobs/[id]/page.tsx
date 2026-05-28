@@ -9,6 +9,7 @@ import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { safeWindowOpen, isSafeOpenUrl } from '@/lib/safe-url';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
+import { normalizeJobDescription } from '@/lib/job-description';
 import type { Job } from '@/lib/types';
 
 
@@ -122,7 +123,7 @@ export default function JobDetailPage() {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
-    description: job.description,
+    description: normalizeJobDescription(job.description ?? ''),
     datePosted: job.posted,
     employmentType: job.type === 'full-time' ? 'FULL_TIME' : job.type === 'part-time' ? 'PART_TIME' : job.type === 'contract' ? 'CONTRACTOR' : job.type === 'freelance' ? 'TEMPORARY' : 'OTHER',
     jobLocationType: 'TELECOMMUTE',
@@ -157,11 +158,14 @@ export default function JobDetailPage() {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-5">
           <div className="card p-6">
-            <div className="flex items-center gap-4 mb-4">
+            {/* Long titles wrap to 2+ lines; items-center pushed the icon
+                halfway down and stranded the company name below it. Anchor
+                the icon to the top so title flows naturally beside it. */}
+            <div className="flex items-start gap-4 mb-4">
               <div className="w-16 h-16 shrink-0 rounded-xl bg-stone-100 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400">
                 {job.logo}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 pt-0.5">
                 <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight leading-tight mb-1">{job.title}</h1>
                 {isFree ? (
                   <p className="text-sm font-semibold flex items-center gap-1.5 text-stone-400">
@@ -355,11 +359,12 @@ export default function JobDetailPage() {
 }
 
 // Render a scraped job description as structured blocks. ATS feeds give us
-// plaintext with line breaks; we infer paragraphs / bullet lists / section
-// headers from punctuation patterns so the preview reads cleanly without
-// requiring a markdown parser dep.
+// plaintext (sometimes HTML — normalizeJobDescription handles that) with
+// line breaks; we infer paragraphs / bullet lists / section headers from
+// punctuation patterns so the preview reads cleanly without requiring a
+// markdown parser dep.
 function renderJobDescription(raw: string): React.ReactNode {
-  const lines = raw.split('\n').map(l => l.trimEnd());
+  const lines = normalizeJobDescription(raw).split('\n').map(l => l.trimEnd());
   const blocks: React.ReactNode[] = [];
   let bulletBuf: string[] = [];
   let paraBuf: string[] = [];

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { normalizeJobDescription } from '@/lib/job-description';
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   try {
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
     const title = `${job.title} at ${job.company} | RemoteJobs44`;
     const description = job.description
-      ? job.description.slice(0, 160).replace(/\n/g, ' ')
+      ? normalizeJobDescription(job.description).slice(0, 160).replace(/\s+/g, ' ').trim()
       : `Apply for ${job.title} at ${job.company}. Remote job — ${job.location}. Find remote jobs at RemoteJobs44.`;
 
     const salary = job.salary_min
