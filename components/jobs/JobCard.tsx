@@ -1,4 +1,5 @@
 'use client';
+import { memo } from 'react';
 import Link from 'next/link';
 import { BookmarkPlus, BookmarkCheck, MapPin, Timer, ArrowUpRight, Banknote, Sparkles, Star, Lock, Zap } from 'lucide-react';
 import { cn, formatRelativeDate, formatSalary, capitalize, CATEGORY_META, SOURCE_META } from '@/lib/utils';
@@ -25,17 +26,34 @@ function cardHref(job: Job) {
 
 interface JobCardProps { job: Job; listMode?: boolean; }
 
-export function JobCard({ job, listMode = false }: JobCardProps) {
-  const { user, isPro, isAdmin, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
-  const { isSaved, toggleSave, hasApplied, addApplication } = useJobsStore();
-  const { toast } = useUIStore();
-  const saved   = isSaved(job.id);
-  const applied = hasApplied(job.id);
+function JobCardImpl({ job, listMode = false }: JobCardProps) {
+  // Narrow primitive zustand selectors: each card only re-renders when
+  // the specific value it reads actually changes. The previous version
+  // destructured the whole useAuthStore/useJobsStore/useUIStore objects,
+  // so any save/apply re-ran every card on the page (50 of them on /jobs)
+  // even though only the toggled card needed to re-render.
+  const userPlan        = useAuthStore(s => s.user?.plan);
+  const userRole        = useAuthStore(s => s.user?.role);
+  const loggedIn        = useAuthStore(s => !!s.user);
+  const dailyAppsUsed   = useAuthStore(s => s.dailyAppsUsed);
+  const incrementDailyApp = useAuthStore(s => s.incrementDailyApp);
+  // Derived booleans from primitives — re-renders only when underlying
+  // primitive flips.
+  const isPro    = userPlan === 'daily' || userPlan === 'pro' || userPlan === 'admin';
+  const isAdmin  = userRole === 'admin';
+  const isDaily  = userPlan === 'daily';
+  const isFree   = !loggedIn || userPlan === 'free';
+  // Per-job primitive selectors: `saved` flips only when THIS job's id is
+  // added/removed from savedJobIds; other cards' subscriptions are noops.
+  const saved   = useJobsStore(s => s.savedJobIds.includes(job.id));
+  const applied = useJobsStore(s => s.applications.some(a => a.jobId === job.id));
+  const toggleSave     = useJobsStore(s => s.toggleSave);
+  const addApplication = useJobsStore(s => s.addApplication);
+  const toast = useUIStore(s => s.toast);
+
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
   const srcMeta = SOURCE_META[job.source as keyof typeof SOURCE_META]       ?? SOURCE_META['manual'];
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
-  const isDaily = user?.plan === 'daily';
-  const isFree = !isLoggedIn() || user?.plan === 'free';
   // Day pass users also see company blurred — revealed when they click Apply
   const hideCompany = isFree || isDaily;
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
@@ -44,7 +62,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
+    if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
     const nowSaved = toggleSave(job.id);
     toast(nowSaved ? 'Job saved!' : 'Removed from saved', 'success', 2000);
   }
@@ -60,8 +78,8 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
 
   async function handleApply(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
-    if (!isPro())      { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
+    if (!isPro)      { modalService.open(<PaywallModal mode="subscribe" />); return; }
     if (isDaily && dailyLimitReached) {
       toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
@@ -130,15 +148,15 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
         {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
         <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
         <button onClick={handleApply} onAuxClick={cancelAux}
-          aria-label={applied ? 'Already applied' : isPro() ? 'Apply to this job' : 'Subscribe to apply'}
-          title={applied ? 'Already applied' : isPro() ? 'Apply' : 'Subscribe to apply'}
+          aria-label={applied ? 'Already applied' : isPro ? 'Apply to this job' : 'Subscribe to apply'}
+          title={applied ? 'Already applied' : isPro ? 'Apply' : 'Subscribe to apply'}
           className={cn(
             'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
-              : isPro() ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
+              : isPro ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
               : 'border border-brand-600 text-brand-700 dark:text-brand-400 hover:bg-brand-50'
           )}>
-          {applied ? '✓' : isPro() ? 'Apply' : '🔒'}
+          {applied ? '✓' : isPro ? 'Apply' : '🔒'}
         </button>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
@@ -211,7 +229,7 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
       <div className="flex flex-wrap gap-3 text-xs text-stone-400 dark:text-stone-500">
         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
         {job.timezone && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{job.timezone}</span>}
-        {isAdmin() && (
+        {isAdmin && (
           <span className={cn('flex items-center gap-1', srcMeta.color)}>
             {srcMeta.icon} {srcMeta.label}
           </span>
@@ -233,16 +251,23 @@ export function JobCard({ job, listMode = false }: JobCardProps) {
               ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : dailyLimitReached
               ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed'
-              : isPro()
+              : isPro
               ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800 shadow-sm'
               : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'
           )}>
           {applied ? <><BookmarkCheck className="w-3 h-3" /> Applied</>
             : dailyLimitReached ? '10/10 Limit'
-            : isPro() ? <><ArrowUpRight className="w-3 h-3" /> Apply</>
+            : isPro ? <><ArrowUpRight className="w-3 h-3" /> Apply</>
             : <><Lock className="w-3 h-3" /> Subscribe</>}
         </button>
       </div>
     </Link>
   );
 }
+
+// Memoised export — combined with the per-job primitive zustand selectors
+// above, this means a save/apply on card A only re-renders card A. Card B's
+// `job` prop reference is stable across renders (the parent's jobs array
+// comes from the server-component fetch), so React.memo's default shallow
+// prop compare correctly skips them.
+export const JobCard = memo(JobCardImpl);

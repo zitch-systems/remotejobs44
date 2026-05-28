@@ -23,6 +23,25 @@ import {
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
 
+// Build the dedup key for a Paystack event. Each event type carries its
+// canonical resource id in a different field — we pick the most
+// specific available so e.g. a `charge.success` retry with the same
+// `reference` short-circuits even if `data.id` rotated.
+function extractPaystackId(event: any): string | null {
+  const d = event?.data ?? {};
+  const candidates = [
+    d.reference,                          // charge.success
+    d.invoice_code,                       // invoice.create / invoice.update
+    d.subscription?.subscription_code,    // invoice.payment_failed (nested)
+    d.subscription_code,                  // subscription.disable / expiring_cards
+    d.id != null ? String(d.id) : null,   // generic numeric id fallback
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.length > 0) return c;
+  }
+  return null;
+}
+
 // Fire-and-forget: tell ops a paid charge landed for a user that no longer
 // exists in the profiles table. Without this, the user is silently never
 // upgraded after paying — they'd have to email support before anyone noticed.
@@ -80,6 +99,33 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminSupabaseClient();
+
+  // Generic idempotency: short-circuit any event we've already
+  // processed. Keyed on (event_type, paystack_id) where paystack_id is
+  // the most specific identifier in the payload. The unique index on
+  // paystack_webhook_events raises a 23505 (unique_violation) on insert
+  // for a duplicate; we catch that and return 200 OK silently so
+  // Paystack stops retrying.
+  const paystackId = extractPaystackId(event);
+  if (paystackId) {
+    const { error: dedupError } = await supabase
+      .from('paystack_webhook_events')
+      .insert({
+        event_type:  event.event ?? 'unknown',
+        paystack_id: paystackId,
+        payload:     event.data ?? null,
+      });
+    if (dedupError) {
+      // 23505 = unique_violation. Treat as "already processed".
+      if (dedupError.code === '23505') {
+        console.log(`[webhook] dedup hit: ${event.event} ${paystackId}`);
+        return NextResponse.json({ received: true, deduplicated: true });
+      }
+      // Any other insert error → log and proceed (don't block the
+      // event just because the audit log failed).
+      console.error('[webhook] dedup log insert failed:', dedupError.message);
+    }
+  }
 
   switch (event.event) {
     case 'charge.success': {

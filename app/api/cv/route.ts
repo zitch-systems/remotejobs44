@@ -2,11 +2,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 
+// Magic-byte signatures for the three formats we accept. Verified against
+// the *actual* file bytes — never trust the client-supplied MIME-type
+// header alone, since multipart uploads let the caller set it to anything.
+// Without this check, a user could ship `<script>...</script>` HTML with
+// Content-Type: application/pdf and have Storage serve it as a PDF (the
+// signed URL has Content-Type: application/pdf in the response header).
+function detectMagicMime(buf: Buffer): string | null {
+  if (buf.length < 4) return null;
+  // %PDF — PDF
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return 'application/pdf';
+  }
+  // PK\x03\x04 — ZIP-family (covers .docx, which is a zipped XML bundle)
+  if (buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  // \xD0\xCF\x11\xE0 — legacy MS Office compound binary (.doc)
+  if (buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0) {
+    return 'application/msword';
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Pro-only gate. /pricing copy lists CV upload as a Pro feature
+    // ("CV upload & auto-apply") but this route used to accept uploads
+    // from any signed-in user including the free tier.
+    const { data: profile } = await supabase
+      .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();
+    const plan = profile?.plan ?? 'free';
+    const allowed = profile?.role === 'admin' || plan === 'daily' || plan === 'pro' || plan === 'admin';
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'CV upload is a Pro feature. Upgrade your plan to upload.' },
+        { status: 403 },
+      );
+    }
 
     const form = await req.formData();
     const file = form.get('cv') as File | null;
@@ -31,6 +68,19 @@ export async function POST(req: NextRequest) {
     const ext      = ALLOWED_EXT[file.type] ?? 'pdf';
     const filename = `${user.id}/cv.${ext}`;
     const buffer   = Buffer.from(await file.arrayBuffer());
+
+    // Magic-byte verification. Reject the upload if the actual file
+    // bytes don't match the claimed MIME-type. Closes the path where a
+    // user POSTs Content-Type: application/pdf with HTML/script bytes
+    // inside — the signed URL would then serve that payload with
+    // Content-Type: application/pdf in the response header.
+    const actualMime = detectMagicMime(buffer);
+    if (!actualMime || actualMime !== file.type) {
+      return NextResponse.json(
+        { error: 'File contents don’t match the file type. Please upload a real PDF or Word document.' },
+        { status: 400 },
+      );
+    }
 
     const { error } = await supabase.storage
       .from('cvs')
