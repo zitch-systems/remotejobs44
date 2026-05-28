@@ -249,12 +249,54 @@ export interface IngestResult {
   results:    Record<string, number | string>;
   paused:     string[];
   at:         string;
+  /** True when another runner held the lock and this call short-circuited. */
+  skipped?:   boolean;
+  reason?:    string;
 }
+
+// Lock TTL: the longest the ingest could plausibly take. If a runner
+// crashes mid-pipeline, the lock auto-expires after this many seconds
+// so the next scheduled run isn't permanently blocked.
+const INGEST_LOCK_NAME = 'ingest';
+const INGEST_LOCK_TTL_SECONDS = 10 * 60;
 
 export async function runIngest(): Promise<IngestResult> {
   const supabase = createAdminSupabaseClient();
   const results: Record<string, number | string> = {};
   let totalAdded = 0;
+
+  // Concurrency lock: only one runIngest may be in flight at a time.
+  // The lock TTL above provides a self-heal in case a runner crashes;
+  // the release at the end of this function is the happy-path cleanup.
+  // (migration_v14 adds the cron_locks table + try_acquire_cron_lock fn.)
+  try {
+    const { data: acquired, error: lockErr } = await supabase.rpc('try_acquire_cron_lock', {
+      lock_name:    INGEST_LOCK_NAME,
+      ttl_seconds:  INGEST_LOCK_TTL_SECONDS,
+    });
+    if (lockErr) {
+      // Function missing (migration not applied yet) — log and continue
+      // rather than block ingest entirely. Logged so it's noisy in ops.
+      console.warn('[ingest] lock RPC failed, proceeding without lock:', lockErr.message);
+    } else if (acquired === false) {
+      console.log('[ingest] skipped: another runner holds the lock');
+      return {
+        success:    true,
+        totalAdded: 0,
+        results:    {},
+        paused:     [],
+        at:         new Date().toISOString(),
+        skipped:    true,
+        reason:     'Another ingest is already running. Try again in a few minutes.',
+      };
+    }
+  } catch (err: any) {
+    console.warn('[ingest] lock acquire threw, proceeding without lock:', err.message);
+  }
+
+  // From here on, we hold the lock (or the lock layer was unavailable).
+  // Wrap the rest in try/finally so the lock always releases.
+  try {
 
   // Read paused sources from job_sources. Admin can pause a misbehaving
   // source (e.g. ATS upstream that's been returning spam) by setting
@@ -409,13 +451,24 @@ export async function runIngest(): Promise<IngestResult> {
     console.warn('[ingest] reading user-added sources failed:', err.message);
   }
 
-  return {
-    success:    true,
-    totalAdded,
-    results,
-    paused:     pausedNames,
-    at:         new Date().toISOString(),
-  };
+    return {
+      success:    true,
+      totalAdded,
+      results,
+      paused:     pausedNames,
+      at:         new Date().toISOString(),
+    };
+  } finally {
+    // Release the lock no matter how the pipeline exited (early return,
+    // thrown error caught by the route's outer try, normal completion).
+    // If the RPC isn't there (pre-v14 envs) this is a no-op; the TTL
+    // self-heal kicks in instead.
+    try {
+      await supabase.rpc('release_cron_lock', { lock_name: INGEST_LOCK_NAME });
+    } catch (err: any) {
+      console.warn('[ingest] release_cron_lock RPC failed:', err.message);
+    }
+  }
 }
 
 // Lightweight update-by-id used for user-added sources. (recordSourceRun

@@ -53,7 +53,13 @@ export default function SourcesPage() {
   const [bulkText, setBulkText] = useState('');
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [ingesting, setIngesting] = useState(false);
-  const [ingestResult, setIngestResult] = useState<{ totalAdded: number; results: Record<string, number | string>; paused?: string[] } | null>(null);
+  const [ingestResult, setIngestResult] = useState<{
+    totalAdded: number;
+    results: Record<string, number | string>;
+    paused?: string[];
+    skipped?: boolean;
+    reason?: string;
+  } | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
 
   async function loadSources() {
@@ -154,7 +160,13 @@ export default function SourcesPage() {
       const r = await fetch('/api/admin/ingest-now', { method: 'POST' });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'failed');
-      setIngestResult({ totalAdded: j.totalAdded ?? 0, results: j.results ?? {}, paused: j.paused });
+      setIngestResult({
+        totalAdded: j.totalAdded ?? 0,
+        results:    j.results ?? {},
+        paused:     j.paused,
+        skipped:    j.skipped,
+        reason:     j.reason,
+      });
       // Refresh the list so last_sync_at / jobs_added are current.
       await loadSources();
     } catch (err: any) {
@@ -189,17 +201,23 @@ export default function SourcesPage() {
               Runs the same pipeline the cron runs at 06:00 UTC: hardcoded sources (Remotive, Jobicy, RemoteOK, Arbeitnow, Findwork/SerpApi if keyed) + every active row below.
             </p>
             {ingestResult && (
-              <div className="mt-3 p-3 rounded-lg bg-stone-50 dark:bg-[#162033] text-xs">
-                <p className="font-bold text-brand-700 dark:text-brand-400 mb-1">Added {ingestResult.totalAdded} new jobs</p>
-                <ul className="space-y-0.5 text-stone-600 dark:text-stone-300">
-                  {Object.entries(ingestResult.results).map(([k, v]) => (
-                    <li key={k}><span className="font-semibold">{k}:</span> {String(v)}</li>
-                  ))}
-                </ul>
-                {ingestResult.paused && ingestResult.paused.length > 0 && (
-                  <p className="mt-1 text-stone-400">Paused: {ingestResult.paused.join(', ')}</p>
-                )}
-              </div>
+              ingestResult.skipped ? (
+                <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900 text-xs text-amber-700 dark:text-amber-400">
+                  ⏳ {ingestResult.reason ?? 'Another ingest is already running. Try again in a few minutes.'}
+                </div>
+              ) : (
+                <div className="mt-3 p-3 rounded-lg bg-stone-50 dark:bg-[#162033] text-xs">
+                  <p className="font-bold text-brand-700 dark:text-brand-400 mb-1">Added {ingestResult.totalAdded} new jobs</p>
+                  <ul className="space-y-0.5 text-stone-600 dark:text-stone-300">
+                    {Object.entries(ingestResult.results).map(([k, v]) => (
+                      <li key={k}><span className="font-semibold">{k}:</span> {String(v)}</li>
+                    ))}
+                  </ul>
+                  {ingestResult.paused && ingestResult.paused.length > 0 && (
+                    <p className="mt-1 text-stone-400">Paused: {ingestResult.paused.join(', ')}</p>
+                  )}
+                </div>
+              )
             )}
           </div>
           <button onClick={handleIngestNow} disabled={ingesting}

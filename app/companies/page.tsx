@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, ExternalLink, Briefcase } from 'lucide-react';
+import { Search, Briefcase } from 'lucide-react';
+import { companySlug } from '@/lib/company-slug';
 
 interface Company {
   id: string;
@@ -116,7 +117,7 @@ export default function CompaniesPage() {
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {featured.map(company => (
-                  <Link key={company.id} href={`/jobs?q=${encodeURIComponent(company.name)}`}
+                  <Link key={company.id} href={`/companies/${companySlug(company.name)}`}
                     className="card p-5 flex flex-col items-center text-center hover:border-brand-600 dark:hover:border-brand-500 hover:-translate-y-0.5 transition-all group">
                     <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400 mb-3">
                       {company.logo ?? company.name[0]}
@@ -144,43 +145,46 @@ export default function CompaniesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map(company => (
-                <div key={company.id} className="card p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 shrink-0">
-                      {company.logo ?? company.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
-                        {company.name}
-                      </p>
-                      {company.categories.length > 0 && (
-                        <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 capitalize">
-                          {company.categories.slice(0, 2).join(' · ')}
+              {filtered.map(company => {
+                const slug = companySlug(company.name);
+                return (
+                  <Link key={company.id} href={`/companies/${slug}`}
+                    className="card p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group block">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 shrink-0">
+                        {company.logo ?? company.name[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
+                          {company.name}
                         </p>
-                      )}
+                        {company.categories.length > 0 && (
+                          <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 capitalize">
+                            {company.categories.slice(0, 2).join(' · ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {company.categories.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {company.categories.slice(0, 3).map(cat => (
-                        <span key={cat} className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px] font-semibold uppercase tracking-wider">
-                          {cat}
-                        </span>
-                      ))}
+                    {company.categories.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {company.categories.slice(0, 3).map(cat => (
+                          <span key={cat} className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px] font-semibold uppercase tracking-wider">
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-stone-100 dark:border-[#1e3a5f]">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-400">
+                        <Briefcase className="w-3.5 h-3.5" />
+                        {company.jobCount} open {company.jobCount === 1 ? 'role' : 'roles'}
+                      </span>
                     </div>
-                  )}
-
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-stone-100 dark:border-[#1e3a5f]">
-                    <Link href={`/jobs?q=${encodeURIComponent(company.name)}`}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-400 hover:underline">
-                      <Briefcase className="w-3.5 h-3.5" />
-                      {company.jobCount} open {company.jobCount === 1 ? 'role' : 'roles'}
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </>
