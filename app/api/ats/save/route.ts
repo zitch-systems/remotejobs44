@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { logError } from '@/lib/log';
 import type { Job } from '@/lib/types';
 
@@ -83,6 +84,19 @@ export async function POST(req: NextRequest) {
       revalidatePath('/jobs');
       revalidatePath('/');
     } catch {}
+
+    // Bulk imports are high-blast-radius admin actions — a compromised
+    // admin session could shove thousands of fake jobs into the public
+    // feed. The audit row makes it possible to find and roll back via
+    // (admin_id, action='ats.bulk_import', created_at). Sample of source
+    // names in metadata helps identify which feed got abused without
+    // recording every UUID.
+    const sampleSources = Array.from(new Set(rows.map(r => r.source ?? 'api'))).slice(0, 10);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'ats.bulk_import', targetType: null, targetId: null,
+      metadata: { inserted, failed, total: jobs.length, sample_sources: sampleSources },
+    });
 
     return NextResponse.json({
       success: true,

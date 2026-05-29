@@ -2,9 +2,11 @@
 // Lets an admin trigger the full job ingestion pipeline from the admin UI
 // without needing to wait for the next cron tick or expose CRON_SECRET.
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { runIngest } from '@/lib/ingest-pipeline';
-import { logError } from '@/lib/log';
+import { logError, logWarn } from '@/lib/log';
 
 export async function POST() {
   const auth = await requireAdmin();
@@ -12,6 +14,17 @@ export async function POST() {
 
   try {
     const result = await runIngest();
+    // Mirror /api/cron/ingest: flush /jobs only when the run actually
+    // added rows. Avoids dropping a warm cache for a no-op run.
+    if (result.totalAdded > 0) {
+      try { revalidatePath('/jobs'); }
+      catch (err: any) { logWarn({ event: 'admin.ingest_now.revalidate_failed', error: err?.message ?? String(err) }); }
+    }
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'ingest.run_now', targetType: null, targetId: null,
+      metadata: { totalAdded: result.totalAdded, paused: result.paused, skipped: result.skipped },
+    });
     return NextResponse.json(result);
   } catch (err: any) {
     logError({ event: 'admin.ingest_now.failed', error: err?.message ?? String(err) });

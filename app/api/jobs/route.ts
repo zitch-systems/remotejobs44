@@ -4,9 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { rateLimit, getIP } from '@/lib/rate-limit';
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
+import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
 
 // /jobs (60s revalidate) and /jobs/[id] (300s revalidate) cache server-
@@ -249,20 +250,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
-  try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-      return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  }
-}
+// Local requireAdmin was a parallel implementation of the shared
+// lib/admin/auth.ts that LACKED the `suspended` kill-switch check —
+// a suspended hardcoded admin could still mutate jobs. Switched to the
+// shared helper which also surfaces adminId + adminEmail for the
+// audit log calls below.
 
 const VALID_CATEGORIES = ['engineering','design','marketing','finance','sales','data','hr','product','legal','operations','other'];
 const VALID_TYPES      = ['full-time','part-time','contract','freelance','internship'];
@@ -337,6 +329,11 @@ export async function POST(req: NextRequest) {
     // on the public surface immediately instead of after the next
     // revalidate tick.
     safeRevalidate('/jobs', `/jobs/${job.id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.create', targetType: 'job', targetId: job.id,
+      metadata: { title: job.title, company: job.company, source: job.source },
+    });
     return NextResponse.json({ job: transformJob(job) }, { status: 201 });
   } catch (err: any) {
     logError({ event: 'jobs.post_failed', error: err?.message ?? String(err) });
@@ -380,6 +377,13 @@ export async function PATCH(req: NextRequest) {
     const { data: job, error } = await supabase.from('jobs').update(updates).eq('id', id).select().single();
     if (error) throw new Error('update_failed');
     safeRevalidate('/jobs', `/jobs/${id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.update', targetType: 'job', targetId: id,
+      // Track which columns the admin changed without dumping the full
+      // before/after — that bloats the audit table and risks PII echo.
+      metadata: { changed_columns: Object.keys(updates) },
+    });
     return NextResponse.json({ job: transformJob(job) });
   } catch (err: any) {
     logError({ event: 'jobs.patch_failed', error: err?.message ?? String(err) });
@@ -396,11 +400,25 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
+    // Capture the row before delete so the audit metadata has the job
+    // title/company even after the row is gone. Critical for "who
+    // deleted what" forensics — without it, an audit entry pointing at
+    // a no-longer-existing UUID is nearly useless.
+    const { data: existing } = await supabase
+      .from('jobs')
+      .select('title, company, source')
+      .eq('id', id)
+      .maybeSingle();
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw new Error('delete_failed');
     // Flush the listing AND the now-404 detail page so a stale cached
     // copy of the deleted job doesn't keep serving for up to 5 minutes.
     safeRevalidate('/jobs', `/jobs/${id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.delete', targetType: 'job', targetId: id,
+      metadata: existing ?? { note: 'row already gone at delete time' },
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'jobs.delete_failed', error: err?.message ?? String(err) });
