@@ -36,9 +36,24 @@ const nextConfig = {
     //   - font-src — fonts are self-hosted via next/font now; keep 'self'
     //     plus data: for Tailwind's emoji rendering.
     //   - frame-ancestors 'none' — supersedes X-Frame-Options.
+    //
+    // unsafe-eval: production app code uses no eval / new Function (verified
+    // with a repo-wide grep). HMR in `next dev` does, so we keep it in dev
+    // only — prod CSP omits unsafe-eval, closing the most useful XSS pivot.
+    // If this breaks something at runtime, restore 'unsafe-eval' here and
+    // open an issue documenting which dep needs it.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(isDev ? ["'unsafe-eval'"] : []),
+      'https://va.vercel-scripts.com',
+      'https://vercel.live',
+      'https://js.paystack.co',
+    ].join(' ');
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://js.paystack.co",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
