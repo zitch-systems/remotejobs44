@@ -91,27 +91,26 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    // Resolve plan via the session-bound client first — getRequesterPlan
-    // only reads from auth.users + public.profiles, both of which are
-    // safe to query as anon/authenticated.
+    // Resolve plan via the session-bound client — getRequesterPlan
+    // reads from auth.users + public.profiles, both safe to query as
+    // anon/authenticated.
     const sessionClient = await createServerSupabaseClient();
     const requesterPlan = await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
 
-    // Then pick the DB client + column list based on the answer:
-    //   * Paid (Day Pass / Pro / Admin) → service-role admin client +
-    //     `*`. Migration_v16 revoked anon/authenticated SELECT on
-    //     apply_url and apply_email, so `*` via the session client
-    //     would 403. The admin client bypasses column grants;
-    //     downstream code still trusts the explicit is_active=true /
-    //     notExpired / notFlagged filters.
-    //   * Free / anon                  → session-bound client +
-    //     SAFE_JOB_COLUMNS. The session client retains RLS as a safety
-    //     net (jobs RLS filters is_active=true at the table level), and
-    //     the safe column list omits the paid fields by design — so
-    //     the scrub is enforced at the DB query layer, not just by
-    //     transformJob's seePaid flag.
-    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    // Always use the admin (service-role) client for the actual jobs
+    // query. Supabase sets a per-role statement_timeout: anon ~3s,
+    // authenticated ~8s, service_role 60s. FTS with multi-clause filters
+    // over our 60k-row jobs table needed ~6s in EXPLAIN; on cold caches
+    // it was tripping the 8s authenticated cap and surfacing as a 500.
+    //
+    // Security is preserved by column-list discipline, not by client
+    // choice: anon + free callers get SAFE_JOB_COLUMNS (the migration_v16
+    // safe set, no apply_url / apply_email), Day Pass / Pro / Admin get
+    // '*'. The DB column-level revoke remains the wall blocking the
+    // direct-REST leak path — that wall is at PostgREST + grants,
+    // independent of which client we use server-side.
+    const supabase = createAdminSupabaseClient();
     const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
     // Visibility gates — see lib/jobs-visibility.ts. Filters out expired

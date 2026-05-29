@@ -35,19 +35,18 @@ async function fetchJob(id: string): Promise<Job | null> {
   try {
     // Two-step pattern (matches /api/jobs after migration_v16):
     //   1. Resolve plan via session client — safe to query as anon.
-    //   2. Switch client + column list based on the answer. The session
-    //      client lost SELECT on apply_url/apply_email in v16, so for
-    //      anon + free we MUST use the safe column list (or PostgREST
-    //      returns 403). Paid users go through service-role to get the
-    //      full row including apply_url.
-    //
-    // Previous Promise.all parallelism is gone — the second query depends
-    // on the first's answer. Plan lookup is a single-row read from
-    // profiles, so the latency cost is negligible (<5 ms warm).
+    //   2. Run the actual jobs query as service-role (admin client).
+    //      The column-list discipline is what enforces the paywall:
+    //      anon/free get SAFE_JOB_COLUMNS (no apply_url/apply_email),
+    //      paid get '*'. We use the admin client unconditionally to
+    //      sidestep the 3s/8s per-role statement_timeout — single-row
+    //      reads are cheap but EXPLAIN at scale on the SAME jobs table
+    //      under FTS load showed the anon timeout cap was hitting on
+    //      cold caches.
     const sessionClient = await createServerSupabaseClient();
     const requesterPlan = await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
-    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    const supabase = createAdminSupabaseClient();
     const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
     // Supabase's PostgrestQueryBuilder.select() narrows the row type from
