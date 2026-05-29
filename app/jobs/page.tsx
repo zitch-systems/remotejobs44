@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -63,7 +64,7 @@ interface SearchParams {
   page?:        string;
 }
 
-function transform(j: any): Job {
+function transform(j: any, seePaid: boolean): Job {
   return {
     id:           j.id,
     title:        j.title,
@@ -82,8 +83,11 @@ function transform(j: any): Job {
     requirements: j.requirements ?? undefined,
     skills:       j.skills ?? [],
     benefits:     j.benefits ?? undefined,
-    applyUrl:     j.apply_url ?? undefined,
-    applyEmail:   j.apply_email ?? undefined,
+    // Off-site apply channel gated by plan — see lib/auth/requester-plan.
+    // Free + anon: stripped (the Apply button on JobCard shows the
+    // Subscribe paywall instead of redirecting).
+    applyUrl:     seePaid ? (j.apply_url   ?? undefined) : undefined,
+    applyEmail:   seePaid ? (j.apply_email ?? undefined) : undefined,
     posted:       j.posted_at ?? j.created_at ?? new Date().toISOString(),
     expires:      j.expires_at ?? undefined,
     featured:     j.featured ?? false,
@@ -109,6 +113,12 @@ async function fetchJobs(sp: SearchParams) {
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
   const supabase = createServerSupabaseClient();
+
+  // Resolve plan in parallel with the listing fetch — same paywall as
+  // /api/jobs and /jobs/[id]: anon + free get apply links stripped, so
+  // the only path to an external recruiter URL is through an authed
+  // Day Pass / Pro account.
+  const requesterPlanPromise = getRequesterPlan(supabase);
 
   let query = supabase
     .from('jobs')
@@ -172,8 +182,9 @@ async function fetchJobs(sp: SearchParams) {
   const from = (page - 1) * JOBS_PER_PAGE;
   query = query.range(from, from + JOBS_PER_PAGE - 1);
 
-  const { data, count } = await query;
-  const jobs = (data ?? []).map(transform);
+  const [{ data, count }, requesterPlan] = await Promise.all([query, requesterPlanPromise]);
+  const seePaid = canSeePaidFields(requesterPlan);
+  const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
   const total = count ?? jobs.length;
   return {
     jobs,

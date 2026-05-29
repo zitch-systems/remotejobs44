@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { MapPin, Clock, ArrowLeft } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -33,15 +34,25 @@ async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
     const supabase = createServerSupabaseClient();
-    const { data } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', id)
-      .eq('is_active', true)
-      .or(notExpired())
-      .or(NOT_FLAGGED)
-      .maybeSingle();
+    // Resolve plan in parallel with the row fetch — the apply links are
+    // gated behind a paid plan, so anon + free callers get the off-site
+    // apply URL stripped from the data shipped into the client island.
+    // This is what makes the paywall enforceable: previously the URL was
+    // serialised into the React tree and readable via DevTools regardless
+    // of the displayed CTA.
+    const [{ data }, requesterPlan] = await Promise.all([
+      supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', id)
+        .eq('is_active', true)
+        .or(notExpired())
+        .or(NOT_FLAGGED)
+        .maybeSingle(),
+      getRequesterPlan(supabase),
+    ]);
     if (!data) return null;
+    const seePaid = canSeePaidFields(requesterPlan);
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in
     // /api/jobs/route.ts but maps `posted_at → posted` (the field name the
     // Job type and downstream components actually use; the API route's
@@ -64,8 +75,8 @@ async function fetchJob(id: string): Promise<Job | null> {
       requirements:  data.requirements ?? undefined,
       skills:        data.skills ?? [],
       benefits:      data.benefits ?? undefined,
-      applyUrl:      data.apply_url ?? undefined,
-      applyEmail:    data.apply_email ?? undefined,
+      applyUrl:      seePaid ? (data.apply_url   ?? undefined) : undefined,
+      applyEmail:    seePaid ? (data.apply_email ?? undefined) : undefined,
       posted:        data.posted_at ?? data.created_at ?? new Date().toISOString(),
       expires:       data.expires_at ?? undefined,
       featured:      data.featured ?? false,

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { encryptSecret, decryptSecret } from '@/lib/crypto/secret';
 import { logError } from '@/lib/log';
 
 const SUPPORTED_PROVIDERS = new Set([
@@ -39,10 +40,22 @@ export async function GET() {
       throw new Error(error.message);
     }
 
-    // Never return plaintext api_key over the wire. Replace with masked form.
+    // Never return plaintext api_key over the wire. Decrypt the stored
+    // value just long enough to compute the last-4 mask, then drop it.
+    // Legacy plaintext rows decrypt as themselves (decryptSecret is a
+    // no-op when there's no `enc:v1:` prefix), so the same code path
+    // handles both shapes during migration.
     const safe = (data ?? []).map((row: any) => {
       const { api_key, ...rest } = row;
-      return { ...rest, ...maskApiKey(api_key) };
+      let plain: string | null = null;
+      try {
+        plain = decryptSecret(api_key);
+      } catch (err: any) {
+        // Encrypted row but no AI_KEYS_ENCRYPTION_KEY (or wrong key). Surface
+        // a clear "missing key" tail rather than crashing the whole list.
+        logError({ event: 'admin.ai_discovery_settings.decrypt_failed', provider_id: row.provider_id, error: err?.message ?? String(err) });
+      }
+      return { ...rest, ...maskApiKey(plain) };
     });
     return NextResponse.json({ configs: safe });
   } catch (err: any) {
@@ -82,7 +95,11 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = createAdminSupabaseClient();
     const payload: Record<string, unknown> = { provider_id: providerId };
-    if (apiKeyClean !== undefined) payload.api_key = apiKeyClean;
+    // Encrypt at write-time. When AI_KEYS_ENCRYPTION_KEY is unset,
+    // encryptSecret returns the plaintext (with a one-time warn) so the
+    // feature still works during onboarding; once the env var lands, the
+    // next save migrates the row to the v1 envelope automatically.
+    if (apiKeyClean !== undefined) payload.api_key = encryptSecret(apiKeyClean);
     if (model       !== undefined) payload.model   = model;
     if (enabled     !== undefined) payload.enabled = enabled;
 

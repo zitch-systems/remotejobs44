@@ -5,6 +5,7 @@ import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visi
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
 import { logError } from '@/lib/log';
 
 // MOCK_JOBS is a development fallback used by single-job lookups when the
@@ -77,6 +78,14 @@ export async function GET(req: NextRequest) {
     // regressions that might accidentally surface inactive/private rows.
     const supabase = createServerSupabaseClient();
 
+    // Paywall: off-site apply_url / apply_email are paid-tier fields.
+    // anon + free requesters get them scrubbed before send so a scraper
+    // hitting /api/jobs can't mirror the dataset bypass the Subscribe
+    // flow. Day Pass / Pro / admin see the real values (Day Pass has its
+    // own quota enforced on the apply track endpoint).
+    const requesterPlan = await getRequesterPlan(supabase);
+    const seePaid = canSeePaidFields(requesterPlan);
+
     // Visibility gates — see lib/jobs-visibility.ts. Filters out expired
     // postings (cron currently doesn't flip is_active=false on expiry) and
     // rows the scam-detect heuristic flagged at ingest.
@@ -87,7 +96,7 @@ export async function GET(req: NextRequest) {
       const { data: job } = await supabase
         .from('jobs').select('*').eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
-      if (job) return NextResponse.json({ job: transformJob(job) });
+      if (job) return NextResponse.json({ job: transformJob(job, seePaid) });
       const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
       return NextResponse.json({ job: mock ?? null });
     }
@@ -103,7 +112,7 @@ export async function GET(req: NextRequest) {
       const { data: rows } = await supabase
         .from('jobs').select('*').in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
-      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r)]));
+      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
     }
@@ -200,7 +209,7 @@ export async function GET(req: NextRequest) {
 
     if (jobs.length > 0) {
       return NextResponse.json({
-        jobs: jobs.map(transformJob),
+        jobs: jobs.map((j: any) => transformJob(j, seePaid)),
         total: count ?? 0,
         page, perPage,
         pages: Math.ceil((count ?? 0) / perPage),
@@ -364,7 +373,12 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-function transformJob(j: any) {
+// `seePaid` controls whether the off-site application channel
+// (apply_url + apply_email) is included in the response. Anonymous and
+// Free-plan requesters get `null` for both, mirroring what the SSR
+// /jobs/[id] page sends to free users. Defaults to true for non-API
+// callers that haven't been updated to pass the flag.
+function transformJob(j: any, seePaid: boolean = true) {
   return {
     id:           j.id,
     title:        j.title,
@@ -383,8 +397,8 @@ function transformJob(j: any) {
     requirements: j.requirements ?? null,
     skills:       j.skills ?? [],
     benefits:     j.benefits ?? null,
-    applyUrl:     j.apply_url ?? null,
-    applyEmail:   j.apply_email ?? null,
+    applyUrl:     seePaid ? (j.apply_url   ?? null) : null,
+    applyEmail:   seePaid ? (j.apply_email ?? null) : null,
     postedAt:     j.posted_at ?? j.created_at,
     expiresAt:    j.expires_at ?? null,
     featured:     j.featured ?? false,
