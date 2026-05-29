@@ -17,8 +17,8 @@ function find(slug: string) {
   return SALARY_ROLES.find(r => r.slug === slug.toLowerCase());
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const r = find(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const r = find((await params).slug);
   if (!r) return {};
   const lo = r.bands[0].usdLow;
   const hi = r.bands[r.bands.length-1].usdHigh;
@@ -36,8 +36,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 const fmtUSD = (n: number) => `$${(n/1000).toFixed(0)}k`;
 const fmtNGN = (n: number) => `₦${(n/1000000).toFixed(0)}M`;
 
-export default function SalaryRolePage({ params }: { params: { slug: string } }) {
-  const r = find(params.slug);
+export default async function SalaryRolePage({ params }: { params: Promise<{ slug: string }> }) {
+  const r = find((await params).slug);
   if (!r) notFound();
 
   // JSON-LD for Google rich result

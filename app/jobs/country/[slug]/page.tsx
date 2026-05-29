@@ -19,8 +19,8 @@ export function generateStaticParams() {
   return COUNTRIES.map(c => ({ slug: c.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const country = findCountry(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const country = findCountry((await params).slug);
   if (!country) return {};
   const title = `Remote Jobs in ${country.label} | RemoteJobs44`;
   const description = `${country.blurb} Updated daily — apply from ${country.label} to global companies.`;
@@ -34,8 +34,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CountryPage({ params }: { params: { slug: string } }) {
-  const country = findCountry(params.slug);
+export default async function CountryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const country = findCountry((await params).slug);
   if (!country) notFound();
 
   let jobs: any[] = [];

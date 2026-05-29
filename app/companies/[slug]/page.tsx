@@ -71,14 +71,14 @@ async function findCompany(slug: string): Promise<{ name: string; jobs: JobRow[]
   return { name, jobs: matches.slice(0, 30), total: matches.length };
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const found = await findCompany(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const found = await findCompany((await params).slug);
   if (!found) {
     return { title: 'Company not found | RemoteJobs44' };
   }
   const title = `${found.name} Remote Jobs (${found.total} open) | RemoteJobs44`;
   const description = `${found.total} open remote jobs at ${found.name}. Browse active listings and apply directly — RemoteJobs44.`;
-  const url = `${BASE}/companies/${params.slug}`;
+  const url = `${BASE}/companies/${(await params).slug}`;
   const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`${found.name} Remote Jobs`)}&company=${encodeURIComponent(found.name)}&subtitle=${encodeURIComponent(`${found.total} open positions`)}`;
   return {
     title,
@@ -89,12 +89,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CompanyPage({ params }: { params: { slug: string } }) {
-  const found = await findCompany(params.slug);
+export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
+  const found = await findCompany((await params).slug);
   if (!found) notFound();
 
   const { name, jobs, total } = found;
-  const url = `${BASE}/companies/${params.slug}`;
+  const url = `${BASE}/companies/${(await params).slug}`;
 
   // Organization schema — lets Google build a Knowledge Panel entry +
   // sitelinks for branded queries. We don't have logo / sameAs / founding
@@ -135,7 +135,7 @@ export default async function CompanyPage({ params }: { params: { slug: string }
         items={[
           { name: 'Home',      href: '/'           },
           { name: 'Companies', href: '/companies'  },
-          { name,              href: `/companies/${params.slug}` },
+          { name,              href: `/companies/${(await params).slug}` },
         ]}
       />
 

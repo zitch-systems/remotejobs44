@@ -14,11 +14,13 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    // @sparticuz/chromium ships a Chromium binary that Webpack must NOT try
-    // to bundle — keep it as an external server-side dependency so it lives
-    // in node_modules in the Vercel function and gets loaded at runtime.
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   },
+  // Next 15 graduated `experimental.serverComponentsExternalPackages` to
+  // top-level `serverExternalPackages`. @sparticuz/chromium ships a
+  // Chromium binary that Webpack must NOT try to bundle — keep both as
+  // external server-side deps so they live in node_modules in the
+  // Vercel function and get loaded at runtime.
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   async headers() {
     // Content-Security-Policy is the meaningful XSS defence; X-XSS-Protection
     // is deprecated and some Safari versions can be tricked into XSS via it.

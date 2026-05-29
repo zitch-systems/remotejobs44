@@ -8,14 +8,15 @@ import { requireAdmin } from '@/lib/admin/auth';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const supabase = createAdminSupabaseClient();
   // Look up the user's email — we need it for the resetPasswordForEmail call.
-  const { data: profile } = await supabase.from('profiles').select('email').eq('id', params.id).maybeSingle();
+  const { data: profile } = await supabase.from('profiles').select('email').eq('id', id).maybeSingle();
   if (!profile?.email) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   // generateLink with type='recovery' returns a magic link; admin.inviteUserByEmail
@@ -29,7 +30,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
-    action: 'user.reset_password', targetType: 'user', targetId: params.id,
+    action: 'user.reset_password', targetType: 'user', targetId: id,
     metadata: { sent_to: profile.email },
   });
 

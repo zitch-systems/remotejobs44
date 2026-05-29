@@ -22,8 +22,8 @@ function find(slug: string) {
   return INDUSTRIES.find(i => i.slug === slug.toLowerCase());
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const i = find(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const i = find((await params).slug);
   if (!i) return {};
   const title = `Remote ${i.label} Jobs | RemoteJobs44`;
   const description = `${i.blurb} Apply from Nigeria, Kenya, South Africa, and anywhere globally — 50,000+ remote jobs on RemoteJobs44.`;
@@ -51,8 +51,8 @@ const KEYWORDS: Record<string, string[]> = {
   agency:     ['agency','consulting','consultancy','dev shop','studio'],
 };
 
-export default async function IndustryPage({ params }: { params: { slug: string } }) {
-  const i = find(params.slug);
+export default async function IndustryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const i = find((await params).slug);
   if (!i) notFound();
 
   let jobs: any[] = [];

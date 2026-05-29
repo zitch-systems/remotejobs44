@@ -12,17 +12,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // GET — full user record for the drill-in page.
 // Returns: profile, current subscription (if any), and recent applications.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const supabase = createAdminSupabaseClient();
   const [{ data: profile }, { data: subscription }, { data: applications }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', params.id).maybeSingle(),
-    supabase.from('subscriptions').select('*').eq('user_id', params.id).maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+    supabase.from('subscriptions').select('*').eq('user_id', id).maybeSingle(),
     supabase.from('applications').select('id,job_title,company,status,applied_at')
-      .eq('user_id', params.id).order('applied_at', { ascending: false }).limit(20),
+      .eq('user_id', id).order('applied_at', { ascending: false }).limit(20),
   ]);
 
   if (!profile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -33,10 +34,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // PATCH — update plan / role / name / suspension. Pass only the fields you
 // want changed. Each accepted field is audit-logged separately so the log
 // shows what was touched, not just "user updated".
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   let body: {
     plan?: string; role?: string; name?: string;
@@ -56,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!ALLOWED_ROLES.includes(body.role)) return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     // Belt-and-braces: an admin should not be able to demote themselves and
     // immediately lose access to this very endpoint.
-    if (params.id === auth.adminId && body.role !== 'admin') {
+    if (id === auth.adminId && body.role !== 'admin') {
       return NextResponse.json({ error: 'You cannot demote yourself' }, { status: 400 });
     }
     patch.role = body.role;
@@ -68,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (typeof body.suspended !== 'boolean') return NextResponse.json({ error: 'suspended must be boolean' }, { status: 400 });
     // Can't suspend yourself — would lock you out of the admin panel
     // immediately and require a DB poke to recover.
-    if (params.id === auth.adminId && body.suspended) {
+    if (id === auth.adminId && body.suspended) {
       return NextResponse.json({ error: 'You cannot suspend yourself' }, { status: 400 });
     }
     patch.suspended    = body.suspended;
@@ -85,33 +87,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   patch.updated_at = new Date().toISOString();
 
   const supabase = createAdminSupabaseClient();
-  const { error } = await supabase.from('profiles').update(patch).eq('id', params.id);
+  const { error } = await supabase.from('profiles').update(patch).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  logInfo({ event: 'admin.user.updated', admin_email: auth.adminEmail, target_user_id: params.id, patch });
+  logInfo({ event: 'admin.user.updated', admin_email: auth.adminEmail, target_user_id: id, patch });
 
   // Audit-log a separate row per field so a search by action="user.suspend"
   // doesn't pick up unrelated name edits.
   const tasks: Promise<void>[] = [];
   if (patch.plan !== undefined) tasks.push(recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
-    action: 'user.update_plan', targetType: 'user', targetId: params.id,
+    action: 'user.update_plan', targetType: 'user', targetId: id,
     metadata: { plan: patch.plan },
   }));
   if (patch.role !== undefined) tasks.push(recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
-    action: 'user.update_role', targetType: 'user', targetId: params.id,
+    action: 'user.update_role', targetType: 'user', targetId: id,
     metadata: { role: patch.role },
   }));
   if (patch.suspended !== undefined) tasks.push(recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
     action: patch.suspended ? 'user.suspend' : 'user.unsuspend',
-    targetType: 'user', targetId: params.id,
+    targetType: 'user', targetId: id,
     metadata: { reason: patch.suspended_reason ?? null },
   }));
   if (patch.name !== undefined) tasks.push(recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
-    action: 'user.update_name', targetType: 'user', targetId: params.id,
+    action: 'user.update_name', targetType: 'user', targetId: id,
     metadata: { name: patch.name },
   }));
   await Promise.all(tasks);
@@ -121,14 +123,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 // DELETE — wipe the user from auth.users. profiles, applications, saved_jobs,
 // and subscriptions all cascade via FK constraints in schema.sql.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   // Hard guard: an admin must not delete their own account from this route —
   // accidental click would log them out and leave the app with one fewer admin.
-  if (params.id === auth.adminId) {
+  if (id === auth.adminId) {
     return NextResponse.json({ error: 'You cannot delete yourself' }, { status: 400 });
   }
 
@@ -137,21 +140,21 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   // billing a deleted account. We don't await Paystack's API here — the
   // periodic cron / next webhook will reconcile.
   await supabase.from('subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() })
-    .eq('user_id', params.id);
+    .eq('user_id', id);
 
   // Pull the email *before* deleting so the audit row has something useful
   // beyond a UUID once the user is gone.
-  const { data: profile } = await supabase.from('profiles').select('email').eq('id', params.id).maybeSingle();
+  const { data: profile } = await supabase.from('profiles').select('email').eq('id', id).maybeSingle();
 
-  const { error } = await supabase.auth.admin.deleteUser(params.id);
+  const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) {
-    logError({ event: 'admin.user.delete_failed', admin_email: auth.adminEmail, target_user_id: params.id, error: error.message });
+    logError({ event: 'admin.user.delete_failed', admin_email: auth.adminEmail, target_user_id: id, error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  logInfo({ event: 'admin.user.deleted', admin_email: auth.adminEmail, target_user_id: params.id });
+  logInfo({ event: 'admin.user.deleted', admin_email: auth.adminEmail, target_user_id: id });
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
-    action: 'user.delete', targetType: 'user', targetId: params.id,
+    action: 'user.delete', targetType: 'user', targetId: id,
     metadata: { email: profile?.email ?? null },
   });
   return NextResponse.json({ success: true });

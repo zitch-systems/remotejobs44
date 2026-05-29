@@ -16,8 +16,8 @@ export function generateStaticParams() {
   return TIMEZONES.map(t => ({ slug: t.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const tz = findTimezone(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const tz = findTimezone((await params).slug);
   if (!tz) return {};
   const title = `Remote Jobs — ${tz.label} | RemoteJobs44`;
   const description = `${tz.blurb} Updated every few hours.`;
@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function TimezonePage({ params }: { params: { slug: string } }) {
-  const tz = findTimezone(params.slug);
+export default async function TimezonePage({ params }: { params: Promise<{ slug: string }> }) {
+  const tz = findTimezone((await params).slug);
   if (!tz) notFound();
 
   let jobs: any[] = [];

@@ -16,8 +16,8 @@ export function generateStaticParams() {
   return SKILLS.map(s => ({ slug: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const skill = findSkill(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const skill = findSkill((await params).slug);
   if (!skill) return {};
   const title = `Remote ${skill.label} Jobs | RemoteJobs44`;
   const description = `${skill.blurb} Apply from anywhere — updated every few hours.`;
@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function SkillPage({ params }: { params: { slug: string } }) {
-  const skill = findSkill(params.slug);
+export default async function SkillPage({ params }: { params: Promise<{ slug: string }> }) {
+  const skill = findSkill((await params).slug);
   if (!skill) notFound();
 
   let jobs: any[] = [];

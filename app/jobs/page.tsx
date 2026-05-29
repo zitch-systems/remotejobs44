@@ -112,7 +112,7 @@ async function fetchJobs(sp: SearchParams) {
   const sort        = sp.sort       ?? 'newest';
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   // Resolve plan in parallel with the listing fetch — same paywall as
   // /api/jobs and /jobs/[id]: anon + free get apply links stripped, so
@@ -221,15 +221,21 @@ function paginationHref(sp: SearchParams, targetPage: number): string {
   return qs ? `/jobs?${qs}` : '/jobs';
 }
 
-export default async function JobsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { jobs, total, page, pages } = await fetchJobs(searchParams);
+export default async function JobsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  // Next 15+ made searchParams async — must be awaited once at the top
+  // and then read off the resolved object. Rename to `sp` to avoid
+  // shadowing the closure-captured prop in the helper calls below
+  // (`paginationHref(sp, …)` is functionally identical to passing the
+  // raw object that previously came in synchronously).
+  const sp = await searchParams;
+  const { jobs, total, page, pages } = await fetchJobs(sp);
 
-  const category   = (searchParams.category ?? 'all') as JobCategory | 'all';
-  const q          = searchParams.q ?? '';
-  const remoteOnly = (searchParams.remote ?? 'true') !== 'false';
-  const salary     = searchParams.salary ?? '';
+  const category   = (sp.category ?? 'all') as JobCategory | 'all';
+  const q          = sp.q ?? '';
+  const remoteOnly = (sp.remote ?? 'true') !== 'false';
+  const salary     = sp.salary ?? '';
   const activeFilterCount = ['type','level','salary','timezone','posted','companySize','region','country']
-    .filter(k => searchParams[k as keyof SearchParams]).length;
+    .filter(k => sp[k as keyof SearchParams]).length;
   const hasActive = !!(q || (category && category !== 'all') || activeFilterCount > 0);
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
 
@@ -296,7 +302,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           {salary ? (
             <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-md mx-auto text-sm">
               Most jobs on the site don&rsquo;t publish a salary range, so the salary filter
-              excludes them. <Link href={paginationHref({ ...searchParams, salary: '' }, 1)} className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Clear the salary filter</Link> to see all matching jobs.
+              excludes them. <Link href={paginationHref({ ...sp, salary: '' }, 1)} className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Clear the salary filter</Link> to see all matching jobs.
             </p>
           ) : (
             <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
@@ -315,7 +321,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           {pages > 1 && (
             <div className="flex items-center justify-center gap-1.5">
               {page > 1 ? (
-                <Link href={paginationHref(searchParams, page - 1)}
+                <Link href={paginationHref(sp, page - 1)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                   <ChevronLeft className="w-4 h-4" />Previous
                 </Link>
@@ -325,14 +331,14 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
                 </span>
               )}
               {pageWindow(page, pages).map(p => (
-                <Link key={p} href={paginationHref(searchParams, p)}
+                <Link key={p} href={paginationHref(sp, p)}
                   className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all flex items-center justify-center',
                     p === page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628]')}>
                   {p}
                 </Link>
               ))}
               {page < pages ? (
-                <Link href={paginationHref(searchParams, page + 1)}
+                <Link href={paginationHref(sp, page + 1)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                   Next<ChevronRight className="w-4 h-4" />
                 </Link>

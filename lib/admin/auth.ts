@@ -18,7 +18,7 @@ export type RequireAdminResult =
   | { ok: false; res: NextResponse };
 
 export async function requireAdmin(): Promise<RequireAdminResult> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
     return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };

@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     // governs what the public can see. Service-role was being used here
     // as a perf shortcut, but it closes the only safety net against future
     // regressions that might accidentally surface inactive/private rows.
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
 
     // Paywall: off-site apply_url / apply_email are paid-tier fields.
     // anon + free requesters get them scrubbed before send so a scraper

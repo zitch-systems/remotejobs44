@@ -22,8 +22,8 @@ function find(slug: string) {
   return CITIES.find(c => c.slug === slug.toLowerCase());
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const c = find(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const c = find((await params).slug);
   if (!c) return {};
   const title = `Remote Jobs in ${c.label} | Work from Home for Global Companies`;
   const description = `${c.blurb} Remote roles open to ${c.label}-based talent on RemoteJobs44 — paid in USD, GBP, EUR.`;
@@ -37,8 +37,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CityPage({ params }: { params: { slug: string } }) {
-  const c = find(params.slug);
+export default async function CityPage({ params }: { params: Promise<{ slug: string }> }) {
+  const c = find((await params).slug);
   if (!c) notFound();
 
   // Most "remote" jobs are not city-specific. We surface a mix of:

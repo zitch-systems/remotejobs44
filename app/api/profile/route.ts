@@ -26,7 +26,7 @@ const SAFE_PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, 
 // subscriptions.current_period_end, so applies are already blocked.
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

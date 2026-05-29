@@ -33,7 +33,7 @@ export const revalidate = 300;
 async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     // Resolve plan in parallel with the row fetch — the apply links are
     // gated behind a paid plan, so anon + free callers get the off-site
     // apply URL stripped from the data shipped into the client island.
@@ -181,8 +181,8 @@ function renderJobDescription(raw: string): React.ReactNode {
   return <>{blocks}</>;
 }
 
-export default async function JobDetailPage({ params }: { params: { id: string } }) {
-  const job = await fetchJob(params.id);
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const job = await fetchJob((await params).id);
   if (!job) notFound();
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
