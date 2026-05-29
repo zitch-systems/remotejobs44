@@ -12,9 +12,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, Clock, ArrowLeft, Flag } from 'lucide-react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -33,26 +33,39 @@ export const revalidate = 300;
 async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
-    const supabase = await createServerSupabaseClient();
-    // Resolve plan in parallel with the row fetch — the apply links are
-    // gated behind a paid plan, so anon + free callers get the off-site
-    // apply URL stripped from the data shipped into the client island.
-    // This is what makes the paywall enforceable: previously the URL was
-    // serialised into the React tree and readable via DevTools regardless
-    // of the displayed CTA.
-    const [{ data }, requesterPlan] = await Promise.all([
-      supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', id)
-        .eq('is_active', true)
-        .or(notExpired())
-        .or(NOT_FLAGGED)
-        .maybeSingle(),
-      getRequesterPlan(supabase),
-    ]);
-    if (!data) return null;
+    // Two-step pattern (matches /api/jobs after migration_v16):
+    //   1. Resolve plan via session client — safe to query as anon.
+    //   2. Switch client + column list based on the answer. The session
+    //      client lost SELECT on apply_url/apply_email in v16, so for
+    //      anon + free we MUST use the safe column list (or PostgREST
+    //      returns 403). Paid users go through service-role to get the
+    //      full row including apply_url.
+    //
+    // Previous Promise.all parallelism is gone — the second query depends
+    // on the first's answer. Plan lookup is a single-row read from
+    // profiles, so the latency cost is negligible (<5 ms warm).
+    const sessionClient = await createServerSupabaseClient();
+    const requesterPlan = await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
+    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
+
+    // Supabase's PostgrestQueryBuilder.select() narrows the row type from
+    // the literal column list. We pass `cols` as a runtime variable so the
+    // generic resolves to GenericStringError — fine at runtime, but the
+    // downstream `data.title` etc. then fail tsc. Cast back to `any` so the
+    // existing snake_case → camelCase mapping below keeps compiling. The
+    // real shape is enforced by what we put into SAFE_JOB_COLUMNS + the
+    // migration_v16 column grants.
+    const { data } = await supabase
+      .from('jobs')
+      .select(cols)
+      .eq('id', id)
+      .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
+      .maybeSingle() as { data: any };
+    if (!data) return null;
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in
     // /api/jobs/route.ts but maps `posted_at → posted` (the field name the
     // Job type and downstream components actually use; the API route's

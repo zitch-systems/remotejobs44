@@ -5,7 +5,7 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/sup
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { rateLimit, getIP } from '@/lib/rate-limit';
-import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
@@ -91,19 +91,28 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    // Public read — use the session-bound server client so RLS still
-    // governs what the public can see. Service-role was being used here
-    // as a perf shortcut, but it closes the only safety net against future
-    // regressions that might accidentally surface inactive/private rows.
-    const supabase = await createServerSupabaseClient();
-
-    // Paywall: off-site apply_url / apply_email are paid-tier fields.
-    // anon + free requesters get them scrubbed before send so a scraper
-    // hitting /api/jobs can't mirror the dataset bypass the Subscribe
-    // flow. Day Pass / Pro / admin see the real values (Day Pass has its
-    // own quota enforced on the apply track endpoint).
-    const requesterPlan = await getRequesterPlan(supabase);
+    // Resolve plan via the session-bound client first — getRequesterPlan
+    // only reads from auth.users + public.profiles, both of which are
+    // safe to query as anon/authenticated.
+    const sessionClient = await createServerSupabaseClient();
+    const requesterPlan = await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
+
+    // Then pick the DB client + column list based on the answer:
+    //   * Paid (Day Pass / Pro / Admin) → service-role admin client +
+    //     `*`. Migration_v16 revoked anon/authenticated SELECT on
+    //     apply_url and apply_email, so `*` via the session client
+    //     would 403. The admin client bypasses column grants;
+    //     downstream code still trusts the explicit is_active=true /
+    //     notExpired / notFlagged filters.
+    //   * Free / anon                  → session-bound client +
+    //     SAFE_JOB_COLUMNS. The session client retains RLS as a safety
+    //     net (jobs RLS filters is_active=true at the table level), and
+    //     the safe column list omits the paid fields by design — so
+    //     the scrub is enforced at the DB query layer, not just by
+    //     transformJob's seePaid flag.
+    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
     // Visibility gates — see lib/jobs-visibility.ts. Filters out expired
     // postings (cron currently doesn't flip is_active=false on expiry) and
@@ -113,7 +122,7 @@ export async function GET(req: NextRequest) {
 
     if (id) {
       const { data: job } = await supabase
-        .from('jobs').select('*').eq('id', id).eq('is_active', true)
+        .from('jobs').select(cols).eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
       if (job) return NextResponse.json({ job: transformJob(job, seePaid) });
       const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
@@ -129,14 +138,14 @@ export async function GET(req: NextRequest) {
       )).slice(0, 10);
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
       const { data: rows } = await supabase
-        .from('jobs').select('*').in('id', wantedIds).eq('is_active', true)
+        .from('jobs').select(cols).in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
     }
 
-    let query = supabase.from('jobs').select('*', { count: 'exact' })
+    let query = supabase.from('jobs').select(cols, { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);

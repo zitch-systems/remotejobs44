@@ -61,3 +61,32 @@ export async function getRequesterPlan(supabase: SupabaseClient): Promise<Reques
 export function canSeePaidFields(plan: RequesterPlan): boolean {
   return plan === 'daily' || plan === 'pro' || plan === 'admin';
 }
+
+/**
+ * The columns of `public.jobs` that anon + authenticated roles can SELECT.
+ *
+ * After migration_v16 the anon and authenticated roles no longer have
+ * SELECT permission on `apply_url` or `apply_email` — so a query that
+ * sends `.select('*')` as either role returns 403 from PostgREST. The
+ * server-side reads in /api/jobs, /jobs SSR, and /jobs/[id] SSR therefore
+ * have to enumerate the safe columns explicitly when using the session-
+ * bound client.
+ *
+ * When the requester is on a paid tier (canSeePaidFields → true), the
+ * code switches to `createAdminSupabaseClient()` (service role bypasses
+ * column grants) and selects `'*'` — that path is the only way apply_url
+ * reaches the wire.
+ *
+ * Keep this list in lock-step with migration_v16.sql's GRANT SELECT
+ * column list. A new column added to `public.jobs` needs to be added in
+ * BOTH places before anon/authenticated callers can read it.
+ */
+export const SAFE_JOB_COLUMNS =
+  'id, title, company, company_id, logo,' +
+  ' category, type, level, location, timezone,' +
+  ' description, requirements, skills, benefits,' +
+  ' salary_min, salary_max, currency,' +
+  ' remote, featured, is_new, is_active,' +
+  ' source, source_url, views, applications,' +
+  ' posted_at, expires_at, created_at,' +
+  ' flagged, flagged_reason';

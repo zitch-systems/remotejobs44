@@ -9,9 +9,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -112,17 +112,21 @@ async function fetchJobs(sp: SearchParams) {
   const sort        = sp.sort       ?? 'newest';
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
-  const supabase = await createServerSupabaseClient();
-
-  // Resolve plan in parallel with the listing fetch — same paywall as
-  // /api/jobs and /jobs/[id]: anon + free get apply links stripped, so
-  // the only path to an external recruiter URL is through an authed
-  // Day Pass / Pro account.
-  const requesterPlanPromise = getRequesterPlan(supabase);
+  // Two-step pattern matching /api/jobs after migration_v16: resolve
+  // plan via session client (safe to query as anon), then switch the
+  // DB client + SELECT columns based on the answer. anon + free use
+  // session-bound + SAFE_JOB_COLUMNS (skips apply_url/apply_email, the
+  // columns v16 revoked SELECT on for non-paid roles). Day Pass / Pro /
+  // Admin use service-role + `*` to pick up apply_url.
+  const sessionClient = await createServerSupabaseClient();
+  const requesterPlan = await getRequesterPlan(sessionClient);
+  const seePaid = canSeePaidFields(requesterPlan);
+  const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+  const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
   let query = supabase
     .from('jobs')
-    .select('*', { count: 'exact' })
+    .select(cols, { count: 'exact' })
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);
@@ -182,8 +186,7 @@ async function fetchJobs(sp: SearchParams) {
   const from = (page - 1) * JOBS_PER_PAGE;
   query = query.range(from, from + JOBS_PER_PAGE - 1);
 
-  const [{ data, count }, requesterPlan] = await Promise.all([query, requesterPlanPromise]);
-  const seePaid = canSeePaidFields(requesterPlan);
+  const { data, count } = await query;
   const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
   const total = count ?? jobs.length;
   return {

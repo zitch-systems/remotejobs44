@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Programmatic SEO slug pages (city, country, region, skill, industry,
+  // timezone — ~250 paths) each fetch a jobs slice from Supabase at build
+  // time. The default 60s per-page timeout was occasionally exhausted when
+  // building from a high-latency network or under heavy Supabase load.
+  // 180s headroom keeps Vercel + local builds reliable; pages still SSG
+  // instantly at runtime.
+  staticPageGenerationTimeout: 180,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'logo.clearbit.com' },
