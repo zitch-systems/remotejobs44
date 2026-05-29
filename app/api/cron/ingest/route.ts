@@ -1,22 +1,13 @@
-// app/api/cron/ingest/route.ts — Vercel Cron entry point, runs every 6 hours.
+// app/api/cron/ingest/route.ts — manual ingest re-trigger.
 // Pipeline lives in lib/ingest-pipeline.ts so the admin "run now" endpoint
 // can call it without exporting non-handler symbols from this route file.
 import { NextRequest, NextResponse } from 'next/server';
 import { runIngest } from '@/lib/ingest-pipeline';
-import { logError } from '@/lib/log';
-
-const CRON_SECRET = process.env.CRON_SECRET ?? '';
-const CRON_MIN_LEN = 16;
+import { requireCronSecret } from '@/lib/cron-auth';
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization');
-  if (!CRON_SECRET || CRON_SECRET.length < CRON_MIN_LEN) {
-    logError({ event: 'cron.ingest.misconfigured', detail: 'CRON_SECRET missing or too short' });
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
-  }
-  if (auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireCronSecret(req, 'cron.ingest');
+  if (!auth.ok) return auth.res;
   const result = await runIngest();
   return NextResponse.json(result);
 }

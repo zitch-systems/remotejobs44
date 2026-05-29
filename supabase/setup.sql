@@ -341,6 +341,13 @@ where email = 'mallamplacid@gmail.com';
 -- DONE ✓
 -- After running this script:
 -- 1. Go to Authentication → Providers → Email
---    → Disable "Confirm email" for instant login
--- 2. Log in at /login — you'll land on /admin automatically
+--    → KEEP "Confirm email" ENABLED. This is the primary bot-signup
+--      defense for the platform — without it, anyone can register
+--      with throwaway addresses, buy a Day Pass with stolen cards,
+--      and there is no contact channel for fraud investigation.
+--      (Earlier versions of this file said to disable it for
+--      developer convenience; that was wrong for prod and has been
+--      reversed.)
+-- 2. Log in at /login — you'll land on /admin automatically once
+--    you've confirmed the email link.
 -- ────────────────────────────────────────────────────────────

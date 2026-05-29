@@ -4,11 +4,35 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/sup
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { rateLimit, getIP } from '@/lib/rate-limit';
 import { logError } from '@/lib/log';
+
+// MOCK_JOBS is a development fallback used by single-job lookups when the
+// requested id isn't in the DB. In production an unknown id should resolve
+// to "not found" instead of leaking a mock posting (the Vercel demo job
+// at id='j1' showing up on prod was the original reason for this guard).
+const ALLOW_MOCKS = process.env.NODE_ENV !== 'production';
 
 export const revalidate = 60;
 
 export async function GET(req: NextRequest) {
+  // Per-IP rate-limit to slow bulk-scraping of the public jobs feed.
+  // 120/minute is well above any human-driven page interaction
+  // (real users hit this on filter changes — at most a few per minute)
+  // but well below what a scraper trying to mirror the DB would need.
+  // Defense-in-depth only — direct Supabase REST with the anon key is
+  // still open by RLS design; this just keeps Next.js from being the
+  // easy path. Same in-memory store as the contact form rate limit.
+  const ip = getIP(req);
+  const rl = rateLimit(`jobs:${ip}`, 120, 60_000);
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    return NextResponse.json(
+      { error: 'Too many requests. Slow down.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   const { searchParams } = req.nextUrl;
   const id       = searchParams.get('id');
   // `ids=a,b,c` — batched fetch for dashboard saved-job preview.
@@ -64,7 +88,7 @@ export async function GET(req: NextRequest) {
         .from('jobs').select('*').eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
       if (job) return NextResponse.json({ job: transformJob(job) });
-      const mock = MOCK_JOBS.find(j => j.id === id);
+      const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
       return NextResponse.json({ job: mock ?? null });
     }
 

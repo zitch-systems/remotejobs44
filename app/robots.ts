@@ -1,5 +1,9 @@
 import type { MetadataRoute } from 'next';
 
+// Mirror sitemap.ts — use the deploy URL so preview deploys aren't
+// pointing search engines at prod.
+const BASE = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com').replace(/\/$/, '');
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
@@ -26,7 +30,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
       },
     ],
-    sitemap: 'https://remotejobs44.com/sitemap.xml',
-    host: 'https://remotejobs44.com',
+    sitemap: `${BASE}/sitemap.xml`,
+    host: BASE,
   };
 }

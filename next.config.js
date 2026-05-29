@@ -58,8 +58,15 @@ const nextConfig = {
           { key: 'Content-Security-Policy', value: csp },
           { key: 'X-Content-Type-Options',  value: 'nosniff' },
           { key: 'X-Frame-Options',         value: 'DENY' },
-          // X-XSS-Protection intentionally removed — deprecated and harmful
-          // on some Safari versions. CSP above is the actual defence.
+          // HSTS: tell browsers to only ever load this origin over HTTPS
+          // for the next 2 years. `includeSubDomains` covers any future
+          // subdomain (api., admin., status., …); `preload` opts us into
+          // the browser-shipped HSTS preload list. The header is also a
+          // ranking + trust signal — Google logs HSTS as part of the page
+          // experience report. Only enable once HTTPS is locked in
+          // permanently; rolling back HSTS after a long max-age is
+          // painful.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
           { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },
         ],

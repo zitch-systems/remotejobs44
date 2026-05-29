@@ -20,28 +20,19 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
 import { runIngest } from '@/lib/ingest-pipeline';
+import { requireCronSecret } from '@/lib/cron-auth';
 import { logError } from '@/lib/log';
-
-const CRON_SECRET = process.env.CRON_SECRET ?? '';
-const CRON_MIN_LEN = 16;
 
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
 const PRO_GRACE_MS   = 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
-  // Fail closed when CRON_SECRET is unset/short. The previous `if (SECRET && ...)`
-  // pattern let any caller hit this endpoint when the env var was missing —
-  // and this route mass-downgrades day-pass users to `free`. Mirror the
-  // /api/cron/ingest pattern (503 when secret missing or too short).
-  if (!CRON_SECRET || CRON_SECRET.length < CRON_MIN_LEN) {
-    logError({ event: 'cron.daily.misconfigured', detail: 'CRON_SECRET missing or too short' });
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
-  }
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Shared guard: fails closed (503) when CRON_SECRET is unset/short;
+  // returns 401 on bearer mismatch using a constant-time compare so the
+  // secret isn't leakable via timing-side-channel.
+  const auth = requireCronSecret(req, 'cron.daily');
+  if (!auth.ok) return auth.res;
 
   const supabase = createAdminSupabaseClient();
   const log: Record<string, unknown> = { startedAt: new Date().toISOString() };

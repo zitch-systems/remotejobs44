@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
-import { logError } from '@/lib/log';
+import { rateLimit, getIP } from '@/lib/rate-limit';
+import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 
@@ -14,6 +15,21 @@ const SUBSCRIPTION_PLAN_CODES: Record<string, string | undefined> = {
 };
 
 export async function POST(req: NextRequest) {
+  // Per-IP rate-limit: payment-init is a free outbound hop to Paystack.
+  // A bot loop creating Paystack reference objects costs us API quota and
+  // pollutes the merchant dashboard. 5/hour per IP is plenty for legit
+  // users (a single user only ever clicks "subscribe" a handful of times).
+  const ip = getIP(req);
+  const rl = rateLimit(`paystack-init:${ip}`, 5, 60 * 60 * 1000);
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    logWarn({ event: 'paystack.initialize.rate_limited', ip });
+    return NextResponse.json(
+      { error: `Too many subscription attempts. Try again in ${retryAfter} seconds.` },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   try {
     // Prefer NEXT_PUBLIC_APP_URL to avoid localhost bleed on Paystack callback
     const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '') || new URL(req.url).origin;

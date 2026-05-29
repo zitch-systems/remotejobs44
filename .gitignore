@@ -15,6 +15,10 @@ tsconfig.tsbuildinfo
 # Git bundles
 *.bundle
 
+# Patch files left in working tree (rescue scripts, manual patches, etc.) —
+# share them via PRs / commits, not as committed artifacts.
+*.patch
+
 # Playwright artifacts
 playwright-report/
 test-results/

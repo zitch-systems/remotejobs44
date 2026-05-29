@@ -10,21 +10,13 @@
 //     isn't wrongly downgraded just because Paystack lagged.
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { logError } from '@/lib/log';
+import { requireCronSecret } from '@/lib/cron-auth';
 
-const CRON_MIN_LEN = 16;
 const PRO_GRACE_MS  = 24 * 60 * 60 * 1000; // 24h
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET ?? '';
-  if (!secret || secret.length < CRON_MIN_LEN) {
-    logError({ event: 'cron.expire_daily.misconfigured', detail: 'CRON_SECRET missing or too short' });
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
-  }
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireCronSecret(req, 'cron.expire_daily');
+  if (!auth.ok) return auth.res;
 
   const supabase = createAdminSupabaseClient();
   const now      = new Date().toISOString();
