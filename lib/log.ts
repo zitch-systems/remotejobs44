@@ -30,9 +30,12 @@
 //   * error → console.error  (Vercel shows red, flags the function as
 //                             having errored which surfaces in dashboards)
 //
-// Sentry integration is a no-op today (no SDK installed, no DSN). When
-// @sentry/nextjs is wired up later, the `level === 'error'` branch in
-// emit() is the right hook point — add Sentry.captureException there.
+// Error reporting webhook:
+//   When ERROR_REPORT_URL is set, logError() POSTs the same JSON payload
+//   to that URL (fire-and-forget, never blocks the request). This is the
+//   light-weight Sentry-equivalent — point it at a Discord/Slack webhook
+//   or a custom collector. If you later wire @sentry/nextjs, swap the
+//   reportToWebhook call below for Sentry.captureException.
 
 export type LogLevel = 'info' | 'warn' | 'error';
 
@@ -61,6 +64,47 @@ function emit(level: LogLevel, payload: LogPayload): void {
   if (level === 'error')      console.error(line);
   else if (level === 'warn')  console.warn(line);
   else                        console.log(line);
+
+  if (level === 'error') reportToWebhook(obj);
+}
+
+// Fire-and-forget POST to ERROR_REPORT_URL. The .catch absorbs every
+// failure mode (DNS fail, 4xx/5xx, timeout) so a downed reporting
+// endpoint never bubbles up into a request handler. Setting up:
+//
+//   * Discord:   create a channel webhook → ERROR_REPORT_URL = that URL.
+//                Discord accepts { content: string } so set
+//                ERROR_REPORT_FORMAT=discord to wrap.
+//   * Slack:     same idea with Slack incoming webhooks (use
+//                ERROR_REPORT_FORMAT=slack).
+//   * Generic:   any endpoint that accepts the raw JSON line. Leave
+//                ERROR_REPORT_FORMAT unset.
+function reportToWebhook(obj: Record<string, unknown>): void {
+  const url = process.env.ERROR_REPORT_URL;
+  if (!url) return;
+  const format = process.env.ERROR_REPORT_FORMAT;
+  let body: string;
+  // Trim the payload to avoid Discord's 2000-char message cap.
+  const line = JSON.stringify(obj);
+  const trimmed = line.length > 1800 ? line.slice(0, 1800) + '…' : line;
+  if (format === 'discord') {
+    body = JSON.stringify({ content: '```json\n' + trimmed + '\n```' });
+  } else if (format === 'slack') {
+    body = JSON.stringify({ text: '```' + trimmed + '```' });
+  } else {
+    body = line;
+  }
+  try {
+    // Don't await — request handlers shouldn't hang on a slow reporter.
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => { /* swallow — reporter never breaks the request */ });
+  } catch {
+    // fetch can throw synchronously in some edge environments; same policy.
+  }
 }
 
 // Defensive stringify so a circular field in the payload can't crash a
