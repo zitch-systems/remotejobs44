@@ -77,12 +77,14 @@ export async function GET(req: NextRequest) {
   //   ?perPage=-5    → range(0, -6) → PostgREST 500
   //   ?page=999999   → range(11999976, 11999987) → 500 + log noise
   //   ?perPage=100   → 8s cold start
-  // Cap perPage at 50 (matches the SSR listing page-size); cap page at
-  // 10000 (above which there can't possibly be results in a 64k DB).
+  // perPage caps at 50 (matches the SSR listing page-size). page caps
+  // at 1000 — max usable offset = 1000 * 50 = 50k, well inside the 64k
+  // dataset. Higher pages can't ever have results and would just push
+  // PostgREST into "offset out of range" territory.
   const rawPage    = parseInt(searchParams.get('page')    ?? '1',  10);
   const rawPerPage = parseInt(searchParams.get('perPage') ?? '12', 10);
-  const page    = Number.isFinite(rawPage)    && rawPage    > 0 ? Math.min(rawPage,    10000) : 1;
-  const perPage = Number.isFinite(rawPerPage) && rawPerPage > 0 ? Math.min(rawPerPage, 50)    : 12;
+  const page    = Number.isFinite(rawPage)    && rawPage    > 0 ? Math.min(rawPage,    1000) : 1;
+  const perPage = Number.isFinite(rawPerPage) && rawPerPage > 0 ? Math.min(rawPerPage, 50)   : 12;
 
   const REGION_TERMS: Record<string, string[]> = {
     africa:        ['africa','nigeria','ghana','kenya','south africa','egypt','ethiopia','cameroon','senegal'],
