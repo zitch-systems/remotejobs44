@@ -9,6 +9,7 @@
 // daily run.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
 import { logError } from '@/lib/log';
@@ -86,6 +87,11 @@ export async function POST(req: NextRequest) {
     logError({ event: 'admin.sources.create_failed', error: error?.message ?? 'unknown' });
     return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
   }
+  await recordAdminAction({
+    adminId: auth.adminId, adminEmail: auth.adminEmail,
+    action: 'source.create', targetType: 'source', targetId: data.id,
+    metadata: { name: data.name, url: cleanUrl, method },
+  });
   return NextResponse.json({ source: data as SourceRow }, { status: 201 });
 }
 

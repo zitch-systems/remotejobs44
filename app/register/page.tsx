@@ -46,6 +46,10 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false);
   const [agree,    setAgree]    = useState(false);
   const [loading,  setLoading]  = useState(false);
+  // Honeypot — invisible to real users (off-screen + aria-hidden + autocomplete=off).
+  // Bots that auto-fill every input on the page will fill this; we silently
+  // pretend the signup succeeded and never call Supabase. No CAPTCHA needed.
+  const [website,  setWebsite]  = useState('');
 
   // If someone is already logged in and lands on /register, send them home —
   // they don't need to create another account. Same guard as on /login.
@@ -62,6 +66,13 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Honeypot trip — pretend success, do nothing. Don't surface an error
+    // because that tells the bot to retry without the hidden field.
+    if (website) {
+      toast('Account created! Check your email to confirm.', 'success', 6000);
+      router.push('/login?registered=1');
+      return;
+    }
     if (!agree) { toast('Please accept the terms to continue', 'error'); return; }
     if (password.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
     setLoading(true);
@@ -194,6 +205,21 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
+                never see or focus this; auto-fillers and naive crawlers
+                will populate any <input name="website"> they see. */}
+            <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+              <label>Website (leave blank)
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={website}
+                  onChange={e => setWebsite(e.target.value)}
+                />
+              </label>
+            </div>
             <div>
               <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Full name</label>
               <input

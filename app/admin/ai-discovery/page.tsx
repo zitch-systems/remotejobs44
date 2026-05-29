@@ -504,7 +504,7 @@ export default function AIDiscoveryPage() {
               <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />
               <span className="font-semibold text-brand-700 dark:text-brand-400">{progress.provider}</span>
               <span className="text-stone-400">·</span>
-              <span className="truncate max-w-xs">"{progress.query}"</span>
+              <span className="truncate max-w-xs">&ldquo;{progress.query}&rdquo;</span>
             </span>
             <span className="font-bold">{progressPct}% · {progress.current}/{progress.total}</span>
           </div>

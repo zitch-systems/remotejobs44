@@ -42,7 +42,7 @@ ${escapeForPrompt(cv.slice(0, 8000))}
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: 'Sign in to use the AI CV review.' }, { status: 401 });
 

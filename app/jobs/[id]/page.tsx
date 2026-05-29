@@ -11,9 +11,10 @@
 // client islands.
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Clock, ArrowLeft } from 'lucide-react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { MapPin, Clock, ArrowLeft, Flag } from 'lucide-react';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -32,15 +33,38 @@ export const revalidate = 300;
 async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
-    const supabase = createServerSupabaseClient();
+    // Two-step pattern (matches /api/jobs after migration_v16):
+    //   1. Resolve plan via session client — safe to query as anon.
+    //   2. Switch client + column list based on the answer. The session
+    //      client lost SELECT on apply_url/apply_email in v16, so for
+    //      anon + free we MUST use the safe column list (or PostgREST
+    //      returns 403). Paid users go through service-role to get the
+    //      full row including apply_url.
+    //
+    // Previous Promise.all parallelism is gone — the second query depends
+    // on the first's answer. Plan lookup is a single-row read from
+    // profiles, so the latency cost is negligible (<5 ms warm).
+    const sessionClient = await createServerSupabaseClient();
+    const requesterPlan = await getRequesterPlan(sessionClient);
+    const seePaid = canSeePaidFields(requesterPlan);
+    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
+
+    // Supabase's PostgrestQueryBuilder.select() narrows the row type from
+    // the literal column list. We pass `cols` as a runtime variable so the
+    // generic resolves to GenericStringError — fine at runtime, but the
+    // downstream `data.title` etc. then fail tsc. Cast back to `any` so the
+    // existing snake_case → camelCase mapping below keeps compiling. The
+    // real shape is enforced by what we put into SAFE_JOB_COLUMNS + the
+    // migration_v16 column grants.
     const { data } = await supabase
       .from('jobs')
-      .select('*')
+      .select(cols)
       .eq('id', id)
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)
-      .maybeSingle();
+      .maybeSingle() as { data: any };
     if (!data) return null;
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in
     // /api/jobs/route.ts but maps `posted_at → posted` (the field name the
@@ -64,8 +88,8 @@ async function fetchJob(id: string): Promise<Job | null> {
       requirements:  data.requirements ?? undefined,
       skills:        data.skills ?? [],
       benefits:      data.benefits ?? undefined,
-      applyUrl:      data.apply_url ?? undefined,
-      applyEmail:    data.apply_email ?? undefined,
+      applyUrl:      seePaid ? (data.apply_url   ?? undefined) : undefined,
+      applyEmail:    seePaid ? (data.apply_email ?? undefined) : undefined,
       posted:        data.posted_at ?? data.created_at ?? new Date().toISOString(),
       expires:       data.expires_at ?? undefined,
       featured:      data.featured ?? false,
@@ -170,8 +194,8 @@ function renderJobDescription(raw: string): React.ReactNode {
   return <>{blocks}</>;
 }
 
-export default async function JobDetailPage({ params }: { params: { id: string } }) {
-  const job = await fetchJob(params.id);
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const job = await fetchJob((await params).id);
   if (!job) notFound();
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
@@ -365,6 +389,28 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               </div>
             </div>
           )}
+
+          {/* "Report this job" — user-driven trust signal. Scam-detect +
+              source-trust badge catch the obvious cases at ingest, but the
+              long tail (off-topic listings, broken apply URLs, employer-
+              misrepresentation, expired postings) only reveal themselves
+              when a real user hits them. Pre-filling the subject + body
+              with the job id keeps the friction near zero — most users
+              won't write a follow-up if they have to compose from scratch. */}
+          <div className="card p-5">
+            <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-1.5">
+              <Flag className="w-3.5 h-3.5" /> See something off?
+            </h3>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mb-3 leading-relaxed">
+              Spam, scam, fake employer, broken apply link — let us know and we&rsquo;ll review within 24h.
+            </p>
+            <a
+              href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title} at ${job.company}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors"
+            >
+              <Flag className="w-3 h-3" /> Report this listing
+            </a>
+          </div>
         </div>
       </div>
     </div>

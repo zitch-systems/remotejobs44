@@ -19,8 +19,8 @@ function find(slug: string) {
   return COMPETITORS.find(c => c.slug === slug.toLowerCase());
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const c = find(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const c = find((await params).slug);
   if (!c) return {};
   const title = `RemoteJobs44 vs ${c.name} — Honest Comparison 2026`;
   const description = `Comparing RemoteJobs44 and ${c.name} for remote job seekers in Africa. ${c.oneLiner} Pricing, listings, AI tools, and fit for African talent.`;
@@ -45,8 +45,8 @@ const RJ44_ROWS = [
   { feature: 'Refreshes', us: 'Every 6 hours', them: () => 'Varies' },
 ];
 
-export default function ComparePage({ params }: { params: { slug: string } }) {
-  const c = find(params.slug);
+export default async function ComparePage({ params }: { params: Promise<{ slug: string }> }) {
+  const c = find((await params).slug);
   if (!c) notFound();
 
   return (

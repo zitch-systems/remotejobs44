@@ -18,8 +18,8 @@ export function generateStaticParams() {
   return CATEGORIES.map(c => ({ slug: c.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const cat = findCategory(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const cat = findCategory((await params).slug);
   if (!cat) return {};
   const title = `Remote ${cat.label} Jobs | RemoteJobs44`;
   const description = `${cat.blurb} Browse open positions and apply from Africa and anywhere in the world.`;
@@ -35,8 +35,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const cat = findCategory(params.slug);
+export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const cat = findCategory((await params).slug);
   if (!cat) notFound();
 
   let jobs: any[] = [];

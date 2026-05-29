@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Programmatic SEO slug pages (city, country, region, skill, industry,
+  // timezone — ~250 paths) each fetch a jobs slice from Supabase at build
+  // time. The default 60s per-page timeout was occasionally exhausted when
+  // building from a high-latency network or under heavy Supabase load.
+  // 180s headroom keeps Vercel + local builds reliable; pages still SSG
+  // instantly at runtime.
+  staticPageGenerationTimeout: 180,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'logo.clearbit.com' },
@@ -14,11 +21,13 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    // @sparticuz/chromium ships a Chromium binary that Webpack must NOT try
-    // to bundle — keep it as an external server-side dependency so it lives
-    // in node_modules in the Vercel function and gets loaded at runtime.
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   },
+  // Next 15 graduated `experimental.serverComponentsExternalPackages` to
+  // top-level `serverExternalPackages`. @sparticuz/chromium ships a
+  // Chromium binary that Webpack must NOT try to bundle — keep both as
+  // external server-side deps so they live in node_modules in the
+  // Vercel function and get loaded at runtime.
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   async headers() {
     // Content-Security-Policy is the meaningful XSS defence; X-XSS-Protection
     // is deprecated and some Safari versions can be tricked into XSS via it.
@@ -36,9 +45,24 @@ const nextConfig = {
     //   - font-src — fonts are self-hosted via next/font now; keep 'self'
     //     plus data: for Tailwind's emoji rendering.
     //   - frame-ancestors 'none' — supersedes X-Frame-Options.
+    //
+    // unsafe-eval: production app code uses no eval / new Function (verified
+    // with a repo-wide grep). HMR in `next dev` does, so we keep it in dev
+    // only — prod CSP omits unsafe-eval, closing the most useful XSS pivot.
+    // If this breaks something at runtime, restore 'unsafe-eval' here and
+    // open an issue documenting which dep needs it.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(isDev ? ["'unsafe-eval'"] : []),
+      'https://va.vercel-scripts.com',
+      'https://vercel.live',
+      'https://js.paystack.co',
+    ].join(' ');
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://js.paystack.co",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
@@ -58,8 +82,15 @@ const nextConfig = {
           { key: 'Content-Security-Policy', value: csp },
           { key: 'X-Content-Type-Options',  value: 'nosniff' },
           { key: 'X-Frame-Options',         value: 'DENY' },
-          // X-XSS-Protection intentionally removed — deprecated and harmful
-          // on some Safari versions. CSP above is the actual defence.
+          // HSTS: tell browsers to only ever load this origin over HTTPS
+          // for the next 2 years. `includeSubDomains` covers any future
+          // subdomain (api., admin., status., …); `preload` opts us into
+          // the browser-shipped HSTS preload list. The header is also a
+          // ranking + trust signal — Google logs HSTS as part of the page
+          // experience report. Only enable once HTTPS is locked in
+          // permanently; rolling back HSTS after a long max-age is
+          // painful.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
           { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },
         ],

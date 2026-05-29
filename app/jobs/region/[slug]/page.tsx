@@ -25,8 +25,8 @@ export function generateStaticParams() {
   return REGIONS.map(r => ({ slug: r.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const region = findRegion(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const region = findRegion((await params).slug);
   if (!region) return {};
   const title = `Remote Jobs in ${region.label} | RemoteJobs44`;
   const description = `${region.blurb} Browse and apply — updated daily.`;
@@ -40,8 +40,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function RegionPage({ params }: { params: { slug: string } }) {
-  const region = findRegion(params.slug);
+export default async function RegionPage({ params }: { params: Promise<{ slug: string }> }) {
+  const region = findRegion((await params).slug);
   if (!region) notFound();
 
   let jobs: any[] = [];

@@ -51,7 +51,7 @@ Give 4 behavioral, 4 technical/role, 3 remote-specific. Keep each answer skeleto
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: 'Sign in to use the AI interview prep.' }, { status: 401 });
 

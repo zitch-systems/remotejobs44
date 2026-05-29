@@ -14,10 +14,11 @@ import { logError, logInfo } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
-  if (!UUID_RE.test(params.id)) {
+  const { id } = await params;
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
   }
 
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data: profile } = await supabase
     .from('profiles')
     .select('email, role')
-    .eq('id', params.id)
+    .eq('id', id)
     .maybeSingle();
   if (!profile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   if (profile.role === 'admin') {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { error: profileError } = await supabase
     .from('profiles')
     .update({ plan: tier, plan_expires_at: expiresAt.toISOString(), updated_at: nowIso })
-    .eq('id', params.id);
+    .eq('id', id);
   if (profileError) {
     return NextResponse.json({ error: 'Failed to update profile: ' + profileError.message }, { status: 500 });
   }
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // 2. Upsert the subscriptions row — this is what /api/applications checks
   //    to enforce the per-window count and to spot legitimate expiry.
   const { error: subError } = await supabase.from('subscriptions').upsert({
-    user_id:              params.id,
+    user_id:              id,
     plan:                 tier,
     billing,
     status:               'active',
@@ -70,17 +71,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     updated_at:           nowIso,
   }, { onConflict: 'user_id' });
   if (subError) {
-    logError({ event: 'admin.restore_subscription.sub_upsert_failed', admin_email: auth.adminEmail, target_user_id: params.id, error: subError.message });
+    logError({ event: 'admin.restore_subscription.sub_upsert_failed', admin_email: auth.adminEmail, target_user_id: id, error: subError.message });
     // Profile was already updated — don't error out, the user is functional.
   }
 
-  logInfo({ event: 'admin.subscription_restored', admin_email: auth.adminEmail, target_user_id: params.id, target_email: profile.email, plan });
+  logInfo({ event: 'admin.subscription_restored', admin_email: auth.adminEmail, target_user_id: id, target_email: profile.email, plan });
   await recordAdminAction({
     adminId:    auth.adminId,
     adminEmail: auth.adminEmail,
     action:     'user.restore_subscription',
     targetType: 'user',
-    targetId:   params.id,
+    targetId:   id,
     metadata:   { plan, tier, expires_at: expiresAt.toISOString(), email: profile.email },
   });
 

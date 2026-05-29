@@ -15,12 +15,20 @@ tsconfig.tsbuildinfo
 # Git bundles
 *.bundle
 
+# Patch files left in working tree (rescue scripts, manual patches, etc.) —
+# share them via PRs / commits, not as committed artifacts.
+*.patch
+
 # Playwright artifacts
 playwright-report/
 test-results/
 
 # Lighthouse reports
 lighthouse-report.json
+
+# Vitest coverage output (generated in CI; can also be run locally via
+# `npm run test:unit:coverage`)
+coverage/
 
 # OS files
 .DS_Store

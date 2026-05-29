@@ -10,12 +10,12 @@
 //   - We use the `subscriptions` table itself for idempotency, not a separate
 //     `transactions` table (which doesn't exist in the schema).
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac, timingSafeEqual } from 'crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 import { extractPaystackId } from '@/lib/paystack/event-id';
+import { verifyPaystackSignature } from '@/lib/paystack/verify-signature';
 import { logInfo, logWarn, logError } from '@/lib/log';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
@@ -67,13 +67,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
-  const hash = createHmac('sha512', PAYSTACK_SECRET).update(body).digest('hex');
-  // Use constant-time comparison to prevent timing-attack signature leak.
-  // Both sides are hex strings of identical length (128 chars for SHA-512);
-  // bail before timingSafeEqual otherwise (which throws on length mismatch).
-  if (!signature || signature.length !== hash.length ||
-      !timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(signature, 'hex'))) {
-    logWarn({ event: 'webhook.invalid_signature' });
+  // verifyPaystackSignature does the HMAC + constant-time compare + safe
+  // handling of length-mismatch / non-hex probes. See its unit test for
+  // the attacker-probe matrix this guards against.
+  const sigCheck = verifyPaystackSignature(body, signature, PAYSTACK_SECRET);
+  if (!sigCheck.ok) {
+    logWarn({ event: 'webhook.invalid_signature', reason: sigCheck.reason });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 

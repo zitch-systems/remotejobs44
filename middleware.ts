@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { ADMIN_EMAILS } from '@/lib/admin-emails';
+import { hasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 
 function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -20,14 +21,12 @@ function isAdminEmail(email: string | null | undefined): boolean {
 // all, the user is truly logged out. If there IS a cookie but getUser fails,
 // it's a transient error — keep them logged in.
 //
-// Supabase/SSR chunks large sessions (Google OAuth, long JWTs) across
-// `sb-<ref>-auth-token.0`, `.1`, … cookies and deletes the base name.
-// `endsWith('-auth-token')` would miss every chunked session, which is the
-// majority of OAuth users — and the missed check is exactly what triggers
-// the random-logout bounce. Match base or chunked names.
-const SB_AUTH_COOKIE = /^sb-.+-auth-token(\.\d+)?$/;
+// The actual regex + matcher lives in lib/supabase/cookies.ts so middleware
+// and AuthSyncProvider stay in lock-step — they used to drift, and any
+// drift here reintroduces the random-logout bounce for chunked OAuth
+// sessions (the cookie names supabase/ssr writes when the JWT is large).
 function hasSupabaseSessionCookie(request: NextRequest): boolean {
-  return request.cookies.getAll().some(c => SB_AUTH_COOKIE.test(c.name));
+  return hasSupabaseAuthCookie(request.cookies.getAll());
 }
 
 export async function middleware(request: NextRequest) {

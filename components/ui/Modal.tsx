@@ -41,8 +41,20 @@ export function ModalRoot() {
     return () => window.removeEventListener('keydown', handler);
   }, [state, close]);
 
-  _open = open;
-  _close = close;
+  // Wire the module-scope modalService refs to the live callbacks AFTER
+  // the render commits. Doing this during render was the
+  // react-hooks/globals lint error in eslint-config-next 16 — it's a
+  // genuine anti-pattern even outside React Compiler. On unmount,
+  // restore the no-op fallbacks so a stray modalService.open() in a
+  // race condition doesn't call into stale state setters.
+  useEffect(() => {
+    _open = open;
+    _close = close;
+    return () => {
+      _open = () => {};
+      _close = () => {};
+    };
+  }, [open, close]);
 
   if (!state) return null;
 

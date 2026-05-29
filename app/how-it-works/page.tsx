@@ -33,7 +33,7 @@ export default function HowItWorks() {
           From browsing to landing a remote job
         </h1>
         <p className="text-stone-500 dark:text-stone-400 mt-3 max-w-2xl mx-auto leading-relaxed">
-          RemoteJobs44 takes you from "where do I even start" to "I got the offer" — with honest pricing built for African talent and AI tools that make a real difference.
+          RemoteJobs44 takes you from &ldquo;where do I even start&rdquo; to &ldquo;I got the offer&rdquo; — with honest pricing built for African talent and AI tools that make a real difference.
         </p>
       </div>
 

@@ -6,7 +6,7 @@ import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
 // SIGNED_TTL above). Only the row's own user can fetch theirs.
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

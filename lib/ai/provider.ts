@@ -7,6 +7,7 @@
 // cohere) and Anthropic Claude. Picks the first enabled config; if more than
 // one is enabled, Claude wins, otherwise OpenAI, otherwise first found.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { decryptSecret } from '@/lib/crypto/secret';
 import { logError } from '@/lib/log';
 
 export interface AiConfig {
@@ -38,14 +39,28 @@ export async function loadActiveAiConfig(): Promise<AiConfig | null> {
       .eq('enabled', true);
     if (error || !data?.length) return null;
 
-    const valid = data.filter((r: any) => !!r.api_key);
-    if (!valid.length) return null;
+    // Decrypt stored secrets here — rows written before the encryption
+    // wrap-up land back as plaintext (decryptSecret is a no-op without
+    // the `enc:v1:` prefix), so this transparently bridges legacy and
+    // encrypted rows. A row whose ciphertext we can't unwrap (key
+    // rotated or missing) is dropped from the candidate set so we never
+    // ship ciphertext to a provider API.
+    const decrypted: { provider_id: string; api_key: string; model: string }[] = [];
+    for (const r of data as any[]) {
+      if (!r.api_key) continue;
+      try {
+        const plain = decryptSecret(r.api_key);
+        if (plain) decrypted.push({ provider_id: r.provider_id, api_key: plain, model: r.model });
+      } catch (err: any) {
+        logError({ event: 'ai.provider.decrypt_failed', provider_id: r.provider_id, error: err?.message ?? String(err) });
+      }
+    }
+    if (!decrypted.length) return null;
 
-    valid.sort(
-      (a: any, b: any) =>
-        PREFERENCE.indexOf(a.provider_id) - PREFERENCE.indexOf(b.provider_id)
+    decrypted.sort(
+      (a, b) => PREFERENCE.indexOf(a.provider_id) - PREFERENCE.indexOf(b.provider_id)
     );
-    const top = valid[0];
+    const top = decrypted[0];
     return {
       providerId: top.provider_id,
       apiKey:     top.api_key,

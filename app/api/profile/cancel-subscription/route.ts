@@ -15,7 +15,7 @@ import { logError } from '@/lib/log';
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
 
 export async function POST() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

@@ -1,14 +1,58 @@
 // app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
-import { logError } from '@/lib/log';
+import { rateLimit, getIP } from '@/lib/rate-limit';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
+import { logError, logWarn } from '@/lib/log';
+
+// /jobs (60s revalidate) and /jobs/[id] (300s revalidate) cache server-
+// rendered HTML at the edge. Without a manual flush, an admin's create /
+// edit / delete only surfaces to the public after the TTL expires —
+// long enough that admins repeatedly re-fetch wondering whether the
+// save worked. Calling revalidatePath here drops the affected entries
+// from the cache so the very next public request rebuilds with the
+// fresh row. Wrapped in try/catch because revalidatePath can throw at
+// edges (during build, in a worker without an HTTP context) and we'd
+// rather a successful DB write return 200 than fail because the cache
+// flush couldn't reach the dispatcher.
+function safeRevalidate(...paths: string[]): void {
+  for (const p of paths) {
+    try { revalidatePath(p); }
+    catch (err: any) { logWarn({ event: 'jobs.revalidate_failed', path: p, error: err?.message ?? String(err) }); }
+  }
+}
+
+// MOCK_JOBS is a development fallback used by single-job lookups when the
+// requested id isn't in the DB. In production an unknown id should resolve
+// to "not found" instead of leaking a mock posting (the Vercel demo job
+// at id='j1' showing up on prod was the original reason for this guard).
+const ALLOW_MOCKS = process.env.NODE_ENV !== 'production';
 
 export const revalidate = 60;
 
 export async function GET(req: NextRequest) {
+  // Per-IP rate-limit to slow bulk-scraping of the public jobs feed.
+  // 120/minute is well above any human-driven page interaction
+  // (real users hit this on filter changes — at most a few per minute)
+  // but well below what a scraper trying to mirror the DB would need.
+  // Defense-in-depth only — direct Supabase REST with the anon key is
+  // still open by RLS design; this just keeps Next.js from being the
+  // easy path. Same in-memory store as the contact form rate limit.
+  const ip = getIP(req);
+  const rl = rateLimit(`jobs:${ip}`, 120, 60_000);
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    return NextResponse.json(
+      { error: 'Too many requests. Slow down.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   const { searchParams } = req.nextUrl;
   const id       = searchParams.get('id');
   // `ids=a,b,c` — batched fetch for dashboard saved-job preview.
@@ -47,11 +91,28 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    // Public read — use the session-bound server client so RLS still
-    // governs what the public can see. Service-role was being used here
-    // as a perf shortcut, but it closes the only safety net against future
-    // regressions that might accidentally surface inactive/private rows.
-    const supabase = createServerSupabaseClient();
+    // Resolve plan via the session-bound client first — getRequesterPlan
+    // only reads from auth.users + public.profiles, both of which are
+    // safe to query as anon/authenticated.
+    const sessionClient = await createServerSupabaseClient();
+    const requesterPlan = await getRequesterPlan(sessionClient);
+    const seePaid = canSeePaidFields(requesterPlan);
+
+    // Then pick the DB client + column list based on the answer:
+    //   * Paid (Day Pass / Pro / Admin) → service-role admin client +
+    //     `*`. Migration_v16 revoked anon/authenticated SELECT on
+    //     apply_url and apply_email, so `*` via the session client
+    //     would 403. The admin client bypasses column grants;
+    //     downstream code still trusts the explicit is_active=true /
+    //     notExpired / notFlagged filters.
+    //   * Free / anon                  → session-bound client +
+    //     SAFE_JOB_COLUMNS. The session client retains RLS as a safety
+    //     net (jobs RLS filters is_active=true at the table level), and
+    //     the safe column list omits the paid fields by design — so
+    //     the scrub is enforced at the DB query layer, not just by
+    //     transformJob's seePaid flag.
+    const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+    const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
     // Visibility gates — see lib/jobs-visibility.ts. Filters out expired
     // postings (cron currently doesn't flip is_active=false on expiry) and
@@ -61,10 +122,10 @@ export async function GET(req: NextRequest) {
 
     if (id) {
       const { data: job } = await supabase
-        .from('jobs').select('*').eq('id', id).eq('is_active', true)
+        .from('jobs').select(cols).eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
-      if (job) return NextResponse.json({ job: transformJob(job) });
-      const mock = MOCK_JOBS.find(j => j.id === id);
+      if (job) return NextResponse.json({ job: transformJob(job, seePaid) });
+      const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
       return NextResponse.json({ job: mock ?? null });
     }
 
@@ -77,14 +138,14 @@ export async function GET(req: NextRequest) {
       )).slice(0, 10);
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
       const { data: rows } = await supabase
-        .from('jobs').select('*').in('id', wantedIds).eq('is_active', true)
+        .from('jobs').select(cols).in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
-      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r)]));
+      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
     }
 
-    let query = supabase.from('jobs').select('*', { count: 'exact' })
+    let query = supabase.from('jobs').select(cols, { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);
@@ -176,7 +237,7 @@ export async function GET(req: NextRequest) {
 
     if (jobs.length > 0) {
       return NextResponse.json({
-        jobs: jobs.map(transformJob),
+        jobs: jobs.map((j: any) => transformJob(j, seePaid)),
         total: count ?? 0,
         page, perPage,
         pages: Math.ceil((count ?? 0) / perPage),
@@ -184,25 +245,25 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ jobs: [], total: 0, page, perPage, pages: 0 });
-  } catch {
-    return NextResponse.json({ jobs: [], total: 0, page, perPage, pages: 0 });
+  } catch (err: any) {
+    // Previously returned an empty `{ jobs: [] }` on any thrown error,
+    // which made a real DB outage look identical to "your filters
+    // matched nothing" — users have no way to distinguish, retry, or
+    // report. Return a 500 with a structured shape so the client can
+    // render a real error state, and log so ops sees it.
+    logError({ event: 'jobs.get_failed', error: err?.message ?? String(err) });
+    return NextResponse.json(
+      { error: 'Failed to load jobs', jobs: [], total: 0, page, perPage, pages: 0 },
+      { status: 500 },
+    );
   }
 }
 
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
-  try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && !isHardcodedAdmin(user.email)) {
-      return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  }
-}
+// Local requireAdmin was a parallel implementation of the shared
+// lib/admin/auth.ts that LACKED the `suspended` kill-switch check —
+// a suspended hardcoded admin could still mutate jobs. Switched to the
+// shared helper which also surfaces adminId + adminEmail for the
+// audit log calls below.
 
 const VALID_CATEGORIES = ['engineering','design','marketing','finance','sales','data','hr','product','legal','operations','other'];
 const VALID_TYPES      = ['full-time','part-time','contract','freelance','internship'];
@@ -273,6 +334,15 @@ export async function POST(req: NextRequest) {
 
     const { data: job, error } = await supabase.from('jobs').insert(row).select().single();
     if (error) throw new Error('insert_failed');
+    // Flush /jobs cache + the new job's own detail page so they appear
+    // on the public surface immediately instead of after the next
+    // revalidate tick.
+    safeRevalidate('/jobs', `/jobs/${job.id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.create', targetType: 'job', targetId: job.id,
+      metadata: { title: job.title, company: job.company, source: job.source },
+    });
     return NextResponse.json({ job: transformJob(job) }, { status: 201 });
   } catch (err: any) {
     logError({ event: 'jobs.post_failed', error: err?.message ?? String(err) });
@@ -315,6 +385,14 @@ export async function PATCH(req: NextRequest) {
 
     const { data: job, error } = await supabase.from('jobs').update(updates).eq('id', id).select().single();
     if (error) throw new Error('update_failed');
+    safeRevalidate('/jobs', `/jobs/${id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.update', targetType: 'job', targetId: id,
+      // Track which columns the admin changed without dumping the full
+      // before/after — that bloats the audit table and risks PII echo.
+      metadata: { changed_columns: Object.keys(updates) },
+    });
     return NextResponse.json({ job: transformJob(job) });
   } catch (err: any) {
     logError({ event: 'jobs.patch_failed', error: err?.message ?? String(err) });
@@ -331,8 +409,25 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
+    // Capture the row before delete so the audit metadata has the job
+    // title/company even after the row is gone. Critical for "who
+    // deleted what" forensics — without it, an audit entry pointing at
+    // a no-longer-existing UUID is nearly useless.
+    const { data: existing } = await supabase
+      .from('jobs')
+      .select('title, company, source')
+      .eq('id', id)
+      .maybeSingle();
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw new Error('delete_failed');
+    // Flush the listing AND the now-404 detail page so a stale cached
+    // copy of the deleted job doesn't keep serving for up to 5 minutes.
+    safeRevalidate('/jobs', `/jobs/${id}`);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'job.delete', targetType: 'job', targetId: id,
+      metadata: existing ?? { note: 'row already gone at delete time' },
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'jobs.delete_failed', error: err?.message ?? String(err) });
@@ -340,7 +435,12 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-function transformJob(j: any) {
+// `seePaid` controls whether the off-site application channel
+// (apply_url + apply_email) is included in the response. Anonymous and
+// Free-plan requesters get `null` for both, mirroring what the SSR
+// /jobs/[id] page sends to free users. Defaults to true for non-API
+// callers that haven't been updated to pass the flag.
+function transformJob(j: any, seePaid: boolean = true) {
   return {
     id:           j.id,
     title:        j.title,
@@ -359,8 +459,8 @@ function transformJob(j: any) {
     requirements: j.requirements ?? null,
     skills:       j.skills ?? [],
     benefits:     j.benefits ?? null,
-    applyUrl:     j.apply_url ?? null,
-    applyEmail:   j.apply_email ?? null,
+    applyUrl:     seePaid ? (j.apply_url   ?? null) : null,
+    applyEmail:   seePaid ? (j.apply_email ?? null) : null,
     postedAt:     j.posted_at ?? j.created_at,
     expiresAt:    j.expires_at ?? null,
     featured:     j.featured ?? false,

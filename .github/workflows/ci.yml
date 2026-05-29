@@ -42,8 +42,28 @@ jobs:
         # informational output without failing the build.
         run: npm run lint
 
-      - name: Unit tests
-        run: npm run test:unit
+      - name: Unit tests + coverage
+        # --coverage writes lcov + html into ./coverage. We keep
+        # test:unit cheap for local dev (no coverage overhead) and only
+        # ask for the report in CI. The HTML artefact uploaded below is
+        # what reviewers download from a PR run to see uncovered lines
+        # without running anything locally.
+        run: npm run test:unit -- --coverage
+
+      - name: Archive coverage report
+        # always(): run even when tests failed, so the failing PR's
+        # report is still inspectable. Retention is short by design —
+        # CI artefacts on a public repo can be downloaded by anyone, so
+        # we don't want a year of internal coverage reports lying
+        # around. 14d is enough to investigate a regression spotted
+        # late in review.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          retention-days: 14
+          if-no-files-found: ignore
 
       # Build last — it's the slowest step and only matters if the
       # cheaper checks above pass.

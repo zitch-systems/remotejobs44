@@ -9,8 +9,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -63,7 +64,7 @@ interface SearchParams {
   page?:        string;
 }
 
-function transform(j: any): Job {
+function transform(j: any, seePaid: boolean): Job {
   return {
     id:           j.id,
     title:        j.title,
@@ -82,8 +83,11 @@ function transform(j: any): Job {
     requirements: j.requirements ?? undefined,
     skills:       j.skills ?? [],
     benefits:     j.benefits ?? undefined,
-    applyUrl:     j.apply_url ?? undefined,
-    applyEmail:   j.apply_email ?? undefined,
+    // Off-site apply channel gated by plan — see lib/auth/requester-plan.
+    // Free + anon: stripped (the Apply button on JobCard shows the
+    // Subscribe paywall instead of redirecting).
+    applyUrl:     seePaid ? (j.apply_url   ?? undefined) : undefined,
+    applyEmail:   seePaid ? (j.apply_email ?? undefined) : undefined,
     posted:       j.posted_at ?? j.created_at ?? new Date().toISOString(),
     expires:      j.expires_at ?? undefined,
     featured:     j.featured ?? false,
@@ -108,11 +112,21 @@ async function fetchJobs(sp: SearchParams) {
   const sort        = sp.sort       ?? 'newest';
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
-  const supabase = createServerSupabaseClient();
+  // Two-step pattern matching /api/jobs after migration_v16: resolve
+  // plan via session client (safe to query as anon), then switch the
+  // DB client + SELECT columns based on the answer. anon + free use
+  // session-bound + SAFE_JOB_COLUMNS (skips apply_url/apply_email, the
+  // columns v16 revoked SELECT on for non-paid roles). Day Pass / Pro /
+  // Admin use service-role + `*` to pick up apply_url.
+  const sessionClient = await createServerSupabaseClient();
+  const requesterPlan = await getRequesterPlan(sessionClient);
+  const seePaid = canSeePaidFields(requesterPlan);
+  const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+  const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
   let query = supabase
     .from('jobs')
-    .select('*', { count: 'exact' })
+    .select(cols, { count: 'exact' })
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);
@@ -173,7 +187,7 @@ async function fetchJobs(sp: SearchParams) {
   query = query.range(from, from + JOBS_PER_PAGE - 1);
 
   const { data, count } = await query;
-  const jobs = (data ?? []).map(transform);
+  const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
   const total = count ?? jobs.length;
   return {
     jobs,
@@ -210,15 +224,21 @@ function paginationHref(sp: SearchParams, targetPage: number): string {
   return qs ? `/jobs?${qs}` : '/jobs';
 }
 
-export default async function JobsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { jobs, total, page, pages } = await fetchJobs(searchParams);
+export default async function JobsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  // Next 15+ made searchParams async — must be awaited once at the top
+  // and then read off the resolved object. Rename to `sp` to avoid
+  // shadowing the closure-captured prop in the helper calls below
+  // (`paginationHref(sp, …)` is functionally identical to passing the
+  // raw object that previously came in synchronously).
+  const sp = await searchParams;
+  const { jobs, total, page, pages } = await fetchJobs(sp);
 
-  const category   = (searchParams.category ?? 'all') as JobCategory | 'all';
-  const q          = searchParams.q ?? '';
-  const remoteOnly = (searchParams.remote ?? 'true') !== 'false';
-  const salary     = searchParams.salary ?? '';
+  const category   = (sp.category ?? 'all') as JobCategory | 'all';
+  const q          = sp.q ?? '';
+  const remoteOnly = (sp.remote ?? 'true') !== 'false';
+  const salary     = sp.salary ?? '';
   const activeFilterCount = ['type','level','salary','timezone','posted','companySize','region','country']
-    .filter(k => searchParams[k as keyof SearchParams]).length;
+    .filter(k => sp[k as keyof SearchParams]).length;
   const hasActive = !!(q || (category && category !== 'all') || activeFilterCount > 0);
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
 
@@ -285,7 +305,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           {salary ? (
             <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-md mx-auto text-sm">
               Most jobs on the site don&rsquo;t publish a salary range, so the salary filter
-              excludes them. <Link href={paginationHref({ ...searchParams, salary: '' }, 1)} className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Clear the salary filter</Link> to see all matching jobs.
+              excludes them. <Link href={paginationHref({ ...sp, salary: '' }, 1)} className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Clear the salary filter</Link> to see all matching jobs.
             </p>
           ) : (
             <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">Try different keywords or remove some filters.</p>
@@ -304,7 +324,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
           {pages > 1 && (
             <div className="flex items-center justify-center gap-1.5">
               {page > 1 ? (
-                <Link href={paginationHref(searchParams, page - 1)}
+                <Link href={paginationHref(sp, page - 1)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                   <ChevronLeft className="w-4 h-4" />Previous
                 </Link>
@@ -314,14 +334,14 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
                 </span>
               )}
               {pageWindow(page, pages).map(p => (
-                <Link key={p} href={paginationHref(searchParams, p)}
+                <Link key={p} href={paginationHref(sp, p)}
                   className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all flex items-center justify-center',
                     p === page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628]')}>
                   {p}
                 </Link>
               ))}
               {page < pages ? (
-                <Link href={paginationHref(searchParams, page + 1)}
+                <Link href={paginationHref(sp, page + 1)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                   Next<ChevronRight className="w-4 h-4" />
                 </Link>

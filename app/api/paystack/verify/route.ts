@@ -32,9 +32,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${APP_URL}/pricing?error=no_reference`);
   }
 
+  // Whitelist the reference character set before interpolating into the
+  // Paystack URL path. Paystack's own references are alphanumeric +
+  // `_` / `-` (e.g. `T_675846_3yk2j`); anything else is either a
+  // copy-paste error or an attacker trying to walk the URL path
+  // (`xyz/../customer/123`). Without this, the fetch below would issue
+  // a request the attacker designed against api.paystack.co — Bearer
+  // auth is automatically attached, so they could potentially probe
+  // other Paystack endpoints on our merchant account.
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(reference)) {
+    logWarn({ event: 'paystack.verify.invalid_reference', reference: reference.slice(0, 30) });
+    return NextResponse.redirect(`${APP_URL}/pricing?error=invalid_reference`);
+  }
+
   try {
     const res = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
     );
     const data = await res.json();

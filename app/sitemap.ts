@@ -5,7 +5,10 @@ import { INDUSTRIES, CITIES, SALARY_ROLES, COMPETITORS } from '@/lib/seo-extra';
 import { ARTICLES } from '@/lib/resources';
 import { companySlug } from '@/lib/company-slug';
 
-const BASE = 'https://remotejobs44.com';
+// Prefer NEXT_PUBLIC_APP_URL so preview deploys emit sitemap entries
+// pointing at themselves (otherwise staging links push canonical signals
+// to prod). Strip trailing slash so we always join with `${BASE}/path`.
+const BASE = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com').replace(/\/$/, '');
 
 // Daily granularity for lastModified. Previously every URL shared the
 // exact `new Date()` instant, which Google treats as "no real freshness

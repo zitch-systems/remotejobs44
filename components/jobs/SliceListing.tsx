@@ -17,6 +17,10 @@ interface Job {
   posted_at?: string;
 }
 
+// Same base-URL pattern used in /jobs/[id] + sitemap; preview deploys
+// emit ItemList URLs at their own origin instead of leaking to prod.
+const BASE = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com').replace(/\/$/, '');
+
 export function SliceListing({
   title,
   blurb,
@@ -52,10 +56,34 @@ export function SliceListing({
    */
   relatedLinks?: Array<{ label: string; href: string }>;
 }) {
+  // ItemList JSON-LD — gives Google + AI engines (Perplexity, ChatGPT,
+  // ClaudeBot, Gemini) a structured signal that this slice is a curated
+  // jobs feed. Pairs with the BreadcrumbList + FAQPage above to make the
+  // slice page a citable answer source. Cap at 25 items — long ItemLists
+  // are deprioritised in rich-result eligibility.
+  const itemList = jobs.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    numberOfItems: jobs.length,
+    itemListElement: jobs.slice(0, 25).map((j, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${BASE}/jobs/${j.id}`,
+      name: `${j.title} at ${j.company}`,
+    })),
+  } : null;
+
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-10">
       {breadcrumbs && breadcrumbs.length > 0 && <BreadcrumbJsonLd items={breadcrumbs} />}
       {faqs && faqs.length > 0 && <FaqJsonLd items={faqs} />}
+      {itemList && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList).replace(/</g, '\\u003c') }}
+        />
+      )}
       <div className="mb-8">
         <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight">{title}</h1>
         <p className="text-stone-500 dark:text-stone-400 mt-2 max-w-2xl leading-relaxed">{blurb}</p>

@@ -10,7 +10,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

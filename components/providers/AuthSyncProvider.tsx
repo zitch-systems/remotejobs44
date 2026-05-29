@@ -22,6 +22,7 @@
 // introducing an extra DOM node.
 import { useEffect } from 'react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
+import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { useAuthStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -161,10 +162,10 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
         // Final defense: keep persisted state if any sb-* cookie still
         // exists in document.cookie — only log out when storage is
         // truly empty. (Matches the chunked-cookie variant supabase/ssr
-        // uses for large sessions, e.g., Google OAuth.)
-        if (typeof document !== 'undefined' && /(?:^|;\s*)sb-[^=]+-auth-token(?:\.\d+)?/.test(document.cookie)) {
-          return;
-        }
+        // uses for large sessions, e.g., Google OAuth.) Helper lives in
+        // lib/supabase/cookies.ts and is shared with middleware so the
+        // two checks stay in lock-step.
+        if (documentHasSupabaseAuthCookie()) return;
         setUser(null);
         return;
       }

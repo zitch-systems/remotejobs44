@@ -54,7 +54,7 @@ export default function Post() {
           Best Remote Jobs for Beginners With No Experience
         </h1>
         <p className="text-lg text-stone-500 dark:text-stone-400 leading-relaxed">
-          You don't need years of experience to work remotely. These entry-level roles are hiring globally right now — and they pay well.
+          You don&rsquo;t need years of experience to work remotely. These entry-level roles are hiring globally right now — and they pay well.
         </p>
       </div>
       <div className="space-y-5">

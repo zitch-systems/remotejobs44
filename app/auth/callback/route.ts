@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   // Use the shared helper so the PKCE code_verifier cookie is read with the
   // SAME getAll/setAll API that the browser client used to write it.
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   // Branch on which flow we're in:
   //   * `code`            → PKCE OAuth / magic-link from the SAME device

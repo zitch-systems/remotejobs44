@@ -21,8 +21,8 @@ export function generateStaticParams() {
 const AUTHOR_NAME = 'RemoteJobs44 Editorial';
 const AUTHOR_URL  = `${BASE}/about#editorial`;
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const a = findArticle(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const a = findArticle((await params).slug);
   if (!a) return {};
   const url = `${BASE}/resources/${a.slug}`;
   // Per-article OG image — was sharing the generic site OG before.
@@ -44,8 +44,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default function ArticlePage({ params }: { params: { slug: string } }) {
-  const a = findArticle(params.slug);
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const a = findArticle((await params).slug);
   if (!a) notFound();
 
   const url = `${BASE}/resources/${a.slug}`;
