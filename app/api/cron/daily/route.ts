@@ -148,6 +148,13 @@ export async function GET(req: NextRequest) {
 
 
   // ── TASK 4: Send job alert emails to Pro users ────────────────────────
+  // The previous version pulled ten newest jobs once and sent that same
+  // list to every alert — alert.category and alert.keywords were ignored.
+  // A user subscribed to "marketing" alerts received the same engineering
+  // jobs as everyone else. Now we pull the full new-job set then filter
+  // per alert on (category match) AND (every keyword appears in title or
+  // company). Empty filters mean "all" on that axis.
+  let alertsSent = 0;
   try {
     const { data: alerts } = await supabase
       .from('job_alerts')
@@ -156,27 +163,52 @@ export async function GET(req: NextRequest) {
       .eq('frequency', 'daily');
 
     if (alerts && alerts.length > 0) {
-      // Get today's new jobs
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Pull a wider candidate set than the previous 10 so a niche alert
+      // doesn't get nothing just because the 10 most-recent jobs happen
+      // to be in the wrong category. 500 is a soft cap — most days have
+      // far fewer new postings; we slice down to 10 PER ALERT below.
       const { data: newJobs } = await supabase
         .from('jobs')
-        .select('id, title, company, location')
+        .select('id, title, company, location, category')
         .eq('is_active', true)
         .gte('posted_at', yesterday)
-        .limit(10);
+        .limit(500);
 
-      if (newJobs && newJobs.length > 0) {
-        for (const alert of alerts) {
-          const profile = (alert as any).profiles;
-          if (!profile?.email || !['pro','admin'].includes(profile.plan)) continue;
-          const { subject, html } = jobAlertEmail(profile.name ?? 'there', newJobs);
-          await sendEmail({ to: profile.email, subject, html });
-        }
+      const allCandidates = newJobs ?? [];
+
+      for (const alert of alerts) {
+        const profile = (alert as any).profiles;
+        if (!profile?.email || !['pro', 'admin'].includes(profile.plan)) continue;
+
+        // Tokenise keywords on commas/whitespace, drop empties.
+        // Match is case-insensitive substring against title or company.
+        const tokens = String((alert as any).keywords ?? '')
+          .toLowerCase()
+          .split(/[,\s]+/)
+          .filter(Boolean);
+        const cat = String((alert as any).category ?? '').toLowerCase();
+
+        const matched = allCandidates.filter((j: any) => {
+          if (cat && cat !== 'all' && String(j.category ?? '').toLowerCase() !== cat) return false;
+          if (tokens.length === 0) return true;
+          const hay = `${j.title ?? ''} ${j.company ?? ''}`.toLowerCase();
+          return tokens.every(t => hay.includes(t));
+        }).slice(0, 10);
+
+        // No matches in the last 24h is the normal state for narrow
+        // alerts; suppress the email rather than send "0 new jobs."
+        if (matched.length === 0) continue;
+
+        const { subject, html } = jobAlertEmail(profile.name ?? 'there', matched);
+        await sendEmail({ to: profile.email, subject, html });
+        alertsSent += 1;
       }
     }
   } catch (err: any) {
     logError({ event: 'cron.daily.alert_emails_failed', error: err.message });
   }
+  log.alerts = { sent: alertsSent };
 
   log.completedAt = new Date().toISOString();
 
