@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Briefcase, Users, TrendingUp, DollarSign, Rss, PlusCircle, RefreshCw, ArrowRight, Zap, Search, Activity, CheckCircle, AlertCircle, Shield, Globe, Trash2, Star, Eye } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { formatRelativeDate, formatNumber, CATEGORY_META } from '@/lib/utils';
 import { jobsApi } from '@/lib/api';
 import { useUIStore } from '@/lib/store';
@@ -20,14 +19,7 @@ interface Stats {
   signups30d: number[];
 }
 
-// Plan prices in NGN, from app/pricing/page.tsx. Pro Annual amortised to
-// monthly so it contributes the right amount to MRR (₦29,999 / 12 ≈ ₦2,500).
-// Day Pass is one-off so we don't include it in *monthly* recurring revenue.
-const PRO_MONTHLY_NGN   = 2999;
-const PRO_ANNUAL_MONTHLY_NGN = Math.round(29999 / 12); // 2500
-
 export default function AdminPage() {
-  const supabase = createClient();
   const { toast } = useUIStore();
   const [stats,   setStats]   = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,64 +32,35 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function load() {
-      const since30d = new Date();
-      since30d.setDate(since30d.getDate() - 29);
-      since30d.setHours(0, 0, 0, 0);
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const [{ count: jobCount }, { data: profiles }, { count: newTodayCount }, { data: activeSubs }] = await Promise.all([
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('profiles').select('plan,created_at').gte('created_at', since30d.toISOString()),
-        supabase.from('jobs').select('*', { count: 'exact', head: true })
-          .eq('is_active', true).gte('posted_at', todayStart.toISOString()),
-        // MRR comes from the subscriptions table — that's the only place that
-        // knows monthly vs annual billing. profiles.plan='pro' doesn't tell us
-        // whether the user is on a ₦2,999/mo or ₦29,999/yr plan.
-        supabase.from('subscriptions')
-          .select('plan,billing,price')
-          .eq('status', 'active'),
-      ]).catch(() => [{ count: null }, { data: null }, { count: null }, { data: null }] as any);
-
-      // Plan-tier counts come from the ALL profiles query (not the 30-day
-      // window above), so refetch the plan totals cheaply.
-      const { data: allPlans } = await supabase.from('profiles').select('plan');
-      const pro   = allPlans?.filter((p: any) => p.plan === 'pro').length   ?? 0;
-      const daily = allPlans?.filter((p: any) => p.plan === 'daily').length ?? 0;
-
-      // Sum monthly-equivalent revenue from each active subscription. Day
-      // passes are one-off charges — they boost cash flow but aren't MRR.
-      let mrr = 0;
-      for (const s of (activeSubs ?? [])) {
-        if (s.billing === 'annually') {
-          mrr += Math.round((s.price ?? PRO_ANNUAL_MONTHLY_NGN * 12) / 12);
-        } else if (s.billing === 'monthly') {
-          mrr += s.price ?? PRO_MONTHLY_NGN;
-        }
-        // daily intentionally excluded
+      // The v16 column-level revoke on jobs means the browser-side
+      // supabase-js client (anon / authenticated role) gets 401 for any
+      // SELECT on jobs. /api/admin/stats runs the same queries under
+      // service_role and returns everything the dashboard needs in one
+      // round-trip. requireAdmin() inside the route also honors the
+      // suspended-admin kill-switch.
+      try {
+        const res  = await fetch('/api/admin/stats', { cache: 'no-store' });
+        const data = await res.json();
+        setStats({
+          jobs:       Number(data.totalJobs   ?? 0),
+          users:      Number(data.activeUsers ?? 0),
+          pro:        Number(data.pro         ?? 0),
+          daily:      Number(data.daily       ?? 0),
+          mrr:        Number(data.mrr         ?? 0),
+          newToday:   Number(data.newToday    ?? 0),
+          signups30d: Array.isArray(data.signups30d) ? data.signups30d : Array(30).fill(0),
+        });
+        setHealth({
+          db:       res.ok,
+          api:      true,
+          paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
+        });
+      } catch {
+        setStats({ jobs: 0, users: 0, pro: 0, daily: 0, mrr: 0, newToday: 0, signups30d: Array(30).fill(0) });
+        setHealth({ db: false, api: false, paystack: false });
+      } finally {
+        setLoading(false);
       }
-      // Fallback when no subscriptions rows yet — estimate from profiles plan.
-      if (mrr === 0 && pro > 0) mrr = pro * PRO_MONTHLY_NGN;
-
-      // 30-day signup sparkline buckets (oldest → newest)
-      const buckets: number[] = Array(30).fill(0);
-      for (const p of (profiles ?? [])) {
-        const d = new Date(p.created_at);
-        const dayIndex = Math.floor((d.getTime() - since30d.getTime()) / 86_400_000);
-        if (dayIndex >= 0 && dayIndex < 30) buckets[dayIndex]++;
-      }
-
-      setStats({
-        jobs:       jobCount ?? 0,
-        users:      allPlans?.length ?? 0,
-        pro,
-        daily,
-        mrr,
-        newToday:   newTodayCount ?? 0,
-        signups30d: buckets,
-      });
-      setLoading(false);
-      setHealth({ db: jobCount !== null, api: true, paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY });
     }
     load();
 
