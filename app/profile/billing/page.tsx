@@ -221,7 +221,7 @@ export default function BillingPage() {
         <div className="card p-5 mb-5 border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-900/10">
           <p className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
-            Subscription cancelled — won't renew. You keep access until{' '}
+            Subscription cancelled — won&rsquo;t renew. You keep access until{' '}
             {subscription.current_period_end && new Date(subscription.current_period_end).toLocaleDateString()}.
           </p>
           <Link href="/pricing"
@@ -238,7 +238,7 @@ export default function BillingPage() {
             <Bell className="w-4 h-4 text-brand-600" /> Email notifications
           </h2>
           <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">
-            Choose what we email you. Billing receipts always send — they're required by Paystack.
+            Choose what we email you. Billing receipts always send — they&rsquo;re required by Paystack.
           </p>
           <div className="space-y-3">
             {([

@@ -373,7 +373,7 @@ export default function AdminUserDetailPage() {
             <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
               Suspended {profile.suspended_at ? formatRelativeDate(profile.suspended_at) : ''}
               {profile.suspended_reason && (
-                <> — <span className="italic">"{profile.suspended_reason}"</span></>
+                <> — <span className="italic">&ldquo;{profile.suspended_reason}&rdquo;</span></>
               )}
             </p>
             <button onClick={() => handleSuspend(false)} disabled={suspending}

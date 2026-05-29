@@ -47,7 +47,7 @@ export default function Post() {
           How to Find Remote Jobs in Nigeria in 2025
         </h1>
         <p className="text-lg text-stone-500 dark:text-stone-400 leading-relaxed">
-          Remote work has transformed what's possible for Nigerian professionals. Here's everything you need to know to land an international remote role from anywhere in Nigeria.
+          Remote work has transformed what&rsquo;s possible for Nigerian professionals. Here&rsquo;s everything you need to know to land an international remote role from anywhere in Nigeria.
         </p>
       </div>
 

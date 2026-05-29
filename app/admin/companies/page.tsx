@@ -402,7 +402,7 @@ export default function AdminCompaniesPage() {
       {/* Footer hint */}
       <p className="text-xs text-stone-400 mt-4 flex items-center gap-2">
         <AlertCircle className="w-3.5 h-3.5" />
-        Refresh re-scrapes the company's ATS. New roles get inserted, removed roles are marked closed (kept in DB so user application history stays intact).
+        Refresh re-scrapes the company&rsquo;s ATS. New roles get inserted, removed roles are marked closed (kept in DB so user application history stays intact).
       </p>
     </div>
   );
