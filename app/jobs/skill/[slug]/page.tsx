@@ -42,7 +42,7 @@ export default async function SkillPage({ params }: { params: Promise<{ slug: st
     // Match against title or skills array. Description is too noisy for an OR.
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'estimated' })
+      .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

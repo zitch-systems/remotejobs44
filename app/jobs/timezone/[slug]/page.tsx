@@ -43,7 +43,7 @@ export default async function TimezonePage({ params }: { params: Promise<{ slug:
     const tag = tz.slug.toUpperCase();
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'estimated' })
+      .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

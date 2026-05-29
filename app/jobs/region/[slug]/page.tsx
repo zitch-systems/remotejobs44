@@ -52,7 +52,7 @@ export default async function RegionPage({ params }: { params: Promise<{ slug: s
     const orClause = keywords.map(k => `location.ilike.%${k.replace(/[(),]/g,'')}%`).join(',');
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'estimated' })
+      .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

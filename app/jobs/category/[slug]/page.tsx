@@ -45,7 +45,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
     const supabase = createAdminSupabaseClient();
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'estimated' })
+      .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

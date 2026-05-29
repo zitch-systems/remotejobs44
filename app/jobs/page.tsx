@@ -112,25 +112,27 @@ async function fetchJobs(sp: SearchParams) {
   const sort        = sp.sort       ?? 'newest';
   const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
 
-  // Two-step pattern matching /api/jobs after migration_v16: resolve
-  // plan via session client (safe to query as anon), then switch the
-  // DB client + SELECT columns based on the answer. anon + free use
-  // session-bound + SAFE_JOB_COLUMNS (skips apply_url/apply_email, the
-  // columns v16 revoked SELECT on for non-paid roles). Day Pass / Pro /
-  // Admin use service-role + `*` to pick up apply_url.
+  // Always run the actual jobs query against the admin (service-role)
+  // client. anon's 3s / authenticated's 8s statement_timeout was hitting
+  // for FTS over 60k rows; service_role gets 60s. Paywall is enforced at
+  // the SELECT-column list: anon/free get SAFE_JOB_COLUMNS (no
+  // apply_url/apply_email), paid get '*'.
   const sessionClient = await createServerSupabaseClient();
   const requesterPlan = await getRequesterPlan(sessionClient);
   const seePaid = canSeePaidFields(requesterPlan);
-  const supabase = seePaid ? createAdminSupabaseClient() : sessionClient;
+  const supabase = createAdminSupabaseClient();
   const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
+  // Touch sessionClient to silence the no-unused-vars lint — we still
+  // need it for getRequesterPlan above.
+  void sessionClient;
 
   let query = supabase
     .from('jobs')
-    // count: 'estimated' — same reasoning as /api/jobs after the
-    // statement_timeout incident. The /jobs SSR page hits this on every
-    // filter change and the listing card just needs an approximate
-    // "X jobs found" headline + sane pagination math.
-    .select(cols, { count: 'estimated' })
+    // count: 'exact' — admin client gives us 60s timeout, and the
+    // planner's estimated count was wildly off (returned ~half the real
+    // number because it had no stats on is_active selectivity). 43 ms
+    // for exact count is well within budget.
+    .select(cols, { count: 'exact' })
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);

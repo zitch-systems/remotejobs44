@@ -50,7 +50,7 @@ export default async function CityPage({ params }: { params: Promise<{ slug: str
     const supabase = createAdminSupabaseClient();
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'estimated' })
+      .select('id, title, company, location, posted_at', { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)
