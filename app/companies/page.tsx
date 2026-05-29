@@ -5,7 +5,6 @@ import { Search, Briefcase } from 'lucide-react';
 import { companySlug } from '@/lib/company-slug';
 
 interface Company {
-  id: string;
   name: string;
   logo?: string;
   jobCount: number;
@@ -21,40 +20,16 @@ export default function CompaniesPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Fetch all active jobs and derive companies from them. Pass
-        // remote=false explicitly so companies that only post on-site
-        // (e.g. Adyen, some UK firms) still appear in the directory —
-        // /api/jobs defaults to remote-only otherwise.
-        const res = await fetch('/api/jobs?perPage=200&sort=newest&remote=false');
+        // /api/companies aggregates server-side across the entire active
+        // jobs table. Previously this page fetched /api/jobs?perPage=200
+        // and derived the directory from THAT sample — out of 64k+ jobs,
+        // that meant ~150 companies surfaced with wrong per-company
+        // counts. The endpoint is 5-minute revalidated so the next
+        // ingest's additions surface quickly.
+        const res = await fetch('/api/companies');
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
-        const jobs: any[] = data.jobs ?? [];
-
-        // Aggregate by company name
-        const map = new Map<string, Company>();
-        for (const job of jobs) {
-          const key = (job.company ?? '').trim();
-          if (!key) continue;
-          if (!map.has(key)) {
-            map.set(key, {
-              id:         key,
-              name:       key,
-              logo:       job.logo ?? key[0],
-              jobCount:   0,
-              categories: [],
-              featured:   job.featured ?? false,
-            });
-          }
-          const entry = map.get(key)!;
-          entry.jobCount++;
-          if (job.category && !entry.categories.includes(job.category)) {
-            entry.categories.push(job.category);
-          }
-          if (job.featured) entry.featured = true;
-        }
-
-        const list = Array.from(map.values()).sort((a, b) => b.jobCount - a.jobCount);
-        setCompanies(list);
+        setCompanies(data.companies ?? []);
       } catch {
         setCompanies([]);
       } finally {
@@ -117,7 +92,7 @@ export default function CompaniesPage() {
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {featured.map(company => (
-                  <Link key={company.id} href={`/companies/${companySlug(company.name)}`}
+                  <Link key={company.name} href={`/companies/${companySlug(company.name)}`}
                     className="card p-5 flex flex-col items-center text-center hover:border-brand-600 dark:hover:border-brand-500 hover:-translate-y-0.5 transition-all group">
                     <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400 mb-3">
                       {company.logo ?? company.name[0]}
@@ -148,7 +123,7 @@ export default function CompaniesPage() {
               {filtered.map(company => {
                 const slug = companySlug(company.name);
                 return (
-                  <Link key={company.id} href={`/companies/${slug}`}
+                  <Link key={company.name} href={`/companies/${slug}`}
                     className="card p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group block">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-xl bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xl font-black text-brand-700 dark:text-brand-400 shrink-0">
