@@ -185,11 +185,31 @@ export async function GET(req: NextRequest) {
         supabase.rpc('search_jobs_count', args),
       ]);
       if (rowsRes.error) throw new Error(rowsRes.error.message);
-      const total = Number(countRes.data ?? 0);
-      const jobs  = (rowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+      let total = Number(countRes.data ?? 0);
+      let jobs  = (rowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+      let fuzzy = false;
+
+      // Trigram typo fallback — fires only when strict FTS finds nothing.
+      // Catches "reactt" → React, "pythn" → Python, "designr" → Designer.
+      // Surfaces results sorted by word_similarity to the query, with a
+      // `fuzzy: true` flag so the UI can show a "Showing results for…"
+      // hint. The 3-char minimum is enforced inside the RPCs.
+      if (total === 0 && safeQ.length >= 3) {
+        const [fRowsRes, fCountRes] = await Promise.all([
+          supabase.rpc('search_jobs_trgm',       { ...args, v_offset: offset, v_limit: perPage }),
+          supabase.rpc('search_jobs_trgm_count', args),
+        ]);
+        if (!fRowsRes.error) {
+          total = Number(fCountRes.data ?? 0);
+          jobs  = (fRowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+          fuzzy = total > 0;
+        }
+      }
+
       return NextResponse.json({
         jobs, total, page, perPage,
         pages: Math.max(1, Math.ceil(total / perPage)),
+        ...(fuzzy ? { fuzzy: true } : {}),
       });
     }
 

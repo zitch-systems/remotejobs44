@@ -103,6 +103,7 @@ interface FetchJobsResult {
   total: number;
   page:  number;
   pages: number;
+  fuzzy?: boolean;
 }
 
 async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
@@ -168,13 +169,32 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       supabase.rpc('search_jobs', { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
       supabase.rpc('search_jobs_count', args),
     ]);
-    const total = Number(countRes.data ?? 0);
-    const jobs = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+    let total = Number(countRes.data ?? 0);
+    let jobs  = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+    let fuzzy = false;
+
+    // Trigram typo fallback (search_jobs_trgm) — fires only when strict
+    // FTS returns nothing. Catches "reactt" → React, "pythn" → Python
+    // etc. The flag bubbles up so the listing header can show a
+    // "Showing results for…" hint.
+    if (total === 0 && safeQ.length >= 3) {
+      const [fRowsRes, fCountRes] = await Promise.all([
+        supabase.rpc('search_jobs_trgm',       { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
+        supabase.rpc('search_jobs_trgm_count', args),
+      ]);
+      if (!fRowsRes.error) {
+        total = Number(fCountRes.data ?? 0);
+        jobs  = (fRowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+        fuzzy = total > 0;
+      }
+    }
+
     return {
       jobs,
       total,
       page,
       pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
+      fuzzy,
     };
   }
 
@@ -282,7 +302,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   // (`paginationHref(sp, …)` is functionally identical to passing the
   // raw object that previously came in synchronously).
   const sp = await searchParams;
-  const { jobs, total, page, pages } = await fetchJobs(sp);
+  const { jobs, total, page, pages, fuzzy } = await fetchJobs(sp);
 
   const category   = (sp.category ?? 'all') as JobCategory | 'all';
   const q          = sp.q ?? '';
@@ -327,6 +347,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
           <h1 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">
             {q ? `Results for "${q}"` : category === 'all' ? 'All Remote Jobs' : `${catMeta.label} Jobs`}
           </h1>
+          {fuzzy && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+              No exact matches — showing similar results
+            </p>
+          )}
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
             {total.toLocaleString()} jobs found
             {total > 0 && (
