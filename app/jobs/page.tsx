@@ -98,7 +98,14 @@ function transform(j: any, seePaid: boolean): Job {
   };
 }
 
-async function fetchJobs(sp: SearchParams) {
+interface FetchJobsResult {
+  jobs:  Job[];
+  total: number;
+  page:  number;
+  pages: number;
+}
+
+async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
   const q           = sp.q          ?? '';
   const category    = sp.category   ?? '';
   const type        = sp.type       ?? '';
@@ -126,6 +133,52 @@ async function fetchJobs(sp: SearchParams) {
   // need it for getRequesterPlan above.
   void sessionClient;
 
+  // Q-PRESENT PATH: relevance-ranked FTS via the search_jobs() RPC
+  // (migration v17). Returns SETOF jobs ordered by ts_rank desc, so the
+  // FIRST hit is the best match — not the newest job mentioning the
+  // term. Mirrors the /api/jobs route path; see that file for details.
+  const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
+  if (safeQ) {
+    const locTerm = (() => {
+      if (country && REGION_TERMS[country]) return REGION_TERMS[country][0];
+      if (region  && REGION_TERMS[region])  return REGION_TERMS[region][0];
+      return country || region || null;
+    })();
+    const postedDays = (posted && /^\d+$/.test(posted)) ? Math.min(365, parseInt(posted, 10)) : null;
+    let salMin: number | null = null;
+    let salMax: number | null = null;
+    if (salary && /^\d+-\d+$/.test(salary)) {
+      const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
+      if (Number.isFinite(lo) && Number.isFinite(hi)) { salMin = lo; salMax = hi; }
+    }
+    const offset = (page - 1) * JOBS_PER_PAGE;
+    const args = {
+      q:             safeQ,
+      v_category:    (category && category !== 'all') ? category : null,
+      v_type:        type     || null,
+      v_level:       level    || null,
+      v_remote_only: remoteOnly,
+      v_location:    locTerm,
+      v_timezone:    timezone || null,
+      v_salary_min:  salMin,
+      v_salary_max:  salMax,
+      v_posted_days: postedDays,
+    };
+    const [rowsRes, countRes] = await Promise.all([
+      supabase.rpc('search_jobs', { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
+      supabase.rpc('search_jobs_count', args),
+    ]);
+    const total = Number(countRes.data ?? 0);
+    const jobs = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+    return {
+      jobs,
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
+    };
+  }
+
+  // NO-Q PATH: filter-only browsing
   let query = supabase
     .from('jobs')
     // count: 'exact' — admin client gives us 60s timeout, and the
@@ -136,14 +189,6 @@ async function fetchJobs(sp: SearchParams) {
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);
-
-  if (q) {
-    // Full-text search via the generated search_vector tsvector column
-    // (migration_v15). websearch semantics; GIN-indexed; sub-millisecond
-    // at any scale. See /api/jobs/route.ts for the matching call.
-    const safe = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
-    if (safe) query = query.textSearch('search_vector', safe, { type: 'websearch', config: 'english' });
-  }
   if (category && category !== 'all') query = query.eq('category', category);
   if (type)  query = query.eq('type', type);
   if (level) query = query.eq('level', level);
