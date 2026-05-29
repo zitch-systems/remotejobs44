@@ -12,6 +12,7 @@ export interface SeoSlice {
 
 // ── Industries — vertical-specific landing pages ─────────────────────────
 export const INDUSTRIES: readonly SeoSlice[] = [
+  { slug: 'finance',    label: 'Finance',           blurb: 'Remote finance roles — accounting, FP&A, treasury, controller, payroll, and bookkeeping at global companies.' },
   { slug: 'fintech',    label: 'Fintech',           blurb: 'Remote roles at fintech and banking startups — payments, lending, crypto-rails, neobanks.' },
   { slug: 'crypto',     label: 'Crypto & Web3',     blurb: 'Remote roles at crypto exchanges, DeFi protocols, NFT platforms, and L1/L2 chains.' },
   { slug: 'ai',         label: 'AI & ML',           blurb: 'Remote roles at AI labs, ML platforms, vector databases, and applied-AI startups.' },
@@ -265,5 +266,12 @@ export const COMPETITORS: readonly Competitor[] = [
     oneLiner: 'Generic mega job board — most listings, but few are truly remote-friendly.',
     pros: ['Largest catalogue', 'Free to apply', 'Universal recognition'],
     cons: ['Lots of fake-remote listings', 'No remote filtering at signup', 'No AI tools'],
+  },
+  {
+    slug: 'wellfound',
+    name: 'Wellfound',
+    oneLiner: 'Startup-focused job board (formerly AngelList Talent) — equity-heavy roles at YC/seed/Series-A companies.',
+    pros: ['Startup hiring focus', 'Salary + equity transparency', 'Direct founder messages'],
+    cons: ['Heavily US-weighted', 'No African pricing', 'No application tracker', 'Sparse outside SV ecosystem'],
   },
 ] as const;
