@@ -54,8 +54,10 @@ function emit(level: LogLevel, payload: LogPayload): void {
   // In practice we always want it — even in dev, JSON lines are easier
   // to grep — so the check is just defence against being imported in a
   // build phase where console isn't available (it always is).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const obj: Record<string, any> = {
+  // Using `unknown` instead of `any` here keeps next/core-web-vitals
+  // happy (the project doesn't load the @typescript-eslint plugin, so
+  // an eslint-disable referencing its rules fails the build).
+  const obj: Record<string, unknown> = {
     ts:    new Date().toISOString(),
     level,
     ...payload,
