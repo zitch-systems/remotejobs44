@@ -21,102 +21,104 @@
 --      apply_url + apply_email columns of public.jobs. PostgREST
 --      returns 403 "permission denied for column apply_url" when a
 --      direct anon/authenticated request asks for them.
---   2. A new VIEW public.jobs_public exposes every other column so
---      direct callers who legitimately need the listing data have a
---      clean endpoint to hit.
+--   2. Every OTHER column of public.jobs is re-granted to those roles
+--      (the column-level revoke above collapses the coarse SELECT
+--      grant — without the re-grant, anon would have NO column access
+--      and the entire jobs feed would 403).
 --   3. Service-role retains full access — the admin Supabase client
 --      (createAdminSupabaseClient) bypasses the column grants and is
 --      what /api/jobs uses to fetch apply_url for paying customers
 --      after the plan check.
 --
+-- DEFENSIVE DESIGN
+-- ─────────────────
+-- The previous static-column-list version of this migration failed
+-- when run on a database whose `jobs` table predated migrations
+-- v13/v14/v15 (those added `flagged`, `flagged_reason`, `search_vector`).
+-- This rewrite uses information_schema introspection to build the safe
+-- column list dynamically, so it runs on ANY shape of the jobs table
+-- — base setup.sql only, or every migration applied. The only required
+-- columns are apply_url + apply_email; everything else is enumerated
+-- on-the-fly.
+--
 -- Idempotent — safe to re-run.
 -- ============================================================
 
--- ────────────────────────────────────────────────────────────
--- 1. View — public surface for the jobs listing
--- ────────────────────────────────────────────────────────────
--- Lists every column we want anonymous/listing-tier callers to read.
--- apply_url and apply_email are DELIBERATELY EXCLUDED — direct callers
--- who need them must authenticate as a paying user and route through
--- /api/jobs (which uses service-role behind plan gating).
+do $$
+declare
+  has_apply_url    boolean;
+  has_apply_email  boolean;
+  safe_cols        text;   -- comma-separated list of safe columns
+begin
+  -- ── Guard: bail clearly if the table doesn't exist or apply_url
+  --    / apply_email aren't there. The latter pair are the only
+  --    required columns; without them there's nothing for this
+  --    migration to revoke.
+  if not exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'jobs'
+  ) then
+    raise exception 'public.jobs does not exist - run supabase/setup.sql first';
+  end if;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'jobs' and column_name = 'apply_url'
+  ) into has_apply_url;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'jobs' and column_name = 'apply_email'
+  ) into has_apply_email;
+
+  if not (has_apply_url and has_apply_email) then
+    raise exception 'public.jobs is missing apply_url and/or apply_email - schema is older than expected; bring it up to setup.sql before running v16';
+  end if;
+
+  -- ── Build the safe-column list: every column on jobs EXCEPT the
+  --    two we're revoking. Quoting each identifier defends against
+  --    columns whose names ever collide with a reserved word.
+  select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+  into safe_cols
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name   = 'jobs'
+    and column_name not in ('apply_url', 'apply_email');
+
+  -- ── Column-level revokes. Idempotent - revoking a permission that
+  --    doesn't exist is a no-op.
+  execute 'revoke select (apply_url)   on public.jobs from anon, authenticated';
+  execute 'revoke select (apply_email) on public.jobs from anon, authenticated';
+
+  -- ── Re-grant SELECT on every safe column to anon, authenticated.
+  --    The column-level revokes above collapse the coarse SELECT
+  --    grant - Postgres treats column-level perms and coarse perms as
+  --    independent permission sets. Without this re-grant, anon would
+  --    have zero column-level access and every read would 403.
+  execute format(
+    'grant select (%s) on public.jobs to anon, authenticated',
+    safe_cols
+  );
+
+  -- ── Service-role keeps everything; spelt out for self-documenting.
+  --    service_role RLS bypass is independent of column grants.
+  execute 'grant select on public.jobs to service_role';
+end$$;
+
+-- ============================================================
+-- VERIFY
+-- ============================================================
+-- After running this migration, confirm the leak is closed:
 --
--- security_invoker = true makes the view run with the caller's role,
--- so the underlying jobs.is_active=true RLS policy still applies.
--- Without this, the view would silently surface inactive/flagged rows
--- that the RLS policy hides at the table level.
-create or replace view public.jobs_public
-with (security_invoker = true)
-as
-  select
-    id, title, company, company_id, logo,
-    category, type, level, location, timezone,
-    description, requirements, skills, benefits,
-    salary_min, salary_max, currency,
-    remote, featured, is_new, is_active,
-    source, source_url, views, applications,
-    posted_at, expires_at, created_at,
-    -- flagged + flagged_reason + search_vector exist on the underlying
-    -- table from earlier migrations (v15 added search_vector). Include
-    -- them so the view is a true subset of the public columns — clients
-    -- doing full-text search against jobs_public.search_vector keep
-    -- working without round-tripping through the table.
-    flagged, flagged_reason, search_vector
-  from public.jobs;
-
--- Public read on the view — same audience as jobs had before.
-grant select on public.jobs_public to anon, authenticated;
--- service_role inherits all on schema-level grants, but spell it out
--- for self-documenting purposes.
-grant select on public.jobs_public to service_role;
-
--- ────────────────────────────────────────────────────────────
--- 2. Revoke direct column access on the underlying table
--- ────────────────────────────────────────────────────────────
--- This is the actual leak-closer. After these revokes any direct
--- PostgREST query against /rest/v1/jobs that mentions apply_url or
--- apply_email — or that uses ?select=* and so implicitly asks for
--- every column — returns 403 from anon/authenticated. Pro users
--- accessing the apply URL go through /api/jobs which uses the
--- service-role admin client.
+--   curl -s 'https://<ref>.supabase.co/rest/v1/jobs?select=apply_url&limit=1' \
+--        -H "apikey: <NEXT_PUBLIC_SUPABASE_ANON_KEY>"
 --
--- These statements are idempotent — REVOKE on a permission that
--- doesn't exist is a no-op (no NOTICE, no error).
-revoke select (apply_url)   on public.jobs from anon;
-revoke select (apply_email) on public.jobs from anon;
-revoke select (apply_url)   on public.jobs from authenticated;
-revoke select (apply_email) on public.jobs from authenticated;
-
--- ────────────────────────────────────────────────────────────
--- 3. Re-grant SELECT on every other column so SELECT * in app code
---    still works for anon/authenticated. Without these, the column-
---    level revoke above silently removes column-level SELECT for
---    EVERY column — Postgres treats `GRANT SELECT ON table` as a
---    coarse permission, and the column-level revokes downgrade it
---    to "no columns granted". We have to re-grant the safe columns
---    explicitly.
--- ────────────────────────────────────────────────────────────
-grant select (
-  id, title, company, company_id, logo,
-  category, type, level, location, timezone,
-  description, requirements, skills, benefits,
-  salary_min, salary_max, currency,
-  remote, featured, is_new, is_active,
-  source, source_url, views, applications,
-  posted_at, expires_at, created_at,
-  flagged, flagged_reason, search_vector
-) on public.jobs to anon, authenticated;
-
--- ────────────────────────────────────────────────────────────
--- DONE ✓
--- After running this migration:
--- 1. Confirm direct REST is blocked:
---      curl -s 'https://<ref>.supabase.co/rest/v1/jobs?select=apply_url&limit=1' \
---           -H "apikey: <NEXT_PUBLIC_SUPABASE_ANON_KEY>"
---    Expected: HTTP 403 with body
---      {"code":"42501","message":"permission denied for table jobs"}
---    or "permission denied for column apply_url".
--- 2. /api/jobs and SSR pages keep working — the matching code change
---    switches their SELECT lists to omit apply_url for the anon-context
---    paths and uses the admin client for the paid-user apply URL
---    fetch.
--- ────────────────────────────────────────────────────────────
+-- Expected: HTTP 403 with body
+--   {"code":"42501","message":"permission denied for column apply_url ..."}
+--
+-- And confirm normal reads still work:
+--
+--   curl -s 'https://<ref>.supabase.co/rest/v1/jobs?select=id,title,company&limit=3' \
+--        -H "apikey: <NEXT_PUBLIC_SUPABASE_ANON_KEY>"
+--
+-- Expected: HTTP 200 with a JSON array of 3 jobs.
+-- ============================================================
