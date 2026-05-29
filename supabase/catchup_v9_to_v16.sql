@@ -301,9 +301,14 @@ begin
     and table_name   = 'jobs'
     and column_name not in ('apply_url', 'apply_email');
 
-  execute 'revoke select (apply_url)   on public.jobs from anon, authenticated';
-  execute 'revoke select (apply_email) on public.jobs from anon, authenticated';
+  -- Revoke the COARSE table-level SELECT first — a table-level GRANT
+  -- SELECT covers every column and overrides column-level revokes.
+  -- Without this revoke, ?select=apply_url still returns 200.
+  execute 'revoke select on public.jobs from anon, authenticated';
 
+  -- Re-grant SELECT on every column EXCEPT apply_url + apply_email.
+  -- INSERT/UPDATE/DELETE coarse grants are left alone — those are
+  -- governed by RLS policies.
   execute format(
     'grant select (%s) on public.jobs to anon, authenticated',
     safe_cols
