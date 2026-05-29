@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
@@ -27,6 +28,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, note: 'Saved locally (Supabase table not configured)' });
     }
 
+    // Track which top-level setting keys changed (the values themselves
+    // can drift — a feature-flag toggle, a copy edit). Keys-only keeps
+    // the audit metadata small and prevents echoing arbitrary admin-
+    // supplied content back into the audit table.
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'settings.update', targetType: 'site_settings', targetId: '1',
+      metadata: { changed_keys: Object.keys(settings ?? {}).slice(0, 50) },
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'admin.settings.unhandled', error: err?.message ?? String(err) });

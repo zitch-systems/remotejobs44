@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { encryptSecret, decryptSecret } from '@/lib/crypto/secret';
 import { logError } from '@/lib/log';
 
@@ -117,6 +118,20 @@ export async function POST(req: NextRequest) {
       throw new Error(error.message);
     }
 
+    // Audit metadata: which provider, what changed (key/model/enabled),
+    // never the actual key value. apiKeyClean=undefined means the admin
+    // sent the masked placeholder back (no change); we record that as
+    // "no_key_change" so reviewers can distinguish a rotation from an
+    // enable/disable.
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'ai_provider.update', targetType: 'ai_provider', targetId: providerId,
+      metadata: {
+        key_changed: apiKeyClean !== undefined,
+        model_changed: model !== undefined,
+        enabled: enabled,
+      },
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'admin.ai_discovery_settings.post_failed', error: err?.message ?? String(err) });
@@ -149,6 +164,10 @@ export async function DELETE(req: NextRequest) {
       .delete()
       .eq('provider_id', providerId);
     if (error) throw new Error(error.message);
+    await recordAdminAction({
+      adminId: auth.adminId, adminEmail: auth.adminEmail,
+      action: 'ai_provider.delete', targetType: 'ai_provider', targetId: providerId,
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'admin.ai_discovery_settings.delete_failed', error: err?.message ?? String(err) });

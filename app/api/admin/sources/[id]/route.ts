@@ -3,6 +3,7 @@
 // list + create.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { recordAdminAction } from '@/lib/admin/audit';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 const ALLOWED_STATUSES = new Set(['active', 'paused']);
@@ -41,6 +42,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error || !data) {
     return NextResponse.json({ error: error?.message ?? 'Update failed' }, { status: 500 });
   }
+  await recordAdminAction({
+    adminId: auth.adminId, adminEmail: auth.adminEmail,
+    action: 'source.update', targetType: 'source', targetId: params.id,
+    // The patch keys ARE the change set — listing them in metadata lets
+    // forensics distinguish a name-rename from a pause/resume without
+    // storing the new value (which can be inferred from the row at the
+    // log timestamp).
+    metadata: { changed: Object.keys(patch), new_status: patch.status ?? null },
+  });
   return NextResponse.json({ source: data });
 }
 
@@ -55,6 +65,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
   const supabase = createAdminSupabaseClient();
+  // Snapshot the row before delete so the audit metadata identifies
+  // *which* source was removed by name/URL — a bare UUID post-delete
+  // is unreviewable.
+  const { data: existing } = await supabase
+    .from('job_sources')
+    .select('name, url, method')
+    .eq('id', params.id)
+    .maybeSingle();
   const { error } = await supabase
     .from('job_sources')
     .delete()
@@ -62,5 +80,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  await recordAdminAction({
+    adminId: auth.adminId, adminEmail: auth.adminEmail,
+    action: 'source.delete', targetType: 'source', targetId: params.id,
+    metadata: existing ?? { note: 'row already gone at delete time' },
+  });
   return NextResponse.json({ ok: true });
 }
