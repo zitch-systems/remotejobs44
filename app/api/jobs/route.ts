@@ -144,26 +144,62 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ jobs });
     }
 
-    // count: 'exact' — the admin client (service_role, 60s timeout) gives
-    // us enough budget. An earlier 'estimated' attempt was wildly off
-    // (32k reported vs 64k real) because the planner had no stats on the
-    // is_active selectivity and assumed 50% — bad enough to halve the
-    // headline number on the listing UI. EXPLAIN ANALYZE on the unfiltered
-    // count returns in ~43 ms, so accuracy + correctness over micro-perf.
+    // ── Q-PRESENT PATH: relevance-ranked FTS via search_jobs RPC ───────
+    // When the user is typing in the search box, we want the BEST MATCH
+    // first, not the newest. The search_jobs() / search_jobs_count() pair
+    // (migration v17) does FTS + ts_rank ordering inside Postgres so we
+    // don't have to ship ranking columns over the wire. Falls back to
+    // the listing path below when q is empty.
+    const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
+    if (safeQ) {
+      // Reuse REGION_TERMS to map a region/country slug to a single
+      // location keyword for the RPC's ILIKE filter. The first term is
+      // usually the most specific (e.g. region=africa → 'africa').
+      const locTerm = (() => {
+        if (country && REGION_TERMS[country]) return REGION_TERMS[country][0];
+        if (region  && REGION_TERMS[region])  return REGION_TERMS[region][0];
+        return country || region || null;
+      })();
+      const postedDays = (posted && /^\d+$/.test(posted)) ? Math.min(365, parseInt(posted, 10)) : null;
+      let salMin: number | null = null;
+      let salMax: number | null = null;
+      if (salary && /^\d+-\d+$/.test(salary)) {
+        const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
+        if (Number.isFinite(lo) && Number.isFinite(hi)) { salMin = lo; salMax = hi; }
+      }
+      const offset = (page - 1) * perPage;
+      const args = {
+        q:             safeQ,
+        v_category:    category || null,
+        v_type:        type     || null,
+        v_level:       level    || null,
+        v_remote_only: remote,
+        v_location:    locTerm,
+        v_timezone:    timezone || null,
+        v_salary_min:  salMin,
+        v_salary_max:  salMax,
+        v_posted_days: postedDays,
+      };
+      const [rowsRes, countRes] = await Promise.all([
+        supabase.rpc('search_jobs', { ...args, v_offset: offset, v_limit: perPage }),
+        supabase.rpc('search_jobs_count', args),
+      ]);
+      if (rowsRes.error) throw new Error(rowsRes.error.message);
+      const total = Number(countRes.data ?? 0);
+      const jobs  = (rowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+      return NextResponse.json({
+        jobs, total, page, perPage,
+        pages: Math.max(1, Math.ceil(total / perPage)),
+      });
+    }
+
+    // ── NO-Q PATH: filter-only browsing (existing logic) ───────────────
+    // count: 'exact' is fine on this path — admin client gets the 60s
+    // timeout and the unfiltered count returns in ~43 ms.
     let query = supabase.from('jobs').select(cols, { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);
-    if (q) {
-      // Full-text search via the generated `search_vector` tsvector
-      // column (migration_v15) with `websearch` semantics: handles
-      // multi-word queries with implicit AND, quoted phrases, OR, and
-      // -exclusion the way users expect from a search box. Index is a
-      // GIN on search_vector, so query cost stays milliseconds at any
-      // scale. Caps input to 200 chars to keep tsquery parse cheap.
-      const safe = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
-      if (safe) query = query.textSearch('search_vector', safe, { type: 'websearch', config: 'english' });
-    }
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
