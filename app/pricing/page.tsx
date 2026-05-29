@@ -271,12 +271,25 @@ function PricingContent() {
               </div>
 
               <div className="mb-6">
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100">{plan.price}</span>
+                  {plan.id === 'pro_annual' && (
+                    // Anchored saving badge: 2,999 × 12 = 35,988; annual is
+                    // 29,999. (35988 − 29999) / 35988 ≈ 16.6%. Surfacing
+                    // the saved percentage next to the price is the single
+                    // biggest visible monetisation lever on this page
+                    // (audit MON-5) — users skim prices, not feature lists.
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider">
+                      Save 17%
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{plan.period}</p>
                 {plan.id === 'pro_annual' && (
-                  <p className="text-xs text-accent font-semibold mt-1">= ₦2,500/mo</p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
+                    <span className="line-through">₦35,988</span>
+                    <span className="text-accent font-semibold ml-1.5">= ₦2,500/mo</span>
+                  </p>
                 )}
               </div>
 

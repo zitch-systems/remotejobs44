@@ -217,8 +217,17 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ jobs: [], total: 0, page, perPage, pages: 0 });
-  } catch {
-    return NextResponse.json({ jobs: [], total: 0, page, perPage, pages: 0 });
+  } catch (err: any) {
+    // Previously returned an empty `{ jobs: [] }` on any thrown error,
+    // which made a real DB outage look identical to "your filters
+    // matched nothing" — users have no way to distinguish, retry, or
+    // report. Return a 500 with a structured shape so the client can
+    // render a real error state, and log so ops sees it.
+    logError({ event: 'jobs.get_failed', error: err?.message ?? String(err) });
+    return NextResponse.json(
+      { error: 'Failed to load jobs', jobs: [], total: 0, page, perPage, pages: 0 },
+      { status: 500 },
+    );
   }
 }
 

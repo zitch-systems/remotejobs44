@@ -11,7 +11,7 @@
 // client islands.
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Clock, ArrowLeft } from 'lucide-react';
+import { MapPin, Clock, ArrowLeft, Flag } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
@@ -376,6 +376,28 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               </div>
             </div>
           )}
+
+          {/* "Report this job" — user-driven trust signal. Scam-detect +
+              source-trust badge catch the obvious cases at ingest, but the
+              long tail (off-topic listings, broken apply URLs, employer-
+              misrepresentation, expired postings) only reveal themselves
+              when a real user hits them. Pre-filling the subject + body
+              with the job id keeps the friction near zero — most users
+              won't write a follow-up if they have to compose from scratch. */}
+          <div className="card p-5">
+            <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-1.5">
+              <Flag className="w-3.5 h-3.5" /> See something off?
+            </h3>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mb-3 leading-relaxed">
+              Spam, scam, fake employer, broken apply link — let us know and we&rsquo;ll review within 24h.
+            </p>
+            <a
+              href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title} at ${job.company}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors"
+            >
+              <Flag className="w-3 h-3" /> Report this listing
+            </a>
+          </div>
         </div>
       </div>
     </div>
