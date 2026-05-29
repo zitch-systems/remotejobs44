@@ -73,7 +73,9 @@ export default function AdminUserDetailPage() {
       setLoading(false);
     }
     if (id) load();
-  }, [id]);
+    // toast is a stable Zustand setter — included to satisfy
+    // exhaustive-deps without changing re-run behaviour.
+  }, [id, toast]);
 
   async function handleSave() {
     if (!profile) return;

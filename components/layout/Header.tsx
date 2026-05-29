@@ -48,7 +48,10 @@ export function Header() {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
+  // Close the mobile menu whenever the route changes. setMobileMenuOpen
+  // is a stable Zustand setter so including it in deps doesn't add any
+  // extra re-runs — it just clears the exhaustive-deps warning.
+  useEffect(() => { setMobileMenuOpen(false); }, [pathname, setMobileMenuOpen]);
 
   // Close dropdown on outside click
   useEffect(() => {
