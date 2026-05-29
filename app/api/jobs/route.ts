@@ -1,12 +1,30 @@
 // app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { rateLimit, getIP } from '@/lib/rate-limit';
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
-import { logError } from '@/lib/log';
+import { logError, logWarn } from '@/lib/log';
+
+// /jobs (60s revalidate) and /jobs/[id] (300s revalidate) cache server-
+// rendered HTML at the edge. Without a manual flush, an admin's create /
+// edit / delete only surfaces to the public after the TTL expires —
+// long enough that admins repeatedly re-fetch wondering whether the
+// save worked. Calling revalidatePath here drops the affected entries
+// from the cache so the very next public request rebuilds with the
+// fresh row. Wrapped in try/catch because revalidatePath can throw at
+// edges (during build, in a worker without an HTTP context) and we'd
+// rather a successful DB write return 200 than fail because the cache
+// flush couldn't reach the dispatcher.
+function safeRevalidate(...paths: string[]): void {
+  for (const p of paths) {
+    try { revalidatePath(p); }
+    catch (err: any) { logWarn({ event: 'jobs.revalidate_failed', path: p, error: err?.message ?? String(err) }); }
+  }
+}
 
 // MOCK_JOBS is a development fallback used by single-job lookups when the
 // requested id isn't in the DB. In production an unknown id should resolve
@@ -315,6 +333,10 @@ export async function POST(req: NextRequest) {
 
     const { data: job, error } = await supabase.from('jobs').insert(row).select().single();
     if (error) throw new Error('insert_failed');
+    // Flush /jobs cache + the new job's own detail page so they appear
+    // on the public surface immediately instead of after the next
+    // revalidate tick.
+    safeRevalidate('/jobs', `/jobs/${job.id}`);
     return NextResponse.json({ job: transformJob(job) }, { status: 201 });
   } catch (err: any) {
     logError({ event: 'jobs.post_failed', error: err?.message ?? String(err) });
@@ -357,6 +379,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: job, error } = await supabase.from('jobs').update(updates).eq('id', id).select().single();
     if (error) throw new Error('update_failed');
+    safeRevalidate('/jobs', `/jobs/${id}`);
     return NextResponse.json({ job: transformJob(job) });
   } catch (err: any) {
     logError({ event: 'jobs.patch_failed', error: err?.message ?? String(err) });
@@ -375,6 +398,9 @@ export async function DELETE(req: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw new Error('delete_failed');
+    // Flush the listing AND the now-404 detail page so a stale cached
+    // copy of the deleted job doesn't keep serving for up to 5 minutes.
+    safeRevalidate('/jobs', `/jobs/${id}`);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'jobs.delete_failed', error: err?.message ?? String(err) });

@@ -16,12 +16,13 @@
 //       removed (see feedback_no_apply_url_dedup.md in user memory).
 //   (4) Send daily job-alert emails to Pro users with active alerts.
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
 import { runIngest } from '@/lib/ingest-pipeline';
 import { requireCronSecret } from '@/lib/cron-auth';
-import { logError } from '@/lib/log';
+import { logError, logWarn } from '@/lib/log';
 
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
@@ -50,6 +51,14 @@ export async function GET(req: NextRequest) {
       sources:    ingest.results,
       paused:     ingest.paused,
     };
+    // Flush /jobs cache after a productive ingest so morning visitors
+    // see the freshly imported postings instead of yesterday's snapshot
+    // for the first 60 seconds. Skip when nothing was added — leaves
+    // the warm cache alone for a no-op run.
+    if (ingest.totalAdded > 0) {
+      try { revalidatePath('/jobs'); }
+      catch (err: any) { logWarn({ event: 'cron.daily.revalidate_failed', error: err?.message ?? String(err) }); }
+    }
   } catch (err: any) {
     logError({ event: 'cron.daily.ingest_failed', error: err.message });
     log.ingest = { error: err.message };

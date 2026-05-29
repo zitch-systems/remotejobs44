@@ -26,6 +26,10 @@ test-results/
 # Lighthouse reports
 lighthouse-report.json
 
+# Vitest coverage output (generated in CI; can also be run locally via
+# `npm run test:unit:coverage`)
+coverage/
+
 # OS files
 .DS_Store
 Thumbs.db
