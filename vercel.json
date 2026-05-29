@@ -13,6 +13,8 @@
     "app/api/admin/ingest-now/route.ts":  { "maxDuration": 120 },
     "app/api/cv/route.ts":                { "maxDuration": 30 },
     "app/api/scrape/route.ts":            { "maxDuration": 30 },
-    "app/api/ats/route.ts":               { "maxDuration": 60, "memory": 1024 }
+    "app/api/ats/route.ts":               { "maxDuration": 60, "memory": 1024 },
+    "app/api/jobs/route.ts":              { "maxDuration": 30 },
+    "app/api/companies/route.ts":         { "maxDuration": 30 }
   }
 }
