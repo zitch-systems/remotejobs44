@@ -64,7 +64,7 @@ export default async function IndustryPage({ params }: { params: Promise<{ slug:
     const ors = kws.flatMap(k => [`title.ilike.%${k}%`, `description.ilike.%${k}%`, `company.ilike.%${k}%`]).join(',');
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'exact' })
+      .select('id, title, company, location, posted_at', { count: 'estimated' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

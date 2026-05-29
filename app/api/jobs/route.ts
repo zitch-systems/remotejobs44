@@ -145,7 +145,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ jobs });
     }
 
-    let query = supabase.from('jobs').select(cols, { count: 'exact' })
+    // count: 'estimated' uses pg_class.reltuples (planner stats) instead
+    // of a full COUNT(*). At our row count (~64k+) plus the FTS predicate
+    // + multi-clause .or() filters, the exact count was hitting Supabase's
+    // ~8s statement_timeout and surfacing as a "Failed to load jobs" 500
+    // (see Postgres logs: "canceling statement due to statement timeout").
+    // Estimated is approximate but more than accurate enough for the
+    // "X jobs found" headline + pagination math. When the table grows
+    // past ~500k the same fix protects every filter combination.
+    let query = supabase.from('jobs').select(cols, { count: 'estimated' })
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);

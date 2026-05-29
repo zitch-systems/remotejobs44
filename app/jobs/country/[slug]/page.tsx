@@ -44,7 +44,7 @@ export default async function CountryPage({ params }: { params: Promise<{ slug: 
     const supabase = createAdminSupabaseClient();
     const { data, count } = await supabase
       .from('jobs')
-      .select('id, title, company, location, posted_at', { count: 'exact' })
+      .select('id, title, company, location, posted_at', { count: 'estimated' })
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)

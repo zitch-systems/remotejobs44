@@ -126,7 +126,11 @@ async function fetchJobs(sp: SearchParams) {
 
   let query = supabase
     .from('jobs')
-    .select(cols, { count: 'exact' })
+    // count: 'estimated' — same reasoning as /api/jobs after the
+    // statement_timeout incident. The /jobs SSR page hits this on every
+    // filter change and the listing card just needs an approximate
+    // "X jobs found" headline + sane pagination math.
+    .select(cols, { count: 'estimated' })
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);
