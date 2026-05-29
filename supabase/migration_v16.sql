@@ -44,6 +44,19 @@
 -- Idempotent — safe to re-run.
 -- ============================================================
 
+-- ─── Prereq: anon needs EXECUTE on is_admin() ────────────────────
+-- The "Admins can manage jobs" RLS policy on public.jobs calls
+-- is_admin(auth.uid()). When anon hits any SELECT, Postgres evaluates
+-- every SELECT policy — and the admin policy's call to is_admin throws
+-- "permission denied for function is_admin" because the function was
+-- only granted to authenticated + service_role originally. The whole
+-- query then 401s before column-level grants are even considered.
+--
+-- is_admin is SECURITY DEFINER and returns false for anon (auth.uid()
+-- is null), so the admin policy still correctly does NOT match anon
+-- queries — it just runs cleanly instead of erroring out.
+grant execute on function public.is_admin(uuid) to anon;
+
 do $$
 declare
   has_apply_url    boolean;

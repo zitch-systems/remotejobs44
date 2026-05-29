@@ -252,6 +252,23 @@ create index if not exists jobs_company_trgm_idx
 
 
 -- ──────────────────────────────────────────────────────────────────
+-- v16-prereq. Grant anon EXECUTE on is_admin().
+-- ──────────────────────────────────────────────────────────────────
+-- The jobs RLS policy "Admins can manage jobs" calls is_admin(auth.uid()).
+-- When anon hits SELECT on public.jobs, Postgres evaluates EVERY SELECT
+-- policy (they're OR'd) — and the admin policy's call to is_admin throws
+-- "permission denied for function is_admin" because the function was
+-- originally granted only to authenticated + service_role. The whole
+-- query then 401s before column-level grants are even considered.
+--
+-- Granting anon EXECUTE is safe: is_admin is SECURITY DEFINER and returns
+-- false for anon (auth.uid() is null, no profiles row matches), so the
+-- admin policy correctly does NOT match — but the function runs cleanly
+-- instead of erroring out.
+grant execute on function public.is_admin(uuid) to anon;
+
+
+-- ──────────────────────────────────────────────────────────────────
 -- v16. Column-level revoke on apply_url + apply_email
 -- ──────────────────────────────────────────────────────────────────
 -- Closes audit finding C-2: a scraper hitting Supabase REST directly
