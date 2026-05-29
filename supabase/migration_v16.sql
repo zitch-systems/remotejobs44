@@ -44,6 +44,19 @@
 -- Idempotent — safe to re-run.
 -- ============================================================
 
+-- ─── Prereq: anon needs EXECUTE on is_admin() ────────────────────
+-- The "Admins can manage jobs" RLS policy on public.jobs calls
+-- is_admin(auth.uid()). When anon hits any SELECT, Postgres evaluates
+-- every SELECT policy — and the admin policy's call to is_admin throws
+-- "permission denied for function is_admin" because the function was
+-- only granted to authenticated + service_role originally. The whole
+-- query then 401s before column-level grants are even considered.
+--
+-- is_admin is SECURITY DEFINER and returns false for anon (auth.uid()
+-- is null), so the admin policy still correctly does NOT match anon
+-- queries — it just runs cleanly instead of erroring out.
+grant execute on function public.is_admin(uuid) to anon;
+
 do $$
 declare
   has_apply_url    boolean;
@@ -84,23 +97,28 @@ begin
     and table_name   = 'jobs'
     and column_name not in ('apply_url', 'apply_email');
 
-  -- ── Column-level revokes. Idempotent - revoking a permission that
-  --    doesn't exist is a no-op.
-  execute 'revoke select (apply_url)   on public.jobs from anon, authenticated';
-  execute 'revoke select (apply_email) on public.jobs from anon, authenticated';
+  -- ── Revoke the COARSE table-level SELECT first.
+  --    Postgres precedence: a table-level GRANT SELECT covers EVERY
+  --    column and overrides any column-level REVOKE. Supabase's default
+  --    role setup grants the coarse SELECT to both anon + authenticated,
+  --    so without this revoke the column-level grants below have no
+  --    effect and ?select=apply_url still returns 200.
+  --    INSERT/UPDATE/DELETE coarse grants are left alone — RLS row
+  --    policies gate those; we only need column-level control over
+  --    SELECT.
+  execute 'revoke select on public.jobs from anon, authenticated';
 
-  -- ── Re-grant SELECT on every safe column to anon, authenticated.
-  --    The column-level revokes above collapse the coarse SELECT
-  --    grant - Postgres treats column-level perms and coarse perms as
-  --    independent permission sets. Without this re-grant, anon would
-  --    have zero column-level access and every read would 403.
+  -- ── Re-grant SELECT on every column EXCEPT apply_url + apply_email.
+  --    After this, anon and authenticated can read the safe columns
+  --    via PostgREST as before. A ?select=* request that includes
+  --    apply_url returns 403 with code 42501.
   execute format(
     'grant select (%s) on public.jobs to anon, authenticated',
     safe_cols
   );
 
-  -- ── Service-role keeps everything; spelt out for self-documenting.
-  --    service_role RLS bypass is independent of column grants.
+  -- ── Service-role keeps full access via Supabase's default role
+  --    grants; restated here for self-documenting purposes.
   execute 'grant select on public.jobs to service_role';
 end$$;
 
