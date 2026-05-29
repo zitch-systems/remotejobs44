@@ -26,47 +26,23 @@ export async function GET() {
   try {
     const supabase = createAdminSupabaseClient();
 
-    // Pull every active, non-flagged, non-expired job's (company, category,
-    // featured) — the only columns we aggregate on. Limit defends against
-    // a runaway response if the table ever grows past a few hundred k.
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('company, category, featured, logo')
-      .eq('is_active', true)
-      .or('flagged.eq.false,flagged.is.null')
-      .or('expires_at.is.null,expires_at.gt.now()')
-      .limit(200_000);
+    // Server-side GROUP BY via the companies_aggregate() function (added
+    // by migration: add_companies_aggregate_function). The previous
+    // approach pulled rows over the wire and aggregated in JS, but
+    // PostgREST capped the response at 1000 rows so only ~75 of the
+    // real ~950 companies surfaced. The function returns 951 rows for
+    // 64k jobs in ~150 ms — cheap, accurate, capped.
+    const { data, error } = await supabase.rpc('companies_aggregate');
 
     if (error) throw new Error(error.message);
 
-    // GROUP BY company in JS — Supabase's PostgREST .group() isn't
-    // exposed via the JS client, and round-tripping a custom SQL RPC for
-    // a 5-minute-cached endpoint isn't worth the extra surface.
-    const map = new Map<string, CompanyAggregate>();
-    for (const row of (data ?? [])) {
-      const name = (row.company ?? '').trim();
-      if (!name) continue;
-      let entry = map.get(name);
-      if (!entry) {
-        entry = {
-          name,
-          logo:       row.logo ?? name[0]?.toUpperCase() ?? '?',
-          jobCount:   0,
-          categories: [],
-          featured:   false,
-        };
-        map.set(name, entry);
-      }
-      entry.jobCount++;
-      if (row.category && !entry.categories.includes(row.category)) {
-        entry.categories.push(row.category);
-      }
-      if (row.featured) entry.featured = true;
-    }
-
-    // Sort by job count desc — drives the "featured 8" slot at the top
-    // of the page and the main grid below.
-    const companies = Array.from(map.values()).sort((a, b) => b.jobCount - a.jobCount);
+    const companies: CompanyAggregate[] = (data ?? []).map((r: any) => ({
+      name:       r.name,
+      logo:       r.logo ?? r.name?.[0]?.toUpperCase() ?? '?',
+      jobCount:   Number(r.job_count ?? 0),
+      categories: r.categories ?? [],
+      featured:   !!r.featured,
+    }));
 
     return NextResponse.json({
       companies,
