@@ -2,7 +2,7 @@
 // Programmatic SEO landing page for each job category. Server-rendered with
 // per-slug metadata so Google / Bing / AI search engines can index each one.
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { CATEGORIES, findCategory, SKILLS } from '@/lib/seo-slices';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
@@ -36,7 +36,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
-  const cat = findCategory((await params).slug);
+  const slug = (await params).slug;
+  // Audit caught users hitting /jobs/category/all expecting "show all
+  // categories" — quietly redirect to the canonical /jobs listing so
+  // the link works instead of 404'ing.
+  if (slug === 'all') redirect('/jobs');
+  const cat = findCategory(slug);
   if (!cat) notFound();
 
   let jobs: any[] = [];

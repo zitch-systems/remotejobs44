@@ -72,8 +72,17 @@ export async function GET(req: NextRequest) {
   const timezone = searchParams.get('timezone') ?? '';
   const posted   = searchParams.get('posted') ?? '';
   const sort     = searchParams.get('sort') ?? 'newest';
-  const page     = parseInt(searchParams.get('page') ?? '1');
-  const perPage  = parseInt(searchParams.get('perPage') ?? '12');
+  // Clamp page/perPage at the route boundary so attacker-supplied or
+  // fat-fingered values don't cascade into a 500. Audit found:
+  //   ?perPage=-5    → range(0, -6) → PostgREST 500
+  //   ?page=999999   → range(11999976, 11999987) → 500 + log noise
+  //   ?perPage=100   → 8s cold start
+  // Cap perPage at 50 (matches the SSR listing page-size); cap page at
+  // 10000 (above which there can't possibly be results in a 64k DB).
+  const rawPage    = parseInt(searchParams.get('page')    ?? '1',  10);
+  const rawPerPage = parseInt(searchParams.get('perPage') ?? '12', 10);
+  const page    = Number.isFinite(rawPage)    && rawPage    > 0 ? Math.min(rawPage,    10000) : 1;
+  const perPage = Number.isFinite(rawPerPage) && rawPerPage > 0 ? Math.min(rawPerPage, 50)    : 12;
 
   const REGION_TERMS: Record<string, string[]> = {
     africa:        ['africa','nigeria','ghana','kenya','south africa','egypt','ethiopia','cameroon','senegal'],

@@ -121,7 +121,18 @@ export const REGIONS = [
 export function findCategory(slug: string)  { return CATEGORIES.find(c => c.slug === slug); }
 export function findCountry(slug: string)   { return COUNTRIES.find(c => c.slug === slug); }
 export function findSkill(slug: string)     { return SKILLS.find(c => c.slug === slug); }
-export function findTimezone(slug: string)  { return TIMEZONES.find(c => c.slug === slug); }
+// Map common timezone synonyms to their canonical slug. "utc" is the
+// most-typed query but the entry is keyed by "gmt"; "uk" maps to
+// London (GMT). Keep this list tight — synonyms cost no extra storage
+// but bloat the surface map.
+const TIMEZONE_ALIASES: Record<string, string> = {
+  utc: 'gmt',
+  uk:  'gmt',
+};
+export function findTimezone(slug: string) {
+  const canonical = TIMEZONE_ALIASES[slug] ?? slug;
+  return TIMEZONES.find(c => c.slug === canonical);
+}
 export function findRegion(slug: string)    { return REGIONS.find(c => c.slug === slug); }
 
 // Map a freeform skill name (from a job's skills[] array) to its canonical
