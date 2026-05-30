@@ -1,7 +1,16 @@
 'use client';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
-export default function Error({ error, reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // Surface the real error in the browser console for devs / power users
+  // without leaking it to the rendered page. error.digest is the
+  // Next.js correlation id we can ask support to quote.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.error('[app/error]', error);
+  }, [error]);
+
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-5">
       <div className="text-center max-w-md">
@@ -10,7 +19,10 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
           Something went wrong
         </h1>
         <p className="text-stone-400 dark:text-stone-500 mb-6 text-sm">
-          {error.message || 'An unexpected error occurred. Our team has been notified.'}
+          An unexpected error occurred. Refresh the page, or come back in a moment.
+          {error.digest && (
+            <> <span className="block mt-2 font-mono text-[10px] text-stone-400">ref: {error.digest}</span></>
+          )}
         </p>
         <div className="flex gap-3 justify-center">
           <button onClick={reset}

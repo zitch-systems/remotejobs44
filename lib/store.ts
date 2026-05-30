@@ -213,19 +213,7 @@ export const useJobsStore = create<JobsState>()(
   )
 );
 
-// ── Language Store ────────────────────────────────────────────────────────────
-type Locale = 'en' | 'fr' | 'es' | 'de' | 'pt' | 'ar' | 'zh' | 'ja';
-interface LangState {
-  locale:    Locale;
-  setLocale: (l: Locale) => void;
-}
-
-export const useLangStore = create<LangState>()(
-  persist(
-    (set) => ({
-      locale: 'en' as Locale,
-      setLocale: (locale) => set({ locale }),
-    }),
-    { name: 'rj44-lang' }
-  )
-);
+// useLangStore was scaffolded for a multi-locale feature that never
+// shipped — no component imported it and the persisted `rj44-lang`
+// localStorage entry was dead weight. Removed in this commit. If
+// internationalisation comes back, lift from this commit's parent.
