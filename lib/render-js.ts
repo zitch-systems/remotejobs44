@@ -47,8 +47,26 @@ export async function renderHtml(rawUrl: string, opts?: { waitForSelector?: stri
     await page.setRequestInterception(true);
     page.on('request', req => {
       const t = req.resourceType();
-      if (t === 'image' || t === 'media' || t === 'font' || t === 'stylesheet') req.abort();
-      else req.continue();
+      if (t === 'image' || t === 'media' || t === 'font' || t === 'stylesheet') {
+        return req.abort();
+      }
+      // Re-check the SUB-RESOURCE URL against the SSRF guard. The
+      // initial validateExternalUrl above only covers the top-level
+      // navigation; once chromium starts running the page's JS, it
+      // can issue fetch()/XHR/iframe loads to any URL it wants. A
+      // page passing the initial public-host check could still
+      // trigger `fetch('http://169.254.169.254/latest/meta-data/...')`
+      // (cloud metadata) or hit a private VPC service. The response
+      // is then visible in `page.content()` — extractable via DOM
+      // injection.
+      //
+      // Validate every sub-request the same way; on failure abort
+      // the single request, NOT the whole render. This lets a page
+      // legitimately attempt many internal calls and we just block
+      // them one by one.
+      const sub = validateExternalUrl(req.url());
+      if (!sub.ok) return req.abort();
+      return req.continue();
     });
 
     await page.goto(url, {
