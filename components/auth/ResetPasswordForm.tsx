@@ -17,12 +17,26 @@ export function ResetPasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
-    if (password !== confirm) { toast('Passwords do not match', 'error'); return; }
+    // Trim BEFORE validation so the user's "8 char" includes their
+    // accidental trailing space — and so the stored password matches
+    // what /login + /register store (both trim too). Without this,
+    // resetting to "hello   " stored that raw, but a subsequent login
+    // submit was trimmed to "hello" and failed.
+    const trimmed        = password.trim();
+    const trimmedConfirm = confirm.trim();
+    if (trimmed.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    if (trimmed !== trimmedConfirm) { toast('Passwords do not match', 'error'); return; }
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) { toast(error.message, 'error'); setLoading(false); return; }
+    const { error } = await supabase.auth.updateUser({ password: trimmed });
+    if (error) {
+      // Generic message — Supabase auth errors can leak rate-limit
+      // hints. Browser console keeps the detail for support.
+      console.error('[reset-password]', error.message);
+      toast('Could not update password. Please try again.', 'error');
+      setLoading(false);
+      return;
+    }
     toast('Password updated! Please log in.', 'success');
     window.location.replace('/login');
   }

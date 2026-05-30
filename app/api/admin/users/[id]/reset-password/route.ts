@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,7 +27,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
     redirectTo: appUrl ? `${appUrl}/reset-password` : undefined,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Don't echo Supabase auth API messages (can include rate-limit
+    // info, user-state hints) — log server-side and return generic.
+    logError({ event: 'admin.reset_password.failed', admin_email: auth.adminEmail, target_user_id: id, error: error.message });
+    return NextResponse.json({ error: 'Could not send reset email. Please try again.' }, { status: 500 });
+  }
 
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
