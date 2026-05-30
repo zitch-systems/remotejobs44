@@ -8,7 +8,7 @@
 //
 // State lives in the URL — each control updates the querystring via
 // router.push, which re-runs the server component's data fetch.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, SlidersHorizontal, X, MapPin, Banknote, Briefcase, TrendingUp,
@@ -207,6 +207,11 @@ export function JobsFiltersBar() {
   const searchParams = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  // useTransition surfaces the in-flight SSR navigation so the search
+  // input can spin and the Search button can show "Searching…" while
+  // the new /jobs?q=... route is rendered. Without this the user sees
+  // nothing happen for ~2-8s on cold queries and thinks Enter died.
+  const [isPending, startTransition] = useTransition();
 
   const q           = searchParams.get('q')           ?? '';
   const category    = (searchParams.get('category')   ?? 'all') as JobCategory | 'all';
@@ -230,17 +235,17 @@ export function JobsFiltersBar() {
     const p = new URLSearchParams(searchParams.toString());
     if (value && value !== 'all') p.set(key, value); else p.delete(key);
     p.delete('page');
-    router.push(`/jobs?${p.toString()}`);
+    startTransition(() => { router.push(`/jobs?${p.toString()}`); });
   }
   function handleSearch() {
     const p = new URLSearchParams(searchParams.toString());
     if (searchInput.trim()) p.set('q', searchInput.trim()); else p.delete('q');
     p.delete('page');
-    router.push(`/jobs?${p.toString()}`);
+    startTransition(() => { router.push(`/jobs?${p.toString()}`); });
   }
   function clearAll() {
     setSearchInput('');
-    router.push('/jobs');
+    startTransition(() => { router.push('/jobs'); });
   }
 
   return (
@@ -248,7 +253,11 @@ export function JobsFiltersBar() {
       {/* Search row */}
       <div className="flex gap-2 flex-col sm:flex-row">
         <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 focus-within:shadow-glow transition-all shadow-sm">
-          <Search className="w-4 h-4 text-stone-400 shrink-0" />
+          {isPending ? (
+            <span className="w-4 h-4 border-2 border-stone-300 dark:border-stone-600 border-t-brand-600 rounded-full animate-spin shrink-0" aria-label="Searching" />
+          ) : (
+            <Search className="w-4 h-4 text-stone-400 shrink-0" />
+          )}
           <input
             type="text"
             value={searchInput}
@@ -265,7 +274,8 @@ export function JobsFiltersBar() {
               }
             }}
             placeholder="Job title, skill, or company…"
-            className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 disabled:opacity-60"
+            disabled={isPending}
           />
           {searchInput && (
             <button onClick={() => { setSearchInput(''); setParam('q', ''); }} className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
@@ -293,9 +303,9 @@ export function JobsFiltersBar() {
             )}
           </button>
           {searchInput && (
-            <button onClick={handleSearch}
-              className="px-5 py-2.5 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shadow-sm">
-              Search
+            <button onClick={handleSearch} disabled={isPending}
+              className="px-5 py-2.5 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {isPending ? 'Searching…' : 'Search'}
             </button>
           )}
         </div>
