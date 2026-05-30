@@ -43,6 +43,10 @@ export function JobActionsCard({ job }: { job: Job }) {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
+    }).catch(() => {
+      // Promise rejects in non-secure contexts / permission-denied.
+      // Without .catch the console fills with "Uncaught (in promise)".
+      toast('Copy failed', 'error', 2000);
     });
   }
 
@@ -136,7 +140,20 @@ export function JobActionsCard({ job }: { job: Job }) {
             {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
             {saved ? 'Saved' : 'Save'}
           </button>
-          <button onClick={() => { navigator.clipboard.writeText(window.location.href); toast('Link copied!', 'success', 2000); }}
+          <button onClick={async () => {
+            // navigator.clipboard.writeText returns a Promise that
+            // REJECTS in older browsers, non-secure contexts, and when
+            // the user denies clipboard permission. The previous fire-
+            // and-forget version showed "Link copied!" regardless, so
+            // a user on an unsupported browser thought the URL was on
+            // their clipboard when it wasn't. Branch on the outcome.
+            try {
+              await navigator.clipboard.writeText(window.location.href);
+              toast('Link copied!', 'success', 2000);
+            } catch {
+              toast('Copy failed — long-press the URL bar to copy instead', 'error', 3000);
+            }
+          }}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-500 text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
             <Share2 className="w-4 h-4" /> Share
           </button>

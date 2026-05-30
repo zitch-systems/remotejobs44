@@ -70,8 +70,13 @@ export function validateExternalUrl(raw: string): UrlValidation | UrlError {
     return { ok: false, error: 'Private IP addresses are not allowed' };
   }
 
-  // Reject any host ending in .local, .internal, .lan, etc.
-  if (/\.(local|internal|lan|intranet|corp|home)$/i.test(host)) {
+  // Reject any host ending in .local, .internal, .lan, etc. and the
+  // .localhost suffix — RFC 6761 reserves the *.localhost TLD and
+  // virtually every resolver (musl, glibc, libcurl) maps anything
+  // under it to 127.0.0.1 / ::1. The earlier regex only caught
+  // *.local exactly (the .localhost suffix slipped through, and DNS
+  // then routed evil.localhost into our own loopback).
+  if (/\.(local|internal|lan|intranet|corp|home|localhost)$/i.test(host)) {
     return { ok: false, error: 'Internal-only hosts are not allowed' };
   }
 

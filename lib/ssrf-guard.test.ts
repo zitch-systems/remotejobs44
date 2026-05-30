@@ -57,6 +57,11 @@ describe('validateExternalUrl', () => {
       ['http://127.0.0.1/'],
       ['http://127.0.0.1:3000/'],
       ['http://0.0.0.0/'],
+      // RFC 6761 reserves the *.localhost TLD. Every mainstream
+      // resolver routes anything under it to 127.0.0.1 / ::1, so we
+      // must reject the suffix not just the exact 'localhost' host.
+      ['http://evil.localhost/'],
+      ['http://attacker.localhost:8080/internal-api'],
     ])('rejects %s', (u) => {
       const r = validateExternalUrl(u);
       expect(r.ok).toBe(false);
