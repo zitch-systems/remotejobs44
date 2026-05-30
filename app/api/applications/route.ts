@@ -183,6 +183,15 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
+      // 23505 = unique_violation. With the new applications_user_job_unique
+      // constraint (migration: add_dedup_unique_constraints) we can now
+      // distinguish a real DB error from the rapid-double-click race that
+      // sneaks past the maybeSingle() pre-check above. Treat the
+      // unique-violation as "already applied" — same 409 the pre-check
+      // returns — so both paths look identical to the client.
+      if ((insertError as any).code === '23505') {
+        return NextResponse.json({ error: 'You have already applied to this job' }, { status: 409 });
+      }
       // Surface a clear error — don't expose raw DB messages
       logError({ event: 'applications.insert_failed', user_id: user.id, error: insertError.message });
       return NextResponse.json(

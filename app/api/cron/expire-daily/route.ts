@@ -32,7 +32,12 @@ export async function GET(req: NextRequest) {
 
   const dailyIds = (expiredDaily ?? []).map((s: { user_id: string }) => s.user_id);
   if (dailyIds.length > 0) {
-    await supabase.from('profiles').update({ plan: 'free' }).in('id', dailyIds);
+    // Skip admins — profile.plan='admin' is a display tag we don't want
+    // a paid-then-expired admin to lose. role='admin' keeps their actual
+    // access regardless of the plan column, so demoting them to 'free'
+    // is purely a wrong-label bug but worth avoiding.
+    await supabase.from('profiles').update({ plan: 'free' })
+      .in('id', dailyIds).neq('role', 'admin');
     await supabase.from('subscriptions').update({ status: 'expired' })
       .in('user_id', dailyIds).eq('billing', 'daily');
   }
@@ -55,7 +60,8 @@ export async function GET(req: NextRequest) {
 
   const proIds = (expiredPro ?? []).map((s: { user_id: string }) => s.user_id);
   if (proIds.length > 0) {
-    await supabase.from('profiles').update({ plan: 'free' }).in('id', proIds);
+    await supabase.from('profiles').update({ plan: 'free' })
+      .in('id', proIds).neq('role', 'admin');
     await supabase.from('subscriptions').update({ status: 'expired' })
       .in('user_id', proIds).in('billing', ['monthly', 'annually']);
   }

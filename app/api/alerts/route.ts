@@ -64,16 +64,47 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Don't echo raw DB messages to the client (handler names, constraint
+    // ids, etc.). Log server-side, ship a generic error.
+    // eslint-disable-next-line no-console
+    console.error('[alerts.post] insert failed:', error.message);
+    return NextResponse.json({ error: 'Could not create alert. Please try again.' }, { status: 500 });
+  }
   return NextResponse.json({ alert: data });
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function DELETE(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { id } = await req.json();
-  await supabase.from('job_alerts').delete().eq('id', id).eq('user_id', user.id);
+  let body: { id?: string } = {};
+  try { body = await req.json(); } catch {}
+  const id = String(body.id ?? '');
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid alert id' }, { status: 400 });
+  }
+
+  // Return how many rows were actually deleted so the client can
+  // distinguish "alert removed" from "id didn't exist / wasn't yours".
+  // The user_id eq() means RLS plus our explicit filter both block
+  // cross-user deletes — no need to look the row up first.
+  const { count, error } = await supabase
+    .from('job_alerts')
+    .delete({ count: 'exact' })
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[alerts.delete] failed:', error.message);
+    return NextResponse.json({ error: 'Could not delete alert.' }, { status: 500 });
+  }
+  if (!count) {
+    return NextResponse.json({ error: 'Alert not found' }, { status: 404 });
+  }
   return NextResponse.json({ success: true });
 }

@@ -81,7 +81,11 @@ export async function GET(req: NextRequest) {
   let expiredDayPasses = 0;
   if (expiredDaily && expiredDaily.length > 0) {
     const ids = expiredDaily.map((s: { user_id: string }) => s.user_id);
-    await supabase.from('profiles').update({ plan: 'free' }).in('id', ids);
+    // Don't clobber profile.plan='admin' to 'free' — same reason as
+    // /api/cron/expire-daily. Role is unchanged so the user keeps
+    // their actual privileges, but the plan tag matters for UI.
+    await supabase.from('profiles').update({ plan: 'free' })
+      .in('id', ids).neq('role', 'admin');
     await supabase.from('subscriptions')
       .update({ status: 'expired' })
       .in('user_id', ids)
@@ -103,7 +107,8 @@ export async function GET(req: NextRequest) {
   let expiredPro_n = 0;
   if (expiredPro && expiredPro.length > 0) {
     const ids = expiredPro.map((s: { user_id: string }) => s.user_id);
-    await supabase.from('profiles').update({ plan: 'free' }).in('id', ids);
+    await supabase.from('profiles').update({ plan: 'free' })
+      .in('id', ids).neq('role', 'admin');
     await supabase.from('subscriptions')
       .update({ status: 'expired' })
       .in('user_id', ids)
