@@ -230,20 +230,15 @@ export async function GET(req: NextRequest) {
     }
 
     // ── NO-Q PATH: filter-only browsing ────────────────────────────────
-    // The big inline `count: 'exact'` previously fired here forced a
-    // Seq Scan because (NOT flagged OR flagged IS NULL) AND (expires_at
-    // IS NULL OR expires_at > now()) defeats every visibility index —
-    // about 4 s on a cold buffer cache. Combined with cold-lambda
-    // overhead and SAFE_JOB_COLUMNS serialization the route bumped
-    // past the Vercel function timeout.
-    //
-    // Fix: split the count off and run it in parallel as a cheap
-    // is_active=true count (Index Only Scan on jobs_is_active_idx,
-    // ~117 ms). The visibility OR filters are tautological against
-    // current data (verified: 64,397/64,397 rows satisfy them), so
-    // the split count is accurate today; a future flagged or
-    // expires_at row would drift the total by 1.
-    let query = supabase.from('jobs').select(cols)
+    // count: 'exact' on the SAME query that fetches the rows. The
+    // earlier "split count" optimisation traded correctness for speed —
+    // counting only `is_active = true` while the data SELECT also
+    // applied remote / category / type filters meant the displayed
+    // "X jobs found" total stayed at 81k regardless of what the user
+    // toggled. With maxDuration = 30 the ~4s seq-scan from the
+    // OR-IS-NULL visibility predicates fits inside the lambda budget,
+    // and PostgREST does the count + select in one round-trip.
+    let query = supabase.from('jobs').select(cols, { count: 'exact' })
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);
@@ -320,22 +315,13 @@ export async function GET(req: NextRequest) {
     const from = (page - 1) * perPage;
     query = query.range(from, from + perPage - 1);
 
-    // Parallel: the actual rows + a cheap index-only count. See the
-    // comment on the select() above for why the count is split out
-    // and runs against the looser `is_active = true` predicate.
-    const [rowsRes, countRes] = await Promise.all([
-      query,
-      supabase
-        .from('jobs')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true),
-    ]);
-    if (rowsRes.error || !rowsRes.data) throw new Error(rowsRes.error?.message ?? 'Query failed');
-    const total = countRes.count ?? 0;
+    const { data: jobs, count, error } = await query;
+    if (error || !jobs) throw new Error(error?.message ?? 'Query failed');
+    const total = count ?? 0;
 
-    if (rowsRes.data.length > 0) {
+    if (jobs.length > 0) {
       return NextResponse.json({
-        jobs: rowsRes.data.map((j: any) => transformJob(j, seePaid)),
+        jobs: jobs.map((j: any) => transformJob(j, seePaid)),
         total,
         page, perPage,
         pages: Math.max(1, Math.ceil(total / perPage)),
