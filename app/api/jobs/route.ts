@@ -371,18 +371,21 @@ const VALID_CATEGORIES = ['engineering','design','marketing','finance','sales','
 const VALID_TYPES      = ['full-time','part-time','contract','freelance','internship'];
 const VALID_LEVELS     = ['entry','mid','senior','lead','executive'];
 
-function validateJobBody(body: any): string | null {
-  if (!body.title?.trim())   return 'title is required';
-  if (!body.company?.trim()) return 'company is required';
-  if (String(body.title).length   > 200)    return 'title too long (max 200)';
-  if (String(body.company).length > 200)    return 'company name too long (max 200)';
-  if (body.description && String(body.description).length > 10000) return 'description too long (max 10000)';
-  if (body.requirements && String(body.requirements).length > 5000) return 'requirements too long (max 5000)';
-  if (body.benefits     && String(body.benefits).length     > 3000) return 'benefits too long (max 3000)';
-  if (body.location     && String(body.location).length     > 200)  return 'location too long (max 200)';
-  if (body.category && !VALID_CATEGORIES.includes(body.category)) return 'invalid category';
-  if (body.type     && !VALID_TYPES.includes(body.type))           return 'invalid type';
-  if (body.level    && !VALID_LEVELS.includes(body.level))         return 'invalid level';
+// Per-field validators reused by both POST (full insert) and PATCH
+// (partial update). Each returns an error string or null. Splitting
+// the rule set this way lets PATCH apply the same length/whitelist
+// gates to whichever subset of fields the admin sent without
+// re-requiring `title` + `company`.
+function validateFieldValues(body: any): string | null {
+  if (body.title       !== undefined && String(body.title).length        > 200)    return 'title too long (max 200)';
+  if (body.company     !== undefined && String(body.company).length      > 200)    return 'company name too long (max 200)';
+  if (body.description !== undefined && String(body.description).length  > 10000)  return 'description too long (max 10000)';
+  if (body.requirements!== undefined && String(body.requirements).length > 5000)   return 'requirements too long (max 5000)';
+  if (body.benefits    !== undefined && String(body.benefits).length     > 3000)   return 'benefits too long (max 3000)';
+  if (body.location    !== undefined && String(body.location).length     > 200)    return 'location too long (max 200)';
+  if (body.category    !== undefined && !VALID_CATEGORIES.includes(body.category)) return 'invalid category';
+  if (body.type        !== undefined && !VALID_TYPES.includes(body.type))          return 'invalid type';
+  if (body.level       !== undefined && !VALID_LEVELS.includes(body.level))        return 'invalid level';
   if (body.salaryMin !== undefined && body.salaryMin !== null) {
     const n = Number(body.salaryMin);
     if (isNaN(n) || n < 0) return 'salaryMin must be a non-negative number';
@@ -391,8 +394,14 @@ function validateJobBody(body: any): string | null {
     const n = Number(body.salaryMax);
     if (isNaN(n) || n < 0) return 'salaryMax must be a non-negative number';
   }
-  if (body.applyUrl && !/^https?:\/\/.+/.test(body.applyUrl)) return 'applyUrl must be a valid URL';
+  if (body.applyUrl !== undefined && body.applyUrl !== null && body.applyUrl !== '' && !/^https?:\/\/.+/.test(body.applyUrl)) return 'applyUrl must be a valid URL';
   return null;
+}
+
+function validateJobBody(body: any): string | null {
+  if (!body.title?.trim())   return 'title is required';
+  if (!body.company?.trim()) return 'company is required';
+  return validateFieldValues(body);
 }
 
 export async function POST(req: NextRequest) {
@@ -461,6 +470,14 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
+    // Same per-field whitelist + length/value gates as POST. The
+    // previous PATCH happily accepted `category: "foo"`, an unbounded
+    // title, or a `javascript:` applyUrl — none of those were exploitable
+    // through the rendering path (apply URLs go through isSafeOpenUrl,
+    // text fields go through React text nodes) but they leak straight
+    // into the DB. Apply the same gates we already promise on POST.
+    const validationError = validateFieldValues(body);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
     const supabase = createAdminSupabaseClient();
 
     const updates: Record<string, unknown> = {};
