@@ -95,7 +95,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const supabase = createAdminSupabaseClient();
   const { error } = await supabase.from('profiles').update(patch).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    logError({ event: 'admin.user.update_failed', admin_email: auth.adminEmail, target_user_id: id, error: error.message });
+    return NextResponse.json({ error: 'Failed to update user.' }, { status: 500 });
+  }
 
   logInfo({ event: 'admin.user.updated', admin_email: auth.adminEmail, target_user_id: id, patch });
 
@@ -155,8 +158,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) {
+    // GoTrue admin SDK error messages occasionally include gateway hints —
+    // log raw, ship generic. Matches the redaction policy applied across
+    // the rest of the admin routes.
     logError({ event: 'admin.user.delete_failed', admin_email: auth.adminEmail, target_user_id: id, error: error.message });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete user.' }, { status: 500 });
   }
   logInfo({ event: 'admin.user.deleted', admin_email: auth.adminEmail, target_user_id: id });
   await recordAdminAction({
