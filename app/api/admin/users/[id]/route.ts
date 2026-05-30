@@ -19,9 +19,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const supabase = createAdminSupabaseClient();
+  // Explicit column lists — the previous select('*') pulled
+  // paystack_customer_code + paystack_subscription_code off profiles
+  // and the full paystack token set off subscriptions into the admin
+  // browser. None of those are read by the React tree below; keeping
+  // them off the wire is the standard defense-in-depth pattern.
+  const PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_at, suspended_reason, cv_url';
+  const SUB_COLS     = 'id, user_id, plan, billing, status, price, currency, current_period_start, current_period_end, created_at, updated_at';
   const [{ data: profile }, { data: subscription }, { data: applications }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
-    supabase.from('subscriptions').select('*').eq('user_id', id).maybeSingle(),
+    supabase.from('profiles').select(PROFILE_COLS).eq('id', id).maybeSingle(),
+    supabase.from('subscriptions').select(SUB_COLS).eq('user_id', id).maybeSingle(),
     supabase.from('applications').select('id,job_title,company,status,applied_at')
       .eq('user_id', id).order('applied_at', { ascending: false }).limit(20),
   ]);
