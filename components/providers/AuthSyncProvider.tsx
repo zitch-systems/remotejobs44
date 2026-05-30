@@ -23,7 +23,7 @@
 import { useEffect } from 'react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
-import { useAuthStore } from '@/lib/store';
+import { useAuthStore, useJobsStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
 
@@ -31,6 +31,15 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore(s => s.setUser);
 
   useEffect(() => {
+    // Both stores were configured with `skipHydration: true` so SSR and
+    // the first client paint render the empty default state. Trigger the
+    // localStorage read here on mount — Zustand re-renders subscribed
+    // components with the persisted values as a normal state update,
+    // not a hydration mismatch. Without this call, persisted users would
+    // appear logged-out forever client-side.
+    try { (useAuthStore as any).persist?.rehydrate?.(); } catch {}
+    try { (useJobsStore as any).persist?.rehydrate?.(); } catch {}
+
     const supabase = createClient();
     let ignoreNextSignedOut = false;
 

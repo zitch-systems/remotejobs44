@@ -104,9 +104,15 @@ export const useAuthStore = create<AuthState>()(
     {
       name:    'rj44-auth',
       storage: createJSONStorage(storage),
-      // Don't persist `hydrated` — it must be false on every fresh page load
-      // so the UI waits for syncAuth to confirm the persisted user matches a
-      // real Supabase session before rendering role-dependent elements.
+      // skipHydration: true means Zustand will NOT auto-read localStorage
+      // at module-load time on the client. Both SSR and the first client
+      // render see the empty default state (user: null, dailyAppsUsed: 0)
+      // — preventing the hydration mismatch where logged-in JobCard
+      // headers, BottomNav badges and JobActionsCard "Apply" buttons
+      // diverged between the server HTML (logged-out look) and the first
+      // client render (logged-in look from localStorage). AuthSyncProvider
+      // explicitly calls useAuthStore.persist.rehydrate() after mount.
+      skipHydration: true,
       partialize: (state) => ({
         user: state.user,
         token: state.token,
@@ -198,6 +204,11 @@ export const useJobsStore = create<JobsState>()(
     {
       name:    'rj44-jobs',
       storage: createJSONStorage(storage),
+      // Same skipHydration treatment as useAuthStore — savedJobIds is read
+      // by JobCard's "Saved" badge and the BottomNav saved-count pill,
+      // both rendered server-side. AuthSyncProvider triggers rehydration
+      // after mount via useJobsStore.persist.rehydrate().
+      skipHydration: true,
     }
   )
 );
