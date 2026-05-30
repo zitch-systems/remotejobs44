@@ -135,6 +135,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { jobId } = body;
     if (!jobId) return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
+    // applications.job_id is uuid — short-circuit a bad shape locally
+    // rather than letting PostgREST 22P02 cascade into the 500 branch.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof jobId !== 'string' || !UUID_RE.test(jobId)) {
+      return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+    }
+    // auto_applied is a boolean column. Coerce defensively so a client
+    // sending `autoApplied: "hello"` doesn't 22023 the whole insert.
+    const autoApplied = body.autoApplied === true;
 
     // Fetch job details using admin client (bypasses RLS)
     const adminSupabase = createAdminSupabaseClient();
@@ -176,7 +185,7 @@ export async function POST(req: NextRequest) {
         company:      job.company,
         company_logo: job.logo ?? null,
         status:       'applied',
-        auto_applied: body.autoApplied ?? false,
+        auto_applied: autoApplied,
         steps,
       })
       .select()

@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, email and message are required.' }, { status: 400 });
     }
 
-    const safeEmail   = String(email).replace(/[\r\n\t]/g, '').trim();
+    // Cap the email at 254 chars (RFC 5321 SMTP envelope limit). A 2 MB
+    // "email" address would pass the regex below and only fail upstream
+    // at Resend — keep the bad-input rejection cheap here.
+    const safeEmail   = String(email).replace(/[\r\n\t]/g, '').trim().slice(0, 254);
     const safeName    = String(name).replace(/[\r\n]/g, '').trim().slice(0, 100);
     const safeSubject = String(subject ?? '').replace(/[\r\n]/g, '').trim().slice(0, 200);
     const safeMessage = String(message).slice(0, 2000);
