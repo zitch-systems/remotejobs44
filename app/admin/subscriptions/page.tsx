@@ -25,11 +25,21 @@ export default function SubscriptionsPage() {
   const [q, setQ]           = useState('');
 
   useEffect(() => {
+    // Explicit column list — the old select('*') pulled
+    // paystack_subscription_code + paystack_email_token + customer_code
+    // into the browser. Admins have RLS access so PostgREST would
+    // return them, but those tokens shouldn't sit in a React tree the
+    // user (or a browser extension) could read off. The UI only reads
+    // the seven columns below.
     supabase
       .from('subscriptions')
-      .select('*, profiles(name, email)')
+      .select('id, user_id, plan, billing, status, price, currency, current_period_start, current_period_end, profiles(name, email)')
       .order('current_period_start', { ascending: false })
-      .then(({ data }) => { setSubs((data ?? []) as Sub[]); setLoading(false); });
+      .range(0, 999) // PostgREST caps at 1000 anyway — make it explicit
+      // Cast through unknown because PostgREST's join inferred type is
+      // `profiles: { name; email; }[]` but the runtime shape is the
+      // single object Sub declares.
+      .then(({ data }) => { setSubs((data ?? []) as unknown as Sub[]); setLoading(false); });
   }, []);
 
   const filtered = subs.filter(s =>

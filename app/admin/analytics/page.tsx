@@ -1,37 +1,44 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { TrendingUp, Users, DollarSign, Briefcase, Eye, MousePointerClick } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 
 export default function AdminAnalyticsPage() {
-  const supabase = createClient();
   const [counts, setCounts] = useState({ users: 0, pro: 0, daily: 0, free: 0, revenue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // The previous implementation called
+    //   supabase.from('profiles').select('plan')
+    // from the browser client. PostgREST caps responses at db-max-rows
+    // (1000) regardless of the client limit, so as soon as the user
+    // base crossed 1k the page started lying about totals + MRR (only
+    // the first 1000 rows were filter-counted). Route through
+    // /api/admin/stats which does the head-count under service_role on
+    // the server — same source the /admin overview already uses.
     async function load() {
-      const [{ data: profiles }, { data: activeSubs }] = await Promise.all([
-        supabase.from('profiles').select('plan'),
-        // MRR comes from real subscription rows so monthly vs annual is
-        // distinguished correctly. Annual contributes price/12 per month.
-        supabase.from('subscriptions').select('billing,price').eq('status', 'active'),
-      ]);
-      if (profiles) {
-        const pro   = profiles.filter(p => p.plan === 'pro').length;
-        const daily = profiles.filter(p => p.plan === 'daily').length;
-        const free  = profiles.filter(p => p.plan === 'free').length;
-        let mrr = 0;
-        for (const s of (activeSubs ?? [])) {
-          if (s.billing === 'annually') mrr += Math.round((s.price ?? 29999) / 12);
-          else if (s.billing === 'monthly') mrr += s.price ?? 2999;
-          // daily is one-off, not recurring
-        }
-        // Fallback estimate when there are no subscription rows yet.
-        if (mrr === 0 && pro > 0) mrr = pro * 2999;
-        setCounts({ users: profiles.length, pro, daily, free, revenue: mrr });
+      try {
+        const res = await fetch('/api/admin/stats', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`stats ${res.status}`);
+        const data = await res.json();
+        const users = Number(data.activeUsers ?? 0);
+        const pro   = Number(data.pro         ?? 0);
+        const daily = Number(data.daily       ?? 0);
+        setCounts({
+          users,
+          pro,
+          daily,
+          // Free is everyone who isn't paid / admin. The stats route
+          // doesn't expose an admin count yet, so this matches what the
+          // /admin overview shows.
+          free:    Math.max(0, users - pro - daily),
+          revenue: Number(data.mrr ?? 0),
+        });
+      } catch {
+        setCounts({ users: 0, pro: 0, daily: 0, free: 0, revenue: 0 });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, []);
