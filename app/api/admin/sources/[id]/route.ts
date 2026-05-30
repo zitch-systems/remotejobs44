@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 const ALLOWED_STATUSES = new Set(['active', 'paused']);
 
@@ -51,7 +52,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .select('id, name, url, method, status, last_sync_at, jobs_added, created_at')
     .single();
   if (error || !data) {
-    return NextResponse.json({ error: error?.message ?? 'Update failed' }, { status: 500 });
+    logError({ event: 'admin.source.patch_failed', admin_email: auth.adminEmail, source_id: id, error: error?.message ?? 'unknown' });
+    return NextResponse.json({ error: 'Failed to update source.' }, { status: 500 });
   }
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
@@ -90,7 +92,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .delete()
     .eq('id', id);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logError({ event: 'admin.source.delete_failed', admin_email: auth.adminEmail, source_id: id, error: error.message });
+    return NextResponse.json({ error: 'Failed to delete source.' }, { status: 500 });
   }
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,
