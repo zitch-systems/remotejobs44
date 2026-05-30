@@ -97,17 +97,39 @@ export async function POST(req: NextRequest) {
   }));
 
   let added = 0;
+  let attempted = 0;
+  let firstError: string | null = null;
   for (let i = 0; i < toInsert.length; i += 100) {
     const batch = toInsert.slice(i, i + 100);
+    attempted += batch.length;
     const { data, error: insErr } = await admin
       .from('jobs')
       .insert(batch)
       .select('id');
     if (insErr) {
       logError({ event: 'admin.companies_refresh.insert_failed', error: insErr.message });
+      if (!firstError) firstError = insErr.message;
       continue;
     }
     added += data?.length ?? batch.length;
+  }
+  // Same hole as /api/ats/save: a 100% DB failure used to come back
+  // as success: true, added: 0 — the admin saw "0 added" and assumed
+  // the company already had the same listings. Surface a 502 when
+  // there were rows to insert and none made it through.
+  if (attempted > 0 && added === 0) {
+    return NextResponse.json({
+      success: false,
+      company,
+      platform,
+      slug,
+      added: 0,
+      removed: 0,
+      reactivated: 0,
+      kept: 0,
+      total_fetched: fetched.total,
+      error: firstError ?? 'All rows failed to insert',
+    }, { status: 502 });
   }
 
   // No expire / reactivate phases anymore — they relied on apply_url

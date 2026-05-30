@@ -61,6 +61,13 @@ export async function POST(req: NextRequest) {
     // new rows regardless of whether any apply_url already exists in DB.
     let inserted = 0;
     let failed   = 0;
+    // Keep the first DB-error message so we can surface it in the
+    // response when nothing inserts. Without this, two days of
+    // bulk-import failures (the search_vector trigger bug) reported
+    // success-with-skipped and the user thought rows were just being
+    // deduped. The audit log captured failed/inserted but the client
+    // never saw why.
+    let firstError: string | null = null;
 
     for (let i = 0; i < rows.length; i += 100) {
       const batch = rows.slice(i, i + 100);
@@ -72,6 +79,7 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         logError({ event: 'ats.save.batch_failed', error: error.message });
+        if (!firstError) firstError = error.message;
         failed += batch.length;
       } else {
         inserted += data?.length ?? batch.length;
@@ -98,6 +106,21 @@ export async function POST(req: NextRequest) {
       metadata: { inserted, failed, total: jobs.length, sample_sources: sampleSources },
     });
 
+    // 502 when the entire batch died at the DB. The previous behaviour
+    // returned 200 with skipped=failed, which the frontend rendered as
+    // "X saved · Y skipped" and made a complete failure look like dedup.
+    // The benefits-as-text trigger bug burned two days of user activity
+    // this way.
+    if (inserted === 0 && failed > 0) {
+      return NextResponse.json({
+        success: false,
+        inserted: 0,
+        skipped: failed,
+        total: jobs.length,
+        error: firstError ?? 'All rows failed to insert',
+      }, { status: 502 });
+    }
+
     return NextResponse.json({
       success: true,
       inserted,
@@ -107,6 +130,10 @@ export async function POST(req: NextRequest) {
       // (DB error, bad shape) — duplicates no longer skip.
       skipped: failed,
       total: jobs.length,
+      // When some rows succeeded and some failed, hand the client the
+      // first error message too so the admin sees what went wrong on
+      // the dead rows instead of just a count.
+      ...(failed > 0 && firstError ? { partial_error: firstError } : {}),
     });
   } catch (err: any) {
     logError({ event: 'ats.save.unhandled', error: err?.message ?? String(err) });

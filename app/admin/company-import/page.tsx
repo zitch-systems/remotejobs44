@@ -447,6 +447,11 @@ export default function CompanyImportPage() {
       let totalInserted = 0;
       let totalSkipped  = 0;
       let firstError: string | null = null;
+      // Capture the first per-batch DB error message so a partial-success
+      // run can still surface what went wrong on the dead rows. Before
+      // this, a 70% insert / 30% trigger-bug run would show "X saved · Y
+      // skipped" looking like dedup and hide the real defect.
+      let firstPartial: string | null = null;
       let cursor = 0;
       async function worker() {
         while (true) {
@@ -463,6 +468,7 @@ export default function CompanyImportPage() {
             if (!res.ok) { firstError = data.error ?? 'Failed to save jobs'; return; }
             totalInserted += data.inserted ?? 0;
             totalSkipped  += data.skipped  ?? 0;
+            if (!firstPartial && data.partial_error) firstPartial = data.partial_error;
           } catch (err: any) {
             firstError = err.message ?? 'Network error';
           }
@@ -473,6 +479,11 @@ export default function CompanyImportPage() {
         alert(firstError);
         setSaving(false);
         return;
+      }
+      // Partial-failure path: show the DB error message so the admin
+      // doesn't silently lose rows thinking they were just dedup'd.
+      if (firstPartial && totalSkipped > 0) {
+        alert(`Imported ${totalInserted}, ${totalSkipped} failed at DB. First error: ${firstPartial}`);
       }
       const result = { inserted: totalInserted, skipped: totalSkipped };
       setSaveResult(result);
