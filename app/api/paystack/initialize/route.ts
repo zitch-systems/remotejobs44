@@ -88,9 +88,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
     }
 
+    // Defence-in-depth on the redirect target. The client does
+    // `window.location.href = authorizationUrl` so anything we return
+    // here lands as a top-level nav. Paystack's hosted checkout always
+    // serves from checkout.paystack.com, so we pin that host explicitly
+    // — if a compromised / spoofed Paystack response (or a future API
+    // change) ever returns a different origin, we refuse rather than
+    // bouncing the user to an attacker-controlled URL.
+    const authorizationUrl: string = data.data?.authorization_url ?? '';
+    try {
+      const u = new URL(authorizationUrl);
+      if (u.protocol !== 'https:' || u.hostname !== 'checkout.paystack.com') {
+        logError({ event: 'paystack.initialize.unexpected_redirect_host', host: u.hostname });
+        return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
+      }
+    } catch {
+      logError({ event: 'paystack.initialize.unparseable_redirect', url: authorizationUrl.slice(0, 200) });
+      return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
-      authorizationUrl: data.data.authorization_url,
+      authorizationUrl,
       reference: data.data.reference,
     });
   } catch (err: any) {
