@@ -395,6 +395,11 @@ function validateFieldValues(body: any): string | null {
     if (isNaN(n) || n < 0) return 'salaryMax must be a non-negative number';
   }
   if (body.applyUrl !== undefined && body.applyUrl !== null && body.applyUrl !== '' && !/^https?:\/\/.+/.test(body.applyUrl)) return 'applyUrl must be a valid URL';
+  // jobs.company_id is a nullable uuid — short-circuit a bad shape so
+  // PostgREST 22P02 doesn't cascade into the catch's 500 branch.
+  if (body.companyId !== undefined && body.companyId !== null && body.companyId !== '' && !UUID_RE.test(String(body.companyId))) {
+    return 'companyId must be a valid uuid';
+  }
   return null;
 }
 

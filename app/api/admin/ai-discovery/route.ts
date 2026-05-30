@@ -364,6 +364,23 @@ export async function POST(req: NextRequest) {
   const raw = extractJSONArray(rawText);
 
   // Sanitise & validate. Drop entries missing required fields.
+  // The applyUrl scheme check is critical: the LLM is a prompt-
+  // injection surface and could return `javascript:alert(1)` or
+  // `data:text/html,…` strings. Anything not on http(s) gets dropped
+  // to empty so the downstream /api/ats/save can't persist a URL the
+  // /jobs/[id] page would later expose in JSON-LD / hand to
+  // isSafeOpenUrl. URL constructor handles whitespace + protocol
+  // detection in one parse.
+  function sanitiseApplyUrl(raw: string): string {
+    const s = String(raw ?? '').slice(0, 500).trim();
+    if (!s) return '';
+    try {
+      const u = new URL(s);
+      return u.protocol === 'http:' || u.protocol === 'https:' ? s : '';
+    } catch {
+      return '';
+    }
+  }
   const sanitised = raw
     .filter((j: any) => j && typeof j === 'object' && j.title && j.company)
     .map((j: any) => {
@@ -378,7 +395,7 @@ export async function POST(req: NextRequest) {
         category:    VALID_CATEGORIES.has(category) ? category : 'other',
         level:       VALID_LEVELS.has(level) ? level : 'mid',
         description: String(j.description ?? '').slice(0, 4000),
-        applyUrl:    String(j.applyUrl ?? j.url ?? '').slice(0, 500),
+        applyUrl:    sanitiseApplyUrl(j.applyUrl ?? j.url ?? ''),
         salary:      j.salary ? String(j.salary).slice(0, 100) : undefined,
         remote:      true,
       };
