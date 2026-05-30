@@ -25,6 +25,24 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabaseClient();
 
+    // Accept only http(s) URLs into the apply_url / source_url columns.
+    // Callers feed this route from multiple sources (AI discovery, ATS
+    // engine, company-import, raw paste) and not all of them validate
+    // schemes upstream. A `javascript:` / `data:` value persisted into
+    // jobs.apply_url would render through isSafeOpenUrl on click (safe)
+    // but still show up in the JobPosting JSON-LD and admin previews.
+    // Collapse to null when the value isn't a real http(s) URL.
+    function sanitiseUrl(raw: unknown): string | null {
+      const s = String(raw ?? '').trim();
+      if (!s) return null;
+      try {
+        const u = new URL(s);
+        return u.protocol === 'http:' || u.protocol === 'https:' ? s : null;
+      } catch {
+        return null;
+      }
+    }
+
     // Transform camelCase Job to snake_case DB row. Every fetched job lands
     // as a NEW row — apply_url uniqueness was dropped in migration_v5 at
     // user request, so we no longer dedup at insert time. Same posting
@@ -45,7 +63,7 @@ export async function POST(req: NextRequest) {
       requirements: j.requirements ?? null,
       skills:       j.skills ?? null,
       benefits:     j.benefits ?? null,
-      apply_url:    j.applyUrl ?? null,
+      apply_url:    sanitiseUrl(j.applyUrl),
       apply_email:  j.applyEmail ?? null,
       posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
       expires_at:   j.expires ?? null,
@@ -53,7 +71,7 @@ export async function POST(req: NextRequest) {
       is_new:       true,
       is_active:    true,
       source:       j.source ?? 'api',
-      source_url:   j.sourceUrl ?? null,
+      source_url:   sanitiseUrl(j.sourceUrl),
       remote:       j.remote ?? true,
     }));
 
