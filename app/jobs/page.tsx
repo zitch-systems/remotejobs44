@@ -159,6 +159,12 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
       if (Number.isFinite(lo) && Number.isFinite(hi)) { salMin = lo; salMax = hi; }
     }
+    // search_jobs RPC interpolates these into ilike '%' || param || '%'.
+    // Parameter binding stops SQL injection but doesn't escape LIKE
+    // wildcards — a crafted `?timezone=_` would otherwise match every
+    // row. Mirror the escape from /api/jobs.
+    const escapeLike = (s: string | null): string | null =>
+      s == null ? null : s.replace(/[\\%_]/g, '\\$&').slice(0, 100);
     const offset = (page - 1) * JOBS_PER_PAGE;
     const args = {
       q:             safeQ,
@@ -166,8 +172,8 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       v_type:        type     || null,
       v_level:       level    || null,
       v_remote_only: remoteOnly,
-      v_location:    locTerm,
-      v_timezone:    timezone || null,
+      v_location:    escapeLike(locTerm),
+      v_timezone:    escapeLike(timezone || null),
       v_salary_min:  salMin,
       v_salary_max:  salMax,
       v_posted_days: postedDays,

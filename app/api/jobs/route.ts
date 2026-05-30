@@ -198,6 +198,14 @@ export async function GET(req: NextRequest) {
         const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
         if (Number.isFinite(lo) && Number.isFinite(hi)) { salMin = lo; salMax = hi; }
       }
+      // search_jobs RPC does `ilike '%' || v_location || '%'` and the
+      // same on v_timezone. Parameter binding stops SQL injection but
+      // does NOT escape LIKE wildcards — a value like `_` or `%`
+      // broadens the match to every row. Strip wildcards before
+      // handing them off so a crafted `?timezone=_` (or a region label
+      // that ever grows one) doesn't quietly bypass the filter.
+      const escapeLike = (s: string | null): string | null =>
+        s == null ? null : s.replace(/[\\%_]/g, '\\$&').slice(0, 100);
       const offset = (page - 1) * perPage;
       const args = {
         q:             safeQ,
@@ -205,8 +213,8 @@ export async function GET(req: NextRequest) {
         v_type:        type     || null,
         v_level:       level    || null,
         v_remote_only: remote,
-        v_location:    locTerm,
-        v_timezone:    timezone || null,
+        v_location:    escapeLike(locTerm),
+        v_timezone:    escapeLike(timezone || null),
         v_salary_min:  salMin,
         v_salary_max:  salMax,
         v_posted_days: postedDays,
