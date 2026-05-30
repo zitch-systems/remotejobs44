@@ -167,14 +167,33 @@ async function discoverFeed(url: string): Promise<string | null> {
 }
 
 // ── Normalize raw scraped/parsed job into our Job shape ───────────────────
+// Length caps on every user-/feed-supplied string before it reaches
+// the jobs table. Admin-added sources (/admin/sources) flow through
+// parseXMLFeed / parseJSONFeed → normalizeJob → INSERT, so without
+// these caps a malicious feed can dump megabytes-per-job into the
+// database. The hardcoded in-code SOURCES (Remotive, Jobicy, etc.)
+// each already cap description at 5000; this brings the user-added
+// path to the same floor.
+const TITLE_MAX       = 300;
+const COMPANY_MAX     = 200;
+const DESCRIPTION_MAX = 10_000; // matches /api/jobs POST validateJobBody
+const LOCATION_MAX    = 200;
+const APPLY_URL_MAX   = 2000;   // longest sane URL; well past RFC 7230 8KB
+
+function clamp(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) : s;
+}
+
 export function normalizeJob(raw: Record<string, any>, sourceUrl: string, method: IngestionMethod): Partial<Job> {
-  const title: string = raw.title ?? raw.position ?? raw.role ?? '';
-  const company: string = raw.company ?? raw.organization ?? raw.employer ?? extractDomain(sourceUrl);
-  const description: string = raw.description ?? raw.content ?? raw.summary ?? raw.snippet ?? '';
-  const applyUrl: string = raw.applyUrl ?? raw.apply_url ?? raw.link ?? raw.url ?? raw.href ?? '';
-  const location: string = raw.location ?? raw.region ?? 'Remote / Worldwide';
-  const posted: string = raw.posted ?? raw.date ?? raw.pubDate ?? raw.publishedAt ?? new Date().toISOString();
-  const salary = parseSalary(raw.salary ?? raw.compensation ?? raw.salaryRange ?? '');
+  const title: string = clamp(String(raw.title ?? raw.position ?? raw.role ?? ''), TITLE_MAX);
+  const company: string = clamp(String(raw.company ?? raw.organization ?? raw.employer ?? extractDomain(sourceUrl)), COMPANY_MAX);
+  const description: string = clamp(String(raw.description ?? raw.content ?? raw.summary ?? raw.snippet ?? ''), DESCRIPTION_MAX);
+  const applyUrl: string = clamp(String(raw.applyUrl ?? raw.apply_url ?? raw.link ?? raw.url ?? raw.href ?? ''), APPLY_URL_MAX);
+  const location: string = clamp(String(raw.location ?? raw.region ?? 'Remote / Worldwide'), LOCATION_MAX);
+  const posted: string = String(raw.posted ?? raw.date ?? raw.pubDate ?? raw.publishedAt ?? new Date().toISOString());
+  // parseSalary regex-scans the input — cap before it sees the string so
+  // a feed-supplied 10MB salary text can't tie up the regex engine.
+  const salary = parseSalary(clamp(String(raw.salary ?? raw.compensation ?? raw.salaryRange ?? ''), 200));
 
   return {
     id: 'ext_' + uid(),
