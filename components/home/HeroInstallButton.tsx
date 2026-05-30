@@ -66,7 +66,13 @@ export function HeroInstallButton() {
 
   useEffect(() => {
     const ua = navigator.userAgent;
-    const ios = /iphone|ipad|ipod/i.test(ua);
+    // iPadOS 13+ defaults to the Macintosh UA so /iphone|ipad|ipod/
+    // misses iPads on Safari — those users would see "Desktop"
+    // highlighted instead of "iOS" and the wrong toast on click.
+    // Touch-points >1 on a Mac UA reliably means iPad.
+    const ios =
+      /iphone|ipad|ipod/i.test(ua) ||
+      (/Macintosh/.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1);
     const android = /android/i.test(ua);
     // iOS Safari uses navigator.standalone; other browsers expose it via
     // the display-mode media query. Either signal means the app is
