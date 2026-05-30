@@ -9,7 +9,7 @@
 // blowing them away would corrupt their dashboards.
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
+import { detectATSFromUrl, isValidATSPlatform, type ATSPlatform } from '@/lib/ats-detect';
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
@@ -44,6 +44,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       error: 'Could not determine ATS — pass platform+slug or a representative apply_url_sample',
     }, { status: 400 });
+  }
+  // Validate platform against the ATSPlatform allowlist before fetchATSJobs
+  // splices it into an outbound URL. The earlier `body.platform as ATSPlatform`
+  // cast only satisfies TypeScript — at runtime body.platform could be
+  // 'evil.com/' and we'd issue a fetch against an attacker-controlled host.
+  // The detectATSFromUrl fallback above already returns a known platform,
+  // but a direct body.platform string had no runtime guard.
+  if (!isValidATSPlatform(platform)) {
+    return NextResponse.json({ error: 'Unknown ATS platform' }, { status: 400 });
   }
   // Slug becomes part of an outbound URL fetched by fetchATSJobs. Constrain
   // it to safe filename-ish characters so an admin (or compromised admin
