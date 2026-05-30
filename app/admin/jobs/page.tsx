@@ -11,12 +11,21 @@ import type { Job } from '@/lib/types';
 export default function AdminJobsPage() {
   const { toast } = useUIStore();
   const [jobs, setJobs]       = useState<Job[]>([]);
+  const [total, setTotal]     = useState(0);
   const [q, setQ]             = useState('');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    jobsApi.getJobs({ perPage: 50 }).then(r => { setJobs(r.jobs); setLoading(false); });
+    // Previous header rendered "{jobs.length} jobs in database" off the
+    // LOADED slice (perPage: 50) — so an admin saw "50 jobs in database"
+    // even when the actual table held 80k+. Capture the real total off
+    // the API response and surface it alongside the loaded count.
+    jobsApi.getJobs({ perPage: 50 }).then(r => {
+      setJobs(r.jobs);
+      setTotal((r as any).total ?? r.jobs.length);
+      setLoading(false);
+    });
   }, []);
 
   async function handleDelete(id: string) {
@@ -40,7 +49,7 @@ export default function AdminJobsPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">Manage Jobs</h1>
-          <p className="text-sm text-stone-400 mt-1">{jobs.length} jobs in database</p>
+          <p className="text-sm text-stone-400 mt-1">{total.toLocaleString()} jobs in database · showing {jobs.length}</p>
         </div>
         <Link href="/admin/jobs/new"
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
