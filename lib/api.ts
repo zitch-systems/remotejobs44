@@ -1,6 +1,6 @@
 // lib/api.ts — Hybrid API: Supabase when available, mock data as fallback
 import type { Job, User, Application, SearchFilters, PaginatedJobs, AdminStats } from './types';
-import { MOCK_JOBS, MOCK_COMPANIES } from './mock-data';
+import { MOCK_JOBS } from './mock-data';
 import { uid, sleep, validateEmail } from './utils';
 
 // ── Auth ───────────────────────────────────────────────────────────────────
@@ -159,15 +159,10 @@ export const applicationsApi = {
   },
 };
 
-// ── Companies ──────────────────────────────────────────────────────────────
-export const companiesApi = {
-  async getCompanies(filters: { country?: string; q?: string; category?: string } = {}) {
-    await sleep(200);
-    let companies = [...MOCK_COMPANIES];
-    if (filters.q) { const q = filters.q.toLowerCase(); companies = companies.filter(c => c.name.toLowerCase().includes(q)); }
-    return { companies, total: companies.length };
-  },
-};
+// companiesApi removed — no callers. The /companies page reads
+// /api/companies directly via fetch, and /companies/[slug] does its
+// own server-side aggregation. The mock-only stub here was dead code
+// dating to before the real API existed.
 
 // ── Admin ──────────────────────────────────────────────────────────────────
 export const adminApi = {

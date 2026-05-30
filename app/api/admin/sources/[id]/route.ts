@@ -8,6 +8,12 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 const ALLOWED_STATUSES = new Set(['active', 'paused']);
 
+// Strict UUID v4 shape — the earlier /^[0-9a-f-]{36}$/i let through
+// strings like '------------------------------------' (36 dashes) or
+// 36 a's, which PostgREST would still reject at the DB layer but
+// short-circuiting here is cleaner.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // PATCH — flip status (active ↔ paused) or rename. Admin Sources page
 // uses this for the pause/resume button.
 //
@@ -19,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!auth.ok) return auth.res;
 
   const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
   const body = await req.json().catch(() => ({}));
@@ -67,7 +73,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!auth.ok) return auth.res;
 
   const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
   const supabase = createAdminSupabaseClient();

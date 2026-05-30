@@ -61,8 +61,13 @@ export default function AdminUsersPage() {
 
     if (plan !== 'all') query = query.eq('plan', plan);
     if (debouncedQ) {
-      // ilike with % wildcards on both sides — case-insensitive substring match.
-      const like = `%${debouncedQ}%`;
+      // Strip the characters PostgREST's .or() syntax treats as
+      // structural — ',' is the condition separator, '(' / ')' delimit
+      // groups, '.' is the op separator. Without this a search like
+      // 'doe,j' breaks the parser. Also escape SQL LIKE wildcards so
+      // the user can't probe arbitrary patterns through the search box.
+      const sanitised = debouncedQ.replace(/[,()]/g, ' ').replace(/[\\%_]/g, '\\$&');
+      const like = `%${sanitised}%`;
       query = query.or(`name.ilike.${like},email.ilike.${like}`);
     }
 
