@@ -7,20 +7,40 @@ import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
 
+// Whitelist of writable columns. Without this the raw spread below would let
+// an admin (or anything that compromises an admin session) override the row's
+// `id` (the singleton key) or write into columns we haven't planned for —
+// classic mass-assignment.
+const ALLOWED_KEYS = new Set([
+  'siteName', 'supportEmail', 'jobsPerPage',
+  'notifyNewUser', 'notifyNewSub', 'notifyPayFail', 'notifyDailySync',
+]);
+
+function pickAllowed(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object') return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    if (ALLOWED_KEYS.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
 
   try {
-    const settings = await req.json();
+    const raw      = await req.json();
+    const settings = pickAllowed(raw);
     const supabase = createAdminSupabaseClient();
 
     // Try to upsert into a site_settings table (singleton row with id = 1)
     // This table might not exist yet — if so, we still return 200 so client
-    // falls back to localStorage gracefully.
+    // falls back to localStorage gracefully. id + updated_at sit AFTER the
+    // spread so a crafted body can't override the singleton key.
     const { error } = await supabase
       .from('site_settings')
-      .upsert({ id: 1, ...settings, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      .upsert({ ...settings, id: 1, updated_at: new Date().toISOString() }, { onConflict: 'id' });
 
     if (error) {
       // Table probably doesn't exist — not a fatal error
@@ -44,6 +64,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Mirror of the POST whitelist — if site_settings ever grows columns we
+// haven't whitelisted (server-only flags, debug toggles, etc.) we don't
+// want them leaking to the admin browser via select('*'). Re-list explicitly.
+const READABLE_COLS = [
+  'siteName', 'supportEmail', 'jobsPerPage',
+  'notifyNewUser', 'notifyNewSub', 'notifyPayFail', 'notifyDailySync',
+  'updated_at',
+].join(',');
+
 export async function GET() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
@@ -52,7 +81,7 @@ export async function GET() {
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
       .from('site_settings')
-      .select('*')
+      .select(READABLE_COLS)
       .eq('id', 1)
       .maybeSingle();
 
