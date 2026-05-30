@@ -3,8 +3,17 @@
 // jsonb (added in migration_v4). GET returns the current map; PATCH accepts
 // a partial map and merges it in — so individual toggles can flip without
 // the client having to read the whole record first.
+//
+// PATCH uses the admin (service-role) client for the actual UPDATE. The
+// v9 column lockdown revoked UPDATE on every column except `name` and
+// `updated_at` from the `authenticated` role, so a session-client write
+// to email_prefs returns "permission denied for column email_prefs" —
+// the toggle was silently failing for every user. User identity is
+// still authoritatively resolved via supabase.auth.getUser() above, so
+// this stays a strict own-row write.
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 const VALID_KEYS = ['marketing', 'job_alerts', 'billing', 'product_updates'] as const;
 
@@ -65,11 +74,15 @@ export async function PATCH(req: NextRequest) {
   const current = { ...DEFAULT_PREFS, ...((profile?.email_prefs as Record<string, boolean>) ?? {}) };
   const next    = { ...current, ...patch };
 
-  const { error: updErr } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error: updErr } = await admin
     .from('profiles')
     .update({ email_prefs: next, updated_at: new Date().toISOString() })
     .eq('id', user.id);
 
-  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+  if (updErr) {
+    logError({ event: 'profile.email_prefs.update_failed', user_id: user.id, error: updErr.message });
+    return NextResponse.json({ error: 'Failed to save preferences. Please try again.' }, { status: 500 });
+  }
   return NextResponse.json({ prefs: next });
 }
