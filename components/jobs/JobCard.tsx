@@ -7,8 +7,7 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
-import { isSafeOpenUrl } from '@/lib/safe-url';
-import { ApplyRedirectModal } from '@/components/jobs/ApplyRedirectModal';
+import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -85,26 +84,27 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
     }
-    if (applied) { toast('Already applied to this job', 'info'); return; }
 
     // Treat any non-http(s)/mailto applyUrl as missing — `javascript:` URLs
     // from a compromised ATS feed must not reach window.open.
     const applyTargetRaw = job.applyUrl || (job.applyEmail ? `mailto:${job.applyEmail}` : null);
     const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
 
-    // Show the trust modal before the external redirect (audit
-    // recommendation). Same flow for mock and real jobs; the modal
-    // handles the actual safeWindowOpen on confirm.
-    function openWithWarning() {
-      if (applyTarget) {
-        modalService.open(<ApplyRedirectModal applyUrl={applyTarget} company={job.company} />);
-      } else {
-        toast('No application link available for this job', 'error');
-      }
+    // Already-applied path: skip the API call (no double-counting against
+    // Day Pass limit, no duplicate-409) and just re-open the same link.
+    // The Apply button itself signals "Applied" via the styling below;
+    // re-clicking should still WORK because users routinely re-open
+    // application pages to upload extra docs / check status.
+    if (applied) {
+      if (applyTarget) safeWindowOpen(applyTarget);
+      else toast('No application link available for this job', 'error');
+      return;
     }
 
+    // No-DB-track path for non-real (mock) job ids: just open the link.
     if (!isRealJobId(job.id)) {
-      openWithWarning();
+      if (applyTarget) safeWindowOpen(applyTarget);
+      else toast('No application link available for this job', 'error');
       return;
     }
 
@@ -113,11 +113,12 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       addApplication(app);
       if (isDaily) incrementDailyApp();
       toast('Application tracked! 🎉', 'success');
-      openWithWarning();
+      if (applyTarget) safeWindowOpen(applyTarget);
+      else toast('No application link available for this job', 'error');
     } catch (err: any) {
       // If DB tracking fails but we have a URL, still let them apply
       if (applyTarget && err.message?.includes('not found')) {
-        openWithWarning();
+        safeWindowOpen(applyTarget);
       } else {
         toast(err.message, 'error');
       }

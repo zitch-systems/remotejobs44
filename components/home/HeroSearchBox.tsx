@@ -23,7 +23,12 @@ export function HeroSearchBox() {
         <Search className="w-4 h-4 text-stone-400 shrink-0" />
         <input
           type="text" value={q} onChange={e => setQ(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && search()}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              search();
+            }
+          }}
           placeholder="Job title, skill, or company…"
           className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 py-2"
           aria-label="Search jobs"

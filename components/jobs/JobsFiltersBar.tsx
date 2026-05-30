@@ -253,7 +253,17 @@ export function JobsFiltersBar() {
             type="text"
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            onKeyDown={e => {
+              // Skip Enter while an IME composition session is in progress
+              // (CJK input methods use Enter to confirm candidate text and
+              // we shouldn't treat that as "submit search"). e.preventDefault
+              // is required so the implicit form-submit some browsers fire on
+              // Enter inside an <input> doesn't reload the page.
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSearch();
+              }
+            }}
             placeholder="Job title, skill, or company…"
             className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400"
           />

@@ -21,8 +21,7 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { jobsApi, applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
-import { ApplyRedirectModal } from '@/components/jobs/ApplyRedirectModal';
-import { isSafeOpenUrl } from '@/lib/safe-url';
+import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -65,23 +64,27 @@ export function JobActionsCard({ job }: { job: Job }) {
       toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
     }
-    // Important: this guard runs BEFORE incrementDailyApp(). Previously a
-    // duplicate-click on an already-applied job still bumped the daily
-    // counter — a Day Pass user could hit 10/10 with zero new applications.
-    if (applied) { toast('Already applied', 'info'); return; }
+
+    const applyTargetRaw = job.applyUrl || (job.applyEmail && `mailto:${job.applyEmail}`);
+    const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
+
+    // Already-applied path: skip the API call (no double-count on Day
+    // Pass, no duplicate-409) and just re-open the same link. Per user
+    // request applied users should keep clicking through — useful when
+    // they need to upload extra docs or check status on the employer
+    // site. The button itself signals "Applied" via the styling below.
+    if (applied) {
+      if (applyTarget) safeWindowOpen(applyTarget);
+      else toast('No application link available for this job', 'error');
+      return;
+    }
+
     setApplying(true);
     try {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
-      // Show the "you're leaving RemoteJobs44" trust modal before the
-      // redirect. The application is already recorded above; if the
-      // user cancels the redirect, they can find the apply link again
-      // from /applications. Modal handles the actual safeWindowOpen.
-      const applyTargetRaw = job.applyUrl || (job.applyEmail && `mailto:${job.applyEmail}`);
-      if (isSafeOpenUrl(applyTargetRaw)) {
-        modalService.open(<ApplyRedirectModal applyUrl={applyTargetRaw!} company={job.company} />);
-      }
+      if (applyTarget) safeWindowOpen(applyTarget);
     } catch (err: any) {
       toast(err.message, 'error');
     } finally {
@@ -93,37 +96,38 @@ export function JobActionsCard({ job }: { job: Job }) {
     <>
       {/* Apply card */}
       <div className="card p-5 sticky top-24">
-        {applied ? (
-          <div className="text-center py-2">
-            <div className="text-3xl mb-2">🎉</div>
-            <p className="font-bold text-brand-700 dark:text-brand-400 text-sm">Application submitted!</p>
-            <Link href="/applications" className="text-xs text-stone-400 hover:underline mt-1 block">View in tracker</Link>
+        {applied && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-bold">
+            <span>✅</span>
+            <span className="flex-1">Application tracked</span>
+            <Link href="/applications" className="text-[10px] text-stone-500 hover:underline">View tracker</Link>
           </div>
-        ) : (
-          <>
-            <button onClick={handleApply} disabled={applying || dailyLimitReached}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-3 font-bold rounded-xl transition-colors mb-3',
-                dailyLimitReached
-                  ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 cursor-not-allowed'
-                  : 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60'
-              )}>
-              {applying ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Applying…</>
-                : dailyLimitReached ? '10/10 applications used'
-                : isPro() ? <><Zap className="w-4 h-4" /> Apply Now</>
-                : <><span>🔒</span> Subscribe to Apply</>}
-            </button>
-            {isDaily && dailyLimitReached && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
-                Day Pass limit reached. <Link href="/pricing" className="font-semibold underline">Upgrade to Pro</Link> for unlimited.
-              </p>
-            )}
-            {!isPro() && !dailyLimitReached && (
-              <p className="text-xs text-stone-400 dark:text-stone-500 text-center">
-                <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Pro</Link> unlocks apply links & auto-apply
-              </p>
-            )}
-          </>
+        )}
+        <button onClick={handleApply} disabled={applying || (dailyLimitReached && !applied)}
+          className={cn(
+            'w-full flex items-center justify-center gap-2 py-3 font-bold rounded-xl transition-colors mb-3',
+            applied
+              ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-800 hover:bg-brand-100 dark:hover:bg-brand-900/30'
+              : dailyLimitReached
+                ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 cursor-not-allowed'
+                : 'bg-brand-700 dark:bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60'
+          )}
+          title={applied ? 'Open the application link again' : undefined}>
+          {applying ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Applying…</>
+            : applied ? <><Zap className="w-4 h-4" /> Open Application Link</>
+            : dailyLimitReached ? '10/10 applications used'
+            : isPro() ? <><Zap className="w-4 h-4" /> Apply Now</>
+            : <><span>🔒</span> Subscribe to Apply</>}
+        </button>
+        {isDaily && dailyLimitReached && !applied && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+            Day Pass limit reached. <Link href="/pricing" className="font-semibold underline">Upgrade to Pro</Link> for unlimited.
+          </p>
+        )}
+        {!isPro() && !dailyLimitReached && (
+          <p className="text-xs text-stone-400 dark:text-stone-500 text-center">
+            <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Pro</Link> unlocks apply links & auto-apply
+          </p>
         )}
         <div className="flex gap-2 mt-3">
           <button onClick={() => { const s = toggleSave(job.id); toast(s ? '🔖 Saved!' : 'Removed', 'success', 2000); }}

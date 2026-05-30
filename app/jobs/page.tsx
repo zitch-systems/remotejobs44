@@ -110,6 +110,7 @@ interface FetchJobsResult {
   page:  number;
   pages: number;
   fuzzy?: boolean;
+  error?: boolean;
 }
 
 async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
@@ -175,6 +176,16 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       supabase.rpc('search_jobs', { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
       supabase.rpc('search_jobs_count', args),
     ]);
+    // Same "0 looks identical to error" footgun as the no-q branch —
+    // if the FTS RPC bombs (statement_timeout, schema cache drift,
+    // etc.) we'd render "No jobs found" and pretend nothing was wrong.
+    // Log so Vercel can surface it, set rpcError so the page can show
+    // a real error UI instead.
+    const rpcError = !!(rowsRes.error || countRes.error);
+    if (rpcError) {
+      // eslint-disable-next-line no-console
+      console.error('[fetchJobs] search_jobs RPC failed:', rowsRes.error?.message ?? countRes.error?.message);
+    }
     let total = Number(countRes.data ?? 0);
     let jobs  = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
     let fuzzy = false;
@@ -201,6 +212,7 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       page,
       pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
       fuzzy,
+      error: rpcError,
     };
   }
 
@@ -264,7 +276,18 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
   const from = (page - 1) * JOBS_PER_PAGE;
   query = query.range(from, from + JOBS_PER_PAGE - 1);
 
-  const { data, count } = await query;
+  const { data, count, error } = await query;
+  // Earlier versions of this branch returned total=0, jobs=[] when the
+  // SDK call failed — which rendered as "No jobs found" in the UI and
+  // looked indistinguishable from a real empty result. The user saw
+  // that flash whenever the no-q query timed out at the lambda level.
+  // Log loudly so the failure shows up in Vercel runtime logs, and
+  // surface a small `error: true` flag so the page can render an
+  // actual "Couldn't load — refresh" state instead of a fake zero.
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[fetchJobs] no-q SELECT failed:', error.message);
+  }
   const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
   const total = count ?? jobs.length;
   return {
@@ -272,6 +295,7 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
     total,
     page,
     pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
+    error: !!error,
   };
 }
 
@@ -309,7 +333,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   // (`paginationHref(sp, …)` is functionally identical to passing the
   // raw object that previously came in synchronously).
   const sp = await searchParams;
-  const { jobs, total, page, pages, fuzzy } = await fetchJobs(sp);
+  const { jobs, total, page, pages, fuzzy, error: fetchError } = await fetchJobs(sp);
 
   const category   = (sp.category ?? 'all') as JobCategory | 'all';
   const q          = sp.q ?? '';
@@ -382,6 +406,22 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
       {/* Grid */}
       {jobs.length === 0 ? (
+        fetchError ? (
+          // Distinguish a DB error from an honest empty result so users
+          // don't see "No jobs found" when the actual cause was a query
+          // timeout. Refresh works because the next request retries the
+          // same SDK call (cold-lambda was the most common cause).
+          <div className="bg-white dark:bg-[#0a1628] border border-amber-300 dark:border-amber-700 rounded-2xl p-12 text-center">
+            <div className="text-5xl mb-3">⚠️</div>
+            <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">Couldn&rsquo;t load jobs</h2>
+            <p className="text-stone-400 dark:text-stone-500 mb-5 max-w-sm mx-auto text-sm">
+              We hit a hiccup talking to the database. Refresh the page to try again.
+            </p>
+            <Link href="/jobs" className="px-6 py-2.5 bg-brand-700 dark:bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-800 transition-colors inline-block">
+              Try again
+            </Link>
+          </div>
+        ) : (
         <div className="bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-2xl p-16 text-center">
           <div className="text-5xl mb-4">🔍</div>
           <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">No jobs found</h2>
@@ -397,6 +437,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             Show all jobs
           </Link>
         </div>
+        )
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
