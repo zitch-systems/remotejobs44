@@ -18,6 +18,12 @@ import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/j
 import type { Job, JobCategory } from '@/lib/types';
 
 export const revalidate = 60;
+// Same reason as /api/jobs/route.ts: count('exact') over 81k rows
+// with OR-IS-NULL visibility filters + the remote-on ILIKE chain
+// seq-scans in ~6-8 s. Default 10 s Vercel lambda timeout would tip
+// cold renders into "0 jobs found" empty state. 30 s gives the
+// service-role 60 s timeout room to land.
+export const maxDuration = 30;
 
 // Listing is heavily filterable; the noindex on faceted permutations is
 // enforced via robots.ts (Disallow /jobs?*). The canonical surface for
