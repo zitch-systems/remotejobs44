@@ -198,14 +198,18 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
     };
   }
 
-  // NO-Q PATH: filter-only browsing
+  // NO-Q PATH: filter-only browsing.
+  //
+  // count: 'exact' inline forced a Seq Scan over 64k rows because the
+  // (NOT flagged OR flagged IS NULL) AND (expires_at IS NULL OR
+  // expires_at > now()) clauses defeat the visibility indexes — 4s on
+  // a cold buffer cache, sometimes long enough that the SSR fetch
+  // returned no count and the page rendered "0 jobs found." Mirrors
+  // the /api/jobs route's fix: drop count from the data SELECT and
+  // run a cheap is_active=true index-only count in parallel.
   let query = supabase
     .from('jobs')
-    // count: 'exact' — admin client gives us 60s timeout, and the
-    // planner's estimated count was wildly off (returned ~half the real
-    // number because it had no stats on is_active selectivity). 43 ms
-    // for exact count is well within budget.
-    .select(cols, { count: 'exact' })
+    .select(cols)
     .eq('is_active', true)
     .or(notExpired())
     .or(NOT_FLAGGED);
@@ -257,9 +261,17 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
   const from = (page - 1) * JOBS_PER_PAGE;
   query = query.range(from, from + JOBS_PER_PAGE - 1);
 
-  const { data, count } = await query;
-  const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
-  const total = count ?? jobs.length;
+  // Parallel: rows + cheap index-only count. See the no-q comment
+  // above for why count is split from the data SELECT.
+  const [rowsRes, countRes] = await Promise.all([
+    query,
+    supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true),
+  ]);
+  const jobs = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+  const total = countRes.count ?? jobs.length;
   return {
     jobs,
     total,

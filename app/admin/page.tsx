@@ -74,11 +74,27 @@ export default function AdminPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res  = await fetch('/api/cron/ingest');
+      // /api/cron/ingest is gated by CRON_SECRET (server-to-server) and
+      // returned 401 here, causing the toast to render
+      // "Synced! undefined new jobs added" while nothing actually happened.
+      // /api/admin/ingest-now is the admin-cookie path that the audit
+      // log + revalidate hooks know about — it shells out to the same
+      // runIngest pipeline so the result shape is identical.
+      const res = await fetch('/api/admin/ingest-now', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        setSyncResult(`❌ Sync failed (${res.status}). ${err.slice(0, 100)}`);
+        return;
+      }
       const data = await res.json();
-      setSyncResult(`✅ Synced! ${data.totalAdded} new jobs added.`);
-    } catch {
-      setSyncResult('❌ Sync failed. Check console.');
+      if (data.skipped) {
+        setSyncResult(`⚠ Skipped — another ingest is running. ${data.reason ?? ''}`);
+      } else {
+        const added = Number(data.totalAdded ?? 0);
+        setSyncResult(`✅ Synced! ${added.toLocaleString()} new jobs added.`);
+      }
+    } catch (err: any) {
+      setSyncResult(`❌ Sync failed. ${err?.message ?? 'Check console.'}`);
     }
     setSyncing(false);
   }
