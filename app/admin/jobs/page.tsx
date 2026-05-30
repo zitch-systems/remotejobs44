@@ -23,7 +23,7 @@ export default function AdminJobsPage() {
     // the API response and surface it alongside the loaded count.
     jobsApi.getJobs({ perPage: 50 }).then(r => {
       setJobs(r.jobs);
-      setTotal((r as any).total ?? r.jobs.length);
+      setTotal(r.total ?? r.jobs.length);
       setLoading(false);
     });
   }, []);
