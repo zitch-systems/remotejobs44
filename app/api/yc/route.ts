@@ -3,16 +3,36 @@
 // Each company has website, batch, isHiring, Greenhouse/Lever links etc.
 // We then cross-reference each company's ATS board to get actual job listings
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit, getIP } from '@/lib/rate-limit';
 
 const YC_API = 'https://yc-oss.github.io/api/companies/hiring.json';
 
 export const revalidate = 3600; // re-fetch hourly
 
 export async function GET(req: NextRequest) {
+  // Per-IP rate limit. The route was unauthenticated and served a 1400-
+  // company list per request — a scraper could mirror our endpoint
+  // without ever touching the upstream YC mirror (which we cache for an
+  // hour). 60/min is well above any UI-driven pagination.
+  const ip = getIP(req);
+  const rl = rateLimit(`yc:${ip}`, 60, 60_000);
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    return NextResponse.json(
+      { error: 'Too many requests.', sources: [], total: 0 },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
+
   const q      = req.nextUrl.searchParams.get('q') ?? '';
   const remote = req.nextUrl.searchParams.get('remote') === 'true';
-  const limit  = parseInt(req.nextUrl.searchParams.get('limit') ?? '50');
-  const offset = parseInt(req.nextUrl.searchParams.get('offset') ?? '0');
+  // Clamp limit / offset so `?limit=99999999` doesn't ship a giant
+  // payload and `?limit=-5` (slice's negative-from-end semantic) can't
+  // produce a confusing response.
+  const rawLimit  = parseInt(req.nextUrl.searchParams.get('limit')  ?? '50', 10);
+  const rawOffset = parseInt(req.nextUrl.searchParams.get('offset') ?? '0',  10);
+  const limit  = Number.isFinite(rawLimit)  && rawLimit  > 0 ? Math.min(rawLimit,  100)    : 50;
+  const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.min(rawOffset, 10000) : 0;
 
   try {
     const res = await fetch(YC_API, {
@@ -56,7 +76,11 @@ export async function GET(req: NextRequest) {
       apiInfo: 'Free — yc-oss.github.io community project, updated daily',
     });
   } catch (err: any) {
-    return NextResponse.json({ sources: [], total: 0, error: err.message }, { status: 200 });
+    // YC mirror failures (network, JSON parse, etc.) — log raw, return
+    // generic. err.message can include the upstream YC API URL.
+    // eslint-disable-next-line no-console
+    console.error('[yc.fetch] failed:', err?.message ?? String(err));
+    return NextResponse.json({ sources: [], total: 0, error: 'Could not load YC companies.' }, { status: 200 });
   }
 }
 

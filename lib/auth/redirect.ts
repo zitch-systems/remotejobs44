@@ -27,14 +27,26 @@ export function destinationForRole(role: Role, next?: string | null): string {
 
   if (!next || typeof next !== 'string') return home;
 
-  // Reject anything that isn't a same-origin relative path
-  if (!next.startsWith('/') || next.startsWith('//') || next.includes('://')) return home;
+  // Strip tab/newline characters per WHATWG URL parsing — browsers
+  // ignore them when resolving Location headers, so a value like
+  // `/\tevil.com` would otherwise sail past the slash/backslash check.
+  const cleaned = next.replace(/[\t\r\n]/g, '');
+
+  // Reject anything that isn't a same-origin relative path. Backslash
+  // check closes the `/\evil.com` bypass: the WHATWG URL spec normalises
+  // `\` to `/` inside special schemes (http/https/ws/wss/ftp/file), so
+  // `Location: /\evil.com` resolves to `http://evil.com/` in every
+  // mainstream browser. Reject any next that contains a backslash.
+  if (!cleaned.startsWith('/'))    return home;
+  if (cleaned.startsWith('//'))    return home;
+  if (cleaned.includes('://'))     return home;
+  if (cleaned.includes('\\'))      return home;
 
   // Don't loop back to auth pages
-  if (next === '/login' || next === '/register' || next.startsWith('/auth/')) return home;
+  if (cleaned === '/login' || cleaned === '/register' || cleaned.startsWith('/auth/')) return home;
 
-  if (role === 'admin' && next.startsWith('/dashboard')) return ADMIN_HOME;
-  if (role === 'user'  && next.startsWith('/admin'))     return MEMBER_HOME;
+  if (role === 'admin' && cleaned.startsWith('/dashboard')) return ADMIN_HOME;
+  if (role === 'user'  && cleaned.startsWith('/admin'))     return MEMBER_HOME;
 
-  return next;
+  return cleaned;
 }

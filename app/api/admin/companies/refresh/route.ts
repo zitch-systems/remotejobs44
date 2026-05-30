@@ -64,7 +64,11 @@ export async function POST(req: NextRequest) {
   // ── 1. Pull fresh jobs from the ATS ───────────────────────────────────
   const fetched = await fetchATSJobs(platform, slug, '');
   if (fetched.error) {
-    return NextResponse.json({ error: `ATS fetch failed: ${fetched.error}` }, { status: 502 });
+    // ATS fetch errors carry the upstream URL + sometimes parser detail.
+    // Log raw; client gets a generic shape with the platform/slug context
+    // it already supplied so the admin can re-try.
+    logError({ event: 'admin.companies_refresh.ats_fetch_failed', admin_email: auth.adminEmail, platform, slug, error: fetched.error });
+    return NextResponse.json({ error: 'ATS fetch failed. Check the source and try again.' }, { status: 502 });
   }
 
   // Dedup-by-apply_url was disabled at user request (migration_v5). With
