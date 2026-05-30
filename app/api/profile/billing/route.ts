@@ -5,6 +5,7 @@
 // add a separate paystack_charges table, this is where it'll join.
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/log';
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -17,7 +18,11 @@ export async function GET() {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 });
+  if (subErr) {
+    // Don't echo raw DB messages to the client. Log for ops.
+    logError({ event: 'profile.billing.read_failed', user_id: user.id, error: subErr.message });
+    return NextResponse.json({ error: 'Could not load billing details.' }, { status: 500 });
+  }
 
   return NextResponse.json({ subscription: subscription ?? null });
 }

@@ -99,7 +99,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, url: signedUrl, path: filename });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    // Don't leak Storage/Supabase SDK message text to the client —
+    // those can include internal hostnames + handler names. Log for
+    // ops and ship a generic shape.
+    logError({ event: 'cv.upload.unhandled', error: err?.message ?? String(err) });
+    return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
   }
 }
 
@@ -131,6 +135,7 @@ export async function GET() {
     }
     return NextResponse.json({ url: signed.signedUrl });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    logError({ event: 'cv.get.unhandled', error: err?.message ?? String(err) });
+    return NextResponse.json({ error: 'Could not load your CV.' }, { status: 500 });
   }
 }

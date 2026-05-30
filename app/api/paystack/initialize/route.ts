@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     logError({ event: 'paystack.initialize.unhandled', error: err?.message ?? String(err) });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    // Generic message — Paystack SDK / env errors can carry internal
+    // detail that doesn't belong on a public response.
+    return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 500 });
   }
 }
