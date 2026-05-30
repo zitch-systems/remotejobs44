@@ -17,6 +17,12 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
 import { requireAdmin } from '@/lib/admin/auth';
 
+// Admin views must reflect the live DB the moment after a bulk import
+// finishes. Default Next.js fetch caching could otherwise serve the
+// previous empty/stale response and make the page look broken.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface CompanyRow {
   company:        string;
   platform:       ATSPlatform | 'unknown' | 'manual';

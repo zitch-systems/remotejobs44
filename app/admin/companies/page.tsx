@@ -93,7 +93,9 @@ export default function AdminCompaniesPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/admin/companies');
+    // cache: 'no-store' so the page doesn't serve a stale (e.g. 0
+    // companies, pre-deploy) response right after a bulk import.
+    const res = await fetch('/api/admin/companies', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       setCompanies(data.companies ?? []);
