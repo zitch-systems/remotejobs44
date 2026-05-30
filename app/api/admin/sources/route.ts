@@ -17,6 +17,13 @@ import { logError } from '@/lib/log';
 type SourceMethod = 'rss' | 'json-api' | 'scrape' | 'auto' | 'unknown';
 type SourceStatus = 'active' | 'paused' | 'error';
 
+// Runtime mirror of the SourceMethod union — the TS cast on its own
+// doesn't reject 'method=arbitrary-string-up-to-32-chars'. Without this
+// check the value lands in the DB and lib/ingest-pipeline.ts then falls
+// into its `unknown` branch, which is fine but misleading in the audit
+// log ("source.create with method=hello").
+const ALLOWED_METHODS = new Set<SourceMethod>(['rss', 'json-api', 'scrape', 'auto', 'unknown']);
+
 interface SourceRow {
   id:           string;
   name:         string;
@@ -41,7 +48,7 @@ export async function GET() {
     .limit(500);
   if (error) {
     logError({ event: 'admin.sources.list_failed', error: error.message });
-    return NextResponse.json({ error: error.message, sources: [] }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to load sources', sources: [] }, { status: 500 });
   }
   return NextResponse.json({ sources: (data ?? []) as SourceRow[] });
 }
@@ -53,9 +60,12 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.res;
 
   const body = await req.json().catch(() => ({}));
-  const url:    string = String(body.url ?? '').trim();
-  const name:   string = String(body.name ?? '').trim().slice(0, 100);
-  const method: string = String(body.method ?? 'auto').trim().slice(0, 32) as SourceMethod;
+  const url:       string = String(body.url ?? '').trim();
+  const name:      string = String(body.name ?? '').trim().slice(0, 100);
+  const methodRaw: string = String(body.method ?? 'auto').trim();
+  const method: SourceMethod = ALLOWED_METHODS.has(methodRaw as SourceMethod)
+    ? (methodRaw as SourceMethod)
+    : 'auto';
 
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
 
@@ -85,7 +95,7 @@ export async function POST(req: NextRequest) {
     .single();
   if (error || !data) {
     logError({ event: 'admin.sources.create_failed', error: error?.message ?? 'unknown' });
-    return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create source' }, { status: 500 });
   }
   await recordAdminAction({
     adminId: auth.adminId, adminEmail: auth.adminEmail,

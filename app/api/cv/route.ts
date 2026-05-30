@@ -131,7 +131,11 @@ export async function GET() {
     const { data: signed, error: signErr } = await supabase.storage
       .from('cvs').createSignedUrl(cvPath, 60 * 60);
     if (signErr || !signed?.signedUrl) {
-      return NextResponse.json({ error: signErr?.message ?? 'Sign failed' }, { status: 500 });
+      // Match POST: log the raw Storage error server-side, ship a generic
+      // shape to the client. signErr.message can include the bucket path
+      // + internal hostnames.
+      logError({ event: 'cv.get.sign_failed', user_id: user.id, error: signErr?.message ?? 'unknown' });
+      return NextResponse.json({ error: 'Could not load your CV.' }, { status: 500 });
     }
     return NextResponse.json({ url: signed.signedUrl });
   } catch (err: any) {

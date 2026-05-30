@@ -74,7 +74,12 @@ export default function RegisterPage() {
       return;
     }
     if (!agree) { toast('Please accept the terms to continue', 'error'); return; }
-    if (password.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    // Validate against the value we'll ACTUALLY store. Otherwise pasting
+    // "    pass    " (12 chars, passes length check) would trim down to
+    // 4 chars at signUp and Supabase would reject — confusing UX. Same
+    // bug pattern as components/auth/ResetPasswordForm.tsx.
+    const trimmedPassword = password.trim();
+    if (trimmedPassword.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
     setLoading(true);
 
     // Trim password too — see the same fix on /login. Trailing-space typos
@@ -82,7 +87,7 @@ export default function RegisterPage() {
     // failures in our auth logs.
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
-      password: password.trim(),
+      password: trimmedPassword,
       options: {
         data: { name },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
