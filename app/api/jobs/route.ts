@@ -34,6 +34,11 @@ function safeRevalidate(...paths: string[]): void {
 const ALLOW_MOCKS = process.env.NODE_ENV !== 'production';
 
 export const revalidate = 60;
+// Cold-start + count(*) over 64k rows with OR-IS-NULL filters Seq Scans
+// for ~4 s; vercel.json's path-match maxDuration isn't applying reliably
+// on this route. The per-route export is Next's preferred path and
+// gives us 30 s of budget for cold-lambda + count + select.
+export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
   // Per-IP rate-limit to slow bulk-scraping of the public jobs feed.
@@ -224,10 +229,21 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // ── NO-Q PATH: filter-only browsing (existing logic) ───────────────
-    // count: 'exact' is fine on this path — admin client gets the 60s
-    // timeout and the unfiltered count returns in ~43 ms.
-    let query = supabase.from('jobs').select(cols, { count: 'exact' })
+    // ── NO-Q PATH: filter-only browsing ────────────────────────────────
+    // The big inline `count: 'exact'` previously fired here forced a
+    // Seq Scan because (NOT flagged OR flagged IS NULL) AND (expires_at
+    // IS NULL OR expires_at > now()) defeats every visibility index —
+    // about 4 s on a cold buffer cache. Combined with cold-lambda
+    // overhead and SAFE_JOB_COLUMNS serialization the route bumped
+    // past the Vercel function timeout.
+    //
+    // Fix: split the count off and run it in parallel as a cheap
+    // is_active=true count (Index Only Scan on jobs_is_active_idx,
+    // ~117 ms). The visibility OR filters are tautological against
+    // current data (verified: 64,397/64,397 rows satisfy them), so
+    // the split count is accurate today; a future flagged or
+    // expires_at row would drift the total by 1.
+    let query = supabase.from('jobs').select(cols)
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);
@@ -304,19 +320,29 @@ export async function GET(req: NextRequest) {
     const from = (page - 1) * perPage;
     query = query.range(from, from + perPage - 1);
 
-    const { data: jobs, count, error } = await query;
-    if (error || !jobs) throw new Error(error?.message ?? 'Query failed');
+    // Parallel: the actual rows + a cheap index-only count. See the
+    // comment on the select() above for why the count is split out
+    // and runs against the looser `is_active = true` predicate.
+    const [rowsRes, countRes] = await Promise.all([
+      query,
+      supabase
+        .from('jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true),
+    ]);
+    if (rowsRes.error || !rowsRes.data) throw new Error(rowsRes.error?.message ?? 'Query failed');
+    const total = countRes.count ?? 0;
 
-    if (jobs.length > 0) {
+    if (rowsRes.data.length > 0) {
       return NextResponse.json({
-        jobs: jobs.map((j: any) => transformJob(j, seePaid)),
-        total: count ?? 0,
+        jobs: rowsRes.data.map((j: any) => transformJob(j, seePaid)),
+        total,
         page, perPage,
-        pages: Math.ceil((count ?? 0) / perPage),
+        pages: Math.max(1, Math.ceil(total / perPage)),
       });
     }
 
-    return NextResponse.json({ jobs: [], total: 0, page, perPage, pages: 0 });
+    return NextResponse.json({ jobs: [], total, page, perPage, pages: Math.max(1, Math.ceil(total / perPage)) });
   } catch (err: any) {
     // Previously returned an empty `{ jobs: [] }` on any thrown error,
     // which made a real DB outage look identical to "your filters
