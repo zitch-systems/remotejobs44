@@ -22,6 +22,10 @@ import { requireAdmin } from '@/lib/admin/auth';
 // previous empty/stale response and make the page look broken.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// admin_companies_aggregate() over 64k+ rows runs in ~2 s — cold start
+// + JS post-processing can push the route past the 10 s Vercel default
+// timeout. Give it explicit headroom.
+export const maxDuration = 30;
 
 interface CompanyRow {
   company:        string;
