@@ -15,7 +15,7 @@ const NAV = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { isLoggedIn } = useAuthStore();
+  const { isLoggedIn, hydrated } = useAuthStore();
   const { savedJobIds } = useJobsStore();
 
   return (
@@ -25,7 +25,15 @@ export function BottomNav() {
     >
       {NAV.map(({ href, icon: Icon, label }) => {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-        const showBadge = href === '/applications' && isLoggedIn() && savedJobIds.length > 0;
+        // Gate the badge on `hydrated` so the SSR pass (where Zustand
+        // persist hasn't run yet) and the first client paint produce
+        // the same HTML. Without this the badge text-node count
+        // differed between server (no badge) and client-after-persist
+        // (with badge), tripping React #418 on every page load.
+        const showBadge = hydrated
+          && href === '/applications'
+          && isLoggedIn()
+          && savedJobIds.length > 0;
         return (
           <Link key={href} href={href} className={cn('bottom-nav-item relative', active && 'active')}>
             <div className="relative">
