@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
+import { decryptSecret } from '@/lib/crypto/secret';
+import { logError } from '@/lib/log';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -83,7 +85,12 @@ async function checkAiDiscoveryQuota(adminId: string): Promise<{ ok: true } | { 
   }
 }
 
-// Look up a saved API key + model for a provider, if any
+// Look up a saved API key + model for a provider, if any. The api_key
+// column is stored as an `enc:v1:` envelope (AES-256-GCM via
+// lib/crypto/secret.ts) — decrypt here so callers receive the plaintext
+// key they can actually present to the upstream provider. decryptSecret
+// is a no-op on legacy plaintext rows, so this is safe pre + post
+// migration to encrypted storage.
 async function lookupStoredConfig(providerId: string): Promise<{ apiKey: string | null; model: string | null }> {
   try {
     const admin = createAdminSupabaseClient();
@@ -92,7 +99,18 @@ async function lookupStoredConfig(providerId: string): Promise<{ apiKey: string 
       .select('api_key, model')
       .eq('provider_id', providerId)
       .maybeSingle();
-    return { apiKey: data?.api_key ?? null, model: data?.model ?? null };
+    if (!data) return { apiKey: null, model: null };
+    let plain: string | null = null;
+    try {
+      plain = data.api_key ? decryptSecret(data.api_key) : null;
+    } catch (err: any) {
+      // Encrypted row but AI_KEYS_ENCRYPTION_KEY missing or wrong —
+      // log and surface as "no stored key" so the caller falls back to
+      // a clear "save a key" error rather than 401-ing the upstream
+      // with a base64 blob.
+      logError({ event: 'admin.ai_discovery.decrypt_stored_failed', provider_id: providerId, error: err?.message ?? String(err) });
+    }
+    return { apiKey: plain, model: data.model ?? null };
   } catch {
     return { apiKey: null, model: null };
   }
@@ -282,10 +300,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Unknown provider: ${providerId}` }, { status: 400 });
   }
 
-  // Resolve API key + model: prefer request body, fall back to stored config
-  const stored = (!body.apiKey || !body.model) ? await lookupStoredConfig(providerId) : { apiKey: null, model: null };
-  const apiKey = body.apiKey?.trim() || stored.apiKey || '';
-  const model  = body.model?.trim()  || stored.model  || config.defaultModel;
+  // Resolve API key + model: prefer the request body, fall back to the
+  // stored config. The masked placeholder ("••••XXXX") is what the
+  // settings page sends back when the admin reuses a saved key without
+  // re-typing it — treat that the same as "no key in body" so the
+  // stored-config fallback actually fires. Without this, the masked
+  // string was being passed verbatim to the upstream provider, which
+  // 401'd every reuse-after-save attempt.
+  const bodyKeyClean = (typeof body.apiKey === 'string' && body.apiKey.startsWith('••••'))
+    ? undefined
+    : body.apiKey?.trim();
+  const needsStored = !bodyKeyClean || !body.model;
+  const stored = needsStored ? await lookupStoredConfig(providerId) : { apiKey: null, model: null };
+  const apiKey = bodyKeyClean || stored.apiKey || '';
+  const model  = body.model?.trim() || stored.model || config.defaultModel;
 
   if (!apiKey) {
     return NextResponse.json(
@@ -327,7 +355,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `No handler for provider: ${providerId}` }, { status: 400 });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Provider call failed' }, { status: 502 });
+    // Provider SDK error strings can carry the upstream URL, auth
+    // diagnostic, or model id — log raw, ship a generic shape.
+    logError({ event: 'admin.ai_discovery.provider_call_failed', provider_id: providerId, error: err?.message ?? String(err) });
+    return NextResponse.json({ error: 'Provider call failed.' }, { status: 502 });
   }
 
   const raw = extractJSONArray(rawText);
