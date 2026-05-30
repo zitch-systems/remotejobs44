@@ -67,8 +67,15 @@ create index if not exists jobs_search_vector_idx
 create or replace function public.jobs_search_vector_update()
 returns trigger
 language plpgsql
+set search_path = public, pg_catalog
 as $$
 begin
+  -- benefits, skills, requirements are ALL text[] — must go through
+  -- array_to_string(..., ' '). An earlier version of this trigger
+  -- treated benefits as text and used coalesce(new.benefits, ''),
+  -- which raised "malformed array literal" on every INSERT/UPDATE
+  -- because Postgres tried to coerce '' to text[]. /api/ats/save's
+  -- bulk import was failing 100% (inserted 0, failed 500 per batch).
   new.search_vector :=
       setweight(to_tsvector('english', coalesce(new.title, '')),                                          'A')
     || setweight(to_tsvector('english', coalesce(new.company, '')),                                        'B')
@@ -78,7 +85,7 @@ begin
     || setweight(to_tsvector('english', coalesce(new.level, '')),                                          'C')
     || setweight(to_tsvector('english', coalesce(new.description, '')),                                    'D')
     || setweight(to_tsvector('english', coalesce(array_to_string(new.requirements,  ' '), '')),            'D')
-    || setweight(to_tsvector('english', coalesce(new.benefits, '')),                                       'D');
+    || setweight(to_tsvector('english', coalesce(array_to_string(new.benefits,      ' '), '')),            'D');
   return new;
 end;
 $$;
