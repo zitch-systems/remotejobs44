@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectATSFromUrl, type ATSPlatform } from '@/lib/ats-detect';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
 
 // Admin views must reflect the live DB the moment after a bulk import
 // finishes. Default Next.js fetch caching could otherwise serve the
@@ -55,7 +56,10 @@ export async function GET(_req: NextRequest) {
 
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase.rpc('admin_companies_aggregate');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    logError({ event: 'admin.companies.aggregate_failed', admin_email: auth.adminEmail, error: error.message });
+    return NextResponse.json({ error: 'Failed to load companies.' }, { status: 500 });
+  }
 
   const rows: CompanyRow[] = ((data ?? []) as AggregatedRow[]).map((r) => {
     const detected = r.apply_url_sample ? detectATSFromUrl(r.apply_url_sample) : null;

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
+import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -54,7 +55,10 @@ export async function POST(req: NextRequest) {
     .ilike('company', safeCompany)
     .eq('is_active', true);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    logError({ event: 'admin.companies_remove.update_failed', admin_email: auth.adminEmail, company, error: error.message });
+    return NextResponse.json({ error: 'Failed to remove company jobs.' }, { status: 500 });
+  }
 
   // Bust the cached /jobs page + homepage so the removal takes effect immediately.
   try {
