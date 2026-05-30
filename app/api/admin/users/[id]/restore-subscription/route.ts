@@ -53,7 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .update({ plan: tier, plan_expires_at: expiresAt.toISOString(), updated_at: nowIso })
     .eq('id', id);
   if (profileError) {
-    return NextResponse.json({ error: 'Failed to update profile: ' + profileError.message }, { status: 500 });
+    // Log the raw Postgres message for ops, ship a generic shape.
+    // The previous "Failed to update profile: <msg>" concatenation
+    // leaked column names + constraint ids into the admin browser.
+    logError({ event: 'admin.restore_subscription.profile_update_failed', admin_email: auth.adminEmail, target_user_id: id, error: profileError.message });
+    return NextResponse.json({ error: 'Failed to update profile.' }, { status: 500 });
   }
 
   // 2. Upsert the subscriptions row — this is what /api/applications checks

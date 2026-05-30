@@ -6,6 +6,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseFeed } from '@/lib/feed-parser';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
 import { requireAdmin } from '@/lib/admin/auth';
+import { logError } from '@/lib/log';
+
+// Hard cap on the response body so a malicious feed URL can't blow the
+// 1GB lambda by streaming 5GB of XML. RSS feeds in the wild rarely
+// exceed a few hundred KB; 5MB is generous.
+const MAX_FEED_BYTES = 5 * 1024 * 1024;
 
 // Note: this route is admin-gated, so the Node runtime (default) is required
 // — requireAdmin reads cookies + makes a Supabase query. Drop the previous
@@ -46,8 +52,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `Upstream error: ${res.status}`, jobs: [] }, { status: 200 });
     }
 
+    // Reject obvious giants up front by Content-Length. The header is
+    // optional and lie-able, so we ALSO check the actual byte count
+    // below — this is the cheap path.
+    const declaredLen = parseInt(res.headers.get('content-length') ?? '0', 10);
+    if (declaredLen > MAX_FEED_BYTES) {
+      return NextResponse.json({ error: 'Feed too large (>5MB)', jobs: [] }, { status: 200 });
+    }
+
     const contentType = res.headers.get('content-type') ?? '';
     const text = await res.text();
+    if (text.length > MAX_FEED_BYTES) {
+      return NextResponse.json({ error: 'Feed too large (>5MB)', jobs: [] }, { status: 200 });
+    }
 
     const parsed = parseFeed(text, contentType, url);
     if (parsed.method === 'unknown') {
@@ -55,6 +72,9 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(parsed);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message, jobs: [] }, { status: 200 });
+    // Don't echo the raw fetch error — its message includes the upstream
+    // URL we just refused to follow, plus any DNS / TLS diagnostic.
+    logError({ event: 'rss.fetch_failed', url, admin_email: auth.adminEmail, error: err?.message ?? String(err) });
+    return NextResponse.json({ error: 'Could not fetch feed.', jobs: [] }, { status: 200 });
   }
 }

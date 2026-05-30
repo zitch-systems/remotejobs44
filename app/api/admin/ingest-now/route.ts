@@ -27,7 +27,9 @@ export async function POST() {
     });
     return NextResponse.json(result);
   } catch (err: any) {
+    // Pipeline failures often include feed-source hostnames + parser
+    // diagnostics — useful in logs, not on a public response shape.
     logError({ event: 'admin.ingest_now.failed', error: err?.message ?? String(err) });
-    return NextResponse.json({ error: err.message ?? 'Failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Ingest failed. Check the server logs.' }, { status: 500 });
   }
 }

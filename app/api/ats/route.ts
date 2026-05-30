@@ -4,6 +4,7 @@ import { autoFetchFromCareerUrl, fetchATSJobs } from '@/lib/ats-engine';
 import { isValidATSPlatform } from '@/lib/ats-detect';
 import { requireAdmin } from '@/lib/admin/auth';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { logError } from '@/lib/log';
 
 export const runtime = 'nodejs';
 // `revalidate` is a no-op on POST/admin-driven routes; removed to stop
@@ -54,6 +55,9 @@ export async function GET(req: NextRequest) {
     const result = await autoFetchFromCareerUrl(url!);
     return NextResponse.json(result);
   } catch (err: any) {
-    return NextResponse.json({ jobs: [], total: 0, error: err.message }, { status: 200 });
+    // ATS engine errors include the upstream URL we just fetched —
+    // sometimes a puppeteer trace too. Log raw, return generic.
+    logError({ event: 'ats.fetch_failed', admin_email: auth.adminEmail, error: err?.message ?? String(err) });
+    return NextResponse.json({ jobs: [], total: 0, error: 'ATS fetch failed.' }, { status: 200 });
   }
 }

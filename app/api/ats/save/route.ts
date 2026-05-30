@@ -136,7 +136,11 @@ export async function POST(req: NextRequest) {
       ...(failed > 0 && firstError ? { partial_error: firstError } : {}),
     });
   } catch (err: any) {
+    // The intentional firstError / partial_error leaks above expose
+    // per-row Postgres detail to the admin — that's the documented
+    // debugging contract. This top-level catch is the OTHER bucket:
+    // body parse failures, runtime errors, etc. — generic shape.
     logError({ event: 'ats.save.unhandled', error: err?.message ?? String(err) });
-    return NextResponse.json({ error: err.message ?? 'Failed to save jobs' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to save jobs.' }, { status: 500 });
   }
 }
