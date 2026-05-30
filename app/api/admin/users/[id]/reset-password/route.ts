@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
-import { logError } from '@/lib/log';
+import { rateLimit } from '@/lib/rate-limit';
+import { logError, logWarn } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -14,6 +15,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!auth.ok) return auth.res;
   const { id } = await params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+
+  // Per-target rate limit. An admin (or a compromised admin session)
+  // can otherwise loop password resets for a single user — each call
+  // sends a Supabase recovery email to their inbox, and Supabase's own
+  // upstream rate-limit then locks ALL legitimate self-initiated
+  // resets for that user until the window resets. 3/hour per target
+  // is more than any real admin workflow needs.
+  const rl = rateLimit(`reset-pwd:${id}`, 3, 60 * 60 * 1000);
+  if (!rl.success) {
+    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    logWarn({ event: 'admin.reset_password.rate_limited', admin_email: auth.adminEmail, target_user_id: id });
+    return NextResponse.json(
+      { error: 'This user has been reset recently. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    );
+  }
 
   const supabase = createAdminSupabaseClient();
   // Look up the user's email — we need it for the resetPasswordForEmail call.

@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectMagicMime } from '@/lib/file-magic';
-import { logError } from '@/lib/log';
+import { rateLimit } from '@/lib/rate-limit';
+import { logError, logWarn } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,6 +22,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'CV upload is a Pro feature. Upgrade your plan to upload.' },
         { status: 403 },
+      );
+    }
+
+    // Per-user rate limit. A paid user could otherwise loop 5 MB
+    // uploads — each upload runs the magic-byte scan + the Supabase
+    // storage round-trip + the profile update. Bucket is upsert-by-
+    // path so storage doesn't grow, but bandwidth + lambda CPU do.
+    // 10/hr is far more than any human re-uploads.
+    const rl = rateLimit(`cv-upload:${user.id}`, 10, 60 * 60 * 1000);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+      logWarn({ event: 'cv.upload.rate_limited', user_id: user.id });
+      return NextResponse.json(
+        { error: 'Too many uploads. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
       );
     }
 
