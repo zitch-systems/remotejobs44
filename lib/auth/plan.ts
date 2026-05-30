@@ -50,7 +50,16 @@ export function resolvePlan(input: Input): Plan {
   // Keep whatever non-free plan the client already had — verify route /
   // post-success handler / /pricing optimistic update set it.
   if (effective === 'free' && hasFutureExpiry && currentClientPlan && currentClientPlan !== 'free') {
-    return currentClientPlan as Plan;
+    // Runtime-validate the cast. currentClientPlan flows from the persisted
+    // Zustand store; a user who edits localStorage can plant any string,
+    // and casting `string as Plan` would let `user.plan = "lifetime_pro"`
+    // (or anything else) propagate through the app's narrowed Plan type.
+    // Server gates still enforce, but the client picture lies — and
+    // anywhere downstream that does `plan === 'pro'` would fail for a
+    // bogus value. Only honour the override when it's a real Plan member.
+    if (currentClientPlan === 'daily' || currentClientPlan === 'pro' || currentClientPlan === 'admin') {
+      return currentClientPlan;
+    }
   }
   return effective;
 }

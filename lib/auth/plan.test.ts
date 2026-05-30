@@ -61,4 +61,26 @@ describe('resolvePlan', () => {
       currentClientPlan: 'daily',
     })).toBe('pro');
   });
+
+  // Pins the runtime-validation guard added on the webhook-race branch.
+  // currentClientPlan flows from persisted localStorage, which a user can
+  // freely edit in devtools. Without the guard the function would cast
+  // any string-typed plan through to the response and downstream
+  // `plan === 'pro'` checks would silently miss the truth.
+  it('does NOT honour a non-Plan currentClientPlan even with a future expiry', () => {
+    expect(resolvePlan({
+      role: 'user', dbPlan: 'free', planExpiresAt: FUTURE,
+      currentClientPlan: 'lifetime_pro',
+    })).toBe('free');
+
+    expect(resolvePlan({
+      role: 'user', dbPlan: 'free', planExpiresAt: FUTURE,
+      currentClientPlan: 'PRO',
+    })).toBe('free');
+
+    expect(resolvePlan({
+      role: 'user', dbPlan: 'free', planExpiresAt: FUTURE,
+      currentClientPlan: 'admin',
+    })).toBe('admin'); // 'admin' IS a Plan member, so this one IS honoured
+  });
 });
