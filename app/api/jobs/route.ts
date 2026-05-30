@@ -33,6 +33,13 @@ function safeRevalidate(...paths: string[]): void {
 // at id='j1' showing up on prod was the original reason for this guard).
 const ALLOW_MOCKS = process.env.NODE_ENV !== 'production';
 
+// jobs.id is a uuid column — anything else PostgREST would 22P02
+// ("invalid input syntax for type uuid"), which previously bubbled up
+// through the catch and surfaced as a 500. Spamming `?id=bogus` was
+// enough to fill the error log with noise. Validate the shape here so
+// the route degrades to a graceful "not found".
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const revalidate = 60;
 // Cold-start + count(*) over 64k rows with OR-IS-NULL filters Seq Scans
 // for ~4 s; vercel.json's path-match maxDuration isn't applying reliably
@@ -136,6 +143,13 @@ export async function GET(req: NextRequest) {
     const notFlagged = NOT_FLAGGED;
 
     if (id) {
+      // Malformed uuid → don't hit the DB. MOCK_JOBS ids are short strings
+      // ('j1', 'j2', …) so the dev fallback still works in NODE_ENV !==
+      // production where ALLOW_MOCKS is true.
+      if (!UUID_RE.test(id)) {
+        const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
+        return NextResponse.json({ job: mock ?? null });
+      }
       const { data: job } = await supabase
         .from('jobs').select(cols).eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
@@ -145,11 +159,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (idsParam) {
-      // Filter to non-empty UUID-ish ids, dedupe, cap at 10. Order in the
+      // Filter to well-formed UUIDs only, dedupe, cap at 10. Order in the
       // response matches the request order so the client can render the
-      // saved-jobs list without re-sorting.
+      // saved-jobs list without re-sorting. Skipping the UUID filter
+      // here let `?ids=foo,bar` 22P02 the whole .in() lookup → 500.
       const wantedIds = Array.from(new Set(
-        idsParam.split(',').map(s => s.trim()).filter(Boolean)
+        idsParam.split(',').map(s => s.trim()).filter(s => UUID_RE.test(s))
       )).slice(0, 10);
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
       const { data: rows } = await supabase

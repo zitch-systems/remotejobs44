@@ -40,8 +40,11 @@ export async function POST(req: NextRequest) {
 
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
   if (delErr) {
+    // Supabase Admin SDK error messages occasionally include internal
+    // gateway/service detail (e.g. "[GoTrueError] ..."). Log raw, ship
+    // a generic shape to match the other profile routes.
     logError({ event: 'account.delete_failed', user_id: user.id, error: delErr.message });
-    return NextResponse.json({ error: delErr.message }, { status: 500 });
+    return NextResponse.json({ error: 'Account deletion failed. Please try again.' }, { status: 500 });
   }
 
   // Sign the user out server-side so their cookies are invalidated before
