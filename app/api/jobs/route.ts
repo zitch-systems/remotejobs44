@@ -400,6 +400,14 @@ function validateFieldValues(body: any): string | null {
   if (body.companyId !== undefined && body.companyId !== null && body.companyId !== '' && !UUID_RE.test(String(body.companyId))) {
     return 'companyId must be a valid uuid';
   }
+  // jobs.featured / is_active / remote are boolean columns. The admin
+  // form sends real booleans, but `?featured=true` (string) or a
+  // hand-crafted PATCH would 22023 the whole update. Type-check rather
+  // than coercing so admins notice the malformed payload instead of it
+  // silently flipping the wrong column.
+  if (body.featured !== undefined && typeof body.featured !== 'boolean') return 'featured must be boolean';
+  if (body.isActive !== undefined && typeof body.isActive !== 'boolean') return 'isActive must be boolean';
+  if (body.remote   !== undefined && typeof body.remote   !== 'boolean') return 'remote must be boolean';
   return null;
 }
 
