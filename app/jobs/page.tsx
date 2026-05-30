@@ -227,7 +227,7 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
     // 5.7× faster on this dataset (EXPLAIN: 6.2s → 1.1s). Mirrors the
     // /api/jobs route change.
     query = query.or(
-      'remote.eq.true,location.imatch.(remote|worldwide|anywhere|global|distributed|wfh)'
+      'remote.eq.true,location.imatch.remote|worldwide|anywhere|global|distributed|wfh'
     );
   }
   const locFilter = country || region;

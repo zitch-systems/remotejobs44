@@ -254,7 +254,7 @@ export async function GET(req: NextRequest) {
       // same result set. Same semantics: a NULL `remote` column doesn't
       // satisfy the boolean side, so on-site-only postings stay out.
       query = query.or(
-        'remote.eq.true,location.imatch.(remote|worldwide|anywhere|global|distributed|wfh)'
+        'remote.eq.true,location.imatch.remote|worldwide|anywhere|global|distributed|wfh'
       );
     }
     // Country takes priority over region (more specific). Both fall through
