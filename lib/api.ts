@@ -33,34 +33,40 @@ export const authApi = {
 // ── Jobs ───────────────────────────────────────────────────────────────────
 export const jobsApi = {
   async getJobs(filters: SearchFilters = {}): Promise<PaginatedJobs> {
-    // Try Supabase first (server-side), fallback to mock data
-    try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams();
-        if (filters.q)        params.set('q', filters.q);
-        if (filters.category && filters.category !== 'all') params.set('category', filters.category);
-        if (filters.type)     params.set('type', filters.type);
-        if (filters.level)    params.set('level', filters.level);
-        if (filters.sort)     params.set('sort', filters.sort);
-        if (filters.region)      params.set('region', filters.region);
-        if (filters.country)     params.set('country', filters.country);
-        if (filters.remote)      params.set('remote', 'true');
-        // Advanced filters — see /api/jobs route for how each is applied.
-        if (filters.salary)      params.set('salary', filters.salary);
-        if (filters.timezone)    params.set('timezone', filters.timezone);
-        if (filters.posted)      params.set('posted', filters.posted);
-        if (filters.companySize) params.set('companySize', filters.companySize);
-        params.set('page',    String(filters.page ?? 1));
-        params.set('perPage', String(filters.perPage ?? 12));
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams();
+      if (filters.q)        params.set('q', filters.q);
+      if (filters.category && filters.category !== 'all') params.set('category', filters.category);
+      if (filters.type)     params.set('type', filters.type);
+      if (filters.level)    params.set('level', filters.level);
+      if (filters.sort)     params.set('sort', filters.sort);
+      if (filters.region)      params.set('region', filters.region);
+      if (filters.country)     params.set('country', filters.country);
+      if (filters.remote)      params.set('remote', 'true');
+      // Advanced filters — see /api/jobs route for how each is applied.
+      if (filters.salary)      params.set('salary', filters.salary);
+      if (filters.timezone)    params.set('timezone', filters.timezone);
+      if (filters.posted)      params.set('posted', filters.posted);
+      if (filters.companySize) params.set('companySize', filters.companySize);
+      params.set('page',    String(filters.page ?? 1));
+      params.set('perPage', String(filters.perPage ?? 12));
+      try {
         const res = await fetch(`/api/jobs?${params.toString()}`);
         if (res.ok) {
-          const data = await res.json();
-          if (data.jobs?.length > 0) return data;
+          // Trust the API — an empty jobs array is a real "no results"
+          // signal (admin filtered down, niche search). The earlier
+          // implementation only returned when `data.jobs?.length > 0`
+          // and otherwise fell through to MOCK_JOBS, which made the
+          // admin /admin/jobs page render fake postings when a search
+          // matched zero real rows.
+          return await res.json();
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
-    // Fallback: mock data
+    // Fallback: mock data — only fires on actual network/HTTP failure
+    // (or during true SSR where window is undefined). Useful for dev
+    // when the DB is empty; in production the try{} above runs.
     await sleep(200);
     let jobs = [...MOCK_JOBS];
     if (filters.q) {
@@ -77,15 +83,19 @@ export const jobsApi = {
   },
 
   async getJob(id: string): Promise<Job | null> {
-    try {
-      if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
+      try {
         const res = await fetch(`/api/jobs?id=${id}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.job) return data.job;
+          // Trust the API — `data.job === null` is a real "not found"
+          // signal we should surface as null. The previous version fell
+          // through to MOCK_JOBS.find() for an unknown id, which could
+          // serve a dev fixture for an admin-deleted real row.
+          return data.job ?? null;
         }
-      }
-    } catch {}
+      } catch {}
+    }
     await sleep(100);
     return MOCK_JOBS.find(j => j.id === id) ?? null;
   },
