@@ -33,6 +33,12 @@ interface JobRow {
 }
 
 async function findCompany(slug: string): Promise<{ name: string; jobs: JobRow[]; total: number } | null> {
+  // Length cap + character whitelist. URL slugs come from companySlug()
+  // which only emits [a-z0-9-]; anything beyond that shape can't match
+  // a real company entry, and an unbounded ILIKE pattern from a crafted
+  // URL has no useful purpose. Reject early.
+  if (!slug || slug.length > 100 || !/^[a-z0-9-]+$/.test(slug)) return null;
+
   const supabase = createAdminSupabaseClient();
   // Two-step lookup:
   //   1) Pull a manageable window of active jobs whose lowered+slugified
@@ -44,6 +50,11 @@ async function findCompany(slug: string): Promise<{ name: string; jobs: JobRow[]
   //
   // Performance: with the existing jobs(company) index this should be
   // fast even at 50k jobs (the ILIKE is bounded by the slug length).
+  //
+  // The whitelist above means the slug can never contain `%`, `_`, or
+  // `\` — so no extra escape pass is needed before constructing the
+  // ILIKE pattern. The intentional `-` → `%` swap is the only wildcard
+  // transformation.
   const likeStub = slug.replace(/-/g, '%');
   const { data } = await supabase
     .from('jobs')
