@@ -31,16 +31,33 @@ const ADMIN_NOTIFY    = process.env.CONTACT_EMAIL ?? 'hello@remotejobs44.com';
 // Fire-and-forget: tell ops a paid charge landed for a user that no longer
 // exists in the profiles table. Without this, the user is silently never
 // upgraded after paying — they'd have to email support before anyone noticed.
+//
+// HTML-escape every dynamic value before splicing — the signature check
+// guarantees the event came from Paystack, not that the metadata payload
+// is safe HTML. metadata.plan and metadata.user_id are echoed from what
+// the client sent at /api/paystack/initialize, so they're user-influenced
+// at one remove.
+function notifyOrphanChargeEscape(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function notifyOrphanCharge(reference: string, userId: string, plan: string, amountKobo: number) {
   const naira = (amountKobo / 100).toLocaleString();
+  const refHtml  = notifyOrphanChargeEscape(reference);
+  const userHtml = notifyOrphanChargeEscape(userId);
+  const planHtml = notifyOrphanChargeEscape(plan);
   sendEmail({
     to: ADMIN_NOTIFY,
     subject: `[RemoteJobs44] Orphan Paystack charge — refund or fix profile`,
     html: `<p>A successful Paystack <strong>charge.success</strong> event arrived for a user_id that does not exist in <code>public.profiles</code>.</p>
       <ul>
-        <li><strong>Reference:</strong> ${reference}</li>
-        <li><strong>Missing user_id:</strong> ${userId}</li>
-        <li><strong>Plan:</strong> ${plan}</li>
+        <li><strong>Reference:</strong> ${refHtml}</li>
+        <li><strong>Missing user_id:</strong> ${userHtml}</li>
+        <li><strong>Plan:</strong> ${planHtml}</li>
         <li><strong>Amount:</strong> ₦${naira}</li>
       </ul>
       <p>Action: either refund the customer in the Paystack dashboard, or (if the user just deleted their account and re-signed up) manually upgrade the new profile and re-link the subscription row.</p>`,

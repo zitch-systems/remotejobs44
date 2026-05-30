@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       subject: 'We received your message — RemoteJobs44',
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-          <h2 style="color:#1d4ed8">Thanks for reaching out, ${safeName}!</h2>
+          <h2 style="color:#1d4ed8">Thanks for reaching out, ${nameHtml}!</h2>
           <p style="color:#334155;line-height:1.7">We have received your message and will get back to you within 24-48 hours.</p>
           <p style="color:#334155;line-height:1.7">In the meantime, you can browse remote jobs at <a href="https://remotejobs44.com" style="color:#1d4ed8">remotejobs44.com</a>.</p>
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
