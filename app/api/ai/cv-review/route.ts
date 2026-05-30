@@ -105,8 +105,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ review: json });
   } catch (err: any) {
+    // Log the raw provider error server-side, ship a generic shape to
+    // the client. Provider SDK error messages can include the upstream
+    // URL, model name, or auth-related hints we don't want to surface.
     logError({ event: 'ai.cv_review.unhandled', error: err?.message ?? String(err) });
-    return NextResponse.json({ error: err.message ?? 'CV review failed' }, { status: 500 });
+    return NextResponse.json({ error: 'CV review failed. Please try again.' }, { status: 500 });
   }
 }
 

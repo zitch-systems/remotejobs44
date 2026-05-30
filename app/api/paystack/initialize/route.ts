@@ -79,8 +79,13 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
 
     if (!data.status) {
+      // Don't echo Paystack's upstream message to the browser. Their
+      // failure strings sometimes include integration hints
+      // ("Invalid key", "Plan code X not found", "Test mode key on live
+      // call") that leak more about our merchant config than a generic
+      // message would.
       logError({ event: 'paystack.initialize.upstream_error', upstream_data: data });
-      return NextResponse.json({ error: data.message ?? 'Payment initialization failed' }, { status: 500 });
+      return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
     }
 
     return NextResponse.json({

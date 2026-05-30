@@ -106,8 +106,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ prep: json });
   } catch (err: any) {
+    // Same redaction policy as cv-review — log the raw provider error
+    // server-side, ship a generic shape to the client.
     logError({ event: 'ai.interview_prep.unhandled', error: err?.message ?? String(err) });
-    return NextResponse.json({ error: err.message ?? 'Interview prep failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Interview prep failed. Please try again.' }, { status: 500 });
   }
 }
 
