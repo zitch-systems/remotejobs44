@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Search, Shield, Zap, User, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { Search, Shield, Zap, User, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn, formatRelativeDate } from '@/lib/utils';
+import { useUIStore } from '@/lib/store';
 
 interface Profile {
   id: string; name: string | null; email: string;
@@ -27,6 +28,7 @@ const SORT_FIELDS: Record<SortBy, { col: string; asc: boolean }> = {
 
 export default function AdminUsersPage() {
   const supabase = createClient();
+  const { toast } = useUIStore();
   const [users,   setUsers]   = useState<Profile[]>([]);
   const [total,   setTotal]   = useState(0);
   const [planTotals, setPlanTotals] = useState({ free: 0, daily: 0, pro: 0, admin: 0 });
@@ -37,6 +39,77 @@ export default function AdminUsersPage() {
   const [plan,   setPlan]   = useState<PlanFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [page,   setPage]   = useState(1);
+
+  // Bulk selection — Set so individual row toggles don't re-render the
+  // whole table on every check.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<'idle' | 'suspending' | 'unsuspending' | 'setting_plan' | 'deleting'>('idle');
+  const selectedCount = selected.size;
+  const allOnPageSelected = users.length > 0 && users.every(u => selected.has(u.id));
+
+  function toggleRow(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function togglePageAll() {
+    setSelected(prev => {
+      const next = new Set(prev);
+      const allOn = users.every(u => next.has(u.id));
+      for (const u of users) {
+        if (allOn) next.delete(u.id);
+        else next.add(u.id);
+      }
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
+  async function runBulk(action: 'suspend' | 'unsuspend' | 'set_plan' | 'delete', extra?: { plan?: string; reason?: string }) {
+    if (selectedCount === 0) return;
+    const ids = Array.from(selected);
+    // Confirm destructive paths in the UI; the server also guards
+    // against the calling admin's own id.
+    if (action === 'delete') {
+      if (!confirm(`Permanently delete ${ids.length} user account${ids.length === 1 ? '' : 's'}?\n\nThis cascades through profiles, applications, saved_jobs, subscriptions — and can't be undone.`)) return;
+    }
+    if (action === 'suspend' && !extra?.reason) {
+      const reason = prompt('Optional suspension reason (visible to other admins in the audit log):') ?? '';
+      extra = { reason };
+    }
+    setBulkAction(action === 'suspend' ? 'suspending'
+      : action === 'unsuspend' ? 'unsuspending'
+      : action === 'set_plan'  ? 'setting_plan'
+      : 'deleting');
+    try {
+      const res = await fetch('/api/admin/users/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, userIds: ids, ...extra }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Bulk operation failed');
+      // Summarise the outcome — bulk delete returns per-id results.
+      if (action === 'delete') {
+        toast(`Deleted ${data.succeeded} of ${data.target_count}${data.failed ? ` (${data.failed} failed)` : ''}`, data.failed ? 'error' : 'success', 5000);
+      } else if (action === 'set_plan') {
+        toast(`Plan updated for ${data.affected} of ${data.target_count}`, 'success', 4000);
+      } else {
+        toast(`${action === 'suspend' ? 'Suspended' : 'Unsuspended'} ${data.affected} of ${data.target_count}`, 'success', 4000);
+      }
+      clearSelection();
+      load();
+    } catch (err: any) {
+      toast(err?.message ?? 'Bulk operation failed', 'error', 5000);
+    } finally {
+      setBulkAction('idle');
+    }
+  }
 
   // Debounce search so we don't fire a query on every keystroke.
   useEffect(() => {
@@ -155,6 +228,50 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {/* Bulk action toolbar — appears whenever ≥1 row is checked */}
+      {selectedCount > 0 && (
+        <div className="card p-3 mb-5 flex flex-wrap items-center gap-3 border-brand-200 dark:border-brand-900/40 bg-brand-50/40 dark:bg-brand-900/10">
+          <div className="flex items-center gap-2 text-sm font-semibold text-brand-800 dark:text-brand-300">
+            <span className="px-2 py-0.5 rounded-full bg-brand-700 text-white text-xs">{selectedCount}</span>
+            selected
+          </div>
+          <button onClick={clearSelection}
+            className="text-xs text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 flex items-center gap-1">
+            <X className="w-3.5 h-3.5" /> Clear
+          </button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button onClick={() => runBulk('suspend')} disabled={bulkAction !== 'idle'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-60 transition-colors">
+              {bulkAction === 'suspending' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+              Suspend
+            </button>
+            <button onClick={() => runBulk('unsuspend')} disabled={bulkAction !== 'idle'}
+              className="px-3 py-1.5 rounded-md border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-60 transition-colors flex items-center gap-1.5">
+              {bulkAction === 'unsuspending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Unsuspend
+            </button>
+            <div className="flex items-center gap-1">
+              <select id="bulk-plan"
+                className="text-xs border border-stone-200 dark:border-[#1e3a5f] rounded-md px-2 py-1.5 bg-white dark:bg-[#0d1a2e] text-stone-700 dark:text-stone-300"
+                disabled={bulkAction !== 'idle'}
+                onChange={e => { if (e.target.value) { runBulk('set_plan', { plan: e.target.value }); e.target.value = ''; } }}
+                defaultValue="">
+                <option value="" disabled>Set plan…</option>
+                <option value="free">Free</option>
+                <option value="daily">Day Pass</option>
+                <option value="pro">Pro</option>
+              </select>
+              {bulkAction === 'setting_plan' && <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-400" />}
+            </div>
+            <button onClick={() => runBulk('delete')} disabled={bulkAction !== 'idle'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 transition-colors">
+              {bulkAction === 'deleting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="card overflow-hidden">
         {loading ? (
           <div className="p-8 animate-pulse space-y-3">
@@ -166,17 +283,40 @@ export default function AdminUsersPage() {
           </div>
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
-            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400">
-              <div className="col-span-5">User</div>
+            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400 items-center">
+              <div className="col-span-1 flex items-center">
+                <input
+                  type="checkbox"
+                  aria-label="Select all on this page"
+                  checked={allOnPageSelected}
+                  onChange={togglePageAll}
+                  className="w-4 h-4 rounded border-stone-300 dark:border-[#1e3a5f] text-brand-700 focus:ring-brand-600 cursor-pointer"
+                />
+              </div>
+              <div className="col-span-4">User</div>
               <div className="col-span-2">Plan</div>
               <div className="col-span-3">Joined</div>
               <div className="col-span-2 text-right">Actions</div>
             </div>
             {users.map(user => (
               <div key={user.id}
-                className="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+                className={cn(
+                  'grid grid-cols-12 gap-3 px-5 py-3 items-center transition-colors',
+                  selected.has(user.id)
+                    ? 'bg-brand-50/40 dark:bg-brand-900/10'
+                    : 'hover:bg-stone-50 dark:hover:bg-[#162033]'
+                )}>
+                <div className="col-span-1 flex items-center">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${user.email}`}
+                    checked={selected.has(user.id)}
+                    onChange={() => toggleRow(user.id)}
+                    className="w-4 h-4 rounded border-stone-300 dark:border-[#1e3a5f] text-brand-700 focus:ring-brand-600 cursor-pointer"
+                  />
+                </div>
                 <Link href={`/admin/users/${user.id}`}
-                  className="col-span-5 flex items-center gap-3 min-w-0 group">
+                  className="col-span-4 flex items-center gap-3 min-w-0 group">
                   <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
                     {(user.name?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
                   </div>
