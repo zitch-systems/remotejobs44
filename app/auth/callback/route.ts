@@ -120,7 +120,8 @@ export async function GET(request: NextRequest) {
             name,
             plan: 'free',
             role: 'user',
-            profile_completion: 20,
+            // profile_completion omitted — DEFAULT 0 (migration_v24).
+            // The recompute fires on the next /api/profile GET.
           }, { onConflict: 'id', ignoreDuplicates: true });
         } catch (err) {
           console.error('[auth/callback] background profile upsert failed:', err);

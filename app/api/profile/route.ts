@@ -111,7 +111,10 @@ export async function GET() {
         email:              user.email,
         plan:               isAdmin ? 'admin' : 'free',
         role:               isAdmin ? 'admin' : 'user',
-        profile_completion: 20,
+        // profile_completion intentionally omitted — DEFAULT 0
+        // (migration_v24). The recompute on the next read fills in
+        // the honest value (typically 20 for a freshly-confirmed
+        // signup who has nothing else set).
       }, { onConflict: 'id' })
       // Re-select via SAFE_PROFILE_COLS so the response shape matches the
       // happy path and we don't leak paystack_* columns.
@@ -131,14 +134,24 @@ export async function GET() {
 
     if (insertError) {
       logError({ event: 'profile.insert_failed', user_id: user.id, error: insertError.message });
-      // Return a safe fallback profile even if DB write fails
+      // Return a safe fallback profile even if DB write fails. Compute
+      // profile_completion from the signals we have access to here
+      // (no DB available — apps/saved counts assumed 0) so the
+      // dashboard renders an honest baseline instead of a stale 20.
       return NextResponse.json({
         profile: {
           id:   user.id,
           name: name,
           plan: isAdmin ? 'admin' : 'free',
           role: isAdmin ? 'admin' : 'user',
-          profile_completion: 20,
+          profile_completion: computeProfileCompletion({
+            name,
+            email:             user.email,
+            emailConfirmedAt:  user.email_confirmed_at,
+            cvUrl:             null,
+            applicationsCount: 0,
+            savedJobsCount:    0,
+          }),
         }
       });
     }
