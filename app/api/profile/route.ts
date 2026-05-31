@@ -10,6 +10,7 @@ import { welcomeEmail } from '@/lib/email/templates';
 import { resolvePlan } from '@/lib/auth/plan';
 import { computeProfileCompletion } from '@/lib/auth/profile-completion';
 import { logError } from '@/lib/log';
+import { waitUntil } from '@vercel/functions';
 
 // Columns safe to expose to the owning user. Paystack identifiers
 // (customer_code, subscription_code, email_token) are intentionally EXCLUDED
@@ -75,17 +76,23 @@ export async function GET() {
         applicationsCount: applicationsCount ?? 0,
         savedJobsCount:    savedJobsCount ?? 0,
       });
-      // Write-back when it drifted from the stored value. Best-effort
-      // — a failure here doesn't block the response, the client just
-      // sees the freshly-computed number this request and the DB
-      // catches up on the next call.
+      // Write-back when it drifted from the stored value. waitUntil
+      // keeps the lambda alive past the JSON response so Vercel
+      // doesn't kill the request before the UPDATE lands — without
+      // it the write-back was effectively never persisted on cold
+      // serverless invocations.
       if (computed !== (profile.profile_completion ?? 0)) {
-        admin.from('profiles')
-          .update({ profile_completion: computed, updated_at: new Date().toISOString() })
-          .eq('id', user.id)
-          .then(({ error: writeErr }) => {
-            if (writeErr) logError({ event: 'profile.completion_writeback_failed', user_id: user.id, error: writeErr.message });
-          });
+        // Promise.resolve() unwraps Supabase's PostgrestBuilder (a
+        // PromiseLike, not a real Promise) into the Promise<T> shape
+        // waitUntil expects.
+        waitUntil(Promise.resolve(
+          admin.from('profiles')
+            .update({ profile_completion: computed, updated_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .then(({ error: writeErr }) => {
+              if (writeErr) logError({ event: 'profile.completion_writeback_failed', user_id: user.id, error: writeErr.message });
+            })
+        ));
       }
       return NextResponse.json({
         profile: { ...profile, plan, role, profile_completion: computed },

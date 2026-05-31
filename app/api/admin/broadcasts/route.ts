@@ -33,8 +33,15 @@ import { recordAdminAction } from '@/lib/admin/audit';
 import { sendEmail } from '@/lib/email/send';
 import { logError, logInfo, logWarn } from '@/lib/log';
 
+// 500 recipients × 1.1s inter-chunk pause × 100/chunk = ~5.5s of
+// scheduled pauses, plus the actual sendEmail latency. Fits well
+// inside the 60s Vercel ceiling. The previous 5,000 cap would have
+// timed out hard at ~55s of pauses alone before any send landed.
+// Anything bigger needs a background worker, not a longer lambda.
+export const maxDuration = 60;
+
 const ALLOWED_PLANS = new Set(['all', 'free', 'daily', 'pro']);
-const MAX_RECIPIENTS = 5000;
+const MAX_RECIPIENTS = 500;
 const CHUNK_SIZE     = 100;
 const CHUNK_PAUSE_MS = 1100;
 const EMAIL_RE       = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;

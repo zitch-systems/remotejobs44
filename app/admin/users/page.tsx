@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Search, Shield, Zap, User, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, Loader2 } from 'lucide-react';

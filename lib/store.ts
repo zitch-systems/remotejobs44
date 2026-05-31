@@ -194,12 +194,20 @@ export const useJobsStore = create<JobsState>()(
       },
 
       isSaved:        (id)    => get().savedJobIds.includes(id),
-      // Server-sourced fan-in. Dedup with whatever is already locally
-      // saved so an in-flight save started during the same session
-      // (toggleSave optimistic update) isn't undone by a slower GET
-      // arriving after.
-      setSavedJobIds: (ids)   => set((s) => ({
-        savedJobIds: Array.from(new Set([...ids, ...s.savedJobIds])),
+      // Server-sourced replace. Used by the AuthSync hydrate fetch on
+      // mount so the server (source of truth) wins over any stale
+      // localStorage from a different device. If a user unsaves a
+      // job on device B, device A on next load sees the server set
+      // and the locally-cached id disappears — without this it would
+      // resurrect on every page load via a merge.
+      //
+      // The race against an in-flight optimistic toggleSave is real
+      // but narrow (the AuthSync useEffect fires before the UI is
+      // interactive, ~100ms window). If a user does manage to click
+      // Save in that window, the server POST still fires and the
+      // next page nav reconciles via this same path.
+      setSavedJobIds: (ids)   => set(() => ({
+        savedJobIds: Array.from(new Set(ids)),
       })),
       addApplication: (app)   => set((s) => ({ applications: [app, ...s.applications] })),
       hasApplied:     (jobId) => get().applications.some((a) => a.jobId === jobId),

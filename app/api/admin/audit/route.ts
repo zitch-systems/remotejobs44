@@ -22,7 +22,6 @@ import { requireAdmin } from '@/lib/admin/auth';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { logError } from '@/lib/log';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_TARGET_TYPES = new Set(['user', 'job', 'company', 'source', 'site_settings', 'ai_provider', 'subscription']);
 
 export async function GET(req: NextRequest) {
@@ -87,10 +86,4 @@ export async function GET(req: NextRequest) {
     perPage,
     pages:   Math.max(1, Math.ceil((count ?? 0) / perPage)),
   });
-}
-
-// Surface the UUID + target-type validators for any future per-row
-// detail GET we might add. Kept here so the constants don't leak.
-export function _internals_for_tests() {
-  return { UUID_RE, ALLOWED_TARGET_TYPES };
 }

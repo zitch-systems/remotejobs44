@@ -26,6 +26,12 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logInfo } from '@/lib/log';
 
+// 5-wide deletes × up to 200 ids = 40 chunks × ~200ms = ~8s upper
+// bound. Vercel's default 10s would cut close — give explicit
+// headroom so a sluggish auth.admin.deleteUser response doesn't
+// leave the call half-applied.
+export const maxDuration = 60;
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_ACTIONS = new Set(['suspend', 'unsuspend', 'set_plan', 'delete']);
 const ALLOWED_PLANS   = new Set(['free', 'daily', 'pro', 'admin']);
