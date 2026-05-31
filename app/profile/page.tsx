@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
+import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 
 // Profile page — anti-glitch pattern:
 //   * Initial load uses /api/profile which already enumerates safe columns,
@@ -256,6 +257,7 @@ function ProfileContent() {
 
   return (
     <div className="max-w-[860px] mx-auto px-5 py-8">
+      <VerifyEmailBanner />
       {/* Page header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <div>

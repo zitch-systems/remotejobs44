@@ -8,6 +8,7 @@ import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
 import { formatRelativeDate } from '@/lib/utils';
+import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 import type { Job, Application } from '@/lib/types';
 
 // Inner component — uses useSearchParams, so must be inside <Suspense>
@@ -497,6 +498,7 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-8">
+      <VerifyEmailBanner />
       <Suspense fallback={
         <div className="animate-pulse space-y-4">
           <div className="skeleton h-8 w-48 rounded" />

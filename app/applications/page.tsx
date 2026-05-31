@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Briefcase } from 'lucide-react';
 import { useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
+import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 
 const STATUS_CONFIG = {
   applied:   { label: 'Applied',    color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',   icon: <Clock className="w-4 h-4" /> },
@@ -80,6 +81,7 @@ function ApplicationsContent() {
 
   return (
     <div className="max-w-[900px] mx-auto px-5 py-8">
+      <VerifyEmailBanner />
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">My Applications</h1>
