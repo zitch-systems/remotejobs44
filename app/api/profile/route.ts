@@ -8,6 +8,7 @@ import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { sendEmail } from '@/lib/email/send';
 import { welcomeEmail } from '@/lib/email/templates';
 import { resolvePlan } from '@/lib/auth/plan';
+import { computeProfileCompletion } from '@/lib/auth/profile-completion';
 import { logError } from '@/lib/log';
 
 // Columns safe to expose to the owning user. Paystack identifiers
@@ -57,7 +58,38 @@ export async function GET() {
         dbPlan: profile.plan,
         planExpiresAt: profile.plan_expires_at,
       });
-      return NextResponse.json({ profile: { ...profile, plan, role } });
+      // Profile completion %: recompute against the current signals
+      // (name, email_confirmed_at, cv_url, application count, saved
+      // count) so the ring on /profile and /dashboard reflects reality
+      // instead of the hardcoded 20/80 the column used to be stuck on.
+      // Counts use head:true so we don't pay row payload to count.
+      const [{ count: applicationsCount }, { count: savedJobsCount }] = await Promise.all([
+        admin.from('applications').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+        admin.from('saved_jobs').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+      ]);
+      const computed = computeProfileCompletion({
+        name:              profile.name,
+        email:             profile.email,
+        emailConfirmedAt:  user.email_confirmed_at,
+        cvUrl:             profile.cv_url,
+        applicationsCount: applicationsCount ?? 0,
+        savedJobsCount:    savedJobsCount ?? 0,
+      });
+      // Write-back when it drifted from the stored value. Best-effort
+      // — a failure here doesn't block the response, the client just
+      // sees the freshly-computed number this request and the DB
+      // catches up on the next call.
+      if (computed !== (profile.profile_completion ?? 0)) {
+        admin.from('profiles')
+          .update({ profile_completion: computed, updated_at: new Date().toISOString() })
+          .eq('id', user.id)
+          .then(({ error: writeErr }) => {
+            if (writeErr) logError({ event: 'profile.completion_writeback_failed', user_id: user.id, error: writeErr.message });
+          });
+      }
+      return NextResponse.json({
+        profile: { ...profile, plan, role, profile_completion: computed },
+      });
     }
 
     // Profile missing — create it now (handles users who signed up before trigger was added)

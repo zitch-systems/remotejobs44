@@ -26,6 +26,7 @@ import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { useAuthStore, useJobsStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
+import { fetchServerSavedJobs } from '@/lib/saved-jobs-sync';
 
 export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore(s => s.setUser);
@@ -130,6 +131,22 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     syncAuth();
+
+    // Server-side saved-jobs hydrate. Fires once on mount whenever
+    // there's an authed session — fetches /api/saved-jobs and merges
+    // the result into useJobsStore. The set helper dedupes against any
+    // in-flight optimistic toggles started during the same session so
+    // a slower GET can't undo a fresh save.
+    (async () => {
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (!s?.user) return;
+        const ids = await fetchServerSavedJobs();
+        if (ids.length > 0) {
+          useJobsStore.getState().setSavedJobIds(ids);
+        }
+      } catch { /* network blip — next page nav will retry */ }
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {

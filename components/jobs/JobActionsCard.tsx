@@ -22,6 +22,7 @@ import { jobsApi, applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
+import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
 import { cn } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
@@ -134,7 +135,19 @@ export function JobActionsCard({ job }: { job: Job }) {
           </p>
         )}
         <div className="flex gap-2 mt-3">
-          <button onClick={() => { const s = toggleSave(job.id); toast(s ? '🔖 Saved!' : 'Removed', 'success', 2000); }}
+          <button onClick={async () => {
+              // Optimistic toggle then mirror to /api/saved-jobs.
+              // On error, undo locally so the bookmark icon doesn't
+              // lie about the server-side state.
+              const s = toggleSave(job.id);
+              toast(s ? '🔖 Saved!' : 'Removed', 'success', 2000);
+              const fn = s ? saveJobRemote : unsaveJobRemote;
+              const { ok } = await fn(job.id);
+              if (!ok) {
+                toggleSave(job.id);
+                toast(s ? 'Couldn’t save — try again' : 'Couldn’t remove — try again', 'error', 3000);
+              }
+            }}
             className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors',
               saved ? 'border-amber-300 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : 'border-stone-200 dark:border-[#1e3a5f] text-stone-500 hover:bg-stone-50 dark:hover:bg-[#162033]')}>
             {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}

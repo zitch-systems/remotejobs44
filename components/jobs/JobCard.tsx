@@ -8,6 +8,7 @@ import { applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
+import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -60,11 +61,20 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   const href = cardHref(job);
   const isExternal = href.startsWith('http');
 
-  function handleSave(e: React.MouseEvent) {
+  async function handleSave(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
     if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
+    // Optimistic flip first so the bookmark icon updates instantly,
+    // then mirror to the server. On error, rollback + warn so the
+    // local + remote state stay in sync.
     const nowSaved = toggleSave(job.id);
     toast(nowSaved ? 'Job saved!' : 'Removed from saved', 'success', 2000);
+    const fn = nowSaved ? saveJobRemote : unsaveJobRemote;
+    const { ok } = await fn(job.id);
+    if (!ok) {
+      toggleSave(job.id);
+      toast(nowSaved ? 'Couldn’t save — try again' : 'Couldn’t remove — try again', 'error', 3000);
+    }
   }
 
   // Cancel the parent <Link>'s native middle-click → new-tab behaviour so

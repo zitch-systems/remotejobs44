@@ -170,6 +170,9 @@ interface JobsState {
   addApplication:(app: Application) => void;
   hasApplied:    (jobId: string) => boolean;
   setSavedFilters:(f: SearchFilters) => void;
+  /** Replace the saved set wholesale — used by the AuthSync hydrate
+   *  call to merge the server-side `saved_jobs` table into Zustand. */
+  setSavedJobIds:(ids: string[]) => void;
   reset:         () => void;
 }
 
@@ -191,6 +194,13 @@ export const useJobsStore = create<JobsState>()(
       },
 
       isSaved:        (id)    => get().savedJobIds.includes(id),
+      // Server-sourced fan-in. Dedup with whatever is already locally
+      // saved so an in-flight save started during the same session
+      // (toggleSave optimistic update) isn't undone by a slower GET
+      // arriving after.
+      setSavedJobIds: (ids)   => set((s) => ({
+        savedJobIds: Array.from(new Set([...ids, ...s.savedJobIds])),
+      })),
       addApplication: (app)   => set((s) => ({ applications: [app, ...s.applications] })),
       hasApplied:     (jobId) => get().applications.some((a) => a.jobId === jobId),
       setSavedFilters:(f)     => set({ savedFilters: f }),
