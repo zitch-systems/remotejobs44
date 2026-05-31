@@ -105,18 +105,38 @@ export async function POST(req: NextRequest) {
   // Confirmed-only filter requires a join against auth.users. The
   // profiles table doesn't carry email_confirmed_at, but profiles.id
   // = auth.users.id, so we resolve the auth set first and intersect.
+  //
+  // listUsers caps at 1000 rows per call (Supabase Admin SDK
+  // default + max). At total > 1000 the previous single-page call
+  // silently excluded confirmed users on page 2+ from EVERY
+  // broadcast — they'd never receive a message. Paginate until a
+  // short page lands or we hit the hard cap, which corresponds to
+  // MAX_PAGES_TOTAL × PAGE_SIZE auth users.
   let confirmedIds: Set<string> | null = null;
   if (onlyConfirmed) {
-    const { data: authUsers, error: authErr } = await supabase.auth.admin.listUsers({
-      page: 1, perPage: 1000,
-    });
-    if (authErr) {
-      logError({ event: 'broadcast.list_users_failed', admin_email: auth.adminEmail, error: authErr.message });
-      return NextResponse.json({ error: 'Failed to resolve audience.' }, { status: 500 });
+    const PAGE_SIZE       = 1000;
+    const MAX_PAGES_TOTAL = 10; // up to 10k auth users
+    const acc = new Set<string>();
+    for (let page = 1; page <= MAX_PAGES_TOTAL; page++) {
+      const { data, error: authErr } = await supabase.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
+      if (authErr) {
+        logError({ event: 'broadcast.list_users_failed', admin_email: auth.adminEmail, page, error: authErr.message });
+        return NextResponse.json({ error: 'Failed to resolve audience.' }, { status: 500 });
+      }
+      for (const u of data.users) {
+        if (u.email_confirmed_at) acc.add(u.id);
+      }
+      // A short page = last page. SDK doesn't expose a total count.
+      if (data.users.length < PAGE_SIZE) break;
+      if (page === MAX_PAGES_TOTAL) {
+        // Hard cap hit — log so we know when the simple paginator
+        // outgrows itself and we need to refactor to a streaming
+        // join. At 10k auth users we already need a different shape
+        // for the broadcast anyway.
+        logWarn({ event: 'broadcast.list_users_capped', admin_email: auth.adminEmail, pages: MAX_PAGES_TOTAL });
+      }
     }
-    confirmedIds = new Set(
-      authUsers.users.filter(u => u.email_confirmed_at).map(u => u.id)
-    );
+    confirmedIds = acc;
   }
 
   const { data: rawProfiles, error: profileErr } = await q;

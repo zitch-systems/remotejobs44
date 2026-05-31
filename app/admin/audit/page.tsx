@@ -214,10 +214,20 @@ export default function AdminAuditPage() {
             </div>
             {rows.map(r => {
               const isOpen = expanded === r.id;
+              // Only act on click when there's metadata to expand. The
+              // chevron in the right column gets hidden too so the
+              // row reads correctly as "no further detail" instead of
+              // a broken click target.
+              const hasMetadata = !!(r.metadata && Object.keys(r.metadata).length > 0);
               return (
                 <div key={r.id}
-                  className="px-4 py-3 hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors cursor-pointer"
-                  onClick={() => setExpanded(isOpen ? null : r.id)}>
+                  className={cn(
+                    'px-4 py-3 transition-colors',
+                    hasMetadata
+                      ? 'hover:bg-stone-50 dark:hover:bg-[#162033] cursor-pointer'
+                      : 'cursor-default',
+                  )}
+                  onClick={hasMetadata ? () => setExpanded(isOpen ? null : r.id) : undefined}>
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
                     <div className="md:col-span-3 text-xs text-stone-500">
                       <div className="text-stone-700 dark:text-stone-300 font-semibold">
@@ -240,7 +250,9 @@ export default function AdminAuditPage() {
                           <span className="truncate">{r.target_id ?? '—'}</span>
                         </>
                       ) : <em className="text-stone-400">no target</em>}
-                      <ChevronDown className={cn('w-3.5 h-3.5 ml-auto shrink-0 text-stone-400 transition-transform', isOpen && 'rotate-180')} />
+                      {hasMetadata && (
+                        <ChevronDown className={cn('w-3.5 h-3.5 ml-auto shrink-0 text-stone-400 transition-transform', isOpen && 'rotate-180')} />
+                      )}
                     </div>
                   </div>
                   {isOpen && r.metadata && Object.keys(r.metadata).length > 0 && (
