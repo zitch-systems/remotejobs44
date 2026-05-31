@@ -39,11 +39,19 @@ export function HeroSection() {
           🌍 Remote jobs worldwide
         </div>
 
-        {/* Headline */}
+        {/* Headline — the brand-coloured "starts here" doubles as the
+            primary signup entry point. It already reads as
+            interactive (highlighted, brand colour); the link makes
+            that affordance real. Routes to /register so the click
+            lands on the signup flow. */}
         <h1 className="font-display font-extrabold tracking-tight text-stone-900 dark:text-stone-100 text-balance animate-slide-up"
           style={{ fontSize:'clamp(2rem,6vw,3.75rem)', lineHeight:1.08, maxWidth:'900px' }}>
           Your next remote job{' '}
-          <span className="text-highlight">starts here</span>
+          <Link href="/register"
+            className="text-highlight hover:underline focus:outline-none focus:underline transition-all"
+            aria-label="Create your free account to start applying">
+            starts here
+          </Link>
         </h1>
 
         {/* LCP element — server-rendered so it lands without waiting for JS. */}

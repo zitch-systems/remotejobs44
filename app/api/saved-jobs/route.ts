@@ -97,9 +97,22 @@ export async function DELETE(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let body: { jobId?: string } = {};
-  try { body = await req.json(); } catch {}
-  const jobId = String(body.jobId ?? '');
+  // Read jobId from the query string. DELETE-with-body is
+  // standards-compliant but unreliable end-to-end: some CDNs,
+  // corporate proxies, and older mobile browsers strip the body
+  // before it reaches the lambda, which would land here as
+  // `body = {}` → 400 → silent unsave failure for those users.
+  // Query string is universally proxied through.
+  //
+  // Body fallback kept for backwards compat with any in-flight
+  // requests minted before the client switched.
+  let jobId = req.nextUrl.searchParams.get('jobId')?.trim() ?? '';
+  if (!jobId) {
+    try {
+      const body = await req.json();
+      jobId = String((body as { jobId?: string })?.jobId ?? '').trim();
+    } catch {}
+  }
   if (!UUID_RE.test(jobId)) {
     return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
   }

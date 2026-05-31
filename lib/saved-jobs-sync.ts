@@ -37,10 +37,11 @@ export async function saveJobRemote(jobId: string): Promise<{ ok: boolean }> {
 
 export async function unsaveJobRemote(jobId: string): Promise<{ ok: boolean }> {
   try {
-    const res = await fetch('/api/saved-jobs', {
+    // Query string instead of a JSON body — some HTTP intermediaries
+    // strip bodies from DELETE requests. The server still tolerates
+    // the old body shape for backwards compat.
+    const res = await fetch(`/api/saved-jobs?jobId=${encodeURIComponent(jobId)}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId }),
     });
     return { ok: res.ok };
   } catch {
