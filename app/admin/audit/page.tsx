@@ -69,6 +69,13 @@ export default function AdminAuditPage() {
   const [targetType, setTargetType] = useState('');
   const [targetId,   setTargetId]   = useState('');
   const [since,      setSince]      = useState('');
+  // Tracks which "since" chip the user picked, so the chip stays
+  // highlighted regardless of how long the user has been on the
+  // page. Previously derived the active-chip state from comparing
+  // `since` to (now - chip.hours), which drifted after 60s and
+  // visually un-highlighted the chip while the filter still
+  // applied. Decouple the visual state from wall-clock time.
+  const [activeSinceChip, setActiveSinceChip] = useState<number | null>(null);
   const [page,       setPage]       = useState(1);
 
   const qs = useMemo(() => {
@@ -108,7 +115,7 @@ export default function AdminAuditPage() {
   useEffect(() => { setPage(1); }, [action, adminEmail, targetType, targetId, since]);
 
   function resetFilters() {
-    setAction(''); setAdminEmail(''); setTargetType(''); setTargetId(''); setSince(''); setPage(1);
+    setAction(''); setAdminEmail(''); setTargetType(''); setTargetId(''); setSince(''); setActiveSinceChip(null); setPage(1);
   }
 
   const anyFilter = !!(action || adminEmail || targetType || targetId || since);
@@ -175,9 +182,16 @@ export default function AdminAuditPage() {
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <span className="text-xs text-stone-400">Since:</span>
         {SINCE_CHIPS.map(c => {
-          const isActive = since && Math.abs(new Date(since).getTime() - (Date.now() - c.hours * 3600_000)) < 60_000;
+          const isActive = activeSinceChip === c.hours;
           return (
-            <button key={c.label} onClick={() => setSince(isActive ? '' : isoSince(c.hours))}
+            <button key={c.label}
+              onClick={() => {
+                if (isActive) {
+                  setSince(''); setActiveSinceChip(null);
+                } else {
+                  setSince(isoSince(c.hours)); setActiveSinceChip(c.hours);
+                }
+              }}
               className={cn('px-2.5 py-1 rounded-full text-xs font-bold transition-colors',
                 isActive
                   ? 'bg-brand-700 text-white dark:bg-brand-500'
@@ -188,7 +202,8 @@ export default function AdminAuditPage() {
           );
         })}
         {since && (
-          <button onClick={() => setSince('')} className="text-xs text-stone-400 hover:text-stone-600 underline">
+          <button onClick={() => { setSince(''); setActiveSinceChip(null); }}
+            className="text-xs text-stone-400 hover:text-stone-600 underline">
             clear
           </button>
         )}

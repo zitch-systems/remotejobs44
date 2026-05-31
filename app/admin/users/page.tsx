@@ -79,7 +79,12 @@ export default function AdminUsersPage() {
       if (!confirm(`Permanently delete ${ids.length} user account${ids.length === 1 ? '' : 's'}?\n\nThis cascades through profiles, applications, saved_jobs, subscriptions — and can't be undone.`)) return;
     }
     if (action === 'suspend' && !extra?.reason) {
-      const reason = prompt('Optional suspension reason (visible to other admins in the audit log):') ?? '';
+      // prompt() returns null when the user clicks Cancel and '' when
+      // they hit OK with an empty box. Distinguish: null = "I changed
+      // my mind, don't run the suspend at all"; '' = "no reason
+      // needed, proceed with empty reason".
+      const reason = prompt('Optional suspension reason (visible to other admins in the audit log):');
+      if (reason === null) return;
       extra = { reason };
     }
     setBulkAction(action === 'suspend' ? 'suspending'
