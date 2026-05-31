@@ -38,8 +38,17 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     // components with the persisted values as a normal state update,
     // not a hydration mismatch. Without this call, persisted users would
     // appear logged-out forever client-side.
+    //
+    // rehydrate() returns a Promise. Save the handle so the saved-jobs
+    // hydrate IIFE below can await it BEFORE applying the server set —
+    // otherwise the rehydrate firing after the fetch would overwrite
+    // the fresh server set with stale localStorage. Either order is
+    // possible without the await; pinning it removes the race.
+    const jobsRehydrate: Promise<void> = (() => {
+      try { return (useJobsStore as any).persist?.rehydrate?.() ?? Promise.resolve(); }
+      catch { return Promise.resolve(); }
+    })();
     try { (useAuthStore as any).persist?.rehydrate?.(); } catch {}
-    try { (useJobsStore as any).persist?.rehydrate?.(); } catch {}
 
     const supabase = createClient();
     let ignoreNextSignedOut = false;
@@ -137,7 +146,10 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     // replaces the in-store set so the server (source of truth)
     // wins over stale localStorage from a previous device.
     //
-    // Two guards on the apply step:
+    // Three guards on the apply step:
+    //   * Await the jobs-store rehydrate first so a late-finishing
+    //     localStorage read can't overwrite the server set after
+    //     we've already applied it.
     //   * Verify the auth user hasn't changed mid-fetch (user can
     //     log out while we're waiting on the GET; without the
     //     re-check we'd repopulate the just-cleared store with the
@@ -148,6 +160,7 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     //     left stale ids around.
     (async () => {
       try {
+        await jobsRehydrate;
         const { data: { session: s } } = await supabase.auth.getSession();
         if (!s?.user) return;
         const initialUserId = s.user.id;
