@@ -11,6 +11,16 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Email-confirmation gate. CV uploads are private-storage writes
+    // tied to a user-id path; an unverified throwaway shouldn't be
+    // burning our storage egress + magic-byte scans.
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before uploading. Check your inbox for the verification link.' },
+        { status: 403 },
+      );
+    }
+
     // Pro-only gate. /pricing copy lists CV upload as a Pro feature
     // ("CV upload & auto-apply") but this route used to accept uploads
     // from any signed-in user including the free tier.

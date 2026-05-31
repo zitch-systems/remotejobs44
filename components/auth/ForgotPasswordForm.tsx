@@ -13,9 +13,20 @@ export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  // Honeypot. Same pattern as /register + /contact — off-screen field
+  // bots auto-fill but real users never see. A trip routes straight
+  // to the confirmation state without calling Supabase, so the bot
+  // doesn't learn the field exists and doesn't get a recovery email
+  // for whatever address it planted.
+  const [website, setWebsite] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (website) {
+      // Honeypot trip — fake success, no Supabase call.
+      setSent(true);
+      return;
+    }
     setLoading(true);
     // SECURITY: always render the confirmation, regardless of whether
     // the address actually exists. Showing a distinct error when
@@ -49,6 +60,20 @@ export function ForgotPasswordForm() {
   return (
     <div className="card p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
+            never see or focus this; auto-fillers populate it. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+          <label>Website (leave blank)
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={e => setWebsite(e.target.value)}
+            />
+          </label>
+        </div>
         <div>
           <label htmlFor="forgot-email" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Email address</label>
           <input

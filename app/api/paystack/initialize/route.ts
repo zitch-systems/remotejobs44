@@ -44,6 +44,17 @@ export async function POST(req: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be logged in to subscribe' }, { status: 401 });
     }
+    // Email-confirmation gate before we open a payment session. Stops
+    // an unverified throwaway account from creating Paystack
+    // transactions (some of which Paystack still bills test fees for)
+    // and keeps the user contactable when something goes wrong with
+    // their order.
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before subscribing. Check your inbox for the verification link.' },
+        { status: 403 },
+      );
+    }
 
     const amount = PLAN_AMOUNTS[plan];
     const planCode = SUBSCRIPTION_PLAN_CODES[plan];

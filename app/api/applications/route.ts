@@ -36,6 +36,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Email-confirmation gate. Supabase's dashboard setting can be
+    // toggled OFF (by a future admin, by an env migration) which would
+    // silently let unverified accounts apply. Enforce here too so the
+    // requirement survives a config drift. user.email_confirmed_at is
+    // set by Supabase Auth when the recovery / confirmation link is
+    // clicked; null until then.
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before applying. Check your inbox for the verification link.' },
+        { status: 403 },
+      );
+    }
+
     // Check user has an active plan (pro, daily, or admin)
     const { data: profile } = await supabase
       .from('profiles')

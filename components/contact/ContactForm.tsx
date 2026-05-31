@@ -10,6 +10,10 @@ export function ContactForm() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
+  // Honeypot. Off-screen + aria-hidden + autocomplete=off so real users
+  // never see or focus it; naive bots that auto-fill every form input
+  // will populate it. Same pattern as /register.
+  const [website, setWebsite] = useState('');
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -17,6 +21,14 @@ export function ContactForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Honeypot trip — silently pretend success and DON'T hit /api/contact.
+    // Returning an error would teach the bot to retry without the
+    // hidden field; the fake success makes it think the job is done.
+    if (website) {
+      setStatus('success');
+      setForm({ name: '', email: '', subject: '', message: '' });
+      return;
+    }
     setStatus('sending');
     setError('');
     try {
@@ -61,6 +73,21 @@ export function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 space-y-5">
+      {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
+          never see or focus this; auto-fillers fill any
+          <input name="website"> they encounter. */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+        <label>Website (leave blank)
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            value={website}
+            onChange={e => setWebsite(e.target.value)}
+          />
+        </label>
+      </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
