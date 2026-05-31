@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectMagicMime } from '@/lib/file-magic';
 import { rateLimit } from '@/lib/rate-limit';
+import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { logError, logWarn } from '@/lib/log';
+import { waitUntil } from '@vercel/functions';
 
 export async function POST(req: NextRequest) {
   try {
@@ -118,10 +120,21 @@ export async function POST(req: NextRequest) {
     // `authenticated` role to block client-side privilege escalation. We
     // still scope by user.id (authoritatively validated via getUser above),
     // so this stays an own-row-only write.
+    // Persist cv_url here, then recompute profile_completion
+    // separately from the actual signal set (name, email_confirmed,
+    // cv_url, application count, saved count) rather than slapping
+    // a hardcoded 80 on it. The recalc is fire-and-forget via
+    // waitUntil so it doesn't block the upload response — the
+    // dashboard ring + /profile ring will both read the freshly-
+    // updated column on their next request.
     await createAdminSupabaseClient().from('profiles').update({
       cv_url: filename,
-      profile_completion: 80,
     }).eq('id', user.id);
+    waitUntil(recomputeAndPersistProfileCompletion({
+      id:               user.id,
+      email:            user.email,
+      emailConfirmedAt: user.email_confirmed_at,
+    }));
 
     return NextResponse.json({ success: true, url: signedUrl, path: filename });
   } catch (err: any) {

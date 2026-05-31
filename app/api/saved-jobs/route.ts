@@ -14,7 +14,9 @@
 // GET fetch.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { logError } from '@/lib/log';
+import { waitUntil } from '@vercel/functions';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -76,6 +78,14 @@ export async function POST(req: NextRequest) {
     logError({ event: 'saved_jobs.insert_failed', user_id: user.id, job_id: jobId, error: error.message });
     return NextResponse.json({ error: 'Failed to save job.' }, { status: 500 });
   }
+
+  // Bump profile_completion if this just crossed the ≥1-saved
+  // threshold. Fire-and-forget — UI doesn't block on it.
+  waitUntil(recomputeAndPersistProfileCompletion({
+    id:               user.id,
+    email:            user.email,
+    emailConfirmedAt: user.email_confirmed_at,
+  }));
 
   return NextResponse.json({ saved: true });
 }

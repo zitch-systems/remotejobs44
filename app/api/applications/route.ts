@@ -1,7 +1,9 @@
 // app/api/applications/route.ts — Persist job applications to Supabase
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { logError, logInfo } from '@/lib/log';
+import { waitUntil } from '@vercel/functions';
 
 // ── GET /api/applications — List current user's applications ─────────────
 export async function GET() {
@@ -226,6 +228,15 @@ export async function POST(req: NextRequest) {
     try {
       await adminSupabase.rpc('increment_applications', { job_id: jobId });
     } catch {}
+
+    // Bump profile_completion if this just crossed the ≥1-application
+    // threshold. Fire-and-forget via waitUntil so the upload response
+    // doesn't pay the recalc round-trip.
+    waitUntil(recomputeAndPersistProfileCompletion({
+      id:               user.id,
+      email:            user.email,
+      emailConfirmedAt: user.email_confirmed_at,
+    }));
 
     return NextResponse.json({ application: transformApplication(application) }, { status: 201 });
   } catch (err: any) {
