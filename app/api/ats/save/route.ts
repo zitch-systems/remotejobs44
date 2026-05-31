@@ -7,6 +7,20 @@ import { recordAdminAction } from '@/lib/admin/audit';
 import { logError } from '@/lib/log';
 import type { Job } from '@/lib/types';
 
+// jobs table has grown past 180k rows + 600MB. Each INSERT fires
+// trg_jobs_search_vector (9 weighted tsvector fields including
+// array_to_string() on text[] columns) AND updates the GIN index
+// on search_vector. On a batch of 100, that's 100 trigger
+// executions + 100 GIN index updates in a single statement —
+// blew past Postgres's statement_timeout regularly. Drop to 25
+// per chunk so each statement finishes inside the timeout. Adds
+// modest overhead from more round-trips but keeps the import
+// reliable. 60s lambda ceiling on top so the whole import can
+// chunk through a few hundred rows without Vercel cutting it off.
+export const maxDuration = 60;
+
+const INSERT_CHUNK_SIZE = 25;
+
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.res;
@@ -87,8 +101,8 @@ export async function POST(req: NextRequest) {
     // never saw why.
     let firstError: string | null = null;
 
-    for (let i = 0; i < rows.length; i += 100) {
-      const batch = rows.slice(i, i + 100);
+    for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+      const batch = rows.slice(i, i + INSERT_CHUNK_SIZE);
 
       const { data, error } = await supabase
         .from('jobs')

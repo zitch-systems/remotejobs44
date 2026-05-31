@@ -13,6 +13,12 @@ import { detectATSFromUrl, isValidATSPlatform, type ATSPlatform } from '@/lib/at
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+
+// Same statement_timeout issue as /api/ats/save — see comment
+// there. The search_vector trigger + GIN index on the 180k-row
+// jobs table can't handle 100-row INSERT batches reliably.
+export const maxDuration = 60;
+const INSERT_CHUNK_SIZE = 25;
 import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
@@ -112,8 +118,8 @@ export async function POST(req: NextRequest) {
   let added = 0;
   let attempted = 0;
   let firstError: string | null = null;
-  for (let i = 0; i < toInsert.length; i += 100) {
-    const batch = toInsert.slice(i, i + 100);
+  for (let i = 0; i < toInsert.length; i += INSERT_CHUNK_SIZE) {
+    const batch = toInsert.slice(i, i + INSERT_CHUNK_SIZE);
     attempted += batch.length;
     const { data, error: insErr } = await admin
       .from('jobs')
