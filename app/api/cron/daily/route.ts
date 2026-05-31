@@ -151,6 +151,23 @@ export async function GET(req: NextRequest) {
     staleAfterDays: STALE_JOB_DAYS,
   };
 
+  // ── TASK 3.5: Purge old paystack_webhook_events ────────────────────────
+  // The webhook dedup table grows by ~1 row per Paystack event forever
+  // (the route only inserts, never deletes). Keep ≥90 days for charge-
+  // dispute / audit lookups, drop the rest. 90 days easily covers
+  // Paystack's own retry window + a multi-week QA cycle for an
+  // ops-issue investigation.
+  const WEBHOOK_RETAIN_DAYS = 90;
+  const webhookCutoff = new Date(Date.now() - WEBHOOK_RETAIN_DAYS * 86_400_000).toISOString();
+  const { count: purgedWebhooks } = await supabase
+    .from('paystack_webhook_events')
+    .delete({ count: 'exact' })
+    .lt('received_at', webhookCutoff);
+  log.webhookPurge = {
+    purged:          purgedWebhooks ?? 0,
+    retainDays:      WEBHOOK_RETAIN_DAYS,
+  };
+
 
   // ── TASK 4: Send job alert emails to Pro users ────────────────────────
   // The previous version pulled ten newest jobs once and sent that same

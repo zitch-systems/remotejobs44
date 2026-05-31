@@ -133,18 +133,28 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     syncAuth();
 
     // Server-side saved-jobs hydrate. Fires once on mount whenever
-    // there's an authed session — fetches /api/saved-jobs and merges
-    // the result into useJobsStore. The set helper dedupes against any
-    // in-flight optimistic toggles started during the same session so
-    // a slower GET can't undo a fresh save.
+    // there's an authed session — fetches /api/saved-jobs and
+    // replaces the in-store set so the server (source of truth)
+    // wins over stale localStorage from a previous device.
+    //
+    // Two guards on the apply step:
+    //   * Verify the auth user hasn't changed mid-fetch (user can
+    //     log out while we're waiting on the GET; without the
+    //     re-check we'd repopulate the just-cleared store with the
+    //     previous user's saves).
+    //   * Always apply the result — including an empty array — so a
+    //     cross-device unsave that emptied the server set actually
+    //     wipes the local set. Previous code skipped on empty and
+    //     left stale ids around.
     (async () => {
       try {
         const { data: { session: s } } = await supabase.auth.getSession();
         if (!s?.user) return;
+        const initialUserId = s.user.id;
         const ids = await fetchServerSavedJobs();
-        if (ids.length > 0) {
-          useJobsStore.getState().setSavedJobIds(ids);
-        }
+        const { data: { session: s2 } } = await supabase.auth.getSession();
+        if (s2?.user?.id !== initialUserId) return; // logout / switch happened
+        useJobsStore.getState().setSavedJobIds(ids);
       } catch { /* network blip — next page nav will retry */ }
     })();
 
