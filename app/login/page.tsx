@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
+import { ResendVerificationLink } from '@/components/auth/ResendVerificationLink';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -351,6 +352,10 @@ export default function LoginPage() {
         <Suspense fallback={<div className="card p-6 shadow-md animate-pulse"><div className="skeleton h-10 w-full rounded mb-4" /><div className="skeleton h-10 w-full rounded mb-4" /><div className="skeleton h-10 w-full rounded" /></div>}>
           <LoginForm />
         </Suspense>
+
+        <div className="text-center mt-4">
+          <ResendVerificationLink />
+        </div>
 
         <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-5">
           Don&apos;t have an account?{' '}
