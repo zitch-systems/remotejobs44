@@ -54,6 +54,14 @@ export async function POST(req: NextRequest) {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: 'Sign in to use the AI interview prep.' }, { status: 401 });
+    // Email-confirmation gate. Same reason as the cv-review route —
+    // AI calls cost real money per request.
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before using AI tools. Check your inbox for the verification link.' },
+        { status: 403 },
+      );
+    }
 
     const { data: profile } = await supabase
       .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();

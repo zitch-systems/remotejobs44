@@ -45,6 +45,14 @@ export async function POST(req: NextRequest) {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: 'Sign in to use the AI CV review.' }, { status: 401 });
+    // Email-confirmation gate. AI calls cost real money — block
+    // unverified throwaway accounts from burning quota.
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'Please confirm your email address before using AI tools. Check your inbox for the verification link.' },
+        { status: 403 },
+      );
+    }
 
     // Per-user rate limit — free users 1/day, paid users 20/day.
     const { data: profile } = await supabase

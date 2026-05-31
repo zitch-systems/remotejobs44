@@ -20,6 +20,15 @@ export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Email-confirmation gate. Each alert results in a recurring email
+  // job — unverified throwaways shouldn't enrol the daily-cron sender
+  // for an unbounded set of addresses.
+  if (!user.email_confirmed_at) {
+    return NextResponse.json(
+      { error: 'Please confirm your email address before creating alerts. Check your inbox for the verification link.' },
+      { status: 403 },
+    );
+  }
 
   // Enforce per-user alert cap so a free / abusive user can't create
   // thousands of alerts and bloat the table. Free plans get a small

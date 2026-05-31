@@ -18,6 +18,12 @@ function LoginForm() {
   const [loading,  setLoading]  = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success,  setSuccess]  = useState(false);
+  // Honeypot. Same off-screen pattern as /register + /contact +
+  // /forgot-password. Bots that auto-fill every input populate this;
+  // real users never see or focus it. On trip we pretend the sign-in
+  // succeeded (set the success spinner) but never call Supabase, so
+  // the bot doesn't learn the field exists and doesn't get a session.
+  const [website, setWebsite] = useState('');
 
   useEffect(() => {
     const err = searchParams.get('error');
@@ -76,6 +82,19 @@ function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Honeypot trip — pretend the sign-in is in flight then settle on
+    // a generic "Invalid email or password" error after a short
+    // delay. Don't redirect, don't call Supabase. The bot sees the
+    // exact same shape as a wrong-password attempt.
+    if (website) {
+      setLoading(true);
+      setErrorMsg('');
+      setTimeout(() => {
+        setLoading(false);
+        setErrorMsg('Invalid email or password. Please try again.');
+      }, 800);
+      return;
+    }
     setLoading(true);
     setErrorMsg('');
     setSuccess(false);
@@ -233,6 +252,20 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
+            never see or focus this; auto-fillers populate it. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+          <label>Website (leave blank)
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={e => setWebsite(e.target.value)}
+            />
+          </label>
+        </div>
         <div>
           <label htmlFor="login-email" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
             Email address
