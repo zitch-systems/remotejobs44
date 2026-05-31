@@ -9,6 +9,7 @@ import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
 import { formatRelativeDate } from '@/lib/utils';
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
+import { RecommendedJobs } from '@/components/dashboard/RecommendedJobs';
 import type { Job, Application } from '@/lib/types';
 
 // Inner component — uses useSearchParams, so must be inside <Suspense>
@@ -405,6 +406,8 @@ function DashboardContent() {
           </Link>
         ))}
       </div>
+
+      <RecommendedJobs />
 
       {/* Recent applications + saved jobs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
