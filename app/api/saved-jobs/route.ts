@@ -30,9 +30,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('saved_jobs')
-    .select('job_id, saved_at')
+    .select('job_id, created_at')
     .eq('user_id', user.id)
-    .order('saved_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) {
     logError({ event: 'saved_jobs.list_failed', user_id: user.id, error: error.message });
