@@ -1,11 +1,12 @@
 // lib/ingest-pipeline.ts
 // Pulls remote jobs from every active source in the in-code SOURCES list
 // (Remotive, Jobicy, RemoteOK, Arbeitnow, Findwork (if key), SerpApi (if
-// key)) and inserts them into public.jobs. Per the no-dedup decision
-// recorded in user memory we do NOT upsert by apply_url; each daily run
-// inserts fresh rows. Stale rows are downgraded by the daily cron's
-// separate staleness pass (jobs.is_active = false after 60 days), so the
-// public listings stay current without losing history.
+// key)) and upserts them into public.jobs, deduped on apply_url
+// (migration_v25 restored the unique index). A posting we already have is
+// left untouched (ON CONFLICT DO NOTHING) instead of re-inserted, so the
+// daily cron no longer multiplies rows. Stale rows are downgraded by the
+// daily cron's separate staleness pass (jobs.is_active = false after 60
+// days), so the public listings stay current.
 //
 // Called by:
 //   * /api/cron/daily       — scheduled cron, the single daily 6am UTC run
@@ -15,6 +16,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
 import { parseFeed } from '@/lib/feed-parser';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { logInfo, logWarn, logError } from '@/lib/log';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
@@ -346,13 +348,14 @@ export async function runIngest(): Promise<IngestResult> {
         continue;
       }
 
-      // ⚠️  Dedup-by-apply_url was removed at user request (migration_v5).
-      // Every cron run now inserts a fresh copy of every job — after a
-      // week, each posting appears ~7 times in DB. Re-enable upsert here
-      // (and re-create the unique index) if dedup is wanted again.
+      // Dedup on apply_url: collapse repeats inside this batch, then
+      // upsert with ON CONFLICT DO NOTHING (migration_v25's unique index
+      // backs this) so a posting we already have is skipped instead of
+      // re-inserted. select('id') returns only the rows actually
+      // inserted, so the count below reflects genuinely new postings.
       const { data: inserted, error } = await supabase
         .from('jobs')
-        .insert(jobs)
+        .upsert(dedupeByApplyUrl(jobs), { onConflict: 'apply_url', ignoreDuplicates: true })
         .select('id');
 
       if (error) {
@@ -431,7 +434,7 @@ export async function runIngest(): Promise<IngestResult> {
 
         const { data: inserted, error: insErr } = await supabase
           .from('jobs')
-          .insert(jobs)
+          .upsert(dedupeByApplyUrl(jobs), { onConflict: 'apply_url', ignoreDuplicates: true })
           .select('id');
         if (insErr) {
           results[label] = `db error: ${insErr.message}`;

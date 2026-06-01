@@ -13,6 +13,7 @@ import { detectATSFromUrl, isValidATSPlatform, type ATSPlatform } from '@/lib/at
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 
 // Same statement_timeout issue as /api/ats/save — see comment
 // there. The search_vector trigger + GIN index on the 180k-row
@@ -77,13 +78,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ATS fetch failed. Check the source and try again.' }, { status: 502 });
   }
 
-  // Dedup-by-apply_url was disabled at user request (migration_v5). With
-  // no unique key, the previous "compare apply_url sets to find expired /
-  // reactivate / insert-new" reconciliation breaks: a fetched apply_url
-  // can match N existing rows, and "kept" / "removed" are no longer
-  // meaningful concepts. Simplified to: always insert every fetched row.
-  // To purge stale rows, the admin can use the existing Remove Company
-  // button on /admin/companies.
+  // Dedup on apply_url restored in migration_v25. A refresh re-fetches
+  // the company's whole board, so most rows already exist — collapse
+  // repeats inside the fetch, then upsert with ON CONFLICT DO NOTHING so
+  // existing postings are skipped (reported as `kept`) and only genuinely
+  // new vacancies are added. Stale rows that fell off the board are aged
+  // out by the daily staleness sweep / the Remove Company button on
+  // /admin/companies.
   const fetchedJobs = fetched.jobs;
   const admin = createAdminSupabaseClient();
 
@@ -115,28 +116,28 @@ export async function POST(req: NextRequest) {
     remote:       j.remote ?? true,
   }));
 
+  const deduped = dedupeByApplyUrl(toInsert);
   let added = 0;
-  let attempted = 0;
   let firstError: string | null = null;
-  for (let i = 0; i < toInsert.length; i += INSERT_CHUNK_SIZE) {
-    const batch = toInsert.slice(i, i + INSERT_CHUNK_SIZE);
-    attempted += batch.length;
+  for (let i = 0; i < deduped.length; i += INSERT_CHUNK_SIZE) {
+    const batch = deduped.slice(i, i + INSERT_CHUNK_SIZE);
     const { data, error: insErr } = await admin
       .from('jobs')
-      .insert(batch)
+      .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
       .select('id');
     if (insErr) {
       logError({ event: 'admin.companies_refresh.insert_failed', error: insErr.message });
       if (!firstError) firstError = insErr.message;
       continue;
     }
-    added += data?.length ?? batch.length;
+    // ignoreDuplicates → data is the inserted rows only; never fall back
+    // to batch.length or skipped duplicates would inflate `added`.
+    added += data?.length ?? 0;
   }
-  // Same hole as /api/ats/save: a 100% DB failure used to come back
-  // as success: true, added: 0 — the admin saw "0 added" and assumed
-  // the company already had the same listings. Surface a 502 when
-  // there were rows to insert and none made it through.
-  if (attempted > 0 && added === 0) {
+  // Surface a 502 only when a chunk actually errored at the DB and nothing
+  // new was added. All-duplicates (added 0, no error) is the normal result
+  // of refreshing a board that hasn't changed — not a failure.
+  if (added === 0 && firstError) {
     return NextResponse.json({
       success: false,
       company,
@@ -147,12 +148,14 @@ export async function POST(req: NextRequest) {
       reactivated: 0,
       kept: 0,
       total_fetched: fetched.total,
-      error: firstError ?? 'All rows failed to insert',
+      error: firstError,
     }, { status: 502 });
   }
 
-  // No expire / reactivate phases anymore — they relied on apply_url
-  // identity which is no longer unique.
+  // Postings already in the DB that the upsert skipped on conflict.
+  const kept = Math.max(0, deduped.length - added);
+  // No expire / reactivate phases in this route — the daily staleness
+  // sweep handles rows that fall off a board.
   const removed = 0;
   const reactivated = 0;
 
@@ -169,9 +172,9 @@ export async function POST(req: NextRequest) {
     platform,
     slug,
     added,
-    removed,        // always 0 now — see note above
-    reactivated,    // always 0 now — see note above
-    kept:           0,
+    removed,        // always 0 — staleness sweep handles board drop-off
+    reactivated,    // always 0 — no reactivate phase in this route
+    kept,           // existing postings skipped on apply_url conflict
     total_fetched:  fetched.total,
   };
 

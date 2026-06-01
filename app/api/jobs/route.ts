@@ -457,7 +457,19 @@ export async function POST(req: NextRequest) {
     };
 
     const { data: job, error } = await supabase.from('jobs').insert(row).select().single();
-    if (error) throw new Error('insert_failed');
+    if (error) {
+      // 23505 = unique_violation on jobs_apply_url_idx (migration_v25):
+      // a posting with this apply URL already exists. Return a clear 409
+      // instead of a generic 500 so the admin knows it's a duplicate, not
+      // a server fault — and we don't silently edit the existing row.
+      if ((error as { code?: string }).code === '23505') {
+        return NextResponse.json(
+          { error: 'A job with this apply URL already exists.' },
+          { status: 409 },
+        );
+      }
+      throw new Error('insert_failed');
+    }
     // Flush /jobs cache + the new job's own detail page so they appear
     // on the public surface immediately instead of after the next
     // revalidate tick.
