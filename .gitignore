@@ -37,3 +37,7 @@ Thumbs.db
 # Supabase CLI scratch (cli-latest etc.)
 supabase/.temp/
 supabase/.branches/
+
+# Claude Code runtime scratch (session lock files, local agent state)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
