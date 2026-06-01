@@ -2,7 +2,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import { BookmarkPlus, BookmarkCheck, MapPin, Timer, ArrowUpRight, Banknote, Sparkles, Star, Lock, Zap } from 'lucide-react';
-import { cn, formatRelativeDate, formatSalary, capitalize, CATEGORY_META, SOURCE_META } from '@/lib/utils';
+import { cn, formatRelativeDate, formatSalary, capitalize, CATEGORY_META } from '@/lib/utils';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { applicationsApi } from '@/lib/api';
 import { modalService } from '@/components/ui/Modal';
@@ -34,14 +34,12 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   // so any save/apply re-ran every card on the page (50 of them on /jobs)
   // even though only the toggled card needed to re-render.
   const userPlan        = useAuthStore(s => s.user?.plan);
-  const userRole        = useAuthStore(s => s.user?.role);
   const loggedIn        = useAuthStore(s => !!s.user);
   const dailyAppsUsed   = useAuthStore(s => s.dailyAppsUsed);
   const incrementDailyApp = useAuthStore(s => s.incrementDailyApp);
   // Derived booleans from primitives — re-renders only when underlying
   // primitive flips.
   const isPro    = userPlan === 'daily' || userPlan === 'pro' || userPlan === 'admin';
-  const isAdmin  = userRole === 'admin';
   const isDaily  = userPlan === 'daily';
   const isFree   = !loggedIn || userPlan === 'free';
   // Per-job primitive selectors: `saved` flips only when THIS job's id is
@@ -53,7 +51,6 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   const toast = useUIStore(s => s.toast);
 
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
-  const srcMeta = SOURCE_META[job.source as keyof typeof SOURCE_META]       ?? SOURCE_META['manual'];
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
   // Day pass users also see company blurred — revealed when they click Apply
   const hideCompany = isFree || isDaily;
@@ -243,11 +240,6 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       <div className="flex flex-wrap gap-3 text-xs text-stone-400 dark:text-stone-500">
         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
         {job.timezone && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{job.timezone}</span>}
-        {isAdmin && (
-          <span className={cn('flex items-center gap-1', srcMeta.color)}>
-            {srcMeta.icon} {srcMeta.label}
-          </span>
-        )}
       </div>
 
       {/* Footer */}

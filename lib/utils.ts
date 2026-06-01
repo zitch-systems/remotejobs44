@@ -26,12 +26,15 @@ export function formatDate(dateStr: string, fmt = 'MMM d, yyyy'): string {
 }
 
 export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
-  if (!min && !max) return '';
+  // Null/undefined checks rather than truthiness so a legitimate $0 floor
+  // isn't treated as "absent" — previously {min:0,max:50000} rendered as
+  // "Up to $50k", silently dropping the explicit 0 lower bound.
+  if (min == null && max == null) return '';
   const sym: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$' };
   const s = sym[currency] ?? currency + ' ';
   const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-  if (min && max) return `${s}${fmt(min)}–${fmt(max)}/yr`;
-  if (min) return `${s}${fmt(min)}+/yr`;
+  if (min != null && max != null) return `${s}${fmt(min)}–${fmt(max)}/yr`;
+  if (min != null) return `${s}${fmt(min)}+/yr`;
   return `Up to ${s}${fmt(max!)}/yr`;
 }
 
