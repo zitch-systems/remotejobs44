@@ -8,6 +8,7 @@ import { ArrowRight, MapPin, Building2 } from 'lucide-react';
 import { formatRelativeDate } from '@/lib/utils';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { FaqJsonLd } from '@/components/seo/FaqJsonLd';
+import { CompanyMask } from '@/components/jobs/CompanyMask';
 
 interface Job {
   id: string;
@@ -111,7 +112,7 @@ export function SliceListing({
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-stone-900 dark:text-stone-100 truncate">{j.title}</p>
                 <p className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-2 flex-wrap mt-0.5">
-                  <span className="inline-flex items-center gap-1"><Building2 className="w-3 h-3" />{j.company}</span>
+                  <span className="inline-flex items-center gap-1"><Building2 className="w-3 h-3" /><CompanyMask company={j.company} /></span>
                   {j.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{j.location}</span>}
                   {j.posted_at && <span>· {formatRelativeDate(j.posted_at)}</span>}
                 </p>

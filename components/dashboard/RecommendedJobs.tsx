@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, MapPin, Star, ArrowRight } from 'lucide-react';
 import { CATEGORY_META, formatSalary } from '@/lib/utils';
+import { CompanyMask } from '@/components/jobs/CompanyMask';
 
 interface RecommendedJob {
   id:       string;
@@ -103,7 +104,7 @@ export function RecommendedJobs() {
                   <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
                     {j.title}
                   </h3>
-                  <p className="text-xs text-stone-500 truncate">{j.company}</p>
+                  <p className="text-xs text-stone-500 truncate"><CompanyMask company={j.company} /></p>
                 </div>
                 {j.featured && <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
               </div>
