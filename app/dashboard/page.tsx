@@ -10,6 +10,7 @@ import { resolvePlan } from '@/lib/auth/plan';
 import { formatRelativeDate } from '@/lib/utils';
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 import { RecommendedJobs } from '@/components/dashboard/RecommendedJobs';
+import { CompanyMask } from '@/components/jobs/CompanyMask';
 import type { Job, Application } from '@/lib/types';
 
 // Inner component — uses useSearchParams, so must be inside <Suspense>
@@ -388,7 +389,7 @@ function DashboardContent() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
-          { label: 'Saved Jobs',    value: savedJobIds.length,    icon: <BookmarkCheck className="w-5 h-5" />, color: 'amber', href: '/jobs' },
+          { label: 'Saved Jobs',    value: savedJobIds.length,    icon: <BookmarkCheck className="w-5 h-5" />, color: 'amber', href: '/saved' },
           { label: 'Applications', value: applications.length,    icon: <FileText className="w-5 h-5" />,      color: 'blue',  href: '/applications' },
           { label: 'Profile',      value: `${user.profileCompletion ?? 20}%`, icon: <TrendingUp className="w-5 h-5" />, color: 'brand', href: '/profile' },
         ].map(s => (
@@ -450,8 +451,8 @@ function DashboardContent() {
             <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <BookmarkCheck className="w-4 h-4 text-amber-500" /> Saved Jobs
             </h2>
-            <Link href="/jobs" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1">
-              Browse more <ArrowRight className="w-3 h-3" />
+            <Link href="/saved" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
           {savedJobs.length === 0 ? (
@@ -466,7 +467,7 @@ function DashboardContent() {
               <div className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700">{job.logo}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>
-                <p className="text-xs text-stone-400">{job.company} · {job.location}</p>
+                <p className="text-xs text-stone-400"><CompanyMask company={job.company} /> · {job.location}</p>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-stone-300 shrink-0" />
             </Link>

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
-import { logError, logInfo } from '@/lib/log';
+import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
 // ── GET /api/applications — List current user's applications ─────────────
@@ -224,10 +224,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Increment job applications counter — fire-and-forget, never let it fail the request
+    // Increment the per-job applications counter. Never let it fail the
+    // request, but DO surface failures — this function was silently missing
+    // from the DB (migration_v26 added it), so the counter sat at 0 forever
+    // while the faulty catch hid it. rpc() returns {error} for PostgREST
+    // errors rather than throwing, so check it explicitly.
     try {
-      await adminSupabase.rpc('increment_applications', { job_id: jobId });
-    } catch {}
+      const { error: incErr } = await adminSupabase.rpc('increment_applications', { job_id: jobId });
+      if (incErr) logWarn({ event: 'applications.increment_failed', job_id: jobId, error: incErr.message });
+    } catch (err: any) {
+      logWarn({ event: 'applications.increment_threw', job_id: jobId, error: err?.message ?? String(err) });
+    }
 
     // Bump profile_completion if this just crossed the ≥1-application
     // threshold. Fire-and-forget via waitUntil so the upload response

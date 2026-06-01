@@ -90,20 +90,22 @@ export function ContactForm() {
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+          <label htmlFor="contact-name" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
             <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Name</span>
           </label>
           <input
+            id="contact-name"
             type="text" name="name" value={form.name} onChange={handleChange} required
             className="input w-full" placeholder="Your name"
             disabled={status === 'sending'}
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+          <label htmlFor="contact-email" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
             <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email</span>
           </label>
           <input
+            id="contact-email"
             type="email" name="email" value={form.email} onChange={handleChange} required
             className="input w-full" placeholder="you@example.com"
             disabled={status === 'sending'}
@@ -112,10 +114,11 @@ export function ContactForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+        <label htmlFor="contact-subject" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
           Subject <span className="text-stone-400 font-normal">(optional)</span>
         </label>
         <input
+          id="contact-subject"
           type="text" name="subject" value={form.subject} onChange={handleChange}
           className="input w-full" placeholder="What's this about?"
           disabled={status === 'sending'}
@@ -123,10 +126,11 @@ export function ContactForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+        <label htmlFor="contact-message" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
           <span className="flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Message</span>
         </label>
         <textarea
+          id="contact-message"
           name="message" value={form.message} onChange={handleChange} required
           rows={5}
           className="input w-full resize-y min-h-[120px]"
