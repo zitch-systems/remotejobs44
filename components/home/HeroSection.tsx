@@ -17,15 +17,12 @@ import { HeroInstallButton } from './HeroInstallButton';
 
 const POPULAR = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps', 'Product'];
 
-// Honest, directional copy in place of the previous hard-coded
-// "50,000+ jobs / 8,000+ companies / 190+ countries" numbers. /about
-// has real DB-backed counts for visitors who want the exact figure;
-// the hero's stat row stays static so it doesn't add a DB hit to the
-// homepage LCP path.
+// Hero stat row. Kept static so the homepage LCP path doesn't pay a DB
+// hit; the exact, live-counted figures live on /about.
 const HERO_STATS = [
-  { value: 'Daily',     label: 'Fresh listings'      },
-  { value: 'Global',    label: 'Companies hiring'    },
-  { value: 'From ₦500', label: 'Day Pass access'     },
+  { value: '70k+',   label: 'Jobs worldwide'   },
+  { value: 'Daily',  label: 'Fresh listings'   },
+  { value: 'Global', label: 'Companies hiring' },
 ];
 
 export function HeroSection() {
@@ -57,9 +54,8 @@ export function HeroSection() {
         {/* LCP element — server-rendered so it lands without waiting for JS. */}
         <p className="text-stone-500 dark:text-stone-400 max-w-lg leading-relaxed"
           style={{ fontSize:'clamp(1rem,2vw,1.1rem)' }}>
-          Connect with top companies hiring remotely across engineering, design, marketing and more.
-          Day pass from <span className="font-bold text-brand-700 dark:text-brand-400">₦500</span>{' '}
-          (10 applications) or go Pro for unlimited access.
+          Search over <span className="font-bold text-brand-700 dark:text-brand-400">70,000+</span> remote jobs
+          from top companies hiring worldwide — across engineering, design, marketing and more.
         </p>
 
         {/* Search bar — input lives in a small client island. */}
