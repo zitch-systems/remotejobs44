@@ -10,10 +10,10 @@
 //       feed without redeploying.
 //   (2) Expire subscriptions (Day Pass + Pro Monthly/Annual with the
 //       documented 24h grace, plus payment_failed accounts).
-//   (3) Mark jobs older than 7 days as is_new = false, and jobs older
-//       than 60 days as is_active = false. Refreshes the visible job DB
-//       without the apply_url unique constraint the user deliberately
-//       removed (see feedback_no_apply_url_dedup.md in user memory).
+//   (3) Mark jobs older than 7 days as is_new = false, and deactivate
+//       jobs not seen in any feed for 60 days (is_active = false), keeping
+//       the visible job DB fresh. Staleness keys off last_seen_at
+//       (migration_v27) so a posting a feed keeps listing never ages out.
 //   (4) Send daily job-alert emails to Pro users with active alerts.
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
@@ -120,16 +120,16 @@ export async function GET(req: NextRequest) {
 
   // ── TASK 3: Job freshness pass ────────────────────────────────────
   //   * Mark jobs older than 7 days as is_new = false (UI badge).
-  //   * Mark jobs older than 60 days as is_active = false (hide from
-  //     public listings). Public listings already filter
-  //     `expires_at < now()`, but ATS upstreams rarely set expires_at,
-  //     so without this sweep stale postings live forever in the DB.
+  //   * Deactivate (is_active = false) jobs not seen in any feed for 60
+  //     days. Public listings already filter `expires_at < now()`, but
+  //     ATS upstreams rarely set expires_at, so without this sweep stale
+  //     postings live forever in the DB.
   //
-  // Per the user's no-dedup decision, the cron re-inserts fresh copies
-  // of currently-listed jobs every day. This sweep is what keeps the
-  // visible surface current without re-introducing apply_url
-  // uniqueness — old duplicates stay queryable for admin/audit but
-  // disappear from public lists.
+  // Staleness keys off last_seen_at (migration_v27), which the ingest
+  // bumps every time a posting appears in a feed. A job an upstream keeps
+  // listing therefore stays visible indefinitely; one that drops out of
+  // every feed ages out 60 days later. (is_new still keys off posted_at —
+  // newness is about when the job was posted, not when we last saw it.)
   const sevenDaysAgo = new Date(Date.now() - NEW_JOB_DAYS  * 86_400_000).toISOString();
   const staleCutoff  = new Date(Date.now() - STALE_JOB_DAYS * 86_400_000).toISOString();
 
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
     .from('jobs')
     .update({ is_active: false }, { count: 'exact' })
     .eq('is_active', true)
-    .lt('posted_at', staleCutoff);
+    .lt('last_seen_at', staleCutoff);
 
   log.freshness = {
     markedNotNew:   unflaggedNew ?? 0,

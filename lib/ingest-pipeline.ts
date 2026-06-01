@@ -4,9 +4,10 @@
 // key)) and upserts them into public.jobs, deduped on apply_url
 // (migration_v25 restored the unique index). A posting we already have is
 // left untouched (ON CONFLICT DO NOTHING) instead of re-inserted, so the
-// daily cron no longer multiplies rows. Stale rows are downgraded by the
-// daily cron's separate staleness pass (jobs.is_active = false after 60
-// days), so the public listings stay current.
+// daily cron no longer multiplies rows — but we bump its last_seen_at
+// (migration_v27) so a still-listed job keeps a fresh "seen" timestamp.
+// The daily cron's staleness pass deactivates jobs not seen in any feed
+// for 60 days, so the public listings stay current.
 //
 // Called by:
 //   * /api/cron/daily       — scheduled cron, the single daily 6am UTC run
@@ -353,9 +354,10 @@ export async function runIngest(): Promise<IngestResult> {
       // backs this) so a posting we already have is skipped instead of
       // re-inserted. select('id') returns only the rows actually
       // inserted, so the count below reflects genuinely new postings.
+      const deduped = dedupeByApplyUrl(jobs);
       const { data: inserted, error } = await supabase
         .from('jobs')
-        .upsert(dedupeByApplyUrl(jobs), { onConflict: 'apply_url', ignoreDuplicates: true })
+        .upsert(deduped, { onConflict: 'apply_url', ignoreDuplicates: true })
         .select('id');
 
       if (error) {
@@ -365,6 +367,13 @@ export async function runIngest(): Promise<IngestResult> {
         const n = inserted?.length ?? 0;
         results[source.name] = n;
         totalAdded += n;
+        // Mark every posting in this batch as seen now so a still-listed
+        // job keeps a fresh last_seen_at and never ages out of the 60-day
+        // staleness sweep. New rows get last_seen_at from the column
+        // default; this covers the ones ON CONFLICT DO NOTHING skipped. We
+        // deliberately don't flip is_active, so an admin soft-delete
+        // (companies/remove) isn't undone.
+        await touchLastSeen(supabase, deduped);
         await recordSourceRun(supabase, source, n, 'ok');
       }
     } catch (err: any) {
@@ -432,9 +441,10 @@ export async function runIngest(): Promise<IngestResult> {
           continue;
         }
 
+        const deduped = dedupeByApplyUrl(jobs);
         const { data: inserted, error: insErr } = await supabase
           .from('jobs')
-          .upsert(dedupeByApplyUrl(jobs), { onConflict: 'apply_url', ignoreDuplicates: true })
+          .upsert(deduped, { onConflict: 'apply_url', ignoreDuplicates: true })
           .select('id');
         if (insErr) {
           results[label] = `db error: ${insErr.message}`;
@@ -443,6 +453,7 @@ export async function runIngest(): Promise<IngestResult> {
           const n = inserted?.length ?? 0;
           results[label] = n;
           totalAdded += n;
+          await touchLastSeen(supabase, deduped);
           await markSourceStatus(supabase, row.id, 'active', n);
         }
       } catch (err: any) {
@@ -472,6 +483,25 @@ export async function runIngest(): Promise<IngestResult> {
     } catch (err: any) {
       logWarn({ event: 'ingest.lock_release_failed', error: err.message });
     }
+  }
+}
+
+// Refresh last_seen_at for a batch of postings we just saw in a feed.
+// New rows already carry last_seen_at via the column default; this covers
+// the existing rows the ON CONFLICT DO NOTHING upsert left untouched, so a
+// posting that keeps appearing never ages out of the 60-day staleness
+// sweep. Best-effort — a failure here must not fail the ingest, and we
+// never touch is_active (so an admin soft-delete stays deleted).
+async function touchLastSeen(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  rows: Array<Record<string, any>>,
+) {
+  const urls = Array.from(new Set(rows.map(r => r.apply_url).filter(Boolean)));
+  if (urls.length === 0) return;
+  try {
+    await supabase.from('jobs').update({ last_seen_at: new Date().toISOString() }).in('apply_url', urls);
+  } catch (err: any) {
+    logWarn({ event: 'ingest.touch_last_seen_failed', error: err?.message ?? String(err) });
   }
 }
 
