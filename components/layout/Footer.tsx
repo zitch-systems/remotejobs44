@@ -55,7 +55,7 @@ const SOCIAL = [
   },
   {
     name: 'TikTok',
-    href: 'https://tiktok.com/@remotejobs44',
+    href: 'https://www.tiktok.com/@remotejobs_44',
     color: '#000000',
     svg: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">

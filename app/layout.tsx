@@ -114,7 +114,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 'https://x.com/remotejobs44',
                 'https://facebook.com/remotejobs44',
                 'https://linkedin.com/company/remotejobs44',
-                'https://tiktok.com/@remotejobs44',
+                'https://www.tiktok.com/@remotejobs_44',
                 'https://youtube.com/@remotejobs44'
               ],
               contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@remotejobs44.com' }
