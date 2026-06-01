@@ -18,32 +18,34 @@ import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 import type { Job } from '@/lib/types';
 
 // /api/jobs?ids= caps the IN list at 10, so fetch in chunks and merge.
-// Order within each chunk is preserved by the endpoint; we keep the
-// overall saved order by concatenating chunks in sequence.
-async function fetchJobsByIds(ids: string[]): Promise<Job[]> {
+// `ok` is false if ANY chunk failed so the caller can tell a transient
+// network error apart from jobs that are genuinely gone — otherwise a
+// single blip would wrongly tell the user their saves were removed.
+async function fetchJobsByIds(ids: string[]): Promise<{ jobs: Job[]; ok: boolean }> {
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+  let ok = true;
   const results = await Promise.all(
     chunks.map(chunk =>
       fetch(`/api/jobs?ids=${chunk.join(',')}`)
-        .then(r => (r.ok ? r.json() : { jobs: [] }))
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
         .then((d: { jobs?: Job[] }) => d.jobs ?? [])
-        .catch(() => [] as Job[]),
+        .catch(() => { ok = false; return [] as Job[]; }),
     ),
   );
-  return results.flat();
+  return { jobs: results.flat(), ok };
 }
 
 function SavedContent() {
   const router = useRouter();
   const savedJobIds    = useJobsStore(s => s.savedJobIds);
   const setSavedJobIds = useJobsStore(s => s.setSavedJobIds);
-  const [checked, setChecked] = useState(false);
-  const [jobs, setJobs]       = useState<Job[]>([]);
+  const [checked, setChecked]     = useState(false);
+  const [jobs, setJobs]           = useState<Job[]>([]);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    // Never hang the skeleton forever if the network stalls.
     const failsafe = setTimeout(() => { if (!cancelled) setChecked(true); }, 10000);
     (async () => {
       let ids: string[] = savedJobIds;
@@ -64,21 +66,23 @@ function SavedContent() {
         }
       } catch {}
       if (cancelled) return;
-      if (ids.length === 0) { setJobs([]); setChecked(true); return; }
-      const fetched = await fetchJobsByIds(ids);
-      if (!cancelled) { setJobs(fetched); setChecked(true); }
+      if (ids.length === 0) { setJobs([]); setLoadError(false); setChecked(true); return; }
+      const { jobs: fetched, ok } = await fetchJobsByIds(ids);
+      if (!cancelled) { setJobs(fetched); setLoadError(!ok); setChecked(true); }
     })();
     return () => { cancelled = true; clearTimeout(failsafe); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter the fetched details against the live store so an unsave on this
-  // page (JobCard's bookmark) removes the card immediately, and keep the
+  // page (JobCard's bookmark) removes the card instantly, and keep the
   // saved order from the store.
   const visible = savedJobIds
     .map(id => jobs.find(j => j.id === id))
     .filter((j): j is Job => !!j);
-  const unavailable = savedJobIds.length - visible.length;
+  // Only count ids as "gone" when the fetch actually succeeded — a failed
+  // chunk must not be reported as a permanently-removed job.
+  const unavailable = loadError ? 0 : savedJobIds.length - visible.length;
 
   if (!checked) return (
     <div className="max-w-[1200px] mx-auto px-5 py-8 animate-pulse">
@@ -107,7 +111,8 @@ function SavedContent() {
         </Link>
       </div>
 
-      {visible.length === 0 ? (
+      {savedJobIds.length === 0 ? (
+        // True empty state — nothing saved.
         <div className="card p-16 text-center">
           <BookmarkCheck className="w-12 h-12 text-stone-300 dark:text-stone-600 mx-auto mb-4" />
           <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">No saved jobs yet</h2>
@@ -119,6 +124,35 @@ function SavedContent() {
             Browse Jobs <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+      ) : visible.length === 0 ? (
+        loadError ? (
+          // Has saved ids, but the detail fetch failed — offer a retry, do
+          // NOT claim the jobs were removed.
+          <div className="card p-16 text-center">
+            <div className="text-5xl mb-3">⚠️</div>
+            <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">Couldn&rsquo;t load your saved jobs</h2>
+            <p className="text-stone-400 dark:text-stone-500 mb-6 max-w-sm mx-auto">
+              We hit a hiccup talking to the server — your saves are safe. Refresh to try again.
+            </p>
+            <button onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+              Try again
+            </button>
+          </div>
+        ) : (
+          // Has saved ids, fetch succeeded, but none are still active.
+          <div className="card p-16 text-center">
+            <BookmarkCheck className="w-12 h-12 text-stone-300 dark:text-stone-600 mx-auto mb-4" />
+            <h2 className="font-display font-bold text-xl text-stone-900 dark:text-stone-100 mb-2">Your saved jobs are no longer available</h2>
+            <p className="text-stone-400 dark:text-stone-500 mb-6 max-w-sm mx-auto">
+              The {savedJobIds.length === 1 ? 'job you saved has' : `${savedJobIds.length} jobs you saved have`} expired or been removed. Browse the latest openings below.
+            </p>
+            <Link href="/jobs"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+              Browse Jobs <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

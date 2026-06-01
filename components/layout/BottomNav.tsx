@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { House, BriefcaseBusiness, ClipboardCheck, CircleUserRound, Settings } from 'lucide-react';
+import { House, BriefcaseBusiness, BookmarkCheck, ClipboardCheck, CircleUserRound, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, useJobsStore } from '@/lib/store';
 
 const NAV = [
   { href: '/',             icon: House,              label: 'Home'     },
   { href: '/jobs',         icon: BriefcaseBusiness,  label: 'Jobs'     },
+  { href: '/saved',        icon: BookmarkCheck,      label: 'Saved'    },
   { href: '/applications', icon: ClipboardCheck,     label: 'Applied'  },
   { href: '/profile',      icon: CircleUserRound,    label: 'Profile'  },
   { href: '/settings',     icon: Settings,           label: 'Settings' },
@@ -20,7 +21,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-5 pb-safe"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-6 pb-safe"
       aria-label="Mobile navigation"
     >
       {NAV.map(({ href, icon: Icon, label }) => {
@@ -31,7 +32,7 @@ export function BottomNav() {
         // differed between server (no badge) and client-after-persist
         // (with badge), tripping React #418 on every page load.
         const showBadge = hydrated
-          && href === '/applications'
+          && href === '/saved'
           && isLoggedIn()
           && savedJobIds.length > 0;
         return (

@@ -150,6 +150,7 @@ function FilterSelect({ label, value, onChange, options, icon }: {
         {icon}{label}
       </label>
       <select
+        aria-label={label}
         value={value}
         onChange={e => onChange(e.target.value)}
         className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
@@ -179,6 +180,7 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (v: strin
         <MapPin className="w-3 h-3" />Country
       </label>
       <select
+        aria-label="Country"
         value={value}
         onChange={e => onChange(e.target.value)}
         className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
