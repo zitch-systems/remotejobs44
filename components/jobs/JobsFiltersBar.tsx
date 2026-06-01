@@ -12,7 +12,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, SlidersHorizontal, X, MapPin, Banknote, Briefcase, TrendingUp,
-  Clock, Globe2, Building2, Timer, Flag, Code2, Palette, BarChart2,
+  Clock, Globe2, Timer, Flag, Code2, Palette, BarChart2,
   DollarSign, Handshake, Database, Users, Package, Scale, Settings2, Sparkles,
 } from 'lucide-react';
 import { cn, CATEGORY_META } from '@/lib/utils';
@@ -79,12 +79,6 @@ const SORTS = [
   { value:'newest',   label:'Newest first'   },
   { value:'salary',   label:'Highest salary' },
   { value:'relevant', label:'Most relevant'  },
-];
-const COMPANY_SIZES = [
-  { value:'',       label:'Any size'          },
-  { value:'startup',label:'Startup (1–50)'    },
-  { value:'mid',    label:'Mid-size (51–500)' },
-  { value:'large',  label:'Large (500+)'      },
 ];
 const REGIONS = [
   { value:'',             label:'Any region'         },
@@ -221,13 +215,19 @@ export function JobsFiltersBar() {
   const timezone    = searchParams.get('timezone')    ?? '';
   const posted      = searchParams.get('posted')      ?? '';
   const remoteOnly  = (searchParams.get('remote') ?? 'true') !== 'false';
-  const companySize = searchParams.get('companySize') ?? '';
   const region      = searchParams.get('region')      ?? '';
   const country     = searchParams.get('country')     ?? '';
   const sort        = searchParams.get('sort')        ?? 'newest';
 
-  const activeFilterCount = [type, level, salary, timezone, posted, companySize, region, country].filter(Boolean).length;
+  const activeFilterCount = [type, level, salary, timezone, posted, region, country].filter(Boolean).length;
   const hasActiveChips = category !== 'all' || type || level || country || posted;
+
+  // "Most relevant" only ranks when there's a search term — relevance lives
+  // in the search_jobs FTS path, so with no `q` it silently fell back to
+  // newest-first. Only offer it while searching, and never let the <select>
+  // display an option the backend will ignore.
+  const sortOptions = q ? SORTS : SORTS.filter(s => s.value !== 'relevant');
+  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
 
   useEffect(() => { setSearchInput(q); }, [q]);
 
@@ -284,9 +284,9 @@ export function JobsFiltersBar() {
           )}
         </div>
         <div className="flex gap-2">
-          <select value={sort} onChange={e => setParam('sort', e.target.value)}
+          <select aria-label="Sort jobs" value={effectiveSort} onChange={e => setParam('sort', e.target.value)}
             className="input text-sm py-3 pl-3 pr-8 rounded-xl w-auto min-w-[140px]">
-            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {sortOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -335,21 +335,21 @@ export function JobsFiltersBar() {
         </button>
 
         <div className="relative">
-          <select value={type} onChange={e => setParam('type', e.target.value)}
+          <select aria-label="Filter by job type" value={type} onChange={e => setParam('type', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {TYPES.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Job Type' : o.label}</option>)}
           </select>
         </div>
 
         <div className="relative">
-          <select value={level} onChange={e => setParam('level', e.target.value)}
+          <select aria-label="Filter by experience level" value={level} onChange={e => setParam('level', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {LEVELS.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Level' : o.label}</option>)}
           </select>
         </div>
 
         <div className="relative">
-          <select value={posted} onChange={e => setParam('posted', e.target.value)}
+          <select aria-label="Filter by date posted" value={posted} onChange={e => setParam('posted', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {POSTED_WITHIN.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Posted Within' : o.label}</option>)}
           </select>
@@ -369,7 +369,7 @@ export function JobsFiltersBar() {
           {level   && <FilterChip label={LEVELS.find(l => l.value === level)?.label}   onRemove={() => setParam('level',   '')} />}
           {country && <FilterChip label={COUNTRIES.find(c => c.value === country)?.label?.replace(/^\S+\s/, '')} onRemove={() => setParam('country', '')} />}
           {posted  && <FilterChip label={POSTED_WITHIN.find(p => p.value === posted)?.label} onRemove={() => setParam('posted', '')} />}
-          {remoteOnly && <FilterChip label="Remote only" onRemove={() => setParam('remote', '')} />}
+          {remoteOnly && <FilterChip label="Remote only" onRemove={() => setParam('remote', 'false')} />}
         </div>
       )}
 
@@ -388,7 +388,6 @@ export function JobsFiltersBar() {
             )}
             <FilterSelect label="Timezone"     value={timezone}    onChange={v => setParam('timezone', v)}    options={TIMEZONES}     icon={<Timer className="w-3 h-3" />}        />
             <FilterSelect label="Posted"       value={posted}      onChange={v => setParam('posted', v)}      options={POSTED_WITHIN} icon={<Clock className="w-3 h-3" />}        />
-            <FilterSelect label="Company Size" value={companySize} onChange={v => setParam('companySize', v)} options={COMPANY_SIZES} icon={<Building2 className="w-3 h-3" />}    />
             <div className="flex items-end">
               {activeFilterCount > 0 && (
                 <button onClick={clearAll}

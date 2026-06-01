@@ -65,7 +65,6 @@ interface SearchParams {
   remote?:      string;
   region?:      string;
   country?:     string;
-  companySize?: string;
   sort?:        string;
   page?:        string;
 }
@@ -345,7 +344,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const q          = sp.q ?? '';
   const remoteOnly = (sp.remote ?? 'true') !== 'false';
   const salary     = sp.salary ?? '';
-  const activeFilterCount = ['type','level','salary','timezone','posted','companySize','region','country']
+  const activeFilterCount = ['type','level','salary','timezone','posted','region','country']
     .filter(k => sp[k as keyof SearchParams]).length;
   const hasActive = !!(q || (category && category !== 'all') || activeFilterCount > 0);
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
