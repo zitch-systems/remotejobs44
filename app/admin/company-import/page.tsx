@@ -170,7 +170,7 @@ export default function CompanyImportPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQ, setSearchQ] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveResult, setSaveResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [saveResult, setSaveResult] = useState<{ inserted: number; skipped: number; failed: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'import' | 'history'>('import');
   const [history, setHistory] = useState<ScrapeHistoryEntry[]>([]);
   const pauseRef = useRef(false);
@@ -430,9 +430,9 @@ export default function CompanyImportPage() {
     setSaving(true);
     setSaveResult(null);
 
-    // Flatten — no pre-save dedup. The DB unique index on apply_url was
-    // dropped in migration_v5 at user request, so every fetched row is
-    // inserted as-is, even if the same apply_url already exists.
+    // Flatten and let the server dedup. migration_v25 restored the unique
+    // index on apply_url, so /api/ats/save upserts on conflict — a posting
+    // already in the DB comes back counted in `skipped`, not re-inserted.
     const allJobs = doneEntries.flatMap(e => e.jobs ?? []);
 
     try {
@@ -445,7 +445,8 @@ export default function CompanyImportPage() {
         batches.push(allJobs.slice(i, i + SAVE_BATCH_SIZE));
       }
       let totalInserted = 0;
-      let totalSkipped  = 0;
+      let totalSkipped  = 0;  // existing postings deduped on apply_url
+      let totalFailed   = 0;  // rows that errored at the DB
       let firstError: string | null = null;
       // Capture the first per-batch DB error message so a partial-success
       // run can still surface what went wrong on the dead rows. Before
@@ -468,6 +469,7 @@ export default function CompanyImportPage() {
             if (!res.ok) { firstError = data.error ?? 'Failed to save jobs'; return; }
             totalInserted += data.inserted ?? 0;
             totalSkipped  += data.skipped  ?? 0;
+            totalFailed   += data.failed   ?? 0;
             if (!firstPartial && data.partial_error) firstPartial = data.partial_error;
           } catch (err: any) {
             firstError = err.message ?? 'Network error';
@@ -482,10 +484,12 @@ export default function CompanyImportPage() {
       }
       // Partial-failure path: show the DB error message so the admin
       // doesn't silently lose rows thinking they were just dedup'd.
-      if (firstPartial && totalSkipped > 0) {
-        alert(`Imported ${totalInserted}, ${totalSkipped} failed at DB. First error: ${firstPartial}`);
+      // `failed` is the count of rows that errored at the DB — distinct
+      // from `skipped`, which is existing postings deduped on apply_url.
+      if (firstPartial && totalFailed > 0) {
+        alert(`Imported ${totalInserted}, ${totalFailed} failed at DB. First error: ${firstPartial}`);
       }
-      const result = { inserted: totalInserted, skipped: totalSkipped };
+      const result = { inserted: totalInserted, skipped: totalSkipped, failed: totalFailed };
       setSaveResult(result);
 
       // Persist to scrape history
@@ -879,10 +883,14 @@ export default function CompanyImportPage() {
                 <span className="font-semibold text-brand-700 dark:text-brand-400">
                   {saveResult.inserted} saved
                 </span>
-                {/* "skipped" now means insert errored (DB constraint, bad
-                    payload). Duplicates no longer skip after migration_v5. */}
+                {/* `skipped` = existing postings deduped on apply_url
+                    (migration_v25); `failed` = rows that errored at the DB.
+                    Shown separately so a failure never looks like dedup. */}
                 {saveResult.skipped > 0 && (
-                  <span className="text-stone-400 dark:text-stone-500">· {saveResult.skipped} failed</span>
+                  <span className="text-stone-400 dark:text-stone-500">· {saveResult.skipped} duplicates</span>
+                )}
+                {saveResult.failed > 0 && (
+                  <span className="text-red-500 dark:text-red-400">· {saveResult.failed} failed</span>
                 )}
               </div>
             )}

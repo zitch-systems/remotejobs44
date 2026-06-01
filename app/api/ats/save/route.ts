@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
+import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { logError } from '@/lib/log';
 import type { Job } from '@/lib/types';
 
@@ -57,10 +58,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Transform camelCase Job to snake_case DB row. Every fetched job lands
-    // as a NEW row — apply_url uniqueness was dropped in migration_v5 at
-    // user request, so we no longer dedup at insert time. Same posting
-    // fetched via multiple URLs will appear N times in /jobs.
+    // Transform camelCase Job to snake_case DB row. Dedup happens after
+    // this map: rows are collapsed on apply_url and upserted against the
+    // unique index (migration_v25), so a posting already in the DB is
+    // skipped rather than duplicated.
     const rows = jobs.map(j => ({
       title:        j.title ?? 'Untitled',
       company:      j.company ?? 'Unknown',
@@ -89,8 +90,14 @@ export async function POST(req: NextRequest) {
       remote:       j.remote ?? true,
     }));
 
-    // Plain insert — no conflict handling. Each batch of 100 lands as 100
-    // new rows regardless of whether any apply_url already exists in DB.
+    // Collapse repeats inside this payload (a single ON CONFLICT command
+    // can't touch the same apply_url twice), then upsert with ON CONFLICT
+    // DO NOTHING against migration_v25's unique index. select('id')
+    // returns only the rows actually inserted, so `inserted` counts
+    // genuinely new postings; anything already in the DB is a skipped
+    // duplicate (computed below).
+    const deduped = dedupeByApplyUrl(rows);
+
     let inserted = 0;
     let failed   = 0;
     // Keep the first DB-error message so we can surface it in the
@@ -101,12 +108,12 @@ export async function POST(req: NextRequest) {
     // never saw why.
     let firstError: string | null = null;
 
-    for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
-      const batch = rows.slice(i, i + INSERT_CHUNK_SIZE);
+    for (let i = 0; i < deduped.length; i += INSERT_CHUNK_SIZE) {
+      const batch = deduped.slice(i, i + INSERT_CHUNK_SIZE);
 
       const { data, error } = await supabase
         .from('jobs')
-        .insert(batch)
+        .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
         .select('id');
 
       if (error) {
@@ -114,9 +121,15 @@ export async function POST(req: NextRequest) {
         if (!firstError) firstError = error.message;
         failed += batch.length;
       } else {
-        inserted += data?.length ?? batch.length;
+        // With ignoreDuplicates, data holds only the inserted rows —
+        // never default to batch.length or duplicates would inflate the count.
+        inserted += data?.length ?? 0;
       }
     }
+
+    // Whatever was submitted but neither inserted nor failed was an
+    // existing posting the unique index skipped.
+    const duplicates = Math.max(0, jobs.length - inserted - failed);
 
     // Revalidate jobs pages so newly saved jobs appear immediately
     try {
@@ -138,16 +151,17 @@ export async function POST(req: NextRequest) {
       metadata: { inserted, failed, total: jobs.length, sample_sources: sampleSources },
     });
 
-    // 502 when the entire batch died at the DB. The previous behaviour
-    // returned 200 with skipped=failed, which the frontend rendered as
-    // "X saved · Y skipped" and made a complete failure look like dedup.
-    // The benefits-as-text trigger bug burned two days of user activity
-    // this way.
+    // 502 only when rows actually died at the DB and nothing inserted.
+    // A batch that inserted nothing because every row was already in the
+    // DB is a success (skipped > 0, failed = 0), not a failure — so dedup
+    // can never masquerade as an error, and (the earlier fix) a real DB
+    // failure can never masquerade as dedup.
     if (inserted === 0 && failed > 0) {
       return NextResponse.json({
         success: false,
         inserted: 0,
-        skipped: failed,
+        skipped: duplicates,
+        failed,
         total: jobs.length,
         error: firstError ?? 'All rows failed to insert',
       }, { status: 502 });
@@ -156,11 +170,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       inserted,
-      // `skipped` is kept in the response shape for backward compatibility
-      // with the frontend that displays "X saved · Y skipped". With dedup
-      // disabled, "skipped" now only counts rows that failed to insert
-      // (DB error, bad shape) — duplicates no longer skip.
-      skipped: failed,
+      // `skipped` now means "already in the DB" — deduped on apply_url —
+      // which is the meaning the import UI's "X saved · Y skipped" label
+      // expects. Failed rows are reported separately so a DB failure can
+      // never hide inside the dedup count.
+      skipped: duplicates,
+      failed,
       total: jobs.length,
       // When some rows succeeded and some failed, hand the client the
       // first error message too so the admin sees what went wrong on
