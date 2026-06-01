@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         // region|city|industry|timezone/[slug]. Blocking the faceted
         // /jobs?...&page=N permutations keeps the crawl budget on the
         // pages we actually want indexed.
-        disallow: ['/admin', '/api/', '/dashboard', '/applications', '/profile', '/auth/', '/jobs?'],
+        disallow: ['/admin', '/api/', '/dashboard', '/applications', '/saved', '/profile', '/auth/', '/jobs?'],
       },
       {
         userAgent: 'GPTBot',
