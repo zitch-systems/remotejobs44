@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const title   = clamp(searchParams.get('title'),    'Find Remote Jobs');
   const company = clamp(searchParams.get('company'),  '');
   const salary  = clamp(searchParams.get('salary'),   '');
-  const sub     = clamp(searchParams.get('subtitle'), '50,000+ remote jobs • remotejobs44.com');
+  const sub     = clamp(searchParams.get('subtitle'), '70,000+ remote jobs • remotejobs44.com');
 
   return new ImageResponse(
     (
