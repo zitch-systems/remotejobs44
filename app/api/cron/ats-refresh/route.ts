@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const result = await refreshStaleATSBoards(supabase, { budgetMs: 45_000, maxBoards: 200 });
+    const result = await refreshStaleATSBoards(supabase, { budgetMs: 50_000, maxBoards: 300 });
 
     // Flush the public listings only when something actually changed, so a
     // no-op run leaves the warm cache alone.
