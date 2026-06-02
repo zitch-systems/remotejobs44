@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { DollarSign, TrendingUp, Calendar, Search } from 'lucide-react';
 import { formatRelativeDate, formatNumber } from '@/lib/utils';
 
@@ -19,27 +18,21 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function SubscriptionsPage() {
-  const supabase = createClient();
   const [subs, setSubs]     = useState<Sub[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ]           = useState('');
 
   useEffect(() => {
-    // Explicit column list — the old select('*') pulled
-    // paystack_subscription_code + paystack_email_token + customer_code
-    // into the browser. Admins have RLS access so PostgREST would
-    // return them, but those tokens shouldn't sit in a React tree the
-    // user (or a browser extension) could read off. The UI only reads
-    // the seven columns below.
-    supabase
-      .from('subscriptions')
-      .select('id, user_id, plan, billing, status, price, currency, current_period_start, current_period_end, profiles(name, email)')
-      .order('current_period_start', { ascending: false })
-      .range(0, 999) // PostgREST caps at 1000 anyway — make it explicit
-      // Cast through unknown because PostgREST's join inferred type is
-      // `profiles: { name; email; }[]` but the runtime shape is the
-      // single object Sub declares.
-      .then(({ data }) => { setSubs((data ?? []) as unknown as Sub[]); setLoading(false); });
+    // Server-side (service_role behind requireAdmin) so the page works for any
+    // admin regardless of profiles.role — a direct browser query is gated by
+    // the subscriptions RLS policy and returns nothing for a hardcoded-email
+    // admin. Mirrors /api/admin/stats and /api/admin/users. The endpoint
+    // returns only display columns (never the paystack_* tokens).
+    fetch('/api/admin/subscriptions', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { setSubs((d.subscriptions ?? []) as unknown as Sub[]); })
+      .catch(() => { /* keep empty on a transient failure */ })
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = subs.filter(s =>
