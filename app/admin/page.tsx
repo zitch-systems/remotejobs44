@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState(false);
   const [jobSearch, setJobSearch] = useState('');
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
@@ -99,6 +100,26 @@ export default function AdminPage() {
     setSyncing(false);
   }
 
+  // Sweep recent successful Paystack charges and credit any "paid but not
+  // reflected" users (redirect dropped + webhook missed). Idempotent server-side.
+  async function handleReconcile() {
+    setReconciling(true);
+    setSyncResult(null);
+    try {
+      const res  = await fetch('/api/admin/reconcile-payments', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncResult(`❌ Reconcile failed (${res.status}). ${data?.error ?? ''}`);
+        return;
+      }
+      const alreadyOk = (data.skippedRecorded ?? 0) + (data.skippedActive ?? 0);
+      setSyncResult(`✅ Reconcile done — credited ${data.credited ?? 0} of ${data.checked ?? 0} checked · ${alreadyOk} already OK${data.errors ? ` · ${data.errors} errors` : ''}.`);
+    } catch (err: any) {
+      setSyncResult(`❌ Reconcile failed. ${err?.message ?? 'Check console.'}`);
+    }
+    setReconciling(false);
+  }
+
   const filteredJobs = recentJobs.filter(j =>
     !jobSearch || j.title.toLowerCase().includes(jobSearch.toLowerCase()) || j.company.toLowerCase().includes(jobSearch.toLowerCase())
   );
@@ -141,6 +162,11 @@ export default function AdminPage() {
             className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing…' : 'Sync Jobs Now'}
+          </button>
+          <button onClick={handleReconcile} disabled={reconciling}
+            className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
+            <DollarSign className={`w-4 h-4 ${reconciling ? 'animate-pulse' : ''}`} />
+            {reconciling ? 'Reconciling…' : 'Reconcile Payments'}
           </button>
           <Link href="/admin/jobs/new"
             className="flex items-center gap-2 px-4 py-2 bg-brand-700 dark:bg-brand-500 text-white rounded-lg text-sm font-bold hover:bg-brand-600 transition-colors">

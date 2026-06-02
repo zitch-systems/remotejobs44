@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { Search, Shield, Zap, User, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { useUIStore } from '@/lib/store';
@@ -17,17 +16,7 @@ type SortBy     = 'newest' | 'oldest' | 'name' | 'plan';
 
 const PAGE_SIZE = 25;
 
-// Sort orderings — keyed off Supabase column names so we can pass them
-// directly to .order().
-const SORT_FIELDS: Record<SortBy, { col: string; asc: boolean }> = {
-  newest: { col: 'created_at', asc: false },
-  oldest: { col: 'created_at', asc: true  },
-  name:   { col: 'name',       asc: true  },
-  plan:   { col: 'plan',       asc: true  },
-};
-
 export default function AdminUsersPage() {
-  const supabase = createClient();
   const { toast } = useUIStore();
   const [users,   setUsers]   = useState<Profile[]>([]);
   const [total,   setTotal]   = useState(0);
@@ -128,50 +117,33 @@ export default function AdminUsersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { col, asc } = SORT_FIELDS[sortBy];
-    let query = supabase
-      .from('profiles')
-      // suspended is added in migration_v4 — Supabase ignores unknown columns
-      // in the select list on older schemas, so this is forward-compatible.
-      .select('id,name,email,plan,role,created_at,suspended', { count: 'exact' })
-      .order(col, { ascending: asc, nullsFirst: false })
-      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-
-    if (plan !== 'all') query = query.eq('plan', plan);
-    if (debouncedQ) {
-      // Strip the characters PostgREST's .or() syntax treats as
-      // structural — ',' is the condition separator, '(' / ')' delimit
-      // groups, '.' is the op separator. Without this a search like
-      // 'doe,j' breaks the parser. Also escape SQL LIKE wildcards so
-      // the user can't probe arbitrary patterns through the search box.
-      const sanitised = debouncedQ.replace(/[,()]/g, ' ').replace(/[\\%_]/g, '\\$&');
-      const like = `%${sanitised}%`;
-      query = query.or(`name.ilike.${like},email.ilike.${like}`);
+    try {
+      // Server-side list (service_role behind requireAdmin) so the page works
+      // for ANY admin — including hardcoded-email admins whose profiles.role
+      // isn't 'admin', who would otherwise be blocked by the profiles RLS
+      // policy on a direct browser query. Mirrors /api/admin/stats.
+      const params = new URLSearchParams({
+        plan, sort: sortBy, page: String(page), pageSize: String(PAGE_SIZE),
+      });
+      if (debouncedQ) params.set('q', debouncedQ);
+      const res  = await fetch(`/api/admin/users?${params.toString()}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers((data.users ?? []) as Profile[]);
+        setTotal(data.total ?? 0);
+        if (data.planTotals) setPlanTotals(data.planTotals);
+      }
+    } catch {
+      /* keep previous state on a transient failure */
+    } finally {
+      setLoading(false);
     }
-
-    const { data, count, error } = await query;
-    if (!error) {
-      setUsers((data ?? []) as Profile[]);
-      setTotal(count ?? 0);
-    }
-    setLoading(false);
-  }, [debouncedQ, plan, sortBy, page, supabase]);
+  }, [debouncedQ, plan, sortBy, page]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Plan counts: cheap separate queries, one per tier. Refreshed alongside
-  // the main list so the filter chips reflect the current truth.
-  useEffect(() => {
-    async function loadPlanTotals() {
-      const tiers: Array<keyof typeof planTotals> = ['free', 'daily', 'pro', 'admin'];
-      const results = await Promise.all(tiers.map(t =>
-        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('plan', t)
-          .then(({ count }) => [t, count ?? 0] as const)
-      ));
-      setPlanTotals(Object.fromEntries(results) as typeof planTotals);
-    }
-    loadPlanTotals();
-  }, [supabase]);
+  // Plan totals (filter-chip counts) come back with the list response from
+  // /api/admin/users and are applied in load() above.
 
   const planColor = (p: string) => ({
     free:  'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400',
