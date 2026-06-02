@@ -1,18 +1,12 @@
 // app/api/paystack/initialize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
+import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS, canPurchase } from '@/lib/paystack/plans';
+import { resolvePlan } from '@/lib/auth/plan';
 import { rateLimit, releaseRateLimit, getIP } from '@/lib/rate-limit';
 import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
-
-// Plan codes set in Paystack Dashboard → Subscriptions → Plans
-// For 'daily' we use a one-time charge, not a subscription plan
-const SUBSCRIPTION_PLAN_CODES: Record<string, string | undefined> = {
-  pro:        process.env.PAYSTACK_PRO_MONTHLY_PLAN_CODE,
-  pro_annual: process.env.PAYSTACK_PRO_ANNUAL_PLAN_CODE,
-};
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -71,6 +65,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Upgrade-only guard: you can only move *up* (free→daily→pro→annual),
+    // never re-buy the plan you already hold or downgrade. resolvePlan
+    // collapses the verify→webhook race and treats an expired plan as
+    // 'free', so a lapsed user can buy again. Runs before the rate-limit
+    // consume and any Paystack call, so a blocked attempt is free.
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('role, plan, plan_expires_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    const currentTier = resolvePlan({
+      role:          currentProfile?.role,
+      dbPlan:        currentProfile?.plan,
+      planExpiresAt: currentProfile?.plan_expires_at,
+    });
+    // Pro monthly and annual share the 'pro' tier, so pull billing to tell
+    // a monthly→annual upgrade (allowed) apart from a monthly re-buy (not).
+    let currentBilling: string | null = null;
+    if (currentTier === 'pro') {
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('billing')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      currentBilling = sub?.billing ?? null;
+    }
+    const decision = canPurchase({ tier: currentTier, billing: currentBilling }, plan);
+    if (!decision.ok) {
+      logWarn({ event: 'paystack.initialize.blocked_not_upgrade', user_id: user.id, requested: plan });
+      return NextResponse.json({ error: decision.reason }, { status: 409 });
+    }
+
     // Real abuse control: per-user, not per-IP, so users behind a shared
     // NAT get independent budgets. 5 successful initializations per hour
     // is plenty for a legitimate user.
@@ -87,8 +113,14 @@ export async function POST(req: NextRequest) {
     consumed = true;
 
     const amount = PLAN_AMOUNTS[plan];
-    const planCode = SUBSCRIPTION_PLAN_CODES[plan];
 
+    // Every tier is a one-time charge — we deliberately do NOT attach a
+    // Paystack `plan`/subscription. Two reasons: (1) Paystack restricts
+    // subscription checkouts to card only, whereas a plain charge offers
+    // every channel (card, bank, USSD, transfer); (2) it removes the
+    // plan-code dependency entirely. Access is time-boxed by
+    // plan_expires_at (Day Pass 24h, Pro 30d, Pro Annual 1y — see
+    // getPlanExpiry) and the user re-pays to renew when it lapses.
     const body: Record<string, any> = {
       email: user.email,
       amount,
@@ -101,12 +133,6 @@ export async function POST(req: NextRequest) {
       },
       channels: ['card', 'bank', 'ussd', 'bank_transfer'],
     };
-
-    // Pro plans use Paystack subscription (recurring)
-    // Daily pass is a one-time charge
-    if (planCode) {
-      body.plan = planCode;
-    }
 
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',

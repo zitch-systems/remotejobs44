@@ -74,3 +74,46 @@ export function chargeMatchesPlan(
   // Allow 1 naira (100 kobo) tolerance for rounding / fee accommodations.
   return Math.abs((amountKobo ?? 0) - expected) <= 100;
 }
+
+// Plan "rank" — higher means more access. Pro monthly and annual both map
+// to the 'pro' tier in profiles, so billing distinguishes them:
+//   free 0 · daily 1 · pro-monthly 2 · pro-annual 3
+function currentRank(tier: 'free' | 'daily' | 'pro' | 'admin', billing?: string | null): number {
+  if (tier === 'pro')   return billing === 'annually' ? 3 : 2;
+  if (tier === 'daily') return 1;
+  return 0; // 'free' (admin is handled before this is called)
+}
+
+function requestedRank(plan: PaymentPlan): number {
+  if (plan === 'pro_annual') return 3;
+  if (plan === 'pro')        return 2;
+  return 1; // daily
+}
+
+// Upgrade-only purchase rule. Given the user's *current effective plan*
+// (tier from resolvePlan, billing from their subscriptions row) and the
+// plan they want to buy, allow it only when it's a strict upgrade. This
+// stops a user re-paying for the plan they already hold and blocks
+// downgrades, while letting them move up — Day Pass → Pro, monthly →
+// annual, etc. free / expired (resolvePlan → 'free') and admin always pass.
+export function canPurchase(
+  current: { tier: 'free' | 'daily' | 'pro' | 'admin'; billing?: string | null },
+  requested: PaymentPlan,
+): { ok: true } | { ok: false; reason: string } {
+  if (current.tier === 'admin') return { ok: true }; // managed manually
+  const cur = currentRank(current.tier, current.billing);
+  const req = requestedRank(requested);
+  if (req > cur) return { ok: true };
+  if (req === cur) {
+    return {
+      ok: false,
+      reason: current.tier === 'daily'
+        ? "Your Day Pass is still active — you can upgrade to Pro, but you can't buy another Day Pass yet."
+        : "You're already on this plan. You can upgrade, but not re-buy the same plan while it's active.",
+    };
+  }
+  return {
+    ok: false,
+    reason: "You're already on a higher plan — you can change plans once your current one expires.",
+  };
+}

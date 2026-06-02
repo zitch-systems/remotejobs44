@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   PLAN_AMOUNTS_KOBO, isValidPlan, getPlanTier, getBilling,
-  getPlanExpiry, chargeMatchesPlan,
+  getPlanExpiry, chargeMatchesPlan, canPurchase,
 } from './plans';
 
 describe('isValidPlan', () => {
@@ -122,5 +122,46 @@ describe('getPlanExpiry', () => {
     const out  = getPlanExpiry('pro', from);
     expect(out.getUTCMonth()).toBe(4); // May
     expect(out.getUTCDate()).toBe(30);
+  });
+});
+
+describe('canPurchase', () => {
+  it('free / expired users can buy anything', () => {
+    expect(canPurchase({ tier: 'free' }, 'daily').ok).toBe(true);
+    expect(canPurchase({ tier: 'free' }, 'pro').ok).toBe(true);
+    expect(canPurchase({ tier: 'free' }, 'pro_annual').ok).toBe(true);
+  });
+
+  it('Day Pass blocks another Day Pass but allows a Pro upgrade', () => {
+    expect(canPurchase({ tier: 'daily' }, 'daily').ok).toBe(false);
+    expect(canPurchase({ tier: 'daily' }, 'pro').ok).toBe(true);
+    expect(canPurchase({ tier: 'daily' }, 'pro_annual').ok).toBe(true);
+  });
+
+  it('Pro monthly: upgrade to annual ok; re-buy / downgrade blocked', () => {
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro_annual').ok).toBe(true);
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'daily').ok).toBe(false);
+  });
+
+  it('Pro annual is the top tier — nothing left to buy', () => {
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'pro_annual').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'pro').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'daily').ok).toBe(false);
+  });
+
+  it('Pro with unknown billing is treated as monthly (annual upgrade allowed)', () => {
+    expect(canPurchase({ tier: 'pro' }, 'pro_annual').ok).toBe(true);
+    expect(canPurchase({ tier: 'pro' }, 'pro').ok).toBe(false);
+  });
+
+  it('admins are managed manually and may purchase', () => {
+    expect(canPurchase({ tier: 'admin' }, 'pro').ok).toBe(true);
+  });
+
+  it('blocked results carry a reason', () => {
+    const d = canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro');
+    expect(d.ok).toBe(false);
+    if (!d.ok) expect(d.reason).toMatch(/upgrade/i);
   });
 });
