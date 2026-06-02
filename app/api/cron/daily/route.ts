@@ -21,6 +21,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
 import { runIngest } from '@/lib/ingest-pipeline';
+import { reconcilePaystackCharges } from '@/lib/paystack/reconcile';
 import { requireCronSecret } from '@/lib/cron-auth';
 import { logError, logWarn } from '@/lib/log';
 
@@ -167,6 +168,19 @@ export async function GET(req: NextRequest) {
     purged:          purgedWebhooks ?? 0,
     retainDays:      WEBHOOK_RETAIN_DAYS,
   };
+
+  // ── TASK 3.6: Reconcile missed Paystack charges ─────────────────────────
+  // Safety net for "paid but not credited": if a buyer's post-payment redirect
+  // didn't complete AND the charge.success webhook wasn't delivered, the
+  // payment never reflects. Sweep recent successful charges and credit any user
+  // who paid but has no active access. Idempotent on paystack_reference + an
+  // active-access guard, so it never double-credits. See lib/paystack/reconcile.
+  try {
+    log.reconcile = await reconcilePaystackCharges(supabase, { sinceDays: 7, maxPages: 2 });
+  } catch (err: any) {
+    logError({ event: 'cron.daily.reconcile_failed', error: err?.message ?? String(err) });
+    log.reconcile = { error: err?.message ?? String(err) };
+  }
 
 
   // ── TASK 4: Send job alert emails to Pro users ────────────────────────
