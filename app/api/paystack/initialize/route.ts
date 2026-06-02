@@ -1,7 +1,8 @@
 // app/api/paystack/initialize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
+import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS, canPurchase } from '@/lib/paystack/plans';
+import { resolvePlan } from '@/lib/auth/plan';
 import { rateLimit, releaseRateLimit, getIP } from '@/lib/rate-limit';
 import { logError, logWarn } from '@/lib/log';
 
@@ -69,6 +70,30 @@ export async function POST(req: NextRequest) {
         { error: 'Please confirm your email address before subscribing. Check your inbox for the verification link.' },
         { status: 403 },
       );
+    }
+
+    // Upgrade-only guard: don't let a user re-subscribe to a plan they
+    // already actively hold — that would spin up a *second* Paystack
+    // subscription and double-bill them. resolvePlan collapses the
+    // verify→webhook race and treats an expired plan as 'free', so a
+    // lapsed user can still re-subscribe. Runs before the rate-limit
+    // consume and before any Paystack call, so a blocked attempt is free.
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('role, plan, plan_expires_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    const decision = canPurchase(
+      resolvePlan({
+        role:          currentProfile?.role,
+        dbPlan:        currentProfile?.plan,
+        planExpiresAt: currentProfile?.plan_expires_at,
+      }),
+      plan,
+    );
+    if (!decision.ok) {
+      logWarn({ event: 'paystack.initialize.blocked_not_upgrade', user_id: user.id, requested: plan });
+      return NextResponse.json({ error: decision.reason }, { status: 409 });
     }
 
     // Real abuse control: per-user, not per-IP, so users behind a shared

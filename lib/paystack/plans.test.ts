@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   PLAN_AMOUNTS_KOBO, isValidPlan, getPlanTier, getBilling,
-  getPlanExpiry, chargeMatchesPlan,
+  getPlanExpiry, chargeMatchesPlan, canPurchase,
 } from './plans';
 
 describe('isValidPlan', () => {
@@ -122,5 +122,35 @@ describe('getPlanExpiry', () => {
     const out  = getPlanExpiry('pro', from);
     expect(out.getUTCMonth()).toBe(4); // May
     expect(out.getUTCDate()).toBe(30);
+  });
+});
+
+describe('canPurchase', () => {
+  it('lets free / expired users buy anything', () => {
+    expect(canPurchase('free', 'daily').ok).toBe(true);
+    expect(canPurchase('free', 'pro').ok).toBe(true);
+    expect(canPurchase('free', 'pro_annual').ok).toBe(true);
+  });
+
+  it('blocks an active Pro user from re-subscribing to any plan', () => {
+    expect(canPurchase('pro', 'pro').ok).toBe(false);          // same plan
+    expect(canPurchase('pro', 'pro_annual').ok).toBe(false);   // needs change-plan flow
+    expect(canPurchase('pro', 'daily').ok).toBe(false);        // downgrade
+  });
+
+  it('blocks a second Day Pass but allows upgrading to Pro', () => {
+    expect(canPurchase('daily', 'daily').ok).toBe(false);
+    expect(canPurchase('daily', 'pro').ok).toBe(true);
+    expect(canPurchase('daily', 'pro_annual').ok).toBe(true);
+  });
+
+  it('admins are managed manually and may purchase', () => {
+    expect(canPurchase('admin', 'pro').ok).toBe(true);
+  });
+
+  it('gives a human-readable reason when blocked', () => {
+    const d = canPurchase('pro', 'pro');
+    expect(d.ok).toBe(false);
+    if (!d.ok) expect(d.reason).toMatch(/already have an active Pro/i);
   });
 });

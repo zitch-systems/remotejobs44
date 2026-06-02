@@ -74,3 +74,35 @@ export function chargeMatchesPlan(
   // Allow 1 naira (100 kobo) tolerance for rounding / fee accommodations.
   return Math.abs((amountKobo ?? 0) - expected) <= 100;
 }
+
+// Upgrade-only purchase rule. Given the user's *current effective plan*
+// (as returned by resolvePlan) and the plan they're trying to buy, decide
+// whether the purchase may proceed. The point is to stop a user paying for
+// something they already have: re-subscribing while a plan is active would
+// spin up a *second* Paystack subscription and double-bill them.
+//
+//   - Active Pro blocks every purchase (daily, pro, pro_annual). Switching
+//     monthly↔annual needs a cancel-first "change plan" flow we don't have
+//     yet, so it's treated as "already subscribed" rather than silently
+//     stacking two recurring subscriptions.
+//   - An active Day Pass blocks buying another Day Pass, but a Pro upgrade
+//     is allowed.
+//   - free / expired (resolvePlan returns 'free') and admin can buy.
+export function canPurchase(
+  current: 'free' | 'daily' | 'pro' | 'admin',
+  requested: PaymentPlan,
+): { ok: true } | { ok: false; reason: string } {
+  if (current === 'pro') {
+    return {
+      ok: false,
+      reason: 'You already have an active Pro subscription. Manage or change it from your billing page.',
+    };
+  }
+  if (current === 'daily' && requested === 'daily') {
+    return {
+      ok: false,
+      reason: "Your Day Pass is still active — you can upgrade to Pro, but you can't buy another Day Pass yet.",
+    };
+  }
+  return { ok: true };
+}
