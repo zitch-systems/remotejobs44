@@ -5,6 +5,7 @@ import { CategoriesSection } from '@/components/home/CategoriesSection';
 import { FeaturedJobs }      from '@/components/home/FeaturedJobs';
 import { HowItWorks }        from '@/components/home/HowItWorks';
 import { PricingPreview }    from '@/components/home/PricingPreview';
+import { GetTheAppSection }  from '@/components/home/GetTheAppSection';
 import { CTASection }        from '@/components/home/CTASection';
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function HomePage() {
       <FeaturedJobs />
       <HowItWorks />
       <PricingPreview />
+      <GetTheAppSection />
       <CTASection />
     </>
   );
