@@ -71,6 +71,18 @@ export function CTASection() {
               </svg>
             </a>
             <a
+              href="https://www.tiktok.com/@remotejobs_44"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="RemoteJobs44 on TikTok"
+              title="TikTok"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/40 transition-colors"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
+                <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.2 8.2 0 004.79 1.53V6.77a4.85 4.85 0 01-1.02-.08z"/>
+              </svg>
+            </a>
+            <a
               href="mailto:hello@remotejobs44.com"
               aria-label="Email RemoteJobs44"
               title="Email hello@remotejobs44.com"

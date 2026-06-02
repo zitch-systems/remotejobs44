@@ -10,7 +10,7 @@ import { CTASection }        from '@/components/home/CTASection';
 export const metadata: Metadata = {
   title: 'RemoteJobs44 – Global Remote Jobs',
   description:
-    'Find 50,000+ remote jobs from top companies worldwide. Engineering, design, marketing, finance and more. Subscribe from ₦500.',
+    'Search over 70,000+ remote jobs from top companies worldwide. Engineering, design, marketing, finance and more.',
 };
 
 export default function HomePage() {
