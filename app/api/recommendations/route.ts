@@ -142,8 +142,11 @@ export async function GET() {
       jobs: scored.map((j: any) => transform(j, seePaid)),
       total: scored.length,
       // Surface enough about the source so the UI can label correctly
-      // ("Picked from your saved jobs" vs "Featured remote roles").
-      basis: seenIds.length > 0 ? 'history' : 'featured',
+      // ("Picked from your saved jobs" vs "Featured remote roles"). Key
+      // off whether we actually extracted signals — a user whose history
+      // is all null-category/empty-skills falls into the featured branch,
+      // so reporting 'history' just because seenIds>0 would mislabel it.
+      basis: (categories.length > 0 || skills.length > 0) ? 'history' : 'featured',
     });
   } catch (err: any) {
     logError({ event: 'recommendations.failed', user_id: user.id, error: err?.message ?? String(err) });

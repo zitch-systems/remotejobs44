@@ -194,7 +194,13 @@ export async function GET(req: NextRequest) {
         .from('jobs')
         .select('id, title, company, location, category')
         .eq('is_active', true)
-        .gte('posted_at', yesterday)
+        // Gate on created_at (when WE ingested the row), not posted_at.
+        // Feeds report the upstream publish date, which is routinely days/
+        // weeks old, so a job ingested today but published last week never
+        // entered the "new since yesterday" set and the alert emails went
+        // out mostly empty. created_at is our own insert timestamp.
+        .gte('created_at', yesterday)
+        .order('created_at', { ascending: false })
         .limit(500);
 
       const allCandidates = newJobs ?? [];

@@ -327,12 +327,12 @@ function ProfileContent() {
         </h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Full name</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Your name" maxLength={120} />
+            <label htmlFor="profile-name" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Full name</label>
+            <input id="profile-name" value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Your name" maxLength={120} />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Email address</label>
-            <input value={user.email} disabled className="input opacity-60 cursor-not-allowed" />
+            <label htmlFor="profile-email" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Email address</label>
+            <input id="profile-email" value={user.email} disabled className="input opacity-60 cursor-not-allowed" />
             <p className="text-[11px] text-stone-400 mt-1">Email is managed via Supabase auth. Contact support to change it.</p>
           </div>
           <button type="submit" disabled={saving || !name.trim() || name.trim() === user.name}
@@ -399,12 +399,12 @@ function ProfileContent() {
 
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Target role</label>
-            <input type="text" value={targetRole} onChange={e => setTargetRole(e.target.value)} className="input text-sm" placeholder="e.g. Senior Backend Engineer" maxLength={100} />
+            <label htmlFor="profile-target-role" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Target role</label>
+            <input id="profile-target-role" type="text" value={targetRole} onChange={e => setTargetRole(e.target.value)} className="input text-sm" placeholder="e.g. Senior Backend Engineer" maxLength={100} />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Your CV text</label>
-            <textarea value={cvText} onChange={e => setCvText(e.target.value)} rows={6} maxLength={12000}
+            <label htmlFor="profile-cv-text" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Your CV text</label>
+            <textarea id="profile-cv-text" value={cvText} onChange={e => setCvText(e.target.value)} rows={6} maxLength={12000}
               placeholder="Paste your CV / résumé text here (max 12,000 chars)…"
               className="input text-sm font-mono resize-y" />
           </div>

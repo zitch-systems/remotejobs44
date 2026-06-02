@@ -226,25 +226,28 @@ export default function RegisterPage() {
               </label>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Full name</label>
+              <label htmlFor="reg-name" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Full name</label>
               <input
+                id="reg-name"
                 type="text" required value={name} onChange={e => setName(e.target.value)}
                 placeholder="Jane Smith" className="input" autoComplete="name"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Email address</label>
+              <label htmlFor="reg-email" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Email address</label>
               <input
+                id="reg-email"
                 type="email" required value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com" className="input" autoComplete="email"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Password</label>
+              <label htmlFor="reg-password" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Password</label>
               <div className="relative">
                 <input
+                  id="reg-password"
                   type={showPass ? 'text' : 'password'} required value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Create a strong password" className="input pr-10"

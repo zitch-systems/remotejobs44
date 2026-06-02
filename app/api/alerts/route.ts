@@ -53,13 +53,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { category, keywords, frequency } = body;
+  const { category, keywords } = body;
 
   // Whitelist + length-cap inputs so a malicious client can't write
   // megabytes of junk into the alerts table.
   const safeCategory  = category  != null ? String(category).slice(0, 50)  : null;
   const safeKeywords  = keywords  != null ? String(keywords).slice(0, 200) : null;
-  const safeFrequency = ['daily','weekly'].includes(frequency) ? frequency : 'daily';
 
   const { data, error } = await supabase
     .from('job_alerts')
@@ -67,7 +66,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       category: safeCategory,
       keywords: safeKeywords,
-      frequency: safeFrequency,
+      frequency: 'daily', // only 'daily' is supported — the daily cron has no weekly sender
       active: true,
     })
     .select()
