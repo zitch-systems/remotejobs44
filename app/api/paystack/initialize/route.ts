@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS } from '@/lib/paystack/plans';
-import { rateLimit, getIP } from '@/lib/rate-limit';
+import { rateLimit, releaseRateLimit, getIP } from '@/lib/rate-limit';
 import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
@@ -14,21 +14,36 @@ const SUBSCRIPTION_PLAN_CODES: Record<string, string | undefined> = {
   pro_annual: process.env.PAYSTACK_PRO_ANNUAL_PLAN_CODE,
 };
 
+const HOUR_MS = 60 * 60 * 1000;
+
 export async function POST(req: NextRequest) {
-  // Per-IP rate-limit: payment-init is a free outbound hop to Paystack.
-  // A bot loop creating Paystack reference objects costs us API quota and
-  // pollutes the merchant dashboard. 5/hour per IP is plenty for legit
-  // users (a single user only ever clicks "subscribe" a handful of times).
+  // Coarse per-IP flood guard. Reaching the outbound Paystack call below
+  // requires an authenticated, email-confirmed user, so the meaningful
+  // abuse control is the per-user limit further down. This IP cap only
+  // stops an unauthenticated request flood from hammering Supabase auth,
+  // and is deliberately generous: many legitimate users share a single
+  // carrier-grade NAT IP (very common on Nigerian mobile networks), so a
+  // tight per-IP cap locks real users out of each other's budgets — which
+  // is exactly the bug this route used to have (5 / IP / hour).
   const ip = getIP(req);
-  const rl = rateLimit(`paystack-init:${ip}`, 5, 60 * 60 * 1000);
-  if (!rl.success) {
-    const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
-    logWarn({ event: 'paystack.initialize.rate_limited', ip });
+  const ipRl = rateLimit(`paystack-init:ip:${ip}`, 30, HOUR_MS);
+  if (!ipRl.success) {
+    const retryAfter = Math.max(1, Math.ceil((ipRl.resetAt - Date.now()) / 1000));
+    logWarn({ event: 'paystack.initialize.ip_cap_hit', ip });
     return NextResponse.json(
-      { error: `Too many subscription attempts. Try again in ${retryAfter} seconds.` },
+      { error: `Too many requests. Try again in ${retryAfter} seconds.` },
       { status: 429, headers: { 'Retry-After': String(retryAfter) } },
     );
   }
+
+  // Per-user rate-limit bookkeeping. Only a *successful* initialization
+  // should count against the user's hourly budget — a failure on our side
+  // (Paystack rejecting the call, a bad redirect, an exception) creates no
+  // Paystack reference object, so the token is refunded in `finally`. This
+  // stops our own outages from locking a paying user out after a few clicks.
+  let rlKey: string | null = null;
+  let consumed = false;
+  let started  = false;
 
   try {
     // Prefer NEXT_PUBLIC_APP_URL to avoid localhost bleed on Paystack callback
@@ -55,6 +70,21 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    // Real abuse control: per-user, not per-IP, so users behind a shared
+    // NAT get independent budgets. 5 successful initializations per hour
+    // is plenty for a legitimate user.
+    rlKey = `paystack-init:${user.id}`;
+    const rl = rateLimit(rlKey, 5, HOUR_MS);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+      logWarn({ event: 'paystack.initialize.rate_limited', user_id: user.id });
+      return NextResponse.json(
+        { error: `Too many subscription attempts. Try again in ${retryAfter} seconds.` },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
+    }
+    consumed = true;
 
     const amount = PLAN_AMOUNTS[plan];
     const planCode = SUBSCRIPTION_PLAN_CODES[plan];
@@ -94,7 +124,8 @@ export async function POST(req: NextRequest) {
       // failure strings sometimes include integration hints
       // ("Invalid key", "Plan code X not found", "Test mode key on live
       // call") that leak more about our merchant config than a generic
-      // message would.
+      // message would. The full upstream payload is logged so we can
+      // diagnose the real cause server-side.
       logError({ event: 'paystack.initialize.upstream_error', upstream_data: data });
       return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
     }
@@ -118,6 +149,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payment initialization failed. Please try again.' }, { status: 500 });
     }
 
+    // Init succeeded and the redirect target is trusted — keep the
+    // consumed token (don't refund) and hand the URL to the client.
+    started = true;
     return NextResponse.json({
       success: true,
       authorizationUrl,
@@ -128,5 +162,10 @@ export async function POST(req: NextRequest) {
     // Generic message — Paystack SDK / env errors can carry internal
     // detail that doesn't belong on a public response.
     return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 500 });
+  } finally {
+    // Refund the per-user token unless we actually started a Paystack
+    // session. A failed init creates no Paystack reference object, so it
+    // must not count against the user's hourly budget.
+    if (consumed && !started && rlKey) releaseRateLimit(rlKey);
   }
 }

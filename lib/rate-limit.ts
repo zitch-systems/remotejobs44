@@ -52,6 +52,20 @@ export function rateLimit(
   return { success: true, remaining: limit - entry.count, resetAt: entry.resetAt };
 }
 
+/**
+ * Refund a single token previously consumed via rateLimit(). Use when the
+ * guarded action failed for a reason that shouldn't count against the
+ * caller's budget (e.g. a server-side error that created no real resource).
+ * No-op if the key is unknown or its window has already reset; never drops
+ * the count below zero.
+ */
+export function releaseRateLimit(key: string): void {
+  const entry = store.get(key);
+  if (entry && entry.resetAt > Date.now() && entry.count > 0) {
+    entry.count -= 1;
+  }
+}
+
 /** Extract the best available IP from a Next.js request */
 export function getIP(req: Request): string {
   const headers = new Headers((req as Request).headers);
