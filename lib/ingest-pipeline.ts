@@ -23,13 +23,41 @@ import { logInfo, logWarn, logError } from '@/lib/log';
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
 const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
 
+// Per-source cap. Each feed exposes its newest postings; we take up to this
+// many so a still-listed job keeps getting its last_seen_at refreshed and we
+// ingest more than the old hard-coded 50. RemoteOK / WorkingNomads return
+// their whole board, so for them this is the real limiter.
+const MAX_JOBS_PER_SOURCE = 200;
+
 // Shared fetch helper — throws on non-2xx so we don't try to .json() a 404 HTML
 // page or 500 error body. The per-source try/catch in runIngest catches the
 // throw and isolates the failure to that one source.
+//
+// Two resiliency touches for the free feeds: (1) send a browser-ish
+// User-Agent by default — RemoteOK / Jobicy and friends reject the bare
+// Node/undici UA — and (2) retry once on any transient failure (network blip,
+// 429/5xx, timeout) with a short backoff. We set a fresh AbortSignal per
+// attempt (overriding any caller-supplied one) so a first-attempt timeout
+// doesn't instantly fail the retry with an already-aborted signal.
 async function getJson(url: string, init?: RequestInit): Promise<any> {
-  const r = await fetch(url, init);
-  if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText} ${url}`);
-  return r.json();
+  const headers = new Headers(init?.headers);
+  if (!headers.has('user-agent')) {
+    headers.set('User-Agent', 'Mozilla/5.0 (compatible; RemoteJobs44/1.0; +https://remotejobs44.com)');
+  }
+  if (!headers.has('accept')) headers.set('Accept', 'application/json, */*');
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise(res => setTimeout(res, 600 * attempt));
+    try {
+      const r = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText} ${url}`);
+      return await r.json();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 // Defensive array accessor — any free public API can suddenly return a wrapper
@@ -51,7 +79,7 @@ const SOURCES: Source[] = [
     name: 'Remotive',
     sourceUrl: 'https://remotive.com/api/remote-jobs',
     fetch: async () => {
-      const d = await getJson('https://remotive.com/api/remote-jobs?limit=50', { signal: AbortSignal.timeout(15000) });
+      const d = await getJson('https://remotive.com/api/remote-jobs?limit=200', { signal: AbortSignal.timeout(15000) });
       return asArray(d.jobs);
     },
     normalise: (j) => ({
@@ -159,7 +187,7 @@ const SOURCES: Source[] = [
     name: 'Himalayas',
     sourceUrl: 'https://himalayas.app/jobs/api',
     fetch: async () => {
-      const d = await getJson('https://himalayas.app/jobs/api?limit=50', {
+      const d = await getJson('https://himalayas.app/jobs/api?limit=100', {
         headers: { 'User-Agent': 'RemoteJobs44/1.0 (hello@remotejobs44.com)' },
         signal: AbortSignal.timeout(15000),
       });
@@ -327,7 +355,7 @@ export async function runIngest(): Promise<IngestResult> {
     }
     try {
       const raw = await source.fetch();
-      const jobs = raw.slice(0, 50)
+      const jobs = raw.slice(0, MAX_JOBS_PER_SOURCE)
         .map(source.normalise)
         .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
         .map(j => {
@@ -362,7 +390,7 @@ export async function runIngest(): Promise<IngestResult> {
 
       if (error) {
         results[source.name] = `db error: ${error.message}`;
-        await recordSourceRun(supabase, source, 0, 'error');
+        await recordSourceRun(supabase, source, 0, 'error', error.message);
       } else {
         const n = inserted?.length ?? 0;
         results[source.name] = n;
@@ -379,7 +407,7 @@ export async function runIngest(): Promise<IngestResult> {
     } catch (err: any) {
       logError({ event: 'ingest.source_failed', source: source.name, error: err.message });
       results[source.name] = `error: ${err.message}`;
-      await recordSourceRun(supabase, source, 0, 'error');
+      await recordSourceRun(supabase, source, 0, 'error', err.message);
     }
   }
 
@@ -406,7 +434,7 @@ export async function runIngest(): Promise<IngestResult> {
       const v = validateExternalUrl(row.url);
       if (!v.ok) {
         results[label] = `error: blocked URL (${v.error})`;
-        await markSourceStatus(supabase, row.id, 'error', 0);
+        await markSourceStatus(supabase, row.id, 'error', 0, `blocked URL (${v.error})`);
         continue;
       }
       try {
@@ -424,7 +452,7 @@ export async function runIngest(): Promise<IngestResult> {
         const parsed = parseFeed(body, res.headers.get('content-type') ?? '', row.url);
         if (parsed.method === 'unknown') {
           results[label] = `error: ${parsed.error ?? 'unrecognised format'}`;
-          await markSourceStatus(supabase, row.id, 'error', 0);
+          await markSourceStatus(supabase, row.id, 'error', 0, parsed.error ?? 'unrecognised format');
           continue;
         }
 
@@ -448,7 +476,7 @@ export async function runIngest(): Promise<IngestResult> {
           .select('id');
         if (insErr) {
           results[label] = `db error: ${insErr.message}`;
-          await markSourceStatus(supabase, row.id, 'error', 0);
+          await markSourceStatus(supabase, row.id, 'error', 0, insErr.message);
         } else {
           const n = inserted?.length ?? 0;
           results[label] = n;
@@ -459,7 +487,7 @@ export async function runIngest(): Promise<IngestResult> {
       } catch (err: any) {
         logError({ event: 'ingest.user_source_failed', source: label, error: err.message });
         results[label] = `error: ${err.message}`;
-        await markSourceStatus(supabase, row.id, 'error', 0);
+        await markSourceStatus(supabase, row.id, 'error', 0, err.message);
       }
     }
   } catch (err: any) {
@@ -513,6 +541,7 @@ async function markSourceStatus(
   id: string,
   status: 'active' | 'error',
   jobsAdded: number,
+  errorMessage: string | null = null,
 ) {
   try {
     await supabase
@@ -521,6 +550,7 @@ async function markSourceStatus(
         status,
         last_sync_at: new Date().toISOString(),
         jobs_added:   jobsAdded,
+        error_message: status === 'active' ? null : (errorMessage ?? null),
       })
       .eq('id', id);
   } catch {}
@@ -530,7 +560,8 @@ async function recordSourceRun(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
   source: Source,
   added: number,
-  status: 'ok' | 'error'
+  status: 'ok' | 'error',
+  errorMessage: string | null = null,
 ) {
   try {
     await supabase.from('job_sources').upsert({
@@ -540,6 +571,10 @@ async function recordSourceRun(
       status: status === 'ok' ? 'active' : 'error',
       last_sync_at: new Date().toISOString(),
       jobs_added: added,
+      // Persist the failure so /admin/sources shows WHY a feed broke instead
+      // of a blank row; clear it on a clean run so a recovered source looks
+      // healthy again rather than carrying a stale error forever.
+      error_message: status === 'ok' ? null : (errorMessage ?? null),
     }, { onConflict: 'url' });
   } catch {}
 }

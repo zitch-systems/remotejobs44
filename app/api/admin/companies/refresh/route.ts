@@ -14,6 +14,7 @@ import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
+import { touchLastSeen } from '@/lib/jobs-last-seen';
 
 // Same statement_timeout issue as /api/ats/save — see comment
 // there. The search_vector trigger + GIN index on the 180k-row
@@ -134,6 +135,14 @@ export async function POST(req: NextRequest) {
     // to batch.length or skipped duplicates would inflate `added`.
     added += data?.length ?? 0;
   }
+
+  // Keep every still-listed posting alive. The ON CONFLICT DO NOTHING upsert
+  // above only stamps last_seen_at on genuinely-new rows, so without this the
+  // company's existing postings would still age out of the 60-day staleness
+  // sweep 60 days after we first inserted them — even though this very refresh
+  // just confirmed the company still lists them. Best-effort; never blocks.
+  await touchLastSeen(admin, deduped.map(r => r.apply_url));
+
   // Surface a 502 only when a chunk actually errored at the DB and nothing
   // new was added. All-duplicates (added 0, no error) is the normal result
   // of refreshing a board that hasn't changed — not a failure.
