@@ -75,34 +75,45 @@ export function chargeMatchesPlan(
   return Math.abs((amountKobo ?? 0) - expected) <= 100;
 }
 
+// Plan "rank" — higher means more access. Pro monthly and annual both map
+// to the 'pro' tier in profiles, so billing distinguishes them:
+//   free 0 · daily 1 · pro-monthly 2 · pro-annual 3
+function currentRank(tier: 'free' | 'daily' | 'pro' | 'admin', billing?: string | null): number {
+  if (tier === 'pro')   return billing === 'annually' ? 3 : 2;
+  if (tier === 'daily') return 1;
+  return 0; // 'free' (admin is handled before this is called)
+}
+
+function requestedRank(plan: PaymentPlan): number {
+  if (plan === 'pro_annual') return 3;
+  if (plan === 'pro')        return 2;
+  return 1; // daily
+}
+
 // Upgrade-only purchase rule. Given the user's *current effective plan*
-// (as returned by resolvePlan) and the plan they're trying to buy, decide
-// whether the purchase may proceed. The point is to stop a user paying for
-// something they already have: re-subscribing while a plan is active would
-// spin up a *second* Paystack subscription and double-bill them.
-//
-//   - Active Pro blocks every purchase (daily, pro, pro_annual). Switching
-//     monthly↔annual needs a cancel-first "change plan" flow we don't have
-//     yet, so it's treated as "already subscribed" rather than silently
-//     stacking two recurring subscriptions.
-//   - An active Day Pass blocks buying another Day Pass, but a Pro upgrade
-//     is allowed.
-//   - free / expired (resolvePlan returns 'free') and admin can buy.
+// (tier from resolvePlan, billing from their subscriptions row) and the
+// plan they want to buy, allow it only when it's a strict upgrade. This
+// stops a user re-paying for the plan they already hold and blocks
+// downgrades, while letting them move up — Day Pass → Pro, monthly →
+// annual, etc. free / expired (resolvePlan → 'free') and admin always pass.
 export function canPurchase(
-  current: 'free' | 'daily' | 'pro' | 'admin',
+  current: { tier: 'free' | 'daily' | 'pro' | 'admin'; billing?: string | null },
   requested: PaymentPlan,
 ): { ok: true } | { ok: false; reason: string } {
-  if (current === 'pro') {
+  if (current.tier === 'admin') return { ok: true }; // managed manually
+  const cur = currentRank(current.tier, current.billing);
+  const req = requestedRank(requested);
+  if (req > cur) return { ok: true };
+  if (req === cur) {
     return {
       ok: false,
-      reason: 'You already have an active Pro subscription. Manage or change it from your billing page.',
+      reason: current.tier === 'daily'
+        ? "Your Day Pass is still active — you can upgrade to Pro, but you can't buy another Day Pass yet."
+        : "You're already on this plan. You can upgrade, but not re-buy the same plan while it's active.",
     };
   }
-  if (current === 'daily' && requested === 'daily') {
-    return {
-      ok: false,
-      reason: "Your Day Pass is still active — you can upgrade to Pro, but you can't buy another Day Pass yet.",
-    };
-  }
-  return { ok: true };
+  return {
+    ok: false,
+    reason: "You're already on a higher plan — you can change plans once your current one expires.",
+  };
 }

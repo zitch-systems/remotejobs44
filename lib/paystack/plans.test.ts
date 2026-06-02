@@ -126,31 +126,42 @@ describe('getPlanExpiry', () => {
 });
 
 describe('canPurchase', () => {
-  it('lets free / expired users buy anything', () => {
-    expect(canPurchase('free', 'daily').ok).toBe(true);
-    expect(canPurchase('free', 'pro').ok).toBe(true);
-    expect(canPurchase('free', 'pro_annual').ok).toBe(true);
+  it('free / expired users can buy anything', () => {
+    expect(canPurchase({ tier: 'free' }, 'daily').ok).toBe(true);
+    expect(canPurchase({ tier: 'free' }, 'pro').ok).toBe(true);
+    expect(canPurchase({ tier: 'free' }, 'pro_annual').ok).toBe(true);
   });
 
-  it('blocks an active Pro user from re-subscribing to any plan', () => {
-    expect(canPurchase('pro', 'pro').ok).toBe(false);          // same plan
-    expect(canPurchase('pro', 'pro_annual').ok).toBe(false);   // needs change-plan flow
-    expect(canPurchase('pro', 'daily').ok).toBe(false);        // downgrade
+  it('Day Pass blocks another Day Pass but allows a Pro upgrade', () => {
+    expect(canPurchase({ tier: 'daily' }, 'daily').ok).toBe(false);
+    expect(canPurchase({ tier: 'daily' }, 'pro').ok).toBe(true);
+    expect(canPurchase({ tier: 'daily' }, 'pro_annual').ok).toBe(true);
   });
 
-  it('blocks a second Day Pass but allows upgrading to Pro', () => {
-    expect(canPurchase('daily', 'daily').ok).toBe(false);
-    expect(canPurchase('daily', 'pro').ok).toBe(true);
-    expect(canPurchase('daily', 'pro_annual').ok).toBe(true);
+  it('Pro monthly: upgrade to annual ok; re-buy / downgrade blocked', () => {
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro_annual').ok).toBe(true);
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'monthly' }, 'daily').ok).toBe(false);
+  });
+
+  it('Pro annual is the top tier — nothing left to buy', () => {
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'pro_annual').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'pro').ok).toBe(false);
+    expect(canPurchase({ tier: 'pro', billing: 'annually' }, 'daily').ok).toBe(false);
+  });
+
+  it('Pro with unknown billing is treated as monthly (annual upgrade allowed)', () => {
+    expect(canPurchase({ tier: 'pro' }, 'pro_annual').ok).toBe(true);
+    expect(canPurchase({ tier: 'pro' }, 'pro').ok).toBe(false);
   });
 
   it('admins are managed manually and may purchase', () => {
-    expect(canPurchase('admin', 'pro').ok).toBe(true);
+    expect(canPurchase({ tier: 'admin' }, 'pro').ok).toBe(true);
   });
 
-  it('gives a human-readable reason when blocked', () => {
-    const d = canPurchase('pro', 'pro');
+  it('blocked results carry a reason', () => {
+    const d = canPurchase({ tier: 'pro', billing: 'monthly' }, 'pro');
     expect(d.ok).toBe(false);
-    if (!d.ok) expect(d.reason).toMatch(/already have an active Pro/i);
+    if (!d.ok) expect(d.reason).toMatch(/upgrade/i);
   });
 });
