@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Briefcase } from 'lucide-react';
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight, ArrowUpRight, Briefcase } from 'lucide-react';
 import { useJobsStore } from '@/lib/store';
 import { formatRelativeDate } from '@/lib/utils';
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
@@ -117,12 +117,13 @@ function ApplicationsContent() {
                 {byStatus.active.map(app => {
                   const cfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
                   return (
-                    <div key={app.id} className="card p-4 flex items-center gap-4 hover:border-brand-600 dark:hover:border-brand-500 transition-colors">
+                    <Link key={app.id} href={`/jobs/${app.jobId}`} title="Open job — re-open the application link"
+                      className="card p-4 flex items-center gap-4 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group">
                       <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-sm font-black text-brand-700 dark:text-brand-400 shrink-0">
                         {(app.companyLogo ?? app.company[0]).toString()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate">{app.jobTitle}</p>
+                        <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{app.jobTitle}</p>
                         <p className="text-xs text-stone-400 dark:text-stone-500">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                       </div>
                       {/* Progress steps */}
@@ -137,7 +138,8 @@ function ApplicationsContent() {
                       <span className={`badge ${cfg.color} flex items-center gap-1 shrink-0`}>
                         {cfg.icon} {cfg.label}
                       </span>
-                    </div>
+                      <ArrowUpRight className="w-4 h-4 text-stone-300 dark:text-stone-600 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors shrink-0" />
+                    </Link>
                   );
                 })}
               </div>
@@ -152,16 +154,18 @@ function ApplicationsContent() {
               </h2>
               <div className="space-y-2">
                 {byStatus.offers.map(app => (
-                  <div key={app.id} className="card p-4 flex items-center gap-4 border-orange-300 dark:border-orange-700/50 bg-orange-50/30 dark:bg-orange-900/10">
+                  <Link key={app.id} href={`/jobs/${app.jobId}`} title="Open job — re-open the application link"
+                    className="card p-4 flex items-center gap-4 border-orange-300 dark:border-orange-700/50 bg-orange-50/30 dark:bg-orange-900/10 hover:border-orange-400 transition-colors group">
                     <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-sm font-black text-orange-700 dark:text-orange-400 shrink-0">
                       {app.company[0]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate">{app.jobTitle}</p>
+                      <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate group-hover:text-orange-700 dark:group-hover:text-orange-400 transition-colors">{app.jobTitle}</p>
                       <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                     </div>
                     <span className="badge bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">🎉 Offer received</span>
-                  </div>
+                    <ArrowUpRight className="w-4 h-4 text-orange-300 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors shrink-0" />
+                  </Link>
                 ))}
               </div>
             </div>
@@ -177,16 +181,18 @@ function ApplicationsContent() {
                 {byStatus.closed.map(app => {
                   const cfg = STATUS_CONFIG[app.status as keyof typeof STATUS_CONFIG];
                   return (
-                    <div key={app.id} className="card p-4 flex items-center gap-4">
+                    <Link key={app.id} href={`/jobs/${app.jobId}`} title="Open job — re-open the application link"
+                      className="card p-4 flex items-center gap-4 hover:border-brand-500 transition-colors group">
                       <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-sm font-black text-stone-400 shrink-0">
                         {app.company[0]}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-stone-600 dark:text-stone-400 truncate">{app.jobTitle}</p>
+                        <p className="font-bold text-sm text-stone-600 dark:text-stone-400 truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{app.jobTitle}</p>
                         <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                       </div>
                       <span className={`badge ${cfg.color}`}>{cfg.label}</span>
-                    </div>
+                      <ArrowUpRight className="w-4 h-4 text-stone-300 dark:text-stone-600 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors shrink-0" />
+                    </Link>
                   );
                 })}
               </div>
