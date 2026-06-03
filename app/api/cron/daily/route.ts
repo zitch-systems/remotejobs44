@@ -182,6 +182,21 @@ export async function GET(req: NextRequest) {
     log.reconcile = { error: err?.message ?? String(err) };
   }
 
+  // ── TASK 3.7: De-duplicate jobs ─────────────────────────────────────────
+  // Sources hand out a fresh apply_url for the same role on each pull, so the
+  // same title+company+location accumulates active rows over time (the unique
+  // index on apply_url can't catch those). dedupe_jobs() keeps the best row per
+  // (title, company, location) and deactivates the rest — reversible, and it
+  // leaves the same role across different locations intact. See migration_v30.
+  try {
+    const { data: deactivated, error: dedupeErr } = await supabase.rpc('dedupe_jobs');
+    if (dedupeErr) throw dedupeErr;
+    log.jobDedupe = { deactivated: deactivated ?? 0 };
+  } catch (err: any) {
+    logError({ event: 'cron.daily.dedupe_failed', error: err?.message ?? String(err) });
+    log.jobDedupe = { error: err?.message ?? String(err) };
+  }
+
 
   // ── TASK 4: Send job alert emails to Pro users ────────────────────────
   // The previous version pulled ten newest jobs once and sent that same
