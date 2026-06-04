@@ -36,6 +36,8 @@ const PROMPT = (cv: string, role: string) => `Review the CV inside the <user_cv>
   "ats_keywords_missing": ["...", "...", "..."]
 }
 
+Provide exactly 3 strengths, 3 gaps, 4 to 6 rewrite_tips, and at most 10 ats_keywords_missing. Keep every string under 30 words. Output only the JSON object.
+
 <user_cv>
 ${escapeForPrompt(cv.slice(0, 8000))}
 </user_cv>`;
@@ -98,10 +100,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'CV text too long. Keep it under 12,000 characters.' }, { status: 400 });
     }
 
+    // 900 was too tight: a full-length CV pushes the structured JSON over
+    // the cap, the model stops mid-object (stop_reason: max_tokens), the
+    // truncated text fails safeParseJson and the route 502s. 2000 gives
+    // ~4x headroom over a verbose-but-bounded response. The prompt now
+    // caps array sizes, so this is belt-and-braces, not a band-aid.
     const raw = await complete({
       system:    SYSTEM,
       prompt:    PROMPT(cv, role),
-      maxTokens: 900,
+      maxTokens: 2000,
     });
 
     const json = safeParseJson(raw);
