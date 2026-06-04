@@ -87,7 +87,19 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       const { setHydrated } = useAuthStore.getState();
       try {
         const { user: authUser, status, sessionUserId } = await getAuthedUserSafe(supabase);
-        if (status === 'unauthed')  { setUser(null); return; }
+        if (status === 'unauthed') {
+          // 'unauthed' means getSession() found no usable local session. But
+          // the browser can momentarily fail to read a freshly-set or chunked
+          // auth cookie right after a login redirect — and wiping the user
+          // here is exactly what surfaces the false "Your session expired" on
+          // /dashboard. Only clear when NO Supabase auth cookie remains;
+          // otherwise keep state and let the next onAuthStateChange / page nav
+          // re-validate. Mirrors the SIGNED_OUT handler's cookie guard below,
+          // so the two stay consistent (drift here reintroduces random logout).
+          if (documentHasSupabaseAuthCookie()) { setHydrated(true); return; }
+          setUser(null);
+          return;
+        }
 
         // SECURITY: if the persisted user (from localStorage) is for a
         // different person than the live Supabase session, wipe it. Use

@@ -7,6 +7,7 @@ import {
   Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -239,14 +240,28 @@ function ProfileContent() {
   // state that loadSession returned from. Render a clear prompt instead
   // of `return null` (which presented as a blank "profile not loading"
   // page to users).
-  if (!user) return (
-    <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
-      <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your profile.</p>
-      <Link href="/login?next=/profile" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
-        Sign in
-      </Link>
-    </div>
-  );
+  if (!user) {
+    // Cookie still present → not logged out, just a slow session re-read.
+    // Offer Reload instead of the misleading "session expired" prompt.
+    const cookiePresent = typeof document !== 'undefined' && documentHasSupabaseAuthCookie();
+    if (cookiePresent) return (
+      <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+        <div className="inline-block w-8 h-8 border-2 border-brand-500/30 border-t-brand-600 dark:border-t-brand-400 rounded-full animate-spin mb-5" />
+        <p className="text-stone-500 dark:text-stone-400 mb-6">Verifying your session… If this doesn’t clear in a moment, reload the page.</p>
+        <button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+          Reload
+        </button>
+      </div>
+    );
+    return (
+      <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+        <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your profile.</p>
+        <Link href="/login?next=/profile" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   const planLabel = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';
   const planColor =
