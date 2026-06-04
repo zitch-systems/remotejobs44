@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Briefcase, BookmarkCheck, FileText, TrendingUp, ArrowRight, Star, Zap } from 'lucide-react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
+import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { useAuthStore, useJobsStore, useUIStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -344,14 +345,31 @@ function DashboardContent() {
 
   // Fallback prompt instead of `return null` so a transient auth state
   // never presents as a blank "dashboard not loading" page.
-  if (!user) return (
-    <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
-      <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your dashboard.</p>
-      <Link href="/login?next=/dashboard" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
-        Sign in
-      </Link>
-    </div>
-  );
+  if (!user) {
+    // Distinguish a real logout from a transient "couldn't re-read the
+    // session" blip: if a Supabase auth cookie is still in the browser, the
+    // user is NOT logged out — getUser just hasn't resolved yet (slow refresh
+    // right after the login redirect). Show a recoverable state with a Reload
+    // action instead of the misleading "session expired" sign-in prompt.
+    const cookiePresent = typeof document !== 'undefined' && documentHasSupabaseAuthCookie();
+    if (cookiePresent) return (
+      <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+        <div className="inline-block w-8 h-8 border-2 border-brand-500/30 border-t-brand-600 dark:border-t-brand-400 rounded-full animate-spin mb-5" />
+        <p className="text-stone-500 dark:text-stone-400 mb-6">Verifying your session… If this doesn’t clear in a moment, reload the page.</p>
+        <button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+          Reload
+        </button>
+      </div>
+    );
+    return (
+      <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
+        <p className="text-stone-500 dark:text-stone-400 mb-6">Your session expired. Please sign in to view your dashboard.</p>
+        <Link href="/login?next=/dashboard" className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   const recentApps = applications.slice(0, 3);
   const planLabel  = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';
