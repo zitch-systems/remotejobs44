@@ -88,20 +88,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to send message. Please try again.' }, { status: 500 });
     }
 
-    await sendEmail({
-      to: safeEmail,
-      subject: 'We received your message — RemoteJobs44',
-      html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-          <h2 style="color:#1d4ed8">Thanks for reaching out, ${nameHtml}!</h2>
-          <p style="color:#334155;line-height:1.7">We have received your message and will get back to you within 24-48 hours.</p>
-          <p style="color:#334155;line-height:1.7">In the meantime, you can browse remote jobs at <a href="https://remotejobs44.com" style="color:#1d4ed8">remotejobs44.com</a>.</p>
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
-          <p style="color:#94a3b8;font-size:12px">The RemoteJobs44 Team</p>
-        </div>
-      `,
-    });
-
+    // SECURITY: do NOT auto-reply to the submitter-supplied `safeEmail`.
+    // The contact form is public and that address is unverified/attacker-
+    // controlled, so sending a confirmation to it turned this endpoint into
+    // a spam / email-bomb relay — an attacker could make us email arbitrary
+    // victims (the per-IP cap is bypassable across IPs). The owner gets the
+    // message above and replies via the Reply-To header; the on-page success
+    // state is the user's confirmation.
     return NextResponse.json({ success: true });
   } catch (err: any) {
     logError({ event: 'contact.unhandled', error: err?.message ?? String(err) });
