@@ -60,6 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let profileFetchTries = 0;
 
     async function check() {
       const supabase = createClient();
@@ -90,13 +91,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       if (cancelled) return;
 
-      const role = resolveRole({ profileRole: profile?.role, email: user.email });
+      // A failed/timed-out profile fetch is NOT proof the user isn't an
+      // admin. For a DB-only admin (role lives in the profiles row, email
+      // not in the hardcoded list) resolveRole() falls back to 'user' on a
+      // null profile and bounces them to /dashboard — which is exactly the
+      // "logged in as admin but landed on the dashboard / session expired"
+      // report. Only send to /dashboard once we've POSITIVELY read a
+      // non-admin row; on a null fetch with any admin signal, retry instead.
+      if (!profile) {
+        const persistedRole = useAuthStore.getState().user?.role;
+        const looksAdmin = isHardcodedAdmin(user.email) || persistedRole === 'admin';
+        if (looksAdmin) {
+          if (profileFetchTries < 4) {
+            profileFetchTries++;
+            retryTimer = setTimeout(() => { if (!cancelled) check(); }, 1500);
+          } else {
+            // Couldn't confirm via the row after retries, but we have an
+            // admin signal — render the panel (admin API routes still
+            // enforce requireAdmin server-side) rather than bounce.
+            setVerifiedReady(true);
+          }
+          return;
+        }
+        // No admin signal anywhere — treat as a member.
+        router.replace('/dashboard');
+        return;
+      }
+
+      const role = resolveRole({ profileRole: profile.role, email: user.email });
       if (role !== 'admin') {
         router.replace('/dashboard');
         return;
       }
 
-      setAdminName(profile?.name ?? user.email?.split('@')[0] ?? 'Admin');
+      setAdminName(profile.name ?? user.email?.split('@')[0] ?? 'Admin');
       setVerifiedReady(true);
     }
     check();
