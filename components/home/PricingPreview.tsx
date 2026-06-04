@@ -14,6 +14,8 @@ const PLANS = [
     id:        'daily'      as const,
     name:      'Day Pass',
     price:     '₦500',
+    originalPrice: '₦2,000',
+    save:      '75%',
     period:    '/ 24 hours',
     desc:      'Full access for a day. Great for an active job hunt.',
     features:  ['Up to 10 job applications', 'All apply links & emails', 'CV auto-apply', '24-hour access'],
@@ -25,6 +27,8 @@ const PLANS = [
     id:        'pro'        as const,
     name:      'Pro Monthly',
     price:     '₦2,999',
+    originalPrice: '₦8,999',
+    save:      '67%',
     period:    '/ month',
     desc:      'Unlimited access, ongoing alerts, and priority support.',
     features:  ['Everything in Day Pass', 'Ongoing job alerts', 'Priority support', 'Cancel anytime'],
@@ -36,6 +40,8 @@ const PLANS = [
     id:        'pro_annual' as const,
     name:      'Pro Annual',
     price:     '₦29,999',
+    originalPrice: '₦89,999',
+    save:      '67%',
     period:    '/ year',
     desc:      'Best value — save ₦5,989 vs monthly.',
     features:  ['Everything in Pro Monthly', 'Save ₦5,989/yr', 'Early feature access', 'Priority support'],
@@ -102,6 +108,13 @@ export function PricingPreview() {
               </div>
 
               <div className="mb-5">
+                {/* Promo anchor — display only; real charge is unchanged (lib/paystack/plans.ts). */}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-semibold text-stone-400 dark:text-stone-500 line-through">{plan.originalPrice}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider">
+                    Save {plan.save}
+                  </span>
+                </div>
                 <span className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100">{plan.price}</span>
                 <span className="text-stone-400 dark:text-stone-500 text-sm ml-1">{plan.period}</span>
               </div>

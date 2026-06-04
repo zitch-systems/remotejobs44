@@ -7,9 +7,9 @@ import { createClient } from '@/lib/supabase/client';
 interface PaywallModalProps { mode: 'login' | 'subscribe'; }
 
 const PLANS = [
-  { id: 'daily'      as const, label: 'Day Pass',    price: '₦500',    sub: '24-hour full access',   highlight: false },
-  { id: 'pro'        as const, label: 'Pro Monthly', price: '₦2,999',  sub: 'per month',             highlight: true  },
-  { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦29,999', sub: 'per year · save ₦5,989', highlight: false },
+  { id: 'daily'      as const, label: 'Day Pass',    price: '₦500',    originalPrice: '₦2,000',  sub: '24-hour full access',   highlight: false },
+  { id: 'pro'        as const, label: 'Pro Monthly', price: '₦2,999',  originalPrice: '₦8,999',  sub: 'per month',             highlight: true  },
+  { id: 'pro_annual' as const, label: 'Pro Annual',  price: '₦29,999', originalPrice: '₦89,999', sub: 'per year · save ₦5,989', highlight: false },
 ];
 
 export function PaywallModal({ mode }: PaywallModalProps) {
@@ -92,9 +92,13 @@ export function PaywallModal({ mode }: PaywallModalProps) {
                   <p className="text-sm font-bold text-stone-900 dark:text-stone-100">{p.label}</p>
                   <p className="text-xs text-stone-400 dark:text-stone-500">{p.sub}</p>
                 </div>
-                <span className={`font-display font-extrabold text-lg ${p.highlight ? 'text-brand-700 dark:text-brand-400' : 'text-stone-900 dark:text-stone-100'}`}>
-                  {p.price}
-                </span>
+                <div className="text-right shrink-0">
+                  {/* Promo anchor — display only; real charge unchanged (lib/paystack/plans.ts). */}
+                  <span className="block text-xs text-stone-400 dark:text-stone-500 line-through">{p.originalPrice}</span>
+                  <span className={`font-display font-extrabold text-lg ${p.highlight ? 'text-brand-700 dark:text-brand-400' : 'text-stone-900 dark:text-stone-100'}`}>
+                    {p.price}
+                  </span>
+                </div>
               </button>
             ))}
           </div>

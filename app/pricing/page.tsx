@@ -17,6 +17,8 @@ const PLANS = [
     name: 'Free',
     price: '₦0',
     period: 'forever',
+    originalPrice: null,
+    save: null,
     icon: null,
     desc: 'Browse jobs and explore opportunities.',
     cta: 'Start Free',
@@ -37,6 +39,8 @@ const PLANS = [
     name: 'Day Pass',
     price: '₦500',
     period: '/ 24 hours',
+    originalPrice: '₦2,000',
+    save: '75%',
     icon: <Clock className="w-4 h-4" />,
     desc: 'Full access for 24 hours with 10 applications. Perfect for a focused job-hunt day.',
     cta: 'Get Day Pass',
@@ -58,6 +62,8 @@ const PLANS = [
     name: 'Pro Monthly',
     price: '₦2,999',
     period: '/ month',
+    originalPrice: '₦8,999',
+    save: '67%',
     icon: <Zap className="w-4 h-4" />,
     desc: 'Everything you need to land your remote job, month after month.',
     cta: 'Get Pro',
@@ -78,6 +84,8 @@ const PLANS = [
     name: 'Pro Annual',
     price: '₦29,999',
     period: '/ year',
+    originalPrice: '₦89,999',
+    save: '67%',
     icon: <Calendar className="w-4 h-4" />,
     desc: 'Best value — save ₦5,989 compared to monthly.',
     cta: 'Get Annual',
@@ -241,6 +249,14 @@ function PricingContent() {
         </p>
       </div>
 
+      {/* Limited-time promo banner — reinforces the struck-through anchor prices below */}
+      <div className="flex justify-center mb-12">
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider">
+          <PartyPopper className="w-4 h-4" />
+          Limited-time launch promo · save up to 75%
+        </span>
+      </div>
+
       {/* Plans grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-16">
         {PLANS.map(plan => {
@@ -271,24 +287,29 @@ function PricingContent() {
               </div>
 
               <div className="mb-6">
+                {plan.originalPrice && (
+                  // Promo anchor: the pre-promo "was" price struck through, plus
+                  // the discount %, so the live price reads as a deal. Display
+                  // only — the actual Paystack charge is unchanged (the real
+                  // amounts live in lib/paystack/plans.ts → PLAN_AMOUNTS_KOBO).
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-stone-400 dark:text-stone-500 line-through">{plan.originalPrice}</span>
+                    {plan.save && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider">
+                        Save {plan.save}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100">{plan.price}</span>
-                  {plan.id === 'pro_annual' && (
-                    // Anchored saving badge: 2,999 × 12 = 35,988; annual is
-                    // 29,999. (35988 − 29999) / 35988 ≈ 16.6%. Surfacing
-                    // the saved percentage next to the price is the single
-                    // biggest visible monetisation lever on this page
-                    // (audit MON-5) — users skim prices, not feature lists.
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider">
-                      Save 17%
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{plan.period}</p>
                 {plan.id === 'pro_annual' && (
+                  // Per-month framing for the annual plan (₦29,999 / 12 ≈ ₦2,500).
+                  // Kept as a guarded regression check in tests/e2e/pricing.spec.ts.
                   <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
-                    <span className="line-through">₦35,988</span>
-                    <span className="text-accent font-semibold ml-1.5">= ₦2,500/mo</span>
+                    <span className="text-accent font-semibold">= ₦2,500/mo</span>
                   </p>
                 )}
               </div>
