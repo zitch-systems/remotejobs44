@@ -28,6 +28,24 @@ const nextConfig = {
   // external server-side deps so they live in node_modules in the
   // Vercel function and get loaded at runtime.
   serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+  // Canonical host. The project serves BOTH the apex (remotejobs44.com) and
+  // www.remotejobs44.com. @supabase/ssr writes host-only auth cookies (no
+  // Domain attribute), so a session established on one host isn't sent on the
+  // other — a deterministic way to strand a logged-in user on "Verifying your
+  // session…". Force one canonical host so there's a single cookie jar.
+  // apex is already the SEO canonical (metadata alternates + sitemap) and apex
+  // serves directly today (no platform apex→www redirect), so this www→apex
+  // rule terminates and cannot loop.
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.remotejobs44.com' }],
+        destination: 'https://remotejobs44.com/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     // Content-Security-Policy is the meaningful XSS defence; X-XSS-Protection
     // is deprecated and some Safari versions can be tricked into XSS via it.

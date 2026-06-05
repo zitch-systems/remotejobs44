@@ -31,7 +31,30 @@ export type AuthedUserResult = {
   sessionUserId: string | null;
 };
 
+// De-dupe concurrent auth checks. AuthSyncProvider, the dashboard, and the
+// admin layout all validate auth on the same mount, and the body below
+// retries getUser up to 3x on a transient — so one page load could fire a
+// dozen /auth/v1/user requests, the self-inflicted load that pushes calls
+// into rate-limited / transient failures (which then surface as the stuck
+// "Verifying your session…"). Overlapping callers now share ONE in-flight
+// promise. No TTL cache: once it resolves the next call re-validates, so we
+// never serve a stale logged-in/out result.
+let inflightAuthCheck: Promise<AuthedUserResult> | null = null;
+
 export async function getAuthedUserSafe(
+  supabase: SupabaseClient,
+  opts: { retries?: number; delayMs?: number; timeoutMs?: number } = {}
+): Promise<AuthedUserResult> {
+  if (inflightAuthCheck) return inflightAuthCheck;
+  inflightAuthCheck = runAuthedUserSafe(supabase, opts);
+  try {
+    return await inflightAuthCheck;
+  } finally {
+    inflightAuthCheck = null;
+  }
+}
+
+async function runAuthedUserSafe(
   supabase: SupabaseClient,
   opts: { retries?: number; delayMs?: number; timeoutMs?: number } = {}
 ): Promise<AuthedUserResult> {

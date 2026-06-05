@@ -355,10 +355,15 @@ function DashboardContent() {
     if (cookiePresent) return (
       <div className="max-w-[500px] mx-auto px-5 py-20 text-center">
         <div className="inline-block w-8 h-8 border-2 border-brand-500/30 border-t-brand-600 dark:border-t-brand-400 rounded-full animate-spin mb-5" />
-        <p className="text-stone-500 dark:text-stone-400 mb-6">Verifying your session… If this doesn’t clear in a moment, reload the page.</p>
-        <button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
-          Reload
-        </button>
+        <p className="text-stone-500 dark:text-stone-400 mb-6">Verifying your session… If this doesn’t clear in a moment, reload — or sign in again.</p>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 transition-colors">
+            Reload
+          </button>
+          <Link href="/login?next=/dashboard" className="inline-flex items-center gap-2 px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 font-bold rounded-lg hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+            Sign in again
+          </Link>
+        </div>
       </div>
     );
     return (

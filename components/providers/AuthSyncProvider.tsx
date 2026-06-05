@@ -83,6 +83,26 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
+    // Active session recovery. When the browser still has an auth cookie /
+    // local session but we couldn't resolve a user (stale access token, or a
+    // session the client hasn't reconstructed after the login redirect),
+    // force a token refresh. On success this re-reads the refresh token from
+    // the cookie, gives us a user, and emits TOKEN_REFRESHED so the rest of
+    // the app re-syncs — instead of leaving the UI stuck on "Verifying your
+    // session…" waiting for an auto-refresh event that may never fire.
+    // Returns true only when a user was populated.
+    async function tryRecoverSession(): Promise<boolean> {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error || !data?.user) return false;
+        const profile = await fetchProfile(data.user.id);
+        setUser(buildUser(data.user, profile));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     async function syncAuth() {
       const { setHydrated } = useAuthStore.getState();
       try {
@@ -96,7 +116,15 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
           // otherwise keep state and let the next onAuthStateChange / page nav
           // re-validate. Mirrors the SIGNED_OUT handler's cookie guard below,
           // so the two stay consistent (drift here reintroduces random logout).
-          if (documentHasSupabaseAuthCookie()) { setHydrated(true); return; }
+          if (documentHasSupabaseAuthCookie()) {
+            // Cookie present but no usable session yet. Actively try to
+            // recover (force a refresh) instead of leaving the UI stuck on
+            // "Verifying your session…". Only if recovery fails do we keep
+            // the existing state and wait for a later nav / auth event.
+            if (await tryRecoverSession()) return;
+            setHydrated(true);
+            return;
+          }
           setUser(null);
           return;
         }
@@ -119,7 +147,11 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
         const crossAccount = !!(persisted && sessionUserId && persisted.id !== sessionUserId);
 
         if (status === 'transient') {
-          if (crossAccount) setUser(null);
+          if (crossAccount) { setUser(null); setHydrated(true); return; }
+          // Stale access token / failed getUser — force a refresh rather than
+          // passively waiting for an auto-refresh event. Recovers the common
+          // "logged in but stuck verifying" case in one round-trip.
+          if (await tryRecoverSession()) return;
           setHydrated(true);
           return;
         }

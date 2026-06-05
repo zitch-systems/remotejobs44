@@ -126,6 +126,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
+    // Exclude /api/* from middleware. Every API route already authenticates
+    // itself (requireAdmin / supabase.auth.getUser / cron secret), so running
+    // getUser() here too just doubled the auth-server load on every request —
+    // a dashboard load fires page + /api/jobs + /api/applications +
+    // /api/saved-jobs + … and each was a separate /auth/v1/user call. That
+    // flood is what tipped calls into rate-limited / transient failures.
+    // Session-cookie refresh still happens on page navigations (matched here),
+    // via the browser client's background auto-refresh, and inside the route
+    // handlers themselves — so scoping middleware to pages loses nothing.
+    '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
   ],
 };
