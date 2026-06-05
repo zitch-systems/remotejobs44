@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { destinationForRole } from './redirect';
+import { destinationForRole, resolveRole } from './redirect';
+import { isHardcodedAdmin } from '@/lib/admin-emails';
 
 // Pins the open-redirect protection on destinationForRole. This is the
 // gate that decides where /auth/callback and /login send the user after
@@ -92,5 +93,45 @@ describe('destinationForRole', () => {
     ])('admin + next=%j → %j', (next) => {
       expect(destinationForRole('admin', next)).toBe(next);
     });
+  });
+});
+
+// Pins resolveRole — the function at the heart of the admin sign-in saga
+// (PRs #27/#28). The whole "DB-admin bounced to /dashboard → session expired"
+// bug came from how a MISSING profile resolves here, so these cases are the
+// regression guard.
+describe('resolveRole', () => {
+  it('DB role admin → admin (even for a non-hardcoded email)', () => {
+    expect(resolveRole({ profileRole: 'admin', email: 'jane@example.com' })).toBe('admin');
+  });
+
+  it('honours the hardcoded-admin list without any profile role (case-insensitive)', () => {
+    // Cross-check against isHardcodedAdmin rather than hard-coding the email,
+    // so this can't go flaky if HARDCODED_ADMIN_EMAILS overrides the
+    // compile-time fallback in some environment. The point is that resolveRole
+    // is wired to the hardcoded list, and is case-insensitive.
+    const email = 'admin@remotejobs44.com';
+    const expected = isHardcodedAdmin(email) ? 'admin' : 'user';
+    expect(resolveRole({ profileRole: undefined, email })).toBe(expected);
+    expect(resolveRole({ profileRole: undefined, email: email.toUpperCase() })).toBe(expected);
+  });
+
+  it('regular member → user', () => {
+    expect(resolveRole({ profileRole: 'user', email: 'jane@example.com' })).toBe('user');
+  });
+
+  // THE REGRESSION INVARIANT behind #28: a failed/missing profile fetch leaves
+  // profileRole undefined, which for a non-hardcoded email resolves to 'user'.
+  // That is correct — and it is precisely why the /admin gate must only bounce
+  // to /dashboard on a POSITIVELY-read non-admin profile, never on a null
+  // fetch. (A DB-only admin whose profile fetch times out is still an admin.)
+  it('undefined/null profileRole + non-hardcoded email → user (a failed fetch is NOT proof of non-admin)', () => {
+    expect(resolveRole({ profileRole: undefined, email: 'jane@example.com' })).toBe('user');
+    expect(resolveRole({ profileRole: null, email: 'jane@example.com' })).toBe('user');
+  });
+
+  it('missing email → user', () => {
+    expect(resolveRole({ profileRole: undefined, email: null })).toBe('user');
+    expect(resolveRole({ profileRole: undefined, email: undefined })).toBe('user');
   });
 });
