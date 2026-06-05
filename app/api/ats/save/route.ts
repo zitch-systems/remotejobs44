@@ -58,6 +58,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Coerce ATS-supplied list fields into a clean text[] | null. Different
+    // ATS parsers return requirements/skills/benefits as a string[], a single
+    // string, or occasionally a nested/objecty blob — feeding a non-array
+    // value straight into the text[] columns is one way a single row can
+    // poison its whole insert chunk. Normalise to trimmed, non-empty strings.
+    function toTextArray(v: unknown): string[] | null {
+      if (v == null) return null;
+      if (Array.isArray(v)) {
+        const arr = v.map(x => String(x).trim()).filter(Boolean);
+        return arr.length ? arr : null;
+      }
+      if (typeof v === 'string') {
+        const s = v.trim();
+        return s ? [s] : null;
+      }
+      return null;
+    }
+
     // Transform camelCase Job to snake_case DB row. Dedup happens after
     // this map: rows are collapsed on apply_url and upserted against the
     // unique index (migration_v25), so a posting already in the DB is
@@ -75,9 +93,9 @@ export async function POST(req: NextRequest) {
       location:     j.location ?? 'Worldwide',
       timezone:     j.timezone ?? null,
       description:  j.description ?? '',
-      requirements: j.requirements ?? null,
-      skills:       j.skills ?? null,
-      benefits:     j.benefits ?? null,
+      requirements: toTextArray(j.requirements),
+      skills:       toTextArray(j.skills),
+      benefits:     toTextArray(j.benefits),
       apply_url:    sanitiseUrl(j.applyUrl),
       apply_email:  j.applyEmail ?? null,
       posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
@@ -108,22 +126,39 @@ export async function POST(req: NextRequest) {
     // never saw why.
     let firstError: string | null = null;
 
+    const upsertChunk = (chunk: typeof deduped) =>
+      supabase
+        .from('jobs')
+        .upsert(chunk, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .select('id');
+
     for (let i = 0; i < deduped.length; i += INSERT_CHUNK_SIZE) {
       const batch = deduped.slice(i, i + INSERT_CHUNK_SIZE);
 
-      const { data, error } = await supabase
-        .from('jobs')
-        .upsert(batch, { onConflict: 'apply_url', ignoreDuplicates: true })
-        .select('id');
-
-      if (error) {
-        logError({ event: 'ats.save.batch_failed', error: error.message });
-        if (!firstError) firstError = error.message;
-        failed += batch.length;
-      } else {
-        // With ignoreDuplicates, data holds only the inserted rows —
-        // never default to batch.length or duplicates would inflate the count.
+      // With ignoreDuplicates, data holds only the inserted rows — never
+      // default to batch.length or duplicates would inflate the count.
+      const { data, error } = await upsertChunk(batch);
+      if (!error) {
         inserted += data?.length ?? 0;
+        continue;
+      }
+
+      // A single bad row (a value Postgres rejects — e.g. "invalid input
+      // syntax for type json") fails the ENTIRE chunk's statement, which
+      // previously counted all 25 as failed and lost the 24 good rows with
+      // it. Retry the chunk row-by-row so good rows still land and we isolate
+      // (and log) only the genuinely-bad ones — `failed` then reflects the
+      // real count, and the row log pinpoints the offending posting.
+      logError({ event: 'ats.save.batch_failed', error: error.message, retrying_rows: batch.length });
+      for (const row of batch) {
+        const { data: d1, error: e1 } = await upsertChunk([row]);
+        if (e1) {
+          failed += 1;
+          if (!firstError) firstError = e1.message;
+          logError({ event: 'ats.save.row_failed', error: e1.message, apply_url: row.apply_url ?? null, title: row.title });
+        } else {
+          inserted += d1?.length ?? 0;
+        }
       }
     }
 
