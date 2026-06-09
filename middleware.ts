@@ -30,6 +30,29 @@ function hasSupabaseSessionCookie(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
+  const isDashboardRoute = path === '/dashboard' || path.startsWith('/dashboard/');
+
+  // Fast path for every non-gated route (homepage, ~250 SEO pages, /jobs,
+  // /companies, /blog, …). Only the /admin and /dashboard branches below ever
+  // read the validated user, so everywhere else supabase.auth.getUser() was
+  // pure overhead: it ran solely to refresh the session cookie — something the
+  // browser client's background auto-refresh already does.
+  //
+  // Why it matters: getUser() calls /auth/v1/user on the Auth server, and this
+  // project's Auth server is capped at 10 DB connections (Supabase advisor
+  // `auth_db_connections_absolute`). Firing it from Edge middleware on EVERY
+  // page view, soft navigation and RSC prefetch — for every logged-in visitor —
+  // saturated those 10 connections, so /auth/v1/user climbed from <100ms to
+  // 2–14s. The browser then times out getAuthedUserSafe (6s) and dead-ends on
+  // "Verifying your session…", while signInWithPassword / signUp stall on the
+  // same starved Auth server. Scoping the round-trip to the two routes that
+  // actually gate on it removes the self-inflicted flood.
+  if (!isAdminRoute && !isDashboardRoute) {
+    return NextResponse.next({ request: { headers: request.headers } });
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
@@ -84,9 +107,8 @@ export async function middleware(request: NextRequest) {
   if (serverSaid401 && !cookiePresent) confirmedUnauthed = true;
   if (!user && !confirmedUnauthed && !cookiePresent) confirmedUnauthed = true;
 
-  const path = request.nextUrl.pathname;
-  const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
-  const isDashboardRoute = path === '/dashboard' || path.startsWith('/dashboard/');
+  // path / isAdminRoute / isDashboardRoute are computed at the top of the
+  // function (the non-gated fast path returns before we ever reach here).
 
   // Only bounce to /login when we are CERTAIN the user has no session — not on
   // transient errors. Otherwise the page renders and its client-side auth check
@@ -132,9 +154,12 @@ export const config = {
     // a dashboard load fires page + /api/jobs + /api/applications +
     // /api/saved-jobs + … and each was a separate /auth/v1/user call. That
     // flood is what tipped calls into rate-limited / transient failures.
-    // Session-cookie refresh still happens on page navigations (matched here),
-    // via the browser client's background auto-refresh, and inside the route
-    // handlers themselves — so scoping middleware to pages loses nothing.
+    // The Supabase getUser() validation now runs ONLY for /admin and
+    // /dashboard (see the non-gated fast path at the top of middleware) — every
+    // other matched route returns immediately without touching the Auth server.
+    // Session-cookie refresh on public pages is handled by the browser client's
+    // background auto-refresh and by the route handlers themselves, so scoping
+    // the auth round-trip this way loses nothing.
     '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
   ],
 };
