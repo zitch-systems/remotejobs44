@@ -93,6 +93,20 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     // Returns true only when a user was populated.
     async function tryRecoverSession(): Promise<boolean> {
       try {
+        // Only force a refresh when rotation can actually help: no locally
+        // reconstructable session (the original stuck-verifying case), or an
+        // access token that is expired / about to expire. If the local token
+        // is still comfortably valid, the failed getUser was a network blip —
+        // refreshSession() would burn a refresh-token ROTATION whose response
+        // can be lost on exactly those flaky connections, leaving the browser
+        // holding an already-consumed refresh token. GoTrue's reuse detection
+        // then revokes the whole session family: a real, permanent logout
+        // manufactured by our own recovery path. Skipping the rotation costs
+        // nothing — the token still works, and the next nav re-validates.
+        const { data: { session: local } } = await supabase.auth.getSession();
+        if (local?.expires_at && local.expires_at * 1000 - Date.now() > 60_000) {
+          return false;
+        }
         const { data, error } = await supabase.auth.refreshSession();
         if (error || !data?.user) return false;
         const profile = await fetchProfile(data.user.id);

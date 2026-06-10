@@ -29,6 +29,21 @@ function hasSupabaseSessionCookie(request: NextRequest): boolean {
   return hasSupabaseAuthCookie(request.cookies.getAll());
 }
 
+// Redirect responses must carry over any cookies the Supabase client queued
+// via setAll during getUser() — that call silently rotates the refresh token
+// when the access token has expired. Building a bare NextResponse.redirect
+// drops those Set-Cookie headers, so the browser keeps the OLD (already
+// consumed) refresh token; its next refresh then trips GoTrue's reuse
+// detection, which revokes the whole session family — i.e. a random logout /
+// permanent "Verifying your session…" for that user. This is the documented
+// supabase/ssr middleware pitfall ("when creating a new response object,
+// copy over the cookies").
+function redirectWithAuthCookies(url: URL, from: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  from.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie));
+  return redirect;
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
@@ -117,7 +132,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);
-    return NextResponse.redirect(url);
+    return redirectWithAuthCookies(url, response);
   }
 
   // Belt-and-braces server-side check for /admin/*: even with the client
@@ -140,7 +155,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin';
     url.search = '';
-    return NextResponse.redirect(url);
+    return redirectWithAuthCookies(url, response);
   }
 
   return response;
