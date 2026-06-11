@@ -136,11 +136,17 @@ describe('parseXMLFeed', () => {
 </channel></rss>`;
     const r = parseXMLFeed(xml, SOURCE);
     expect(r.total).toBe(1);
+    expect(r.flavor).toBe('wp-job-manager');
     expect(r.jobs[0].company).toBe('Acme Studio');
     expect(r.jobs[0].location).toBe('Manchester, UK');
     expect(r.jobs[0].type).toBe('part-time');
     expect(r.jobs[0].applyUrl).toBe('https://www.example.com/job/social-media-manager/');
     expect(r.jobs[0].description).toContain('Run our socials');
+  });
+
+  it('leaves flavor unset for plain RSS', () => {
+    const xml = `<rss><channel><item><title>T</title><link>https://e.com/1</link></item></channel></rss>`;
+    expect(parseXMLFeed(xml, SOURCE).flavor).toBeUndefined();
   });
 });
 
@@ -175,6 +181,9 @@ describe('feedJobToDbRow', () => {
     // the synthetic ext_* id must not reach the uuid primary key
     expect(row.id).toBeUndefined();
     expect(row.applyUrl).toBeUndefined();
+    // explicit flag keys keep batch columns uniform — see feedJobToDbRow
+    expect(row.flagged).toBe(false);
+    expect(row.flagged_reason).toBeNull();
   });
 
   it('returns null without a usable http(s) apply URL', () => {

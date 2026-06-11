@@ -17,6 +17,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
 import { parseFeed, feedJobToDbRow } from '@/lib/feed-parser';
 import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
+import { enrichDirectApplyLinks } from '@/lib/apply-link';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { logInfo, logWarn, logError } from '@/lib/log';
@@ -29,6 +30,27 @@ const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
 // ingest more than the old hard-coded 50. RemoteOK / WorkingNomads return
 // their whole board, so for them this is the real limiter.
 const MAX_JOBS_PER_SOURCE = 200;
+
+// Soft time budget for the user-added-sources loop. The cron route runs
+// with maxDuration 60s and ingest shares it with other daily tasks; when
+// the budget is gone we record the remaining sources as skipped instead
+// of letting the platform kill the function mid-pipeline (which would
+// leave sources unmarked and the lock held until TTL).
+const USER_SOURCES_BUDGET_MS = 45_000;
+
+// Feed bodies larger than this aren't feeds. Mirrors /api/rss's cap.
+const MAX_FEED_BYTES = 5 * 1024 * 1024;
+
+// WP Job Manager boards: how many new board detail pages we'll fetch per
+// source per run to pull the employer's direct apply link. Items beyond
+// the cap are deferred to the next run (they stay "new" until enriched),
+// so a backlog drains over a few days and every stored job ends up with
+// a direct link rather than a permanent board link.
+const WPJM_ENRICH_MAX = 10;
+
+// The search_vector GIN trigger on jobs can't take large INSERT batches
+// reliably (same limit as /api/ats/save and ats-refresh).
+const JOBS_INSERT_CHUNK = 25;
 
 // Shared fetch helper — throws on non-2xx so we don't try to .json() a 404 HTML
 // page or 500 error body. The per-source try/catch in runIngest catches the
@@ -85,7 +107,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-      logo: (j.company_name ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.company_name),
       category: mapCat(j.category ?? j.title ?? ''), type: 'full-time',
       level: mapLevel(j.title ?? ''), location: j.candidate_required_location ?? 'Worldwide',
       description: (j.description ?? '').slice(0, 5000),
@@ -104,7 +126,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.jobTitle ?? j.title ?? 'Untitled', company: j.companyName ?? j.company ?? 'Unknown',
-      logo: (j.companyName ?? j.company ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.companyName ?? j.company),
       category: mapCat(j.jobIndustry ?? j.title ?? ''), type: mapType(j.jobType ?? ''),
       level: mapLevel(j.jobTitle ?? j.title ?? ''), location: j.jobGeo ?? 'Worldwide',
       description: (j.jobExcerpt ?? j.jobDescription ?? '').slice(0, 5000),
@@ -127,7 +149,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.position ?? j.title ?? 'Untitled', company: j.company ?? 'Unknown',
-      logo: (j.company ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.company),
       category: mapCat(Array.isArray(j.tags) ? j.tags.join(' ') : (j.tags ?? '')),
       type: 'full-time', level: mapLevel(j.position ?? j.title ?? ''),
       location: j.location ?? 'Worldwide',
@@ -148,7 +170,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-      logo: (j.company_name ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.company_name),
       category: mapCat(Array.isArray(j.tags) ? j.tags.join(' ') : (j.title ?? '')),
       type: j.job_types?.[0] ? mapType(j.job_types[0]) : 'full-time',
       level: mapLevel(j.title ?? ''), location: j.location ?? (j.remote ? 'Worldwide' : 'On-site'),
@@ -172,7 +194,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-      logo: (j.company_name ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.company_name),
       category: mapCat(j.category_name ?? j.tags ?? j.title ?? ''),
       type: 'full-time', level: mapLevel(j.title ?? ''),
       location: j.location ?? 'Worldwide',
@@ -197,7 +219,7 @@ const SOURCES: Source[] = [
     normalise: (j) => ({
       title: j.title ?? j.jobTitle ?? 'Untitled',
       company: j.companyName ?? j.company ?? 'Unknown',
-      logo: (j.companyName ?? j.company ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.companyName ?? j.company),
       category: mapCat(Array.isArray(j.categories) ? j.categories.join(' ') : (j.title ?? '')),
       type: mapType(j.employmentType ?? 'full-time'),
       level: mapLevel(j.title ?? ''),
@@ -207,7 +229,7 @@ const SOURCES: Source[] = [
       salary_max: j.maxBaseSalary ?? null,
       currency: j.currency ?? 'USD',
       apply_url: j.applicationLink ?? j.url ?? null,
-      posted_at: j.pubDate ?? j.publishDate ?? new Date().toISOString(),
+      posted_at: toIso(j.pubDate ?? j.publishDate),
       source: 'himalayas', source_url: 'https://himalayas.app/jobs/api',
       remote: true, featured: false, is_new: true, is_active: true,
     }),
@@ -224,7 +246,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j: RawJob) => ({
       title: j.role ?? j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-      logo: (j.company_name ?? 'U')[0].toUpperCase(),
+      logo: firstChar(j.company_name),
       category: mapCat(Array.isArray(j.keywords) ? j.keywords.join(' ') : (j.role ?? '')),
       type: 'full-time', level: mapLevel(j.role ?? ''),
       location: j.location ?? (j.remote ? 'Worldwide' : 'On-site'),
@@ -262,7 +284,7 @@ const SOURCES: Source[] = [
       }
       return {
         title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-        logo: (j.company_name ?? 'U')[0].toUpperCase(),
+        logo: firstChar(j.company_name),
         category: mapCat(j.title ?? ''), type: mapType(j.detected_extensions?.schedule_type ?? ''),
         level: mapLevel(j.title ?? ''), location: j.location ?? 'Worldwide',
         description: (j.description ?? '').slice(0, 5000),
@@ -294,6 +316,7 @@ const INGEST_LOCK_NAME = 'ingest';
 const INGEST_LOCK_TTL_SECONDS = 10 * 60;
 
 export async function runIngest(): Promise<IngestResult> {
+  const ingestStartedAt = Date.now();
   const supabase = createAdminSupabaseClient();
   const results: Record<string, number | string> = {};
   let totalAdded = 0;
@@ -359,7 +382,7 @@ export async function runIngest(): Promise<IngestResult> {
       const jobs = raw.slice(0, MAX_JOBS_PER_SOURCE)
         .map(source.normalise)
         .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
-        .map(j => {
+        .map((j): Record<string, any> => {
           // First-pass scam screen — flag suspicious rows in place so an
           // admin can sweep them at /admin/jobs. We don't drop the row;
           // public listing queries filter `.eq('flagged', false)`. Letting
@@ -369,7 +392,13 @@ export async function runIngest(): Promise<IngestResult> {
           if (scam) {
             return { ...j, flagged: true, flagged_reason: scam.flagged_reason };
           }
-          return j;
+          // Explicit false/null so every row in the batch carries the same
+          // keys. supabase-js builds the insert column list from the union
+          // of keys across the batch and PostgREST NULL-fills the gaps —
+          // an explicit NULL overrides flagged's DEFAULT and violates its
+          // NOT NULL whenever a batch mixes flagged and unflagged rows
+          // (the failure that zeroed Remotive/RemoteOK/WorkingNomads runs).
+          return { ...j, flagged: false, flagged_reason: null };
         });
 
       if (!jobs.length) {
@@ -381,21 +410,19 @@ export async function runIngest(): Promise<IngestResult> {
       // Dedup on apply_url: collapse repeats inside this batch, then
       // upsert with ON CONFLICT DO NOTHING (migration_v25's unique index
       // backs this) so a posting we already have is skipped instead of
-      // re-inserted. select('id') returns only the rows actually
-      // inserted, so the count below reflects genuinely new postings.
+      // re-inserted. The chunked helper returns only genuinely new rows
+      // in its count, and isolates bad rows instead of zeroing the run.
       const deduped = dedupeByApplyUrl(jobs);
-      const { data: inserted, error } = await supabase
-        .from('jobs')
-        .upsert(deduped, { onConflict: 'apply_url', ignoreDuplicates: true })
-        .select('id');
+      const up = await upsertJobsChunked(supabase, deduped);
 
-      if (error) {
-        results[source.name] = `db error: ${error.message}`;
-        await recordSourceRun(supabase, source, 0, 'error', error.message);
+      if (up.inserted === 0 && up.failed > 0) {
+        results[source.name] = `db error: ${up.firstError ?? 'insert failed'}`;
+        await recordSourceRun(supabase, source, 0, 'error', up.firstError);
       } else {
-        const n = inserted?.length ?? 0;
-        results[source.name] = n;
-        totalAdded += n;
+        results[source.name] = up.failed > 0
+          ? `${up.inserted} (${up.failed} rows failed: ${up.firstError})`
+          : up.inserted;
+        totalAdded += up.inserted;
         // Mark every posting in this batch as seen now so a still-listed
         // job keeps a fresh last_seen_at and never ages out of the 60-day
         // staleness sweep. New rows get last_seen_at from the column
@@ -403,7 +430,7 @@ export async function runIngest(): Promise<IngestResult> {
         // deliberately don't flip is_active, so an admin soft-delete
         // (companies/remove) isn't undone.
         await touchLastSeen(supabase, deduped);
-        await recordSourceRun(supabase, source, n, 'ok');
+        await recordSourceRun(supabase, source, up.inserted, 'ok');
       }
     } catch (err: any) {
       logError({ event: 'ingest.source_failed', source: source.name, error: err.message });
@@ -427,9 +454,22 @@ export async function runIngest(): Promise<IngestResult> {
       .select('id, name, url, method')
       .eq('status', 'active');
     const customSources = (customRows ?? []).filter(r => !hardcodedUrls.has(r.url));
+    // Budget counts from the start of the whole ingest (the hardcoded
+    // loop eats into it), with a small floor so user sources always get
+    // some window even after a slow hardcoded run.
+    const userLoopDeadline = Math.max(
+      ingestStartedAt + USER_SOURCES_BUDGET_MS,
+      Date.now() + 10_000,
+    );
 
     for (const row of customSources) {
       const label = row.name || row.url;
+      // Out of budget: record the skip and leave the source's stored
+      // status alone — it runs first thing next cycle.
+      if (Date.now() > userLoopDeadline) {
+        results[label] = 'skipped: ingest time budget exhausted, runs next cycle';
+        continue;
+      }
       // Re-validate URL on every run. A row may have been inserted via
       // SQL (bypassing the API's SSRF guard) so we can't assume it's safe.
       const v = validateExternalUrl(row.url);
@@ -450,6 +490,7 @@ export async function runIngest(): Promise<IngestResult> {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
         const body = await res.text();
+        if (body.length > MAX_FEED_BYTES) throw new Error('response body too large (>5MB) — not a feed');
         const contentType = res.headers.get('content-type') ?? '';
         let parsed = parseFeed(body, contentType, row.url);
 
@@ -477,35 +518,59 @@ export async function runIngest(): Promise<IngestResult> {
 
         // parse* emit the camelCase preview shape; convert to jobs-table
         // rows (snake_case, no synthetic id) before the scam screen and
-        // dedupe — both read DB column names like apply_url.
-        const jobs = parsed.jobs
+        // dedupe — both read DB column names like apply_url. Cap like the
+        // hardcoded sources: parseXMLFeed has no item limit of its own,
+        // and an unbounded feed otherwise becomes an unbounded .in() query.
+        let rows = parsed.jobs
+          .slice(0, MAX_JOBS_PER_SOURCE)
           .map(j => feedJobToDbRow(j, row.url))
-          .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
-          .map(j => {
-            const scam = detectScam(j);
-            return scam ? { ...j, flagged: true, flagged_reason: scam.flagged_reason } : j;
-          });
+          .filter((j): j is Record<string, any> => !!j && !!j.apply_url);
+
+        // WP Job Manager boards: feed items link to the board's own
+        // /job/... detail pages, not the employer. Swap in the direct
+        // apply link from each new item's detail page so applicants land
+        // on the company's posting instead of bouncing through the board.
+        let knownSeenUrls: string[] = [];
+        if (parsed.flavor === 'wp-job-manager' && rows.length) {
+          const wpjm = await prepareWpjmRows(supabase, rows, label);
+          rows = wpjm.rows;
+          knownSeenUrls = wpjm.knownApplyUrls;
+        }
+
+        // Scam screen runs on the final apply targets (post-enrichment).
+        const jobs = rows.map((j): Record<string, any> => {
+          const scam = detectScam(j);
+          return scam
+            ? { ...j, flagged: true,  flagged_reason: scam.flagged_reason }
+            : { ...j, flagged: false, flagged_reason: null };
+        });
 
         if (!jobs.length) {
+          // Still bump last_seen for previously-ingested items that are
+          // in the feed this run, so they don't age out at 60 days.
+          if (knownSeenUrls.length) {
+            await touchLastSeen(supabase, knownSeenUrls.map(u => ({ apply_url: u })));
+          }
           results[label] = 0;
           await markSourceStatus(supabase, row.id, 'active', 0);
           continue;
         }
 
         const deduped = dedupeByApplyUrl(jobs);
-        const { data: inserted, error: insErr } = await supabase
-          .from('jobs')
-          .upsert(deduped, { onConflict: 'apply_url', ignoreDuplicates: true })
-          .select('id');
-        if (insErr) {
-          results[label] = `db error: ${insErr.message}`;
-          await markSourceStatus(supabase, row.id, 'error', 0, insErr.message);
+        const up = await upsertJobsChunked(supabase, deduped);
+        if (up.inserted === 0 && up.failed > 0) {
+          results[label] = `db error: ${up.firstError ?? 'insert failed'}`;
+          await markSourceStatus(supabase, row.id, 'error', 0, up.firstError);
         } else {
-          const n = inserted?.length ?? 0;
-          results[label] = n;
-          totalAdded += n;
+          results[label] = up.failed > 0
+            ? `${up.inserted} (${up.failed} rows failed: ${up.firstError})`
+            : up.inserted;
+          totalAdded += up.inserted;
           await touchLastSeen(supabase, deduped);
-          await markSourceStatus(supabase, row.id, 'active', n);
+          if (knownSeenUrls.length) {
+            await touchLastSeen(supabase, knownSeenUrls.map(u => ({ apply_url: u })));
+          }
+          await markSourceStatus(supabase, row.id, 'active', up.inserted);
         }
       } catch (err: any) {
         logError({ event: 'ingest.user_source_failed', source: label, error: err.message });
@@ -554,6 +619,90 @@ async function touchLastSeen(
   } catch (err: any) {
     logWarn({ event: 'ingest.touch_last_seen_failed', error: err?.message ?? String(err) });
   }
+}
+
+// Chunked upsert with row-level isolation. The search_vector GIN trigger
+// can't take big INSERT batches reliably, and a single bad row in a
+// 200-row statement used to zero the entire source's run (the whole
+// statement fails). Chunks of 25; a failing chunk retries row-by-row so
+// one bad row costs exactly one row, reported instead of swallowed.
+async function upsertJobsChunked(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  rows: Array<Record<string, any>>,
+): Promise<{ inserted: number; failed: number; firstError: string | null }> {
+  let inserted = 0;
+  let failed = 0;
+  let firstError: string | null = null;
+  for (let i = 0; i < rows.length; i += JOBS_INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + JOBS_INSERT_CHUNK);
+    const { data, error } = await supabase
+      .from('jobs')
+      .upsert(chunk, { onConflict: 'apply_url', ignoreDuplicates: true })
+      .select('id');
+    if (!error) {
+      inserted += data?.length ?? 0;
+      continue;
+    }
+    for (const r of chunk) {
+      const { data: one, error: rowErr } = await supabase
+        .from('jobs')
+        .upsert(r, { onConflict: 'apply_url', ignoreDuplicates: true })
+        .select('id');
+      if (rowErr) {
+        failed++;
+        if (!firstError) firstError = rowErr.message;
+      } else {
+        inserted += one?.length ?? 0;
+      }
+    }
+  }
+  return { inserted, failed, firstError };
+}
+
+// WP Job Manager feeds: make the board's /job/... page each row's
+// source_url — a stable per-item key that keeps provenance for admins
+// and lets us recognise items we already ingested even after apply_url
+// was swapped for the employer's link. Items already in the DB are
+// dropped from the insert (their apply URLs are returned so the caller
+// can bump last_seen_at). Up to WPJM_ENRICH_MAX new detail pages are
+// fetched to extract the direct apply target; new items beyond the cap
+// are deferred to the next run so they're enriched eventually rather
+// than stored with a permanent board link. Pages that fail to fetch
+// keep the board link — degraded, never dropped.
+async function prepareWpjmRows(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  rows: Array<Record<string, any>>,
+  label: string,
+): Promise<{ rows: Array<Record<string, any>>; knownApplyUrls: string[] }> {
+  const withKeys = rows.map(r => ({ ...r, source_url: r.apply_url }));
+  const links = withKeys.map(r => r.source_url as string);
+
+  let knownLinks = new Set<string>();
+  let knownApplyUrls: string[] = [];
+  try {
+    const { data } = await supabase
+      .from('jobs')
+      .select('apply_url, source_url')
+      .in('source_url', links);
+    knownLinks = new Set((data ?? []).map(k => k.source_url as string));
+    knownApplyUrls = (data ?? []).map(k => k.apply_url as string).filter(Boolean);
+  } catch (err: any) {
+    // Non-fatal: worst case we re-enrich known items and the apply_url
+    // upsert dedupes them.
+    logWarn({ event: 'ingest.wpjm_known_check_failed', source: label, error: err?.message ?? String(err) });
+  }
+
+  const fresh = withKeys.filter(r => !knownLinks.has(r.source_url));
+  const toEnrich = fresh.slice(0, WPJM_ENRICH_MAX);
+  const deferred = fresh.length - toEnrich.length;
+
+  const enriched = await enrichDirectApplyLinks(toEnrich, { timeoutMs: 5_000 });
+  logInfo({
+    event: 'ingest.wpjm_enrich', source: label,
+    newItems: fresh.length, fetched: enriched.fetched, direct: enriched.enriched,
+    emails: enriched.emails, failed: enriched.failed, deferred,
+  });
+  return { rows: enriched.rows, knownApplyUrls };
 }
 
 // Lightweight update-by-id used for user-added sources. (recordSourceRun
@@ -613,8 +762,42 @@ function parseSerpDate(relative: string): string {
   return new Date().toISOString();
 }
 
-function mapCat(raw: string): string {
-  const r = raw.toLowerCase();
+// Free APIs drift: fields documented as strings arrive as arrays
+// (Jobicy's jobType/jobIndustry) or numbers. Coerce before any string
+// method — a single `e.toLowerCase is not a function` throw kills the
+// whole source's run.
+function textOf(v: unknown): string {
+  if (Array.isArray(v)) return v.map(x => textOf(x)).join(' ');
+  if (v === null || v === undefined) return '';
+  return String(v);
+}
+
+// First letter for the fallback logo. `(name ?? 'U')[0].toUpperCase()`
+// crashes on '' (Findwork sends empty company_name) — ''[0] is undefined.
+function firstChar(v: unknown): string {
+  const s = textOf(v).trim();
+  return (s ? s[0] : 'U').toUpperCase();
+}
+
+// posted_at must be ISO. Some APIs send epoch seconds (Himalayas'
+// pubDate) which Postgres rejects as "date/time field value out of
+// range"; epoch millis would silently parse as year ~58000.
+function toIso(v: unknown): string {
+  if (typeof v === 'number' || (typeof v === 'string' && /^\d{9,13}$/.test(v.trim()))) {
+    const n = Number(v);
+    const ms = n > 1e12 ? n : n * 1000;
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+  if (typeof v === 'string' && v) {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function mapCat(raw: unknown): string {
+  const r = textOf(raw).toLowerCase();
   if (/product manager|product lead|product owner/.test(r)) return 'product';
   if (/data science|data engineer|machine learning|ml engineer|analytics/.test(r)) return 'data';
   if (/marketing|seo|content|growth|brand|social media|copywriter/.test(r)) return 'marketing';
@@ -628,8 +811,8 @@ function mapCat(raw: string): string {
   return 'other';
 }
 
-function mapLevel(title: string): string {
-  const t = title.toLowerCase();
+function mapLevel(title: unknown): string {
+  const t = textOf(title).toLowerCase();
   if (/vp |chief|cto|ceo|coo|president|director/.test(t)) return 'executive';
   if (/lead|staff|principal|head of/.test(t)) return 'lead';
   if (/senior|sr\./.test(t)) return 'senior';
@@ -637,8 +820,8 @@ function mapLevel(title: string): string {
   return 'mid';
 }
 
-function mapType(raw: string): string {
-  const t = raw.toLowerCase();
+function mapType(raw: unknown): string {
+  const t = textOf(raw).toLowerCase();
   if (/part.time/.test(t)) return 'part-time';
   if (/contract|freelance/.test(t)) return 'contract';
   if (/intern/.test(t)) return 'internship';

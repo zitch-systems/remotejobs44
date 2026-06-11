@@ -18,6 +18,10 @@ export interface ParsedFeed {
   jobs:    Array<Record<string, any>>;
   total:   number;
   method:  'rss' | 'json-api' | 'unknown';
+  /** Set when the feed is recognisably from a specific board engine —
+   *  lets the pipeline apply engine-specific handling (e.g. WP Job
+   *  Manager item links point at board detail pages, not the employer). */
+  flavor?: 'wp-job-manager';
   error?:  string;
 }
 
@@ -60,7 +64,12 @@ export function parseXMLFeed(xml: string, sourceUrl: string): ParsedFeed {
       type:        raw.type,
     }, sourceUrl, 'rss'));
 
-  return { jobs, total: jobs.length, method: 'rss' };
+  // WP Job Manager feeds carry their own namespace on item fields. The
+  // flavor tells the pipeline these item links are board detail pages
+  // whose real apply target lives on the page (apply-link enrichment).
+  const flavor = /<job_listing:/i.test(xml) ? ('wp-job-manager' as const) : undefined;
+
+  return { jobs, total: jobs.length, method: 'rss', flavor };
 }
 
 // ── JSON feeds (Remotive / Jobicy / WWR / generic Greenhouse exports) ──
@@ -158,6 +167,13 @@ export function feedJobToDbRow(job: Record<string, any>, sourceUrl: string): Rec
     featured:    false,
     is_new:      true,
     is_active:   true,
+    // Explicit so every row in an upsert batch carries the same keys.
+    // supabase-js builds the column list from the union of keys across
+    // the batch and PostgREST fills gaps with NULL — which overrides the
+    // column DEFAULT and violates flagged's NOT NULL when some rows were
+    // scam-flagged and others omitted the key.
+    flagged:        false,
+    flagged_reason: null,
   };
 }
 
