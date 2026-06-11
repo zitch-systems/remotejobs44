@@ -4,6 +4,7 @@
 // private IPv4 ranges, cloud metadata endpoints, and IPv6 literals.
 import { NextRequest, NextResponse } from 'next/server';
 import { parseFeed } from '@/lib/feed-parser';
+import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
 import { requireAdmin } from '@/lib/admin/auth';
 import { logError } from '@/lib/log';
@@ -66,7 +67,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Feed too large (>5MB)', jobs: [] }, { status: 200 });
     }
 
-    const parsed = parseFeed(text, contentType, url);
+    let parsed = parseFeed(text, contentType, url);
+    // HTML page instead of a feed (admin pasted a job-board listing page):
+    // try the feeds the page advertises / well-known WP Job Manager feed.
+    if (parsed.method === 'unknown' && looksLikeHtml(text, contentType)) {
+      const found = await tryDiscoveredFeeds(text, url);
+      if (found) {
+        parsed = found.parsed;
+      } else {
+        return NextResponse.json({
+          error: 'This is an HTML page with no discoverable job feed — paste the feed URL itself.',
+          jobs: [],
+        }, { status: 200 });
+      }
+    }
     if (parsed.method === 'unknown') {
       return NextResponse.json({ error: parsed.error ?? 'Unrecognised feed format', jobs: [] }, { status: 200 });
     }

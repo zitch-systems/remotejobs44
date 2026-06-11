@@ -15,7 +15,8 @@
 //   * /api/admin/ingest-now — admin "run now" button
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
-import { parseFeed } from '@/lib/feed-parser';
+import { parseFeed, feedJobToDbRow } from '@/lib/feed-parser';
+import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { validateExternalUrl } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { logInfo, logWarn, logError } from '@/lib/log';
@@ -449,14 +450,36 @@ export async function runIngest(): Promise<IngestResult> {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
         const body = await res.text();
-        const parsed = parseFeed(body, res.headers.get('content-type') ?? '', row.url);
+        const contentType = res.headers.get('content-type') ?? '';
+        let parsed = parseFeed(body, contentType, row.url);
+
+        // Admins paste job-board listing pages (WordPress boards etc.),
+        // not feed URLs. When the body is HTML, look for the feed the
+        // page advertises (or WP Job Manager's well-known job_feed) and
+        // retry against that before declaring the source broken.
+        if (parsed.method === 'unknown' && looksLikeHtml(body, contentType)) {
+          const found = await tryDiscoveredFeeds(body, v.url.toString());
+          if (found) {
+            logInfo({ event: 'ingest.feed_discovered', source: label, feed: found.feedUrl });
+            parsed = found.parsed;
+          } else {
+            const msg = 'HTML page with no discoverable job feed — paste the feed URL itself (WP Job Manager boards expose /feed/job_feed/)';
+            results[label] = `error: ${msg}`;
+            await markSourceStatus(supabase, row.id, 'error', 0, msg);
+            continue;
+          }
+        }
         if (parsed.method === 'unknown') {
           results[label] = `error: ${parsed.error ?? 'unrecognised format'}`;
           await markSourceStatus(supabase, row.id, 'error', 0, parsed.error ?? 'unrecognised format');
           continue;
         }
 
+        // parse* emit the camelCase preview shape; convert to jobs-table
+        // rows (snake_case, no synthetic id) before the scam screen and
+        // dedupe — both read DB column names like apply_url.
         const jobs = parsed.jobs
+          .map(j => feedJobToDbRow(j, row.url))
           .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
           .map(j => {
             const scam = detectScam(j);

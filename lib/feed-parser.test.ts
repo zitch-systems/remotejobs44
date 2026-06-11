@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFeed, parseJSONFeed, parseXMLFeed } from './feed-parser';
+import { parseFeed, parseJSONFeed, parseXMLFeed, feedJobToDbRow } from './feed-parser';
 
 const SOURCE = 'https://example.com/feed';
 
@@ -117,6 +117,79 @@ describe('parseXMLFeed', () => {
 </channel></rss>`;
     const r = parseXMLFeed(xml, SOURCE);
     expect(r.total).toBe(1);
+  });
+
+  it('maps WP Job Manager namespaced tags (job_listing:*)', () => {
+    const xml = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:job_listing="https://wpjobmanager.com">
+<channel>
+  <title>Sams Social Media Club &#187; job feed</title>
+  <item>
+    <title>Social Media Manager</title>
+    <link>https://www.example.com/job/social-media-manager/</link>
+    <pubDate>Tue, 09 Jun 2026 10:00:00 +0000</pubDate>
+    <description><![CDATA[<p>Run our socials end to end.</p>]]></description>
+    <job_listing:location>Manchester, UK</job_listing:location>
+    <job_listing:job_type>Part Time</job_listing:job_type>
+    <job_listing:company>Acme Studio</job_listing:company>
+  </item>
+</channel></rss>`;
+    const r = parseXMLFeed(xml, SOURCE);
+    expect(r.total).toBe(1);
+    expect(r.jobs[0].company).toBe('Acme Studio');
+    expect(r.jobs[0].location).toBe('Manchester, UK');
+    expect(r.jobs[0].type).toBe('part-time');
+    expect(r.jobs[0].applyUrl).toBe('https://www.example.com/job/social-media-manager/');
+    expect(r.jobs[0].description).toContain('Run our socials');
+  });
+});
+
+describe('feedJobToDbRow', () => {
+  const job = {
+    id: 'ext_abc123',
+    title: 'Backend Engineer',
+    company: 'Acme',
+    applyUrl: 'https://example.com/jobs/1',
+    location: 'Worldwide',
+    description: 'Build APIs',
+    posted: '2026-01-15T00:00:00.000Z',
+    category: 'engineering',
+    type: 'full-time',
+    level: 'mid',
+    skills: ['Python'],
+    salaryMin: 90000,
+    salaryMax: 120000,
+    currency: 'USD',
+    source: 'rss',
+  };
+
+  it('maps the camelCase preview shape onto jobs-table columns', () => {
+    const row = feedJobToDbRow(job, SOURCE)!;
+    expect(row.apply_url).toBe('https://example.com/jobs/1');
+    expect(row.salary_min).toBe(90000);
+    expect(row.salary_max).toBe(120000);
+    expect(row.posted_at).toBe('2026-01-15T00:00:00.000Z');
+    expect(row.source_url).toBe(SOURCE);
+    expect(row.is_active).toBe(true);
+    expect(row.logo).toBe('A');
+    // the synthetic ext_* id must not reach the uuid primary key
+    expect(row.id).toBeUndefined();
+    expect(row.applyUrl).toBeUndefined();
+  });
+
+  it('returns null without a usable http(s) apply URL', () => {
+    expect(feedJobToDbRow({ ...job, applyUrl: '' }, SOURCE)).toBeNull();
+    expect(feedJobToDbRow({ ...job, applyUrl: 'javascript:alert(1)' }, SOURCE)).toBeNull();
+    expect(feedJobToDbRow({ ...job, applyUrl: undefined }, SOURCE)).toBeNull();
+  });
+
+  it('fills safe defaults for sparse feeds', () => {
+    const row = feedJobToDbRow({ applyUrl: 'https://example.com/j/1' }, SOURCE)!;
+    expect(row.title).toBe('Untitled role');
+    expect(row.company).toBe('Unknown');
+    expect(row.salary_min).toBeNull();
+    expect(row.skills).toBeNull();
+    expect(row.source).toBe('rss');
   });
 });
 

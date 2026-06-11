@@ -43,6 +43,7 @@ export function parseXMLFeed(xml: string, sourceUrl: string): ParsedFeed {
       location:    extractTag(block, 'location') ?? extractTag(block, 'region') ?? 'Remote',
       salary:      extractTag(block, 'salary') ?? extractTag(block, 'compensation') ?? '',
       category:    extractTag(block, 'category') ?? '',
+      type:        extractTag(block, 'job_type') ?? extractTag(block, 'employment_type') ?? '',
     });
   }
 
@@ -56,6 +57,7 @@ export function parseXMLFeed(xml: string, sourceUrl: string): ParsedFeed {
       posted:      raw.pubDate,
       location:    raw.location,
       salary:      raw.salary,
+      type:        raw.type,
     }, sourceUrl, 'rss'));
 
   return { jobs, total: jobs.length, method: 'rss' };
@@ -113,10 +115,50 @@ export function parseFeed(body: string, contentType: string, sourceUrl: string):
 
 // ── tag/attr extractors ────────────────────────────────────────────────
 function extractTag(xml: string, tag: string): string | undefined {
+  // Optional namespace prefix, so asking for `company` also matches
+  // namespaced variants like WP Job Manager's <job_listing:company>.
+  // Callers can still pass an explicit prefix ('dc:creator') verbatim.
+  const t = `(?:[A-Za-z][\\w.-]*:)?${tag}`;
   const m =
-    xml.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, 'i'))
-    ?? xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+    xml.match(new RegExp(`<${t}\\b[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${t}\\s*>`, 'i'))
+    ?? xml.match(new RegExp(`<${t}\\b[^>]*>([\\s\\S]*?)<\\/${t}\\s*>`, 'i'));
   return m ? m[1].trim() : undefined;
+}
+
+// Map the camelCase Partial<Job> that parseXMLFeed/parseJSONFeed emit
+// (via normalizeJob — the shape /api/rss preview consumers render) onto a
+// snake_case public.jobs row for the ingest upsert. Drops the synthetic
+// `ext_*` id so Postgres generates a real uuid, and nulls non-http(s)
+// apply URLs the same way /api/ats/save does. Returns null when there is
+// no usable apply URL — the pipeline can't dedupe or link such a row.
+export function feedJobToDbRow(job: Record<string, any>, sourceUrl: string): Record<string, any> | null {
+  const applyUrl = typeof job.applyUrl === 'string' && /^https?:\/\//i.test(job.applyUrl)
+    ? job.applyUrl
+    : null;
+  if (!applyUrl) return null;
+  const company = String(job.company ?? '').trim() || 'Unknown';
+  return {
+    title:       String(job.title ?? '').trim() || 'Untitled role',
+    company,
+    logo:        company[0]?.toUpperCase() ?? 'U',
+    category:    job.category ?? 'other',
+    type:        job.type ?? 'full-time',
+    level:       job.level ?? null,
+    location:    job.location || 'Worldwide',
+    description: job.description ?? '',
+    salary_min:  Number.isFinite(job.salaryMin) ? Math.round(job.salaryMin) : null,
+    salary_max:  Number.isFinite(job.salaryMax) ? Math.round(job.salaryMax) : null,
+    currency:    job.currency ?? 'USD',
+    skills:      Array.isArray(job.skills) && job.skills.length ? job.skills : null,
+    apply_url:   applyUrl,
+    posted_at:   job.posted ?? new Date().toISOString(),
+    source:      job.source ?? 'rss',
+    source_url:  sourceUrl,
+    remote:      true,
+    featured:    false,
+    is_new:      true,
+    is_active:   true,
+  };
 }
 
 function extractAttr(xml: string, tag: string, attr: string): string | undefined {
