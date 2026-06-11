@@ -41,6 +41,10 @@ const PRESETS = [
   { name: 'Remote OK',        url: 'https://remoteok.com/remote-jobs.rss' },
   { name: 'Working Nomads',   url: 'https://www.workingnomads.com/jobs?format=rss' },
   { name: 'YC Hiring',        url: 'https://yc-oss.github.io/api/companies/hiring.json' },
+  // WP Job Manager board — jobs live in the plugin's job_feed, not the
+  // site's main /feed/. Page URLs from this site also work: the ingest
+  // pipeline resolves HTML pages to this feed automatically.
+  { name: "Sam's Social Media Club", url: 'https://www.samssocialmediaclub.com/feed/job_feed/?posts_per_page=50' },
 ];
 
 export default function SourcesPage() {
@@ -264,7 +268,7 @@ export default function SourcesPage() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100">Bulk Add URLs</h2>
-            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Paste many URLs — one per line. Each is registered as an auto-detect source.</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Paste many URLs — one per line. Feed URLs (RSS / JSON) work directly; job-board pages are resolved to their feed at ingest time when the page advertises one (incl. WP Job Manager boards).</p>
           </div>
           {bulkProgress && (
             <span className="text-xs font-bold text-brand-700 dark:text-brand-400 shrink-0">{bulkProgress.done} / {bulkProgress.total}</span>
