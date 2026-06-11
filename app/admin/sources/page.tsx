@@ -113,23 +113,37 @@ export default function SourcesPage() {
     if (!urls.length) return;
 
     setBulkProgress({ done: 0, total: urls.length });
+    setError(null);
+    // Surface per-URL failures instead of swallowing them — a URL the API
+    // rejects (SSRF guard, validation) otherwise just silently never
+    // appears in the list and the admin assumes it was added.
+    const failed: string[] = [];
     // Cap concurrency so we don't hammer the API or the SSRF guard
     const CONCURRENCY = 4;
     for (let i = 0; i < urls.length; i += CONCURRENCY) {
       const batch = urls.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async (url) => {
         try {
-          await fetch('/api/admin/sources', {
+          const r = await fetch('/api/admin/sources', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, method: 'auto' }),
           });
-        } catch {}
+          if (!r.ok) {
+            const j = await r.json().catch(() => ({} as { error?: string }));
+            failed.push(j.error ? `${url} — ${j.error}` : url);
+          }
+        } catch {
+          failed.push(url);
+        }
         setBulkProgress(p => p ? { ...p, done: p.done + 1 } : null);
       }));
     }
     setBulkText('');
     setBulkProgress(null);
+    if (failed.length) {
+      setError(`Failed to add ${failed.length} of ${urls.length} URL(s): ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? ` and ${failed.length - 3} more` : ''}`);
+    }
     await loadSources();
   }
 
