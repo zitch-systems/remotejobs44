@@ -277,16 +277,19 @@ export async function GET(req: NextRequest) {
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
     if (remote) {
-      // Match remote=true OR a remote-keyword somewhere in location.
-      // Previously this was 7 separate ILIKE patterns — Postgres seq-
-      // scanned and evaluated each substring match per row, ~6.2s on
-      // 85k rows. EXPLAIN ANALYZE confirmed the single POSIX regex via
-      // PostgREST's `imatch` operator (= `~*`) runs in ~1.1s with the
-      // same result set. Same semantics: a NULL `remote` column doesn't
-      // satisfy the boolean side, so on-site-only postings stay out.
-      query = query.or(
-        'remote.eq.true,location.imatch.remote|worldwide|anywhere|global|distributed|wfh'
-      );
+      // Match remote=true OR a remote-keyword somewhere in location —
+      // via the STORED GENERATED column is_remote_compat, whose
+      // expression is exactly that OR chain (COALESCE(remote,false) OR
+      // location ~* '(remote|worldwide|anywhere|global|distributed|wfh)').
+      // Postgres maintains it on every write and the partial index
+      // jobs_is_remote_compat_idx serves it, so the per-row regex this
+      // used to send (203ms warm / seconds cold over 72k index entries)
+      // becomes a 34-36ms index walk with an identical result set
+      // (16,435 = 16,435, verified on prod). NULL-remote semantics
+      // unchanged: COALESCE(remote,false) falls through to the location
+      // regex just like the old remote.eq.true OR did. See
+      // supabase/migration_v32.sql; mirrors app/jobs/page.tsx.
+      query = query.eq('is_remote_compat', true);
     }
     // Country takes priority over region (more specific). Both fall through
     // to a location ILIKE substring match if not in the REGION_TERMS map.
