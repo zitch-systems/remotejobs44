@@ -1,4 +1,6 @@
 {
+  "_regions_comment": "Pin all Serverless Functions to dub1 (AWS eu-west-1, Dublin) — the SAME region as the Supabase project. Without this, functions default to iad1 (US East) and every SSR render / API call pays a transatlantic round-trip PER Supabase query: auth getUser, profiles read, jobs read often run sequentially, so /jobs and /jobs/[id] were stacking 3-4 x ~90ms of pure network on top of query time. Co-locating compute with the database collapses those hops to ~1-3ms and is the single biggest TTFB lever for every dynamic route.",
+  "regions": ["dub1"],
   "crons": [
     { "path": "/api/cron/daily", "schedule": "0 6 * * *" },
     { "path": "/api/cron/ats-refresh", "schedule": "0 18 * * *" }

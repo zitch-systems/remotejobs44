@@ -1,6 +1,6 @@
 // app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
@@ -25,6 +25,14 @@ function safeRevalidate(...paths: string[]): void {
     try { revalidatePath(p); }
     catch (err: any) { logWarn({ event: 'jobs.revalidate_failed', path: p, error: err?.message ?? String(err) }); }
   }
+  // The listing + detail DATA now live in the tagged data cache
+  // (unstable_cache in app/jobs/page.tsx and lib/jobs/job-detail.ts), which
+  // revalidatePath doesn't touch — both routes render dynamically and pull
+  // from that cache. The bulk 'jobs' tag covers every cached listing
+  // variant and every cached detail row in one flush. ('max' is Next 16's
+  // spelling of the classic single-arg revalidateTag semantics.)
+  try { revalidateTag('jobs', 'max'); }
+  catch (err: any) { logWarn({ event: 'jobs.revalidate_tag_failed', error: err?.message ?? String(err) }); }
 }
 
 // MOCK_JOBS is a development fallback used by single-job lookups when the

@@ -58,11 +58,15 @@ export function HeroInstallButton() {
   const { toast } = useUIStore();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [detected, setDetected] = useState<Platform>('desktop');
-  // Standalone check happens after mount because `navigator.standalone`
-  // and `display-mode: standalone` are only available client-side.
-  // Default `true` keeps SSR/hydration silent (renders nothing) until
-  // we know whether the user has already installed.
-  const [hidden, setHidden] = useState(true);
+  // Default VISIBLE: the install row ships in the server HTML, and the
+  // standalone check (only knowable client-side) hides it after mount for
+  // the small already-installed cohort. The previous default of `true`
+  // (render nothing until mounted) inserted a ~50px row into the middle
+  // of the hero on EVERY homepage view, shifting the chips/stats/sections
+  // below it after first paint — a recurring CLS hit on the highest-
+  // traffic route. A brief flash-then-hide for standalone users is the
+  // far cheaper side of that trade.
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent;

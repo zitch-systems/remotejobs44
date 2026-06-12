@@ -13,8 +13,8 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, Clock, ArrowLeft, Flag } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
-import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
+import { getJobDetailRow } from '@/lib/jobs/job-detail';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -25,46 +25,44 @@ import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { companySlug } from '@/lib/company-slug';
 import type { Job } from '@/lib/types';
 
-// Cache job detail pages at the edge for 5 minutes — long enough that the
-// JSON-LD doesn't re-render on every crawler hit, short enough that
-// description edits / role removals propagate quickly.
-export const revalidate = 300;
+// NOTE: this route renders dynamically (the plan check reads cookies), so a
+// page-level `revalidate` export has no effect here. The 5-minute caching
+// lives in lib/jobs/job-detail.ts via unstable_cache — that's what stops the
+// job row from being re-fetched per request / per crawler hit.
 
 async function fetchJob(id: string): Promise<Job | null> {
   if (!id) return null;
   try {
-    // Two-step pattern (matches /api/jobs after migration_v16):
-    //   1. Resolve plan via session client — safe to query as anon.
-    //   2. Run the actual jobs query as service-role (admin client).
-    //      The column-list discipline is what enforces the paywall:
-    //      anon/free get SAFE_JOB_COLUMNS (no apply_url/apply_email),
-    //      paid get '*'. We use the admin client unconditionally to
-    //      sidestep the 3s/8s per-role statement_timeout — single-row
-    //      reads are cheap but EXPLAIN at scale on the SAME jobs table
-    //      under FTS load showed the anon timeout cap was hitting on
-    //      cold caches.
-    const sessionClient = await createServerSupabaseClient();
-    const requesterPlan = await getRequesterPlan(sessionClient);
-    const seePaid = canSeePaidFields(requesterPlan);
-    const supabase = createAdminSupabaseClient();
-    const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
-
-    // Supabase's PostgrestQueryBuilder.select() narrows the row type from
-    // the literal column list. We pass `cols` as a runtime variable so the
-    // generic resolves to GenericStringError — fine at runtime, but the
-    // downstream `data.title` etc. then fail tsc. Cast back to `any` so the
-    // existing snake_case → camelCase mapping below keeps compiling. The
-    // real shape is enforced by what we put into SAFE_JOB_COLUMNS + the
-    // migration_v16 column grants.
-    const { data } = await supabase
-      .from('jobs')
-      .select(cols)
-      .eq('id', id)
-      .eq('is_active', true)
-      .or(notExpired())
-      .or(NOT_FLAGGED)
-      .maybeSingle() as { data: any };
+    // Row + plan resolve concurrently:
+    //   * row — the SAME cached fetch generateMetadata used this request
+    //     (React cache() dedupe), so this usually costs nothing; across
+    //     requests it's served from the 5-min unstable_cache.
+    //   * plan — getRequesterPlan short-circuits to 'anon' without touching
+    //     the Auth server when the request carries no Supabase auth cookie
+    //     (the overwhelming majority of job-detail traffic + every crawler).
+    const [data, requesterPlan] = await Promise.all([
+      getJobDetailRow(id),
+      createServerSupabaseClient().then(getRequesterPlan),
+    ]);
     if (!data) return null;
+    const seePaid = canSeePaidFields(requesterPlan);
+
+    // Paywall: apply_url/apply_email are NEVER in the shared cache (it
+    // stores SAFE_JOB_COLUMNS only — see the invariant note in
+    // lib/jobs/job-detail.ts). Entitled sessions merge them in with one
+    // per-request single-row read as service-role; anon/free skip it and
+    // the fields stay undefined, exactly as before.
+    let applyUrl: string | undefined;
+    let applyEmail: string | undefined;
+    if (seePaid) {
+      const { data: paid } = await createAdminSupabaseClient()
+        .from('jobs')
+        .select('apply_url, apply_email')
+        .eq('id', id)
+        .maybeSingle();
+      applyUrl   = paid?.apply_url   ?? undefined;
+      applyEmail = paid?.apply_email ?? undefined;
+    }
     // Map snake_case DB row → camelCase Job. Mirrors transformJob in
     // /api/jobs/route.ts but maps `posted_at → posted` (the field name the
     // Job type and downstream components actually use; the API route's
@@ -87,8 +85,8 @@ async function fetchJob(id: string): Promise<Job | null> {
       requirements:  data.requirements ?? undefined,
       skills:        data.skills ?? [],
       benefits:      data.benefits ?? undefined,
-      applyUrl:      seePaid ? (data.apply_url   ?? undefined) : undefined,
-      applyEmail:    seePaid ? (data.apply_email ?? undefined) : undefined,
+      applyUrl,
+      applyEmail,
       posted:        data.posted_at ?? data.created_at ?? new Date().toISOString(),
       expires:       data.expires_at ?? undefined,
       featured:      data.featured ?? false,

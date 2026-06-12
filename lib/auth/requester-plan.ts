@@ -24,6 +24,18 @@ export type RequesterPlan = Plan | 'anon';
 
 export async function getRequesterPlan(supabase: SupabaseClient): Promise<RequesterPlan> {
   try {
+    // Anonymous fast path. getSession() only parses the request's cookies —
+    // no network — so a request with no Supabase session resolves to 'anon'
+    // without a round-trip. Without this, every anonymous page view of
+    // /jobs, /jobs/[id], and /api/jobs (most of the site's traffic, plus
+    // every crawler) fired a getUser() call at the Auth server — the same
+    // 10-connection-capped service the middleware fast-path was added to
+    // protect. getUser() below remains the validation step for requests
+    // that DO carry a session; the unverified getSession result is used
+    // for nothing but this null check.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return 'anon';
+
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return 'anon';
 

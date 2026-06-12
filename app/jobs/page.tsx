@@ -8,6 +8,7 @@
 // (which re-runs this server fetch).
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { unstable_cache } from 'next/cache';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
@@ -17,12 +18,18 @@ import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
 import type { Job, JobCategory } from '@/lib/types';
 
-export const revalidate = 60;
+// This page renders dynamically (the plan check reads cookies, and
+// searchParams force request-time rendering anyway), so a page-level
+// `revalidate` export never applied here. The 60s caching that comment
+// intended now actually exists: queryJobsListing below is wrapped in
+// unstable_cache, so the expensive count/list queries run at most once
+// per minute per filter combination instead of on every request.
+//
 // Same reason as /api/jobs/route.ts: count('exact') over 81k rows
 // with OR-IS-NULL visibility filters + the remote-on ILIKE chain
 // seq-scans in ~6-8 s. Default 10 s Vercel lambda timeout would tip
 // cold renders into "0 jobs found" empty state. 30 s gives the
-// service-role 60 s timeout room to land.
+// service-role 60 s timeout room to land (now only paid on cache miss).
 export const maxDuration = 30;
 
 // Listing is heavily filterable; the noindex on faceted permutations is
@@ -112,33 +119,54 @@ interface FetchJobsResult {
   error?: boolean;
 }
 
-async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
-  const q           = sp.q          ?? '';
-  const category    = sp.category   ?? '';
-  const type        = sp.type       ?? '';
-  const level       = sp.level      ?? '';
-  const salary      = sp.salary     ?? '';
-  const timezone    = sp.timezone   ?? '';
-  const posted      = sp.posted     ?? '';
-  const remoteOnly  = (sp.remote    ?? 'true') !== 'false';
-  const region      = sp.region     ?? '';
-  const country     = sp.country    ?? '';
-  const sort        = sp.sort       ?? 'newest';
-  const page        = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+// Every input that influences the listing query, defaults applied. Built
+// with a fixed literal key order so the object JSON-serialises stably —
+// it doubles as the unstable_cache key for queryJobsListing.
+interface ListingParams {
+  q: string; category: string; type: string; level: string;
+  salary: string; timezone: string; posted: string;
+  remoteOnly: boolean; region: string; country: string;
+  sort: string; page: number;
+}
 
-  // Always run the actual jobs query against the admin (service-role)
-  // client. anon's 3s / authenticated's 8s statement_timeout was hitting
-  // for FTS over 60k rows; service_role gets 60s. Paywall is enforced at
-  // the SELECT-column list: anon/free get SAFE_JOB_COLUMNS (no
-  // apply_url/apply_email), paid get '*'.
-  const sessionClient = await createServerSupabaseClient();
-  const requesterPlan = await getRequesterPlan(sessionClient);
-  const seePaid = canSeePaidFields(requesterPlan);
+function normalizeParams(sp: SearchParams): ListingParams {
+  return {
+    q:          sp.q        ?? '',
+    category:   sp.category ?? '',
+    type:       sp.type     ?? '',
+    level:      sp.level    ?? '',
+    salary:     sp.salary   ?? '',
+    timezone:   sp.timezone ?? '',
+    posted:     sp.posted   ?? '',
+    remoteOnly: (sp.remote  ?? 'true') !== 'false',
+    region:     sp.region   ?? '',
+    country:    sp.country  ?? '',
+    sort:       sp.sort     ?? 'newest',
+    page:       Math.max(1, parseInt(sp.page ?? '1', 10) || 1),
+  };
+}
+
+// Carries a degraded-but-renderable result out of queryJobsListing via
+// throw: unstable_cache only memoises clean returns, so a transient DB
+// failure renders its error state once instead of being cached as "0 jobs
+// found" for a full minute of traffic.
+class ListingQueryError extends Error {
+  constructor(public readonly result: FetchJobsResult) {
+    super('jobs listing query failed');
+  }
+}
+
+// The actual Supabase work. MUST stay free of cookies()/headers() — it runs
+// inside unstable_cache. Reads exclusively via the admin (service-role)
+// client: anon's 3s / authenticated's 8s statement_timeout was hitting for
+// FTS over 60k rows; service_role gets 60s. Paywall is enforced at the
+// SELECT-column list: anon/free get SAFE_JOB_COLUMNS (no apply_url/
+// apply_email), paid get '*' — `seePaid` is part of the cache key, so the
+// two variants never cross.
+async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<FetchJobsResult> {
+  const { q, category, type, level, salary, timezone, posted, remoteOnly, region, country, sort, page } = p;
   const supabase = createAdminSupabaseClient();
   const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
-  // Touch sessionClient to silence the no-unused-vars lint — we still
-  // need it for getRequesterPlan above.
-  void sessionClient;
 
   // Q-PRESENT PATH: relevance-ranked FTS via the search_jobs() RPC
   // (migration v17). Returns SETOF jobs ordered by ts_rank desc, so the
@@ -211,7 +239,7 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       }
     }
 
-    return {
+    const result: FetchJobsResult = {
       jobs,
       total,
       page,
@@ -219,6 +247,10 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
       fuzzy,
       error: rpcError,
     };
+    // Render the same degraded result as before, but keep it out of the
+    // cache (see ListingQueryError).
+    if (rpcError) throw new ListingQueryError(result);
+    return result;
   }
 
   // NO-Q PATH: filter-only browsing.
@@ -295,13 +327,42 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
   }
   const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
   const total = count ?? jobs.length;
-  return {
+  const result: FetchJobsResult = {
     jobs,
     total,
     page,
     pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
     error: !!error,
   };
+  if (error) throw new ListingQueryError(result);
+  return result;
+}
+
+// 60s shared cache over the listing queries — the count('exact') +
+// filtered SELECT (or FTS RPC pair) run at most once per minute per
+// distinct filter combination + column variant, instead of on every
+// request. Tagged so /api/jobs admin mutations can flush instantly.
+const queryJobsListingCached = unstable_cache(
+  queryJobsListing,
+  ['jobs-listing-v1'],
+  { revalidate: 60, tags: ['jobs', 'jobs-listing'] },
+);
+
+async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
+  const params = normalizeParams(sp);
+  // Plan resolution stays per-request (it reads the session cookie); for
+  // anonymous traffic getRequesterPlan short-circuits without hitting the
+  // Auth server. Only the heavy data work below is cached.
+  const requesterPlan = await getRequesterPlan(await createServerSupabaseClient());
+  const seePaid = canSeePaidFields(requesterPlan);
+  try {
+    return await queryJobsListingCached(params, seePaid);
+  } catch (err) {
+    if (err instanceof ListingQueryError) return err.result;
+    // eslint-disable-next-line no-console
+    console.error('[fetchJobs] listing query threw:', err instanceof Error ? err.message : String(err));
+    return { jobs: [], total: 0, page: params.page, pages: 1, error: true };
+  }
 }
 
 // Build the page-number window for the pagination control. Mirrors the

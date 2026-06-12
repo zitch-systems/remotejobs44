@@ -113,12 +113,15 @@ const nextConfig = {
           { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },
         ],
       },
-      {
-        source: '/jobs/:id',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=3600, stale-while-revalidate=86400' },
-        ],
-      },
+      // NOTE: /jobs/:id used to ship `Cache-Control: public, max-age=3600`
+      // here, from the era when the page was a static client shell. The
+      // page is now server-rendered per request and its HTML VARIES BY
+      // AUTH (paid users get apply_url baked in) — letting any shared/
+      // public cache hold one user's variant is both a paywall leak (paid
+      // HTML replayed to anon) and a staleness bug (anon HTML replayed to
+      // a user who just paid). Caching for this route now lives server-
+      // side in the tagged data cache (lib/jobs/job-detail.ts), which
+      // stores only the auth-blind SAFE columns by design.
     ];
   },
 };

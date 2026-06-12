@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { normalizeJobDescription } from '@/lib/job-description';
+import { getJobDetailRow } from '@/lib/jobs/job-detail';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
-    const admin = createAdminSupabaseClient();
-    const { data: job } = await admin
-      .from('jobs')
-      .select('title, company, description, location, category, salary_min, salary_max, currency, logo')
-      .eq('id', (await params).id)
-      .maybeSingle();
+    // Shared cached fetch (lib/jobs/job-detail) — the page body reuses the
+    // same row via React cache(), so metadata no longer costs a second
+    // Supabase round-trip per request. Side effect of sharing the page's
+    // visibility filters: expired/flagged jobs now get "Job Not Found"
+    // metadata to match their 404 body, instead of leaking live-looking
+    // tags for a page that doesn't render.
+    const job = await getJobDetailRow((await params).id);
 
     if (!job) return { title: 'Job Not Found | RemoteJobs44' };
 
