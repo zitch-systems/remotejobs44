@@ -153,3 +153,20 @@ PAYSTACK_PRO_MONTHLY_PLAN_CODE=PLN_xxx
 PAYSTACK_PRO_ANNUAL_PLAN_CODE=PLN_xxx
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+## Vercel deployment region (`vercel.json` → `regions`)
+
+`vercel.json` pins all Serverless Functions to **`dub1`** (AWS `eu-west-1`,
+Dublin) — the SAME region as the Supabase project. JSON can't carry
+comments, so the rationale lives here:
+
+Without the pin, functions default to `iad1` (US East) and every SSR
+render / API call pays a transatlantic round-trip PER Supabase query.
+`/jobs` and `/jobs/[id]` run their auth getUser → profiles → jobs reads
+mostly sequentially, stacking 3–4 × ~90ms of pure network on top of query
+time — the bulk of the site's 1.6–2s P75 TTFB. Co-locating compute with
+the database collapses those hops to ~1–3ms.
+
+If the Supabase project is ever migrated to another region, update
+`regions` in `vercel.json` to the matching Vercel region ID at the same
+time (region map: https://vercel.com/docs/edge-network/regions).

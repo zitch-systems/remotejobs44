@@ -55,13 +55,19 @@ export function RecommendedJobs() {
   }, []);
 
   if (loading) {
+    // Mirror the loaded layout as closely as possible — same card count
+    // (the API returns up to 6) and ~the same card/header heights — so the
+    // skeleton→content swap doesn't reflow the application/saved-job
+    // sections below it. The old 3×h-24 placeholder grew by a full row
+    // when the real 6 cards landed, shifting everything under it.
     return (
       <div className="mb-8">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="mb-3 space-y-1.5">
           <div className="skeleton h-5 w-44 rounded" />
+          <div className="skeleton h-3 w-64 rounded" />
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-lg" />)}
+          {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton h-28 rounded-lg" />)}
         </div>
       </div>
     );

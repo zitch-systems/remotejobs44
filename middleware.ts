@@ -50,9 +50,9 @@ export async function middleware(request: NextRequest) {
   const isDashboardRoute = path === '/dashboard' || path.startsWith('/dashboard/');
 
   // Fast path for every non-gated route (homepage, ~250 SEO pages, /jobs,
-  // /companies, /blog, …). Only the /admin and /dashboard branches below ever
-  // read the validated user, so everywhere else supabase.auth.getUser() was
-  // pure overhead: it ran solely to refresh the session cookie — something the
+  // /companies, /blog, …). Only the /admin branch below ever reads the
+  // validated user, so everywhere else supabase.auth.getUser() was pure
+  // overhead: it ran solely to refresh the session cookie — something the
   // browser client's background auto-refresh already does.
   //
   // Why it matters: getUser() calls /auth/v1/user on the Auth server, and this
@@ -62,9 +62,43 @@ export async function middleware(request: NextRequest) {
   // saturated those 10 connections, so /auth/v1/user climbed from <100ms to
   // 2–14s. The browser then times out getAuthedUserSafe (6s) and dead-ends on
   // "Verifying your session…", while signInWithPassword / signUp stall on the
-  // same starved Auth server. Scoping the round-trip to the two routes that
+  // same starved Auth server. Scoping the round-trip to the routes that
   // actually gate on it removes the self-inflicted flood.
   if (!isAdminRoute && !isDashboardRoute) {
+    return NextResponse.next({ request: { headers: request.headers } });
+  }
+
+  // /dashboard: gate on cookie PRESENCE only — no Auth-server round-trip.
+  // The blocking getUser() here was the dashboard's entire TTFB story: the
+  // page itself is a statically-prerendered client shell, so the auth
+  // validation (often 1s+, and 2–14s during the connection-cap incidents)
+  // was the only thing between the visitor and first byte. Speed Insights
+  // had /dashboard as the worst route on the site (RES 37 desktop).
+  //
+  // This loses nothing real:
+  //   * No cookie → redirect to /login, exactly as the old confirmedUnauthed
+  //     path did — just without burning an Auth call to learn what the
+  //     cookie jar already says.
+  //   * Cookie present → let the page render. That was ALREADY the outcome
+  //     whenever getUser() returned 401-with-cookie or any transient error
+  //     ("only bounce when CERTAIN") — the client-side getAuthedUserSafe
+  //     flow owns real validation, retry, and the sign-in fallback UI. A
+  //     forged/stale cookie renders the same skeleton shell it always
+  //     could, and every data fetch behind it authenticates itself.
+  //   * Token refresh moves to the browser client's background auto-refresh,
+  //     the same mechanism every other page (including /profile,
+  //     /applications, /saved — which have no middleware gate at all)
+  //     already relies on.
+  //   * Hardcoded admins are no longer server-redirected /dashboard→/admin;
+  //     the dashboard's client-side role check handles that (as it always
+  //     has for DB-role admins).
+  if (isDashboardRoute) {
+    if (!hasSupabaseSessionCookie(request)) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', path);
+      return NextResponse.redirect(url);
+    }
     return NextResponse.next({ request: { headers: request.headers } });
   }
 
@@ -122,13 +156,13 @@ export async function middleware(request: NextRequest) {
   if (serverSaid401 && !cookiePresent) confirmedUnauthed = true;
   if (!user && !confirmedUnauthed && !cookiePresent) confirmedUnauthed = true;
 
-  // path / isAdminRoute / isDashboardRoute are computed at the top of the
-  // function (the non-gated fast path returns before we ever reach here).
+  // Only /admin/* reaches this point (/dashboard and the non-gated routes
+  // return from the fast paths above).
 
   // Only bounce to /login when we are CERTAIN the user has no session — not on
   // transient errors. Otherwise the page renders and its client-side auth check
   // can handle redirect or render a "loading" state.
-  if ((isAdminRoute || isDashboardRoute) && confirmedUnauthed) {
+  if (confirmedUnauthed) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);
@@ -141,21 +175,10 @@ export async function middleware(request: NextRequest) {
   // Hardcoded-admin emails go through (DB-only admins still rely on the
   // client gate, because reading profiles.role here adds latency to every
   // page load). All admin API routes already require admin via lib/admin/auth.
-  if (user && isAdminRoute && !isAdminEmail(user.email)) {
+  if (user && !isAdminEmail(user.email)) {
     // Don't outright redirect — DB-admin users would loop. Let the client
     // /admin/layout.tsx check decide based on profiles.role.
     // (Intentional no-op; see comment above.)
-  }
-
-  // Server-side shortcut for the hardcoded admin list, so admins never see the
-  // /dashboard flash before the client-side check fires. Members are routed by
-  // the /admin layout's client-side profile lookup (DB role is the source of
-  // truth there).
-  if (user && isDashboardRoute && isAdminEmail(user.email)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/admin';
-    url.search = '';
-    return redirectWithAuthCookies(url, response);
   }
 
   return response;
@@ -169,9 +192,10 @@ export const config = {
     // a dashboard load fires page + /api/jobs + /api/applications +
     // /api/saved-jobs + … and each was a separate /auth/v1/user call. That
     // flood is what tipped calls into rate-limited / transient failures.
-    // The Supabase getUser() validation now runs ONLY for /admin and
-    // /dashboard (see the non-gated fast path at the top of middleware) — every
-    // other matched route returns immediately without touching the Auth server.
+    // The Supabase getUser() validation now runs ONLY for /admin (see the
+    // fast paths at the top of middleware — /dashboard gates on cookie
+    // presence alone) — every other matched route returns immediately
+    // without touching the Auth server.
     // Session-cookie refresh on public pages is handled by the browser client's
     // background auto-refresh and by the route handlers themselves, so scoping
     // the auth round-trip this way loses nothing.
