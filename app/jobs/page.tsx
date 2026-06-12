@@ -272,12 +272,17 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
   if (type)  query = query.eq('type', type);
   if (level) query = query.eq('level', level);
   if (remoteOnly) {
-    // Single POSIX regex (`imatch` = `~*`) instead of 7 ILIKE patterns —
-    // 5.7× faster on this dataset (EXPLAIN: 6.2s → 1.1s). Mirrors the
-    // /api/jobs route change.
-    query = query.or(
-      'remote.eq.true,location.imatch.remote|worldwide|anywhere|global|distributed|wfh'
-    );
+    // is_remote_compat is a STORED GENERATED column in prod:
+    //   COALESCE(remote, false) OR location ~* '(remote|worldwide|anywhere|global|distributed|wfh)'
+    // i.e. exactly the `remote.eq.true,location.imatch.…` OR chain this
+    // used to send — Postgres keeps it in sync on every write, and the
+    // partial index jobs_is_remote_compat_idx serves it. EXPLAIN ANALYZE
+    // on prod (84k rows, identical 16,435-row result set): regex chain
+    // 203ms / 57,967 buffers for the LIMIT-50 page and 189ms for the
+    // count; generated column 36ms / 15,151 buffers and 34ms. The win is
+    // bigger cold — 4× fewer pages to fault in. Recorded in
+    // supabase/migration_v32.sql; mirrors the /api/jobs route.
+    query = query.eq('is_remote_compat', true);
   }
   const locFilter = country || region;
   if (locFilter && REGION_TERMS[locFilter]) {
