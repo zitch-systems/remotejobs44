@@ -22,51 +22,35 @@ export async function GET() {
     const admin = createAdminSupabaseClient();
     const agentId = auth.agentId;
 
-    const [clicksRes, signupsRes, chargesRes, rowsRes, recentRes] = await Promise.all([
+    // Commission totals + plan mix are aggregated in the DB (RPCs) so the
+    // numbers stay exact regardless of how many charges an agent accrues —
+    // no row-fetch cap. Clicks + sign-ups are cheap head-counts on other
+    // tables; `recent` is the bounded table feed.
+    const [clicksRes, signupsRes, summaryRes, breakdownRes, recentRes] = await Promise.all([
       admin.from('referral_clicks').select('id', { count: 'exact', head: true }).eq('agent_id', agentId),
       admin.from('profiles').select('id', { count: 'exact', head: true }).eq('referred_by', agentId),
-      admin.from('agent_commissions').select('id', { count: 'exact', head: true }).eq('agent_id', agentId),
-      admin.from('agent_commissions')
-        .select('plan, amount, commission_amount, referred_user_id, status')
-        .eq('agent_id', agentId).limit(5000),
+      admin.rpc('agent_commission_summary', { p_agent_id: agentId }),
+      admin.rpc('agent_commission_plan_breakdown', { p_agent_id: agentId }),
       admin.from('agent_commissions')
         .select('plan, billing, amount, commission_amount, commission_rate, status, created_at')
         .eq('agent_id', agentId).order('created_at', { ascending: false }).limit(20),
     ]);
 
-    const rows = rowsRes.data ?? [];
-    const subscribers = new Set<string>();
-    const planMap = new Map<string, { count: number; gross: number; commission: number }>();
-    let totalCommission = 0;
-    let pendingCommission = 0;
-    let paidCommission = 0;
-
-    for (const r of rows) {
-      if (r.referred_user_id) subscribers.add(r.referred_user_id as string);
-      const plan = (r.plan as string) ?? 'unknown';
-      const entry = planMap.get(plan) ?? { count: 0, gross: 0, commission: 0 };
-      entry.count += 1;
-      entry.gross += Number(r.amount ?? 0);
-      entry.commission += Number(r.commission_amount ?? 0);
-      planMap.set(plan, entry);
-      const c = Number(r.commission_amount ?? 0);
-      totalCommission += c;
-      if (r.status === 'paid') paidCommission += c;
-      else if (r.status !== 'reversed') pendingCommission += c;
-    }
+    const summary = (Array.isArray(summaryRes.data) ? summaryRes.data[0] : summaryRes.data) ?? {};
+    const breakdown = (breakdownRes.data ?? []) as Array<{ plan: string; count: number; gross: number; commission: number }>;
 
     return NextResponse.json({
       referralCode:   auth.referralCode,
       commissionRate: auth.commissionRate,
       clicks:         clicksRes.count ?? 0,
       signups:        signupsRes.count ?? 0,
-      subscriptions:  chargesRes.count ?? 0,   // total paid charges by referrals
-      subscribers:    subscribers.size,        // distinct paying referrals
-      totalCommission:   round2(totalCommission),
-      pendingCommission: round2(pendingCommission),
-      paidCommission:    round2(paidCommission),
-      planBreakdown: [...planMap.entries()].map(([plan, v]) => ({
-        plan, count: v.count, gross: round2(v.gross), commission: round2(v.commission),
+      subscriptions:  Number(summary.charges ?? 0),     // total paid charges by referrals
+      subscribers:    Number(summary.subscribers ?? 0), // distinct paying referrals
+      totalCommission:   round2(Number(summary.total_commission ?? 0)),
+      pendingCommission: round2(Number(summary.pending_commission ?? 0)),
+      paidCommission:    round2(Number(summary.paid_commission ?? 0)),
+      planBreakdown: breakdown.map(b => ({
+        plan: b.plan, count: Number(b.count), gross: round2(Number(b.gross)), commission: round2(Number(b.commission)),
       })),
       recent: recentRes.data ?? [],
     });

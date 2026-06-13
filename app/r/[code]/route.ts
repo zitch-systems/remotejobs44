@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { getIP } from '@/lib/rate-limit';
+import { getIP, rateLimit } from '@/lib/rate-limit';
 import { logError } from '@/lib/log';
 
 // Same shape as the codes randomReferralCode mints, with slack for any
@@ -18,6 +18,16 @@ const CODE_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 // 30 days — long enough to bridge "saw the link today, signed up next week".
 const REF_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+// Flood guard for the click-log write. /r/<code> is an unauthenticated public
+// endpoint, so without this a script could hammer a valid link to inflate an
+// agent's click count and bloat referral_clicks unbounded. 30 recorded clicks
+// per IP per minute is far above any human, but caps a single-source flood.
+// The cookie + redirect ALWAYS run — only the DB insert is throttled — so
+// attribution is never affected. Generous on purpose: Nigerian carrier-grade
+// NAT means many real users share one IP.
+const CLICK_WRITES_PER_IP = 30;
+const CLICK_WINDOW_MS = 60 * 1000;
 
 function hashIp(ip: string): string {
   const salt = process.env.REFERRAL_IP_SALT ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'rj44';
@@ -49,17 +59,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // Record the click. Best-effort — a logging hiccup must not stop the
     // redirect or the cookie (attribution still works without the click row).
-    try {
-      await admin.from('referral_clicks').insert({
-        agent_id:      agent.id,
-        referral_code: code,
-        path:          request.nextUrl.searchParams.get('p')?.slice(0, 300) ?? null,
-        referrer:      request.headers.get('referer')?.slice(0, 500) ?? null,
-        ip_hash:       hashIp(getIP(request)),
-        user_agent:    request.headers.get('user-agent')?.slice(0, 500) ?? null,
-      });
-    } catch (err: any) {
-      logError({ event: 'referral.click_insert_failed', error: err?.message ?? String(err), code });
+    // Throttled per IP so a flood can't inflate counts or bloat the table;
+    // when throttled we skip the write but still cookie + redirect below.
+    const ip = getIP(request);
+    if (rateLimit(`ref-click:${ip}`, CLICK_WRITES_PER_IP, CLICK_WINDOW_MS).success) {
+      try {
+        await admin.from('referral_clicks').insert({
+          agent_id:      agent.id,
+          referral_code: code,
+          path:          request.nextUrl.searchParams.get('p')?.slice(0, 300) ?? null,
+          referrer:      request.headers.get('referer')?.slice(0, 500) ?? null,
+          ip_hash:       hashIp(ip),
+          user_agent:    request.headers.get('user-agent')?.slice(0, 500) ?? null,
+        });
+      } catch (err: any) {
+        logError({ event: 'referral.click_insert_failed', error: err?.message ?? String(err), code });
+      }
     }
 
     const res = NextResponse.redirect(home);
