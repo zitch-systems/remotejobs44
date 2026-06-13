@@ -20,6 +20,11 @@ describe('destinationForRole', () => {
       expect(destinationForRole('user', null)).toBe('/dashboard');
       expect(destinationForRole('user', '')).toBe('/dashboard');
     });
+    it('agent → /agent', () => {
+      expect(destinationForRole('agent')).toBe('/agent');
+      expect(destinationForRole('agent', null)).toBe('/agent');
+      expect(destinationForRole('agent', '')).toBe('/agent');
+    });
   });
 
   describe('rejects open-redirect payloads', () => {
@@ -73,6 +78,16 @@ describe('destinationForRole', () => {
       expect(destinationForRole('admin', '/dashboard')).toBe('/admin');
       expect(destinationForRole('admin', '/dashboard/applications')).toBe('/admin');
     });
+    it('member/agent surfaces are mutually exclusive with /admin', () => {
+      expect(destinationForRole('agent', '/admin')).toBe('/agent');
+      expect(destinationForRole('agent', '/admin/users')).toBe('/agent');
+      expect(destinationForRole('user', '/agent')).toBe('/dashboard');
+      expect(destinationForRole('admin', '/agent')).toBe('/admin');
+    });
+    it('agents may still reach the member dashboard (they are members too)', () => {
+      expect(destinationForRole('agent', '/dashboard')).toBe('/dashboard');
+      expect(destinationForRole('agent', '/jobs')).toBe('/jobs');
+    });
   });
 
   describe('passes through legitimate same-origin paths', () => {
@@ -118,6 +133,18 @@ describe('resolveRole', () => {
 
   it('regular member → user', () => {
     expect(resolveRole({ profileRole: 'user', email: 'jane@example.com' })).toBe('user');
+  });
+
+  it('DB role agent → agent', () => {
+    expect(resolveRole({ profileRole: 'agent', email: 'jane@example.com' })).toBe('agent');
+  });
+
+  it('admin signal still wins over an agent DB role', () => {
+    // A hardcoded-admin email tagged 'agent' in the DB is treated as admin —
+    // the platform owner promoting their own account shouldn't lose /admin.
+    const email = 'admin@remotejobs44.com';
+    const expected = isHardcodedAdmin(email) ? 'admin' : 'agent';
+    expect(resolveRole({ profileRole: 'agent', email })).toBe(expected);
   });
 
   // THE REGRESSION INVARIANT behind #28: a failed/missing profile fetch leaves

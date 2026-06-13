@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, SlidersHorizontal, Briefcase, Zap, ChevronDown } from 'lucide-react';
+import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, SlidersHorizontal, Briefcase, Zap, ChevronDown, Megaphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ export function Header() {
   const userRef = useRef<HTMLDivElement>(null);
 
   const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
-  const { user, isLoggedIn, isAdmin, setUser, hydrated } = useAuthStore();
+  const { user, isLoggedIn, isAdmin, isAgent, setUser, hydrated } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -178,10 +178,11 @@ export function Header() {
                         { href: '/profile',      icon: <User className="w-4 h-4"/>,            label: 'Profile & CV'     },
                         { href: '/settings',     icon: <SlidersHorizontal className="w-4 h-4"/>, label: 'Settings'        },
                         { href: '/pricing',      icon: <Briefcase className="w-4 h-4"/>,       label: 'Plans'            },
-                        // Only render Admin link when we've confirmed the live
-                        // session role — otherwise persisted state from a
-                        // previous admin login can briefly flash this link to a
-                        // regular member, confusing the user.
+                        // Gate role-specific links on `hydrated` (a confirmed
+                        // live session) — otherwise persisted state from a
+                        // previous login can briefly flash a link to the wrong
+                        // user, confusing them.
+                        ...(hydrated && isAgent() ? [{ href: '/agent', icon: <Megaphone className="w-4 h-4"/>, label: 'Agent Portal' }] : []),
                         ...(hydrated && isAdmin() ? [{ href: '/admin', icon: <Settings className="w-4 h-4"/>, label: 'Admin Panel' }] : []),
                       ].map(item => (
                         <li key={item.href}>

@@ -48,6 +48,10 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
   const isDashboardRoute = path === '/dashboard' || path.startsWith('/dashboard/');
+  // The agent portal gates on cookie PRESENCE only (same as /dashboard) — the
+  // authoritative role check lives in app/agent/layout.tsx + the /api/agent/*
+  // routes, so we don't pay an Auth-server round-trip here.
+  const isAgentRoute     = path === '/agent' || path.startsWith('/agent/');
 
   // Fast path for every non-gated route (homepage, ~250 SEO pages, /jobs,
   // /companies, /blog, …). Only the /admin branch below ever reads the
@@ -64,7 +68,7 @@ export async function middleware(request: NextRequest) {
   // "Verifying your session…", while signInWithPassword / signUp stall on the
   // same starved Auth server. Scoping the round-trip to the routes that
   // actually gate on it removes the self-inflicted flood.
-  if (!isAdminRoute && !isDashboardRoute) {
+  if (!isAdminRoute && !isDashboardRoute && !isAgentRoute) {
     return NextResponse.next({ request: { headers: request.headers } });
   }
 
@@ -92,7 +96,7 @@ export async function middleware(request: NextRequest) {
   //   * Hardcoded admins are no longer server-redirected /dashboard→/admin;
   //     the dashboard's client-side role check handles that (as it always
   //     has for DB-role admins).
-  if (isDashboardRoute) {
+  if (isDashboardRoute || isAgentRoute) {
     if (!hasSupabaseSessionCookie(request)) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';

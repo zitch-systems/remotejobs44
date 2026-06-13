@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Shield, Zap, User, Mail, Calendar, CreditCard,
   Briefcase, RefreshCw, Trash2, KeyRound, Save, AlertTriangle,
-  Ban, CheckCircle as Unsuspend, RotateCw,
+  Ban, CheckCircle as Unsuspend, RotateCw, Megaphone,
 } from 'lucide-react';
 import { useUIStore } from '@/lib/store';
 import { cn, formatRelativeDate } from '@/lib/utils';
@@ -19,6 +19,9 @@ interface Profile {
   suspended: boolean | null;
   suspended_at: string | null;
   suspended_reason: string | null;
+  referral_code: string | null;
+  referred_by: string | null;
+  commission_rate: number | null;
 }
 interface Subscription {
   plan: string; billing: string; status: string;
@@ -46,6 +49,9 @@ export default function AdminUserDetailPage() {
   const [name, setName] = useState('');
   const [plan, setPlan] = useState('');
   const [role, setRole] = useState('');
+  // Agent commission cut (%). Kept as a string so the input can be cleared
+  // while editing; coerced to a number on save.
+  const [commissionRate, setCommissionRate] = useState('');
   const [saving, setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -70,6 +76,7 @@ export default function AdminUserDetailPage() {
       setName(data.profile.name ?? '');
       setPlan(data.profile.plan);
       setRole(data.profile.role);
+      setCommissionRate(String(data.profile.commission_rate ?? 0));
       setLoading(false);
     }
     if (id) load();
@@ -79,10 +86,15 @@ export default function AdminUserDetailPage() {
 
   async function handleSave() {
     if (!profile) return;
-    const patch: Record<string, string> = {};
+    const patch: Record<string, string | number> = {};
     if (name !== (profile.name ?? '')) patch.name = name;
     if (plan !== profile.plan) patch.plan = plan;
     if (role !== profile.role) patch.role = role;
+    const rateNum = Number(commissionRate);
+    const currentRate = Number(profile.commission_rate ?? 0);
+    if (commissionRate.trim() !== '' && Number.isFinite(rateNum) && rateNum !== currentRate) {
+      patch.commission_rate = rateNum;
+    }
     if (Object.keys(patch).length === 0) { toast('Nothing to save', 'info'); return; }
 
     setSaving(true);
@@ -95,7 +107,9 @@ export default function AdminUserDetailPage() {
     setSaving(false);
     if (!res.ok) { toast(data.error ?? 'Save failed', 'error'); return; }
     toast('Saved', 'success');
-    setProfile({ ...profile, ...patch } as Profile);
+    // Promoting to agent mints a referral_code server-side — fold it in so the
+    // link renders without a reload.
+    setProfile({ ...profile, ...patch, ...(data.referral_code ? { referral_code: data.referral_code } : {}) } as Profile);
   }
 
   async function handleReset() {
@@ -185,7 +199,9 @@ export default function AdminUserDetailPage() {
     </div>
   );
 
-  const dirty = name !== (profile.name ?? '') || plan !== profile.plan || role !== profile.role;
+  const dirty = name !== (profile.name ?? '') || plan !== profile.plan || role !== profile.role
+    || (commissionRate.trim() !== '' && Number(commissionRate) !== Number(profile.commission_rate ?? 0));
+  const referralBase = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-8">
@@ -251,10 +267,46 @@ export default function AdminUserDetailPage() {
             <Field label="Role">
               <select value={role} onChange={e => setRole(e.target.value)} className="input text-sm">
                 <option value="user">User</option>
+                <option value="agent">Agent (referral partner)</option>
                 <option value="admin">Admin</option>
               </select>
             </Field>
           </div>
+
+          {/* Agent referral controls — shown when this user is (being made) an
+              agent. The commission rate is the % cut they earn on every
+              subscription their referrals pay for. */}
+          {role === 'agent' && (
+            <div className="rounded-lg border border-brand-200 dark:border-brand-900/40 bg-brand-50/50 dark:bg-brand-900/10 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-brand-700 dark:text-brand-400">
+                <Megaphone className="w-4 h-4" />
+                <h3 className="font-bold text-sm">Agent / referral partner</h3>
+              </div>
+              <Field label="Commission rate (%)">
+                <input
+                  type="number" min={0} max={100} step="0.5"
+                  value={commissionRate}
+                  onChange={e => setCommissionRate(e.target.value)}
+                  className="input text-sm" placeholder="0"
+                />
+                <p className="text-[10px] text-stone-400 mt-1">
+                  Percentage of each referred subscription payment paid to this agent. Starts at 0 until you set it.
+                </p>
+              </Field>
+              {profile.referral_code ? (
+                <div>
+                  <p className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 mb-1">Referral link</p>
+                  <code className="block text-xs break-all bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-md px-2.5 py-2 text-stone-700 dark:text-stone-300">
+                    {referralBase}/r/{profile.referral_code}
+                  </code>
+                </div>
+              ) : (
+                <p className="text-[11px] text-stone-400">
+                  A referral link is generated automatically when you save this user as an agent.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 pt-2">
             <button onClick={handleSave} disabled={!dirty || saving}

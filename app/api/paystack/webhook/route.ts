@@ -14,6 +14,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import { recordReferralCommission } from '@/lib/referral/commission';
 import { extractPaystackId } from '@/lib/paystack/event-id';
 import { verifyPaystackSignature } from '@/lib/paystack/verify-signature';
 import { logInfo, logWarn, logError } from '@/lib/log';
@@ -217,6 +218,18 @@ export async function POST(req: NextRequest) {
         price:                      (amount ?? 0) / 100,
       }, { onConflict: 'user_id' });
       if (subError) logError({ event: 'webhook.subscription_upsert_failed', user_id: userId, error: subError.message });
+
+      // Referral commission — mirror of the verify route. Idempotent on
+      // reference, so whichever of verify/webhook lands second is a no-op,
+      // and internally guarded so it can't break the charge crediting.
+      await recordReferralCommission(supabase, {
+        referredUserId: userId,
+        plan:           tier,
+        billing,
+        amount:         (amount ?? 0) / 100,
+        currency:       currency ?? 'NGN',
+        reference:      reference ?? null,
+      });
 
       logInfo({ event: 'webhook.charge_success', user_id: userId, tier, reference });
       break;

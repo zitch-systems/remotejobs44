@@ -111,6 +111,11 @@ export default function RegisterPage() {
         localStorage.removeItem('rj44-jobs');
       } catch {}
 
+      // Attribute this signup to a referring agent if they arrived via a
+      // referral link. The server reads the httpOnly rj44_ref cookie; we just
+      // poke the endpoint. Awaited so it lands before we navigate away.
+      try { await fetch('/api/referral/attribute', { method: 'POST' }); } catch {}
+
       let profile: any = null;
       try {
         const res = await fetch('/api/profile');
