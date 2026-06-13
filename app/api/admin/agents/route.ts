@@ -33,11 +33,12 @@ export async function GET() {
     const agentIds = (agents ?? []).map(a => a.id);
     if (agentIds.length === 0) return NextResponse.json({ agents: [] });
 
-    const [signupsRes, commissionsRes] = await Promise.all([
+    // Sign-ups are a bounded per-agent count (one row per referred profile);
+    // the money aggregates come from a single DB-side RPC so the totals are
+    // exact with no row-fetch cap, however many charges exist.
+    const [signupsRes, commRes] = await Promise.all([
       admin.from('profiles').select('referred_by').in('referred_by', agentIds).limit(50000),
-      admin.from('agent_commissions')
-        .select('agent_id, commission_amount, referred_user_id, status')
-        .in('agent_id', agentIds).limit(50000),
+      admin.rpc('agent_commission_admin_summary'),
     ]);
 
     const signupsByAgent = new Map<string, number>();
@@ -46,16 +47,10 @@ export async function GET() {
       signupsByAgent.set(k, (signupsByAgent.get(k) ?? 0) + 1);
     }
 
-    const commByAgent = new Map<string, { charges: number; subscribers: Set<string>; total: number; unpaid: number }>();
-    for (const r of commissionsRes.data ?? []) {
-      const k = r.agent_id as string;
-      const e = commByAgent.get(k) ?? { charges: 0, subscribers: new Set<string>(), total: 0, unpaid: 0 };
-      e.charges += 1;
-      if (r.referred_user_id) e.subscribers.add(r.referred_user_id as string);
-      const c = Number(r.commission_amount ?? 0);
-      e.total += c;
-      if (r.status !== 'paid' && r.status !== 'reversed') e.unpaid += c;
-      commByAgent.set(k, e);
+    type CommRow = { agent_id: string; charges: number; subscribers: number; total_commission: number; unpaid_commission: number };
+    const commByAgent = new Map<string, CommRow>();
+    for (const r of (commRes.data ?? []) as CommRow[]) {
+      commByAgent.set(r.agent_id, r);
     }
 
     const out = (agents ?? []).map(a => {
@@ -69,10 +64,10 @@ export async function GET() {
         suspended: a.suspended ?? false,
         created_at: a.created_at,
         signups: signupsByAgent.get(a.id) ?? 0,
-        subscribers: c ? c.subscribers.size : 0,
-        charges: c ? c.charges : 0,
-        total_commission: c ? round2(c.total) : 0,
-        unpaid_commission: c ? round2(c.unpaid) : 0,
+        subscribers: c ? Number(c.subscribers) : 0,
+        charges: c ? Number(c.charges) : 0,
+        total_commission: c ? round2(Number(c.total_commission)) : 0,
+        unpaid_commission: c ? round2(Number(c.unpaid_commission)) : 0,
       };
     });
 

@@ -36,7 +36,7 @@ export async function recordReferralCommission(
 
     const { data: agent } = await admin
       .from('profiles')
-      .select('id, role, commission_rate')
+      .select('id, role, commission_rate, email, name')
       .eq('id', agentId)
       .maybeSingle();
     if (!agent || agent.role !== 'agent') return; // referrer demoted / removed
@@ -50,6 +50,10 @@ export async function recordReferralCommission(
     // row documents that the admin hadn't set a rate at the time of sale.
     const { error } = await admin.from('agent_commissions').insert({
       agent_id:           agentId,
+      // Denormalized so the payout record survives the agent being deleted
+      // (agent_id then becomes NULL via ON DELETE SET NULL).
+      agent_email:        agent.email ?? null,
+      agent_name:         agent.name ?? null,
       referred_user_id:   opts.referredUserId,
       plan:               opts.plan,
       billing:            opts.billing ?? null,
