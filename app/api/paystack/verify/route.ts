@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { paymentSuccessEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
+import { recordReferralCommission } from '@/lib/referral/commission';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier, getBilling, getPlanExpiry,
 } from '@/lib/paystack/plans';
@@ -129,6 +130,19 @@ export async function GET(req: NextRequest) {
       currency:    currency ?? 'NGN',
       price:       (amount ?? 0) / 100,
     }, { onConflict: 'user_id' });
+
+    // Referral commission — if an agent referred this user, log the agent's
+    // cut for this charge. Idempotent (unique on reference) so the webhook
+    // recording the same charge is a harmless no-op, and internally guarded
+    // so it can never break the subscription credit or the redirect.
+    await recordReferralCommission(supabase, {
+      referredUserId: user_id,
+      plan:           planTier,
+      billing:        getBilling(plan),
+      amount:         (amount ?? 0) / 100,
+      currency:       currency ?? 'NGN',
+      reference,
+    });
 
     // Send confirmation email
     try {

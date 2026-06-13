@@ -11,6 +11,20 @@ describe('resolvePlan', () => {
     expect(resolvePlan({ role: 'admin', dbPlan: 'daily', planExpiresAt: null  })).toBe('admin');
   });
 
+  // Agents get REGISTERED-user access by virtue of their role — never
+  // subscribed access. The 'agent' role must resolve plan exactly like 'user':
+  // free until they actually pay, and only their paid tier while a live
+  // plan_expires_at holds. Only 'admin' is ever elevated by role. This pins
+  // that being an agent is NOT a free pass to subscribed features — they must
+  // subscribe like anyone else.
+  it('agent role never elevates the plan — resolves like a normal user', () => {
+    expect(resolvePlan({ role: 'agent', dbPlan: 'free',  planExpiresAt: null   })).toBe('free');
+    expect(resolvePlan({ role: 'agent', dbPlan: null,    planExpiresAt: null   })).toBe('free');
+    expect(resolvePlan({ role: 'agent', dbPlan: 'pro',   planExpiresAt: PAST   })).toBe('free');   // lapsed → free
+    expect(resolvePlan({ role: 'agent', dbPlan: 'pro',   planExpiresAt: FUTURE })).toBe('pro');    // paid → pro
+    expect(resolvePlan({ role: 'agent', dbPlan: 'daily', planExpiresAt: FUTURE })).toBe('daily');  // paid → daily
+  });
+
   it('returns free when expiry is in the past', () => {
     expect(resolvePlan({ role: 'user', dbPlan: 'pro',   planExpiresAt: PAST })).toBe('free');
     expect(resolvePlan({ role: 'user', dbPlan: 'daily', planExpiresAt: PAST })).toBe('free');

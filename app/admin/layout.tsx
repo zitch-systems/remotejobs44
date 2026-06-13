@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Briefcase, Users, BarChart3,
   Rss, Building2, Settings, CreditCard,
-  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt
+  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt, Megaphone
 } from 'lucide-react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ const NAV = [
   { href: '/admin/jobs/new',      icon: PlusCircle,      label: 'Post Job',      indent: true  },
   { href: '/admin/companies',     icon: Building2,       label: 'Companies'                   },
   { href: '/admin/users',         icon: Users,           label: 'Users'                       },
+  { href: '/admin/agents',        icon: Megaphone,       label: 'Agents'                      },
   { href: '/admin/subscriptions', icon: CreditCard,      label: 'Subscriptions'               },
   { href: '/admin/payments',      icon: Receipt,         label: 'Payments'                    },
   { href: '/admin/analytics',     icon: BarChart3,       label: 'Analytics'                   },

@@ -17,6 +17,7 @@ import { welcomeEmail } from '@/lib/email/templates';
 import { destinationForRole, type Role } from '@/lib/auth/redirect';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
+import { attributeReferral } from '@/lib/referral/attribution';
 import { waitUntil } from '@vercel/functions';
 
 export async function GET(request: NextRequest) {
@@ -123,6 +124,15 @@ export async function GET(request: NextRequest) {
             // profile_completion omitted — DEFAULT 0 (migration_v24).
             // The recompute fires on the next /api/profile GET.
           }, { onConflict: 'id', ignoreDuplicates: true });
+
+          // Referral attribution: when the user clicked an agent's link on
+          // this browser, the rj44_ref cookie carries the code. Stamp
+          // referred_by once (attributeReferral is a no-op if it's already
+          // set or the code isn't a live agent). Covers OAuth + email-confirm
+          // first logins; the email/password auto-confirm flow attributes via
+          // /api/referral/attribute instead.
+          const refCode = request.cookies.get('rj44_ref')?.value ?? null;
+          if (refCode) await attributeReferral(admin, { userId: authUser.id, code: refCode });
         } catch (err) {
           console.error('[auth/callback] background profile upsert failed:', err);
         }

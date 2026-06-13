@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
+import { ensureAgentReferralCode } from '@/lib/referral/code';
 import { logError, logInfo } from '@/lib/log';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // and the full paystack token set off subscriptions into the admin
   // browser. None of those are read by the React tree below; keeping
   // them off the wire is the standard defense-in-depth pattern.
-  const PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_at, suspended_reason, cv_url';
+  const PROFILE_COLS = 'id, email, name, plan, role, created_at, updated_at, profile_completion, plan_expires_at, suspended, suspended_at, suspended_reason, cv_url, referral_code, referred_by, commission_rate';
   const SUB_COLS     = 'id, user_id, plan, billing, status, price, currency, current_period_start, current_period_end, created_at, updated_at';
   const [{ data: profile }, { data: subscription }, { data: applications }] = await Promise.all([
     supabase.from('profiles').select(PROFILE_COLS).eq('id', id).maybeSingle(),
@@ -50,11 +51,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let body: {
     plan?: string; role?: string; name?: string;
     suspended?: boolean; suspended_reason?: string;
+    commission_rate?: number;
   } = {};
   try { body = await req.json(); } catch {}
 
   const ALLOWED_PLANS = ['free', 'daily', 'pro', 'admin'];
-  const ALLOWED_ROLES = ['user', 'admin'];
+  const ALLOWED_ROLES = ['user', 'admin', 'agent'];
 
   const patch: Record<string, any> = {};
   if (body.plan !== undefined) {
@@ -88,6 +90,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       patch.suspended_reason = null;
     }
   }
+  // Agent commission cut (% of each referred subscription). 0–100, two
+  // decimals. Only meaningful for role='agent', but accepted independently so
+  // an admin can adjust an existing agent's rate without re-sending role.
+  if (body.commission_rate !== undefined) {
+    const rate = Number(body.commission_rate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      return NextResponse.json({ error: 'commission_rate must be a number between 0 and 100' }, { status: 400 });
+    }
+    patch.commission_rate = Math.round(rate * 100) / 100;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
@@ -101,6 +113,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   logInfo({ event: 'admin.user.updated', admin_email: auth.adminEmail, target_user_id: id, patch });
+
+  // Promoting to agent: make sure they have a shareable referral code. Reuses
+  // an existing one (idempotent), so demote→re-promote keeps the same link.
+  let referralCode: string | null = null;
+  if (patch.role === 'agent') {
+    try {
+      referralCode = await ensureAgentReferralCode(supabase, id);
+    } catch (e: any) {
+      logError({ event: 'admin.user.referral_code_alloc_failed', target_user_id: id, error: e?.message ?? String(e) });
+    }
+  }
 
   // Audit-log a separate row per field so a search by action="user.suspend"
   // doesn't pick up unrelated name edits.
@@ -126,9 +149,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     action: 'user.update_name', targetType: 'user', targetId: id,
     metadata: { name: patch.name },
   }));
+  if (patch.commission_rate !== undefined) tasks.push(recordAdminAction({
+    adminId: auth.adminId, adminEmail: auth.adminEmail,
+    action: 'agent.update_commission_rate', targetType: 'user', targetId: id,
+    metadata: { commission_rate: patch.commission_rate },
+  }));
   await Promise.all(tasks);
 
-  return NextResponse.json({ success: true, patched: patch });
+  return NextResponse.json({ success: true, patched: patch, referral_code: referralCode });
 }
 
 // DELETE — wipe the user from auth.users. profiles, applications, saved_jobs,

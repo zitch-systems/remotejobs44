@@ -3,7 +3,7 @@
 export type Theme = 'light' | 'dark' | 'system';
 export type Locale = 'en' | 'fr' | 'es' | 'de' | 'pt' | 'ar' | 'zh' | 'ja';
 export type UserPlan = 'free' | 'daily' | 'pro' | 'admin';
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'user' | 'admin' | 'agent';
 
 export interface User {
   id: string;

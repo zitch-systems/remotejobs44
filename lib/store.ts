@@ -41,6 +41,7 @@ interface AuthState {
   isLoggedIn: () => boolean;
   isPro:      () => boolean;
   isAdmin:    () => boolean;
+  isAgent:    () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -100,6 +101,7 @@ export const useAuthStore = create<AuthState>()(
       isLoggedIn: () => !!get().user,
       isPro:      () => ['daily', 'pro', 'admin'].includes(get().user?.plan ?? ''),
       isAdmin:    () => get().user?.role === 'admin',
+      isAgent:    () => get().user?.role === 'agent',
     }),
     {
       name:    'rj44-auth',
