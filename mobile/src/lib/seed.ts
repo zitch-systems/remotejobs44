@@ -1,0 +1,205 @@
+// src/lib/seed.ts — seed jobs from the design handoff.
+// In production, replace SEED_JOBS with data fetched from Supabase
+// (and `saved` / `applied` / `status` with the signed-in user's rows).
+import type { Job } from './types';
+
+export const SEED_JOBS: Job[] = [
+  {
+    id: '1',
+    role: 'Senior Frontend Engineer',
+    company: 'Vercel',
+    logo: 'V',
+    grad: ['#0f172a', '#334155'],
+    match: 94,
+    category: 'Engineering',
+    verified: true,
+    salary: '$160k',
+    per: '/yr',
+    time: '2d ago',
+    location: 'Remote · 🌍 Worldwide',
+    type: 'Full-time',
+    level: 'Senior',
+    tags: [
+      { label: 'React', variant: 'blue' },
+      { label: 'TypeScript', variant: 'blue' },
+      { label: 'Next.js', variant: 'default' },
+    ],
+    about:
+      'Build the dashboard and developer tools used by millions of engineers. You will own end-to-end features across our Next.js frontend and design system, partnering closely with product and design.',
+    duties: [
+      'Ship high-quality, accessible UI across the Vercel dashboard',
+      'Own performance budgets and Core Web Vitals for key flows',
+      'Mentor engineers and raise the bar on frontend craft',
+    ],
+    skills: ['React', 'TypeScript', 'Next.js', 'CSS', 'Testing'],
+    verdict: 'You match almost everything here',
+    vcap: 'Your React + TypeScript depth lines up with the core requirements.',
+    breakdown: [
+      { label: 'Skills', value: 'Excellent', pct: 96 },
+      { label: 'Experience', value: 'Strong', pct: 90 },
+      { label: 'Timezone', value: 'Good', pct: 82 },
+    ],
+  },
+  {
+    id: '2',
+    role: 'Product Designer',
+    company: 'Paystack',
+    logo: 'P',
+    grad: ['#0ea5e9', '#1d4ed8'],
+    match: 88,
+    category: 'Design',
+    verified: true,
+    salary: '₦18m',
+    per: '/yr',
+    time: '4d ago',
+    location: 'Remote · Nigeria',
+    type: 'Full-time',
+    level: 'Mid–Senior',
+    tags: [
+      { label: 'Figma', variant: 'blue' },
+      { label: 'Product', variant: 'default' },
+      { label: 'Fintech', variant: 'default' },
+    ],
+    about:
+      'Design payment experiences trusted by hundreds of thousands of African businesses. You will shape flows end-to-end, from research to polished, shippable UI.',
+    duties: [
+      'Lead design for core merchant payment flows',
+      'Run lightweight research and usability testing',
+      'Contribute to and evolve the design system',
+    ],
+    skills: ['Figma', 'Prototyping', 'Design systems', 'Research'],
+    verdict: 'A strong product-design fit',
+    vcap: 'Your fintech portfolio is exactly what this team is hiring for.',
+    breakdown: [
+      { label: 'Skills', value: 'Strong', pct: 90 },
+      { label: 'Experience', value: 'Good', pct: 84 },
+      { label: 'Domain', value: 'Excellent', pct: 92 },
+    ],
+  },
+  {
+    id: '3',
+    role: 'Backend Engineer',
+    company: 'Flutterwave',
+    logo: 'F',
+    grad: ['#f97316', '#ea580c'],
+    match: 81,
+    category: 'Engineering',
+    verified: true,
+    salary: '$120k',
+    per: '/yr',
+    time: '1w ago',
+    location: 'Remote · Africa',
+    type: 'Full-time',
+    level: 'Senior',
+    tags: [
+      { label: 'Go', variant: 'blue' },
+      { label: 'Postgres', variant: 'default' },
+      { label: 'Payments', variant: 'default' },
+    ],
+    about:
+      'Own the services that move money across the continent. You will build reliable, observable payment infrastructure at scale.',
+    duties: [
+      'Design and run high-throughput payment services',
+      'Improve reliability, latency and observability',
+      'Collaborate with compliance on secure data flows',
+    ],
+    skills: ['Go', 'PostgreSQL', 'Kafka', 'AWS', 'Distributed systems'],
+    verdict: 'A good back-end match',
+    vcap: 'Your services background fits; payments domain is a stretch goal.',
+    breakdown: [
+      { label: 'Skills', value: 'Strong', pct: 88 },
+      { label: 'Experience', value: 'Good', pct: 80 },
+      { label: 'Domain', value: 'Fair', pct: 64 },
+    ],
+  },
+  {
+    id: '4',
+    role: 'Growth Marketer',
+    company: 'Kuda',
+    logo: 'K',
+    grad: ['#7c3aed', '#4f46e5'],
+    match: 76,
+    category: 'Marketing',
+    verified: true,
+    salary: '₦12m',
+    per: '/yr',
+    time: '3d ago',
+    location: 'Remote · Nigeria',
+    type: 'Full-time',
+    level: 'Mid',
+    tags: [
+      { label: 'Growth', variant: 'blue' },
+      { label: 'Lifecycle', variant: 'default' },
+      { label: 'Fintech', variant: 'default' },
+    ],
+    about:
+      'Drive acquisition and retention for the bank of the free. You will own experiments across the lifecycle, from install to active saver.',
+    duties: [
+      'Plan and run growth experiments end-to-end',
+      'Own lifecycle messaging and activation metrics',
+      'Partner with data to size and validate bets',
+    ],
+    skills: ['Growth', 'Lifecycle', 'Analytics', 'Copywriting'],
+    verdict: 'A fair match worth a look',
+    vcap: 'Your lifecycle work transfers; fintech growth is newer for you.',
+    breakdown: [
+      { label: 'Skills', value: 'Good', pct: 80 },
+      { label: 'Experience', value: 'Fair', pct: 70 },
+      { label: 'Domain', value: 'Fair', pct: 66 },
+    ],
+  },
+  {
+    id: '5',
+    role: 'Full-Stack Engineer',
+    company: 'Andela',
+    logo: 'A',
+    grad: ['#1ea05e', '#0f766e'],
+    match: 85,
+    category: 'Engineering',
+    verified: true,
+    salary: '$110k',
+    per: '/yr',
+    time: '5d ago',
+    location: 'Remote · 🌍 Worldwide',
+    type: 'Contract',
+    level: 'Senior',
+    tags: [
+      { label: 'React', variant: 'blue' },
+      { label: 'Node', variant: 'default' },
+      { label: 'Remote', variant: 'default' },
+    ],
+    about:
+      'Join elite engineering teams placed with global companies. You will build product features across the stack on long-running engagements.',
+    duties: [
+      'Deliver full-stack features on client engagements',
+      'Write well-tested, maintainable React + Node code',
+      'Communicate clearly across distributed teams',
+    ],
+    skills: ['React', 'Node.js', 'TypeScript', 'SQL', 'REST'],
+    verdict: 'A strong full-stack fit',
+    vcap: 'Your React + Node range matches the engagements on offer.',
+    breakdown: [
+      { label: 'Skills', value: 'Strong', pct: 90 },
+      { label: 'Experience', value: 'Strong', pct: 86 },
+      { label: 'Timezone', value: 'Good', pct: 78 },
+    ],
+  },
+];
+
+// Seed user state from the handoff (jobs 1,2,4 applied; job 3 saved).
+export const SEED_APPLIED: Record<string, import('./types').AppStatus> = {
+  '1': 'review',
+  '2': 'interview',
+  '4': 'applied',
+};
+export const SEED_SAVED: string[] = ['3'];
+
+export const SEED_USER = {
+  name: 'Ada Obi',
+  firstName: 'Ada',
+  title: 'Senior Frontend Engineer · Lagos',
+  email: 'ada.obi@gmail.com',
+  profileStrength: 84,
+  stats: { applications: 12, interviews: 2 },
+  cvName: 'Ada_Obi_CV.pdf',
+};
