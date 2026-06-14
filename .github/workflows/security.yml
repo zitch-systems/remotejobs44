@@ -26,8 +26,14 @@ concurrency:
 jobs:
   dependency-review:
     name: Dependency review (PR)
-    # PR-only: the action diffs the PR's dependency manifest against the base.
-    if: github.event_name == 'pull_request'
+    # PR-only, and only where it can actually run: dependency-review-action
+    # (like CodeQL) needs the Dependency Graph + GitHub Advanced Security,
+    # which on a PRIVATE repo requires a GHAS licence. Gating on
+    # repository.visibility makes the job SKIP (neutral, not red) on private
+    # repos and light up automatically if the repo goes public or GHAS is
+    # enabled. The always-on `npm audit` job below is the gate that runs
+    # everywhere. See docs/SECURITY_SEO_AUDIT_2026.md.
+    if: github.event_name == 'pull_request' && github.event.repository.visibility == 'public'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +65,10 @@ jobs:
 
   codeql:
     name: CodeQL (javascript-typescript)
+    # CodeQL uploads to code scanning, which needs GitHub Advanced Security on
+    # private repos. Skip cleanly where unavailable (see dependency-review note
+    # above); runs automatically on public repos or once GHAS is enabled.
+    if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

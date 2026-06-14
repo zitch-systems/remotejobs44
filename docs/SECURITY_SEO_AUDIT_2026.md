@@ -244,10 +244,20 @@ inline `<script>` can't execute even if it reaches the DOM.
 ### 2.5 CI/CD security pipeline (added this PR)
 
 `.github/workflows/security.yml`:
+- `npm audit --omit=dev --audit-level=high` — **always-on** gate; fails on
+  high/critical in prod deps (verified: currently 0 vulnerabilities).
 - `dependency-review-action` — blocks PRs adding vulnerable/disallowed-license deps.
-- `npm audit --omit=dev --audit-level=high` — fails on high/critical in prod deps.
 - **CodeQL** (`javascript-typescript`, `security-extended`) — static analysis.
 - Weekly `schedule` to catch advisories disclosed after merge.
+
+> **GHAS gating.** `dependency-review` and `codeql` require the Dependency
+> Graph + GitHub Advanced Security, which on a **private** repo needs a GHAS
+> licence (they're free on public repos). Both jobs are therefore gated on
+> `github.event.repository.visibility == 'public'` so they **skip cleanly**
+> (neutral, not a red ❌) on this private repo and activate automatically if it
+> goes public or GHAS is enabled in
+> `Settings → Code security and analysis`. `npm audit` runs everywhere, so the
+> dependency gate is never absent.
 
 `.github/dependabot.yml` — weekly npm + github-actions update PRs (dev deps
 grouped; framework majors pinned for deliberate adoption).
