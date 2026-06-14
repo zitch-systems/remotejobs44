@@ -5,7 +5,8 @@
 import React from 'react';
 import { View } from 'react-native';
 import type { Job } from '@/lib/types';
-import { Card, LogoTile, Pill, Txt } from './ui';
+import { Card, Pill, Txt } from './ui';
+import { CompanyLogo } from './CompanyLogo';
 import { MatchRing } from './MatchRing';
 import { radii, spacing, useTheme } from '@/theme';
 
@@ -57,7 +58,7 @@ export function JobDetailBody({
     <View style={{ gap: spacing[4] }}>
       {showCompanyRow ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-          <LogoTile initial={job.logo} grad={job.grad} size={54} radius={radii.lg} />
+          <CompanyLogo job={job} size={54} radius={radii.lg} />
           <View style={{ flex: 1 }}>
             <Txt variant="h2" numberOfLines={2}>
               {job.role}

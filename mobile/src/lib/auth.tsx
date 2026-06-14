@@ -7,6 +7,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { fetchAppliedMap, fetchSavedIds } from './user-state';
 import { useAppStore } from '@/store/app';
 
 interface AuthValue {
@@ -47,6 +48,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  // Hydrate the saved/applied store from the signed-in user's rows (and clear
+  // it on sign-out). Runs whenever the authenticated user id changes.
+  const userId = session?.user?.id ?? null;
+  useEffect(() => {
+    useAppStore.getState().setUserId(userId);
+    if (!isSupabaseConfigured || !userId) return;
+    let active = true;
+    Promise.all([fetchSavedIds(userId), fetchAppliedMap(userId)])
+      .then(([saved, applied]) => {
+        if (active) useAppStore.getState().hydrate({ saved, applied });
+      })
+      .catch(() => {
+        /* keep optimistic local state on hydration failure */
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   const value = useMemo<AuthValue>(
     () => ({

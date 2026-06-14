@@ -19,7 +19,8 @@ export interface Job {
   id: string;
   role: string;
   company: string;
-  logo: string; // single-letter initial for the gradient tile
+  logo: string; // single-letter initial for the gradient tile (fallback)
+  logoUrl?: string; // real company logo image, when available
   grad: [string, string]; // company tile gradient [from, to]
   match: number; // 0–100 match score
   category: string;
