@@ -9,12 +9,15 @@ design handoff bundle).
 
 | Screen | State |
 |---|---|
-| Auth (sign in / create account) | ✅ real Supabase auth + demo fallback |
-| Home / Match feed | ✅ stats, search, promo, filters, job cards |
+| Auth (sign in / create account) | ✅ Supabase email/password + Google/LinkedIn OAuth + demo |
+| Home / Match feed | ✅ real search, filter sheet, pull-to-refresh, pagination, skill-personalised ranking |
 | Job detail | ✅ match ring, sections, one-tap apply + success burst |
+| Saved jobs | ✅ dedicated tab, live + reactive to unsaves |
 | Applications tracker | ✅ status pills, empty state |
-| Profile | ✅ strength, list groups, real sign-out |
+| Profile | ✅ real name/avatar/strength + Edit profile + Job preferences (skills) + CV |
 | Foldable / tablet master–detail | ✅ responsive list + live detail pane (≥ 840px) |
+
+Bottom nav is now **Home · Saved · Applied · Profile** + the center quick-match FAB.
 
 **Data:** live from Supabase when `EXPO_PUBLIC_SUPABASE_*` is configured —
 `jobs` (public read), with `saved_jobs` and `applications` persisted per-user
@@ -22,10 +25,11 @@ under RLS (hydrated on sign-in, optimistic write-through on save/apply). With
 no env, the app runs on the handoff **seed set** so the UI is fully explorable
 offline.
 
-> A few display-only fields the design uses but the DB doesn't store yet —
-> the **match score**, verdict and gradient tile — are derived deterministically
-> in `src/lib/jobs.ts` (clearly marked). Swap for a real scoring service when
-> one exists.
+> The **match score** is computed in `src/lib/jobs.ts` from real job signals
+> (skill richness, salary transparency, recency, featured) and then boosted by
+> overlap with the user's saved **skills** (Profile → Job preferences). A
+> server-side relevance model is the eventual upgrade. Verdict + gradient tile
+> are still derived display-only fields.
 
 ## Run it
 
@@ -100,14 +104,28 @@ if the mark changes (uses the repo-root `sharp`).
   signals (skill richness, salary transparency, recency, featured) instead of a
   random hash.
 
-## Roadmap (next)
+## Deploy checklist (what's left to operate)
 
-1. **Push sender** — an edge function / cron that finds new matching jobs per
-   user and calls Expo's push API using the stored `device_push_tokens`
-   (the only remaining server-side piece for alerts).
-2. **Server-side relevance model** — replace the client signal score with a
-   profile ↔ job relevance score (needs structured user skills, which the
-   `profiles` table doesn't store yet).
+The app code is complete; these are infra/ops steps that can't be done from a
+sandbox:
+
+1. **Apply migrations** — `migration_v37_device_push_tokens.sql` (push tokens)
+   and `migration_v38_profile_preferences.sql` (skills/target_role/headline).
+2. **Deploy the push sender** — `supabase functions deploy send-job-alerts`,
+   set `PUSH_CRON_SECRET`, and schedule it (pg_cron). It reads
+   `device_push_tokens` and calls Expo's push API. (Code:
+   `supabase/functions/send-job-alerts/index.ts`.)
+3. **Enable OAuth providers** (Google + LinkedIn OIDC) in Supabase Auth and add
+   the `makeRedirectUri` URL to the redirect allow-list.
+4. **`eas init`** for the EAS `projectId` (needed for Expo push tokens) and a
+   **Dev Client** build (Expo Go can't receive remote push).
+5. **On-device QA** — OAuth round-trip, push delivery, encrypted-storage I/O.
+
+## Roadmap (later)
+
+- **Server-side relevance model** — replace the client signal+skills score with
+  a learned profile ↔ job relevance score.
+- **Error reporting** (Sentry RN) + a small mobile test suite.
 
 ## Security notes (carried from the web audit)
 

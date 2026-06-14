@@ -71,3 +71,16 @@ export async function fetchApplicationItems(userId: string): Promise<Application
   }
   return items;
 }
+
+/** The user's saved jobs, newest first. */
+export async function fetchSavedJobs(userId: string): Promise<Job[]> {
+  const { data, error } = await supabase
+    .from('saved_jobs')
+    .select(`jobs(${JOB_COLUMNS})`)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const jobs: Job[] = [];
+  for (const row of (data ?? []) as any[]) if (row.jobs) jobs.push(rowToJob(row.jobs));
+  return jobs;
+}

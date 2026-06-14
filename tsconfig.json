@@ -50,6 +50,7 @@
   "exclude": [
     "node_modules",
     "app/tailwind.config.ts",
-    "mobile"
+    "mobile",
+    "supabase/functions"
   ]
 }

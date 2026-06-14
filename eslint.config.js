@@ -28,6 +28,9 @@ module.exports = [
       // tsconfig, ESLint (expo lint) and toolchain — keep the web lint/
       // type-check out of it (it would choke on RN types + @/ aliases).
       'mobile/**',
+      // Supabase Edge Functions are Deno (remote ESM imports + Deno globals) —
+      // not part of the Next/web tsconfig or lint.
+      'supabase/functions/**',
       // Generated files
       'next-env.d.ts',
       'public/**',

@@ -7,7 +7,7 @@
 // uses but the DB doesn't store yet (match score, verdict, gradient) are
 // DERIVED deterministically here and clearly marked — swap for a real scoring
 // service when one exists.
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { SEED_JOBS } from './seed';
 import type { Job, JobTag } from './types';
@@ -163,16 +163,32 @@ export function rowToJob(r: JobRow): Job {
   };
 }
 
-export async function fetchJobs(limit = 50): Promise<Job[]> {
+export async function fetchJobs(opts: { limit?: number; offset?: number } = {}): Promise<Job[]> {
+  const limit = opts.limit ?? 20;
+  const offset = opts.offset ?? 0;
   const { data, error } = await supabase
     .from('jobs')
     .select(SAFE_COLUMNS)
     .eq('is_active', true)
     .order('featured', { ascending: false })
     .order('posted_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   return (data as JobRow[]).map(rowToJob);
+}
+
+/**
+ * Personalise match scores by the user's skills: each overlapping skill bumps
+ * the score (capped). No-op when the user has no skills set.
+ */
+export function personalizeJobs(jobs: Job[], userSkills: string[]): Job[] {
+  if (!userSkills.length) return jobs;
+  const set = new Set(userSkills.map((s) => s.toLowerCase()));
+  return jobs.map((j) => {
+    const overlap = j.skills.filter((s) => set.has(s.toLowerCase())).length;
+    if (!overlap) return j;
+    return { ...j, match: Math.min(99, j.match + Math.min(8, overlap * 3)) };
+  });
 }
 
 export async function fetchJobById(id: string): Promise<Job | null> {
@@ -181,26 +197,66 @@ export async function fetchJobById(id: string): Promise<Job | null> {
   return data ? rowToJob(data as JobRow) : null;
 }
 
-/** Live job list with loading/error + seed fallback. */
-export function useJobs(): { jobs: Job[]; loading: boolean; error: string | null } {
-  const [state, setState] = useState<{ jobs: Job[]; loading: boolean; error: string | null }>({
-    jobs: isSupabaseConfigured ? [] : SEED_JOBS,
-    loading: isSupabaseConfigured,
-    error: null,
-  });
+export interface JobsFeed {
+  jobs: Job[];
+  loading: boolean; // first page
+  refreshing: boolean; // pull-to-refresh
+  error: string | null;
+  hasMore: boolean;
+  refresh: () => void;
+  loadMore: () => void;
+}
+
+/** Paginated live job list with pull-to-refresh + seed fallback. */
+export function useJobs(pageSize = 20): JobsFeed {
+  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : SEED_JOBS);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(isSupabaseConfigured);
+  const busy = useRef(false);
+
+  const load = useCallback(
+    async (offset: number, mode: 'initial' | 'refresh' | 'more') => {
+      if (!isSupabaseConfigured || busy.current) return;
+      busy.current = true;
+      if (mode === 'refresh') setRefreshing(true);
+      else if (mode === 'initial') setLoading(true);
+      try {
+        const batch = await fetchJobs({ limit: pageSize, offset });
+        setError(null);
+        setHasMore(batch.length === pageSize);
+        setJobs((prev) => (mode === 'more' ? [...prev, ...batch] : batch));
+      } catch (e: any) {
+        if (mode !== 'more') {
+          setJobs(SEED_JOBS);
+          setHasMore(false);
+        }
+        setError(e?.message ?? 'Failed to load jobs');
+      } finally {
+        busy.current = false;
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [pageSize],
+  );
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    let active = true;
-    fetchJobs()
-      .then((jobs) => active && setState({ jobs, loading: false, error: null }))
-      .catch((e) => active && setState({ jobs: SEED_JOBS, loading: false, error: e?.message ?? 'Failed to load jobs' }));
-    return () => {
-      active = false;
-    };
-  }, []);
+    load(0, 'initial');
+  }, [load]);
 
-  return state;
+  return {
+    jobs,
+    loading,
+    refreshing,
+    error,
+    hasMore,
+    refresh: () => load(0, 'refresh'),
+    loadMore: () => {
+      if (hasMore && !busy.current) load(jobs.length, 'more');
+    },
+  };
 }
 
 /** Single job by id with seed fallback. */
