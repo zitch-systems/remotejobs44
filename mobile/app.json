@@ -8,15 +8,16 @@
     "scheme": "remotejobs44",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.remotejobs44.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#2563eb",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
+      "package": "com.remotejobs44.app",
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -29,9 +30,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#2563eb",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
           "android": {
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "imageWidth": 120
           }
         }
       ]

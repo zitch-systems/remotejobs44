@@ -1,20 +1,49 @@
 // src/app/(tabs)/applications.tsx — application tracker (handoff §4).
-import React from 'react';
-import { Pressable, View } from 'react-native';
+// Demo mode resolves seed jobs by the local applied map; live mode reads the
+// applications table joined to jobs.
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ClipboardList } from 'lucide-react-native';
-import { LogoTile, Pill, Screen, Txt } from '@/components/ui';
+import { Pill, Screen, Txt } from '@/components/ui';
+import { CompanyLogo } from '@/components/CompanyLogo';
 import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_LABEL, type AppStatus } from '@/lib/types';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { fetchApplicationItems, type ApplicationItem } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
 import { radii, spacing, useTheme } from '@/theme';
+
+function useApplications(): { items: ApplicationItem[]; loading: boolean } {
+  const applied = useAppStore((s) => s.applied);
+  const userId = useAppStore((s) => s.userId);
+  const [state, setState] = useState<{ items: ApplicationItem[]; loading: boolean }>({
+    items: [],
+    loading: Boolean(isSupabaseConfigured && userId),
+  });
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId) {
+      const items = SEED_JOBS.filter((j) => j.id in applied).map((job) => ({ job, status: applied[job.id] }));
+      setState({ items, loading: false });
+      return;
+    }
+    let active = true;
+    fetchApplicationItems(userId)
+      .then((items) => active && setState({ items, loading: false }))
+      .catch(() => active && setState({ items: [], loading: false }));
+    return () => {
+      active = false;
+    };
+  }, [userId, applied]);
+
+  return state;
+}
 
 export default function Applications() {
   const { colors } = useTheme();
   const router = useRouter();
-  const applied = useAppStore((s) => s.applied);
-
-  const rows = SEED_JOBS.filter((j) => j.id in applied);
+  const { items, loading } = useApplications();
 
   const statusColors = (s: AppStatus) =>
     s === 'applied'
@@ -28,11 +57,15 @@ export default function Applications() {
       <View>
         <Txt variant="screenTitle">Applications</Txt>
         <Txt variant="meta" color={colors.fg3} style={{ marginTop: 2 }}>
-          {rows.length} {rows.length === 1 ? 'application' : 'applications'} tracked
+          {items.length} {items.length === 1 ? 'application' : 'applications'} tracked
         </Txt>
       </View>
 
-      {rows.length === 0 ? (
+      {loading ? (
+        <View style={{ paddingVertical: spacing[16], alignItems: 'center' }}>
+          <ActivityIndicator color={colors.brand} />
+        </View>
+      ) : items.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[16], gap: spacing[3] }}>
           <View
             style={{
@@ -55,8 +88,8 @@ export default function Applications() {
         </View>
       ) : (
         <View style={{ gap: spacing[3] }}>
-          {rows.map((job) => {
-            const c = statusColors(applied[job.id]);
+          {items.map(({ job, status }) => {
+            const c = statusColors(status);
             return (
               <Pressable
                 key={job.id}
@@ -75,7 +108,7 @@ export default function Applications() {
                   pressed && { transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <LogoTile initial={job.logo} grad={job.grad} size={36} />
+                <CompanyLogo job={job} size={36} />
                 <View style={{ flex: 1 }}>
                   <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
                     {job.role}
@@ -84,7 +117,7 @@ export default function Applications() {
                     {job.company} · {job.location}
                   </Txt>
                 </View>
-                <Pill label={STATUS_LABEL[applied[job.id]]} bg={c.bg} fg={c.fg} border={c.border} small />
+                <Pill label={STATUS_LABEL[status]} bg={c.bg} fg={c.fg} border={c.border} small />
               </Pressable>
             );
           })}

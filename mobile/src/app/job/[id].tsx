@@ -1,13 +1,13 @@
 // src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
 // apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bookmark, Check, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
 import { JobDetailBody } from '@/components/JobDetailBody';
-import { SEED_JOBS } from '@/lib/seed';
+import { useJob } from '@/lib/jobs';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -17,7 +17,7 @@ export default function JobDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const job = SEED_JOBS.find((j) => j.id === id);
+  const { job, loading } = useJob(id);
   const saved = useAppStore((s) => (job ? s.saved.includes(job.id) : false));
   const applied = useAppStore((s) => (job ? job.id in s.applied : false));
   const toggleSaved = useAppStore((s) => s.toggleSaved);
@@ -34,6 +34,14 @@ export default function JobDetail() {
     return () => clearTimeout(t);
   }, [burst, burstAnim]);
 
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgApp, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.brand} />
+      </SafeAreaView>
+    );
+  }
+
   if (!job) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgApp, alignItems: 'center', justifyContent: 'center' }}>
@@ -47,7 +55,7 @@ export default function JobDetail() {
 
   function onApply() {
     if (applied || !job) return;
-    applyTo(job.id);
+    applyTo(job);
     setBurst(true);
   }
 

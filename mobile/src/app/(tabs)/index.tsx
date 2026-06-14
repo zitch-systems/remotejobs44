@@ -4,9 +4,10 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Avatar, Card, Chip, Screen, Txt } from '@/components/ui';
-import { JobCard } from '@/components/JobCard';
+import { JobCard, JobCardSkeleton } from '@/components/JobCard';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
-import { SEED_JOBS, SEED_USER } from '@/lib/seed';
+import { useJobs } from '@/lib/jobs';
+import { SEED_USER } from '@/lib/seed';
 import { useAppStore } from '@/store/app';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -67,10 +68,11 @@ export default function Feed() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const strength = SEED_USER.profileStrength;
   const apps = useAppStore((s) => Object.keys(s.applied).length);
+  const { jobs: allJobs, loading } = useJobs();
 
   const jobs = useMemo(
-    () => (filter === 'All' ? SEED_JOBS : SEED_JOBS.filter((j) => j.category === filter)),
-    [filter],
+    () => (filter === 'All' ? allJobs : allJobs.filter((j) => j.category === filter)),
+    [filter, allJobs],
   );
 
   // Tablet / unfolded foldable → side-by-side master–detail (handoff §6).
@@ -136,14 +138,20 @@ export default function Feed() {
 
       {/* job list */}
       <View style={{ gap: spacing[3] }}>
-        {jobs.map((job) => (
-          <JobCard key={job.id} job={job} />
-        ))}
-        {jobs.length === 0 ? (
-          <Txt center color={colors.fg4} style={{ paddingVertical: spacing[8] }}>
-            No roles in this category yet.
-          </Txt>
-        ) : null}
+        {loading ? (
+          [0, 1, 2].map((i) => <JobCardSkeleton key={i} />)
+        ) : (
+          <>
+            {jobs.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+            {jobs.length === 0 ? (
+              <Txt center color={colors.fg4} style={{ paddingVertical: spacing[8] }}>
+                No roles in this category yet.
+              </Txt>
+            ) : null}
+          </>
+        )}
       </View>
     </Screen>
   );

@@ -1,12 +1,36 @@
 // src/components/JobCard.tsx — the feed job card (handoff §2 "Job Card").
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { type DimensionValue, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BadgeCheck, Bookmark } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
 import { useAppStore } from '@/store/app';
 import { radii, spacing, useTheme } from '@/theme';
-import { Card, LogoTile, Pill, Txt } from './ui';
+import { Card, Pill, Txt } from './ui';
+import { CompanyLogo } from './CompanyLogo';
+
+/** Placeholder card shown while live jobs load. */
+export function JobCardSkeleton() {
+  const { colors } = useTheme();
+  const Block = ({ w, h, r = 6 }: { w: DimensionValue; h: number; r?: number }) => (
+    <View style={{ width: w, height: h, borderRadius: r, backgroundColor: colors.bgSection }} />
+  );
+  return (
+    <Card style={{ padding: spacing[4], gap: spacing[3] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+        <Block w={40} h={40} r={radii.logo} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <Block w="60%" h={12} />
+          <Block w="40%" h={10} />
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        <Block w={54} h={18} r={999} />
+        <Block w={54} h={18} r={999} />
+      </View>
+    </Card>
+  );
+}
 
 export function JobCard({ job }: { job: Job }) {
   const { colors } = useTheme();
@@ -22,7 +46,7 @@ export function JobCard({ job }: { job: Job }) {
       <Card style={{ padding: spacing[4], gap: spacing[3] }}>
         {/* Top row */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] }}>
-          <LogoTile initial={job.logo} grad={job.grad} size={40} />
+          <CompanyLogo job={job} size={40} />
           <View style={{ flex: 1 }}>
             <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
               {job.role}

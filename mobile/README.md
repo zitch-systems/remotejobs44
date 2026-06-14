@@ -16,9 +16,16 @@ design handoff bundle).
 | Profile | ✅ strength, list groups, real sign-out |
 | Foldable / tablet master–detail | ✅ responsive list + live detail pane (≥ 840px) |
 
-Data is currently the handoff's **seed set** (`src/lib/seed.ts`). Auth is real
-when env is configured; `saved`/`applied` live in a Zustand store and are not
-yet persisted to Supabase (see Roadmap).
+**Data:** live from Supabase when `EXPO_PUBLIC_SUPABASE_*` is configured —
+`jobs` (public read), with `saved_jobs` and `applications` persisted per-user
+under RLS (hydrated on sign-in, optimistic write-through on save/apply). With
+no env, the app runs on the handoff **seed set** so the UI is fully explorable
+offline.
+
+> A few display-only fields the design uses but the DB doesn't store yet —
+> the **match score**, verdict and gradient tile — are derived deterministically
+> in `src/lib/jobs.ts` (clearly marked). Swap for a real scoring service when
+> one exists.
 
 ## Run it
 
@@ -45,8 +52,8 @@ src/
     job/[id].tsx            # Job detail + apply
   components/               # ui.tsx primitives, JobCard, MatchRing
   theme/                    # tokens.ts (ported 1:1 from the web) + useTheme()
-  lib/                      # supabase, auth, types, seed
-  store/                    # zustand (saved / applied)
+  lib/                      # supabase, auth, jobs (live data), user-state, types, seed
+  store/                    # zustand (saved / applied + hydrate/write-through)
 ```
 
 - **Design tokens** (`src/theme/tokens.ts`) are a 1:1 port of
@@ -58,22 +65,36 @@ src/
 - **Auth**: `src/lib/auth.tsx` wraps Supabase; falls back to **demo mode** when
   `EXPO_PUBLIC_SUPABASE_*` is unset so the UI is explorable immediately.
 
+## Builds (EAS)
+
+`eas.json` defines `development` / `preview` / `production` profiles.
+
+```bash
+npm i -g eas-cli && eas login
+eas init                       # creates the EAS project, writes extra.eas.projectId
+eas build --profile preview    # internal-distribution build (TestFlight / Play internal)
+```
+
+Provide the Supabase env to builds via EAS secrets (or an `env` block per
+profile): `eas env:create --name EXPO_PUBLIC_SUPABASE_URL ...`. The
+RemoteJobs44 app icon + splash are generated from the brand mark (blue tile +
+chart-line + orange dot); regenerate with `node mobile/scripts/gen-icons.mjs`
+if the mark changes (uses the repo-root `sharp`).
+
 ## Roadmap (next)
 
-1. **Live data** — replace `seed.ts` with Supabase queries; persist
-   `saved` / `applied` to the user's rows (reuse the web RLS policies).
-2. **Social sign-in** — wire `supabase.auth.signInWithOAuth()` with
+1. **Social sign-in** — wire `supabase.auth.signInWithOAuth()` with
    `expo-web-browser` + the official Google / LinkedIn provider config.
-3. **Push notifications** for job alerts (`expo-notifications`).
-4. **Secure session storage** — swap AsyncStorage for an
+2. **Push notifications** for job alerts (`expo-notifications`).
+3. **Secure session storage** — swap AsyncStorage for an
    `expo-secure-store`-backed `LargeSecureStore` adapter (chunked, since
    Supabase sessions exceed SecureStore's 2 KB/key limit).
-5. **Real brand assets** — replace the placeholder Expo icon/splash with the
-   RemoteJobs44 logo, and company gradient tiles with real images.
-6. **EAS** build/submit config for TestFlight + Play internal testing.
+4. **Real match scoring** — replace the derived placeholder score in
+   `lib/jobs.ts` with a server-side relevance score.
 
 ## Security notes (carried from the web audit)
 
-- Tokens persist in **AsyncStorage** (unencrypted) today — item 5 above hardens this.
+- Tokens persist in **AsyncStorage** (unencrypted) today — item 3 above hardens this.
 - Only `EXPO_PUBLIC_*` values ship in the bundle; never put service-role keys here.
-- All data access stays behind Supabase **RLS** (same policies as the web app).
+- All data access stays behind Supabase **RLS** (same policies as the web app);
+  saved/application writes are scoped to `auth.uid()`.

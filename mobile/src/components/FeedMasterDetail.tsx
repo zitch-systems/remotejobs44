@@ -6,10 +6,11 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BadgeCheck, Bookmark, Check, Search, Zap } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
-import { SEED_JOBS } from '@/lib/seed';
+import { useJobs } from '@/lib/jobs';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
-import { Chip, LogoTile, Pill, Txt } from './ui';
+import { Chip, Pill, Txt } from './ui';
+import { CompanyLogo } from './CompanyLogo';
 import { JobDetailBody } from './JobDetailBody';
 
 const FILTERS = ['All', 'Engineering', 'Design', 'Marketing'] as const;
@@ -18,16 +19,17 @@ export function FeedMasterDetail() {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState(SEED_JOBS[0]?.id);
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  const { jobs: allJobs } = useJobs();
 
   const jobs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SEED_JOBS.filter(
+    return allJobs.filter(
       (j) =>
         (filter === 'All' || j.category === filter) &&
         (q === '' || j.role.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)),
     );
-  }, [filter, query]);
+  }, [filter, query, allJobs]);
 
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0];
 
@@ -121,7 +123,7 @@ function TabletJobRow({ job, selected, onPress }: { job: Job; selected: boolean;
         pressed && !selected && { backgroundColor: colors.bgApp },
       ]}
     >
-      <LogoTile initial={job.logo} grad={job.grad} size={36} />
+      <CompanyLogo job={job} size={36} />
       <View style={{ flex: 1 }}>
         <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
           {job.role}
@@ -152,7 +154,7 @@ function DetailPane({ job }: { job: Job }) {
     >
       {/* cover */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4] }}>
-        <LogoTile initial={job.logo} grad={job.grad} size={56} radius={radii.lg} />
+        <CompanyLogo job={job} size={56} radius={radii.lg} />
         <View style={{ flex: 1 }}>
           <Txt variant="h2" numberOfLines={2}>
             {job.role}
@@ -190,7 +192,7 @@ function DetailPane({ job }: { job: Job }) {
               <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: colors.fg2 }}>{saved ? 'Saved' : 'Save'}</Txt>
             </Pressable>
             <Pressable
-              onPress={() => applyTo(job.id)}
+              onPress={() => applyTo(job)}
               disabled={applied}
               style={({ pressed }) => [
                 {
