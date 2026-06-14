@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { HeroSearchBox } from './HeroSearchBox';
 import { HeroCTAs } from './HeroCTAs';
 import { HeroInstallButton } from './HeroInstallButton';
+import { waLink } from '@/lib/whatsapp';
 
 const POPULAR = ['React', 'Python', 'Design', 'Marketing', 'Finance', 'DevOps', 'Product'];
 
@@ -41,8 +42,7 @@ export function HeroSection() {
             interactive (highlighted, brand colour); the link makes
             that affordance real. Routes to /register so the click
             lands on the signup flow. */}
-        <h1 className="font-display font-extrabold tracking-tight text-stone-900 dark:text-stone-100 text-balance animate-slide-up"
-          style={{ fontSize:'clamp(2rem,6vw,3.75rem)', lineHeight:1.08, maxWidth:'900px' }}>
+        <h1 className="font-display font-extrabold text-display-1 text-stone-900 dark:text-stone-100 text-balance animate-slide-up max-w-[900px]">
           Your next remote job{' '}
           <Link href="/register"
             className="text-highlight hover:underline focus:outline-none focus:underline transition-all"
@@ -52,8 +52,7 @@ export function HeroSection() {
         </h1>
 
         {/* LCP element — server-rendered so it lands without waiting for JS. */}
-        <p className="text-stone-500 dark:text-stone-400 max-w-lg leading-relaxed"
-          style={{ fontSize:'clamp(1rem,2vw,1.1rem)' }}>
+        <p className="text-fluid-lead text-stone-500 dark:text-stone-400 max-w-lg">
           Search over <span className="font-bold text-brand-700 dark:text-brand-400">70,000+</span> remote jobs
           from top companies hiring worldwide — across engineering, design, marketing and more.
         </p>
@@ -116,7 +115,7 @@ export function HeroSection() {
               </svg>
             </a>
             <a
-              href="https://wa.me/2349169582776"
+              href={waLink()}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Chat with RemoteJobs44 on WhatsApp"

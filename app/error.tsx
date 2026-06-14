@@ -12,7 +12,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-5">
+    <div className="min-h-[70dvh] flex items-center justify-center px-5">
       <div className="text-center max-w-md">
         <div className="text-5xl mb-4">⚠️</div>
         <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mb-3">

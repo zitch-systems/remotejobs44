@@ -83,7 +83,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8faff] dark:bg-[#0f1e38]">
+      <div className="min-h-dvh flex items-center justify-center bg-[#f8faff] dark:bg-[#0f1e38]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full animate-spin"
             style={{ border: '3px solid #bfdbfe', borderTopColor: '#2563eb' }} />
@@ -94,7 +94,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-[#f8faff] dark:bg-[#0f1e38]">
+    <div className="min-h-dvh bg-[#f8faff] dark:bg-[#0f1e38]">
       <div className="border-b border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0a1628]">
         <div className="max-w-[1100px] mx-auto px-5 h-16 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#2563eb' }}>

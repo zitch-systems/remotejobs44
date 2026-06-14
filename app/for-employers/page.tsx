@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Users, Globe2, Brain, Send, ArrowRight, CheckCircle } from 'lucide-react';
+import { waLink } from '@/lib/whatsapp';
 
 const BASE = 'https://remotejobs44.com';
 
@@ -45,7 +46,7 @@ export default function ForEmployers() {
             className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
             Email us <ArrowRight className="w-4 h-4" />
           </a>
-          <a href="https://wa.me/2349169582776" target="_blank" rel="noopener noreferrer"
+          <a href={waLink('Hi RemoteJobs44 — I’d like to post a role / partner with you.')} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-700 dark:text-stone-300 text-sm font-bold rounded-lg hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
             WhatsApp
           </a>

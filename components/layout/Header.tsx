@@ -86,7 +86,10 @@ export function Header() {
 
   return (
     <header className={cn(
-      'fixed top-0 left-0 right-0 z-50 h-[68px] glass-nav border-b transition-shadow duration-200',
+      // app-header (globals.css) = top:0 + height 68px + padding-top:
+      // env(safe-area-inset-top), so the bar's translucent background fills
+      // the notch area while its content stays below the status bar.
+      'fixed left-0 right-0 z-50 app-header glass-nav border-b transition-shadow duration-200',
       'border-stone-200/70 dark:border-[#1e3a5f]/70',
       scrolled && 'shadow-sm shadow-black/5'
     )}>
@@ -230,9 +233,10 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — app-menu-top keeps it pinned directly under the
+          (now safe-area-aware) header instead of a hard-coded top-[68px]. */}
       <div className={cn(
-        'md:hidden fixed top-[68px] left-0 right-0 z-40 bg-white dark:bg-[#0a1628] border-b border-stone-200 dark:border-[#1e3a5f] shadow-lg transition-all duration-300 overflow-hidden',
+        'md:hidden fixed app-menu-top left-0 right-0 z-40 bg-white dark:bg-[#0a1628] border-b border-stone-200 dark:border-[#1e3a5f] shadow-lg transition-all duration-300 overflow-hidden',
         mobileMenuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
       )}>
         <div className="p-4 space-y-1">

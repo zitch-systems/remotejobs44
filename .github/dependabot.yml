@@ -1,0 +1,47 @@
+# Dependabot — automated dependency + GitHub Actions update PRs.
+# Pairs with the committed package-lock.json (exact version pinning) and the
+# `npm audit` / dependency-review gates in .github/workflows/security.yml.
+# This is the "supply-chain / dependency pinning" control from the audit:
+# locked versions for reproducible builds, plus a steady, reviewable stream
+# of security/patch updates instead of a risky big-bang upgrade.
+version: 2
+updates:
+  # Application dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      # Batch low-risk dev/tooling bumps into one PR to cut review noise;
+      # production runtime deps still come through individually so they get
+      # a focused review.
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # Security updates are never ignored; only pin major bumps of the
+    # framework so they're adopted deliberately, not auto-merged.
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # The CI/CD pipeline itself — keep actions patched (and ideally SHA-pinned).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "ci"
+      - "security"

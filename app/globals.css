@@ -4,6 +4,21 @@
 
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    /* Single source of truth for the fixed chrome + the iOS/Android safe
+       areas. env(safe-area-inset-*) only resolves to a non-zero value when
+       the document opts in with `viewport-fit=cover` (set in app/layout.tsx
+       viewport export) — without that it is 0 and these vars collapse to the
+       bare chrome height, which is the correct desktop/Android behaviour. */
+    --app-header-h: 68px;          /* must match <Header> visual height   */
+    --app-bottomnav-h: 72px;       /* must match .bottom-nav-item stack    */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
@@ -11,6 +26,11 @@
     color: #0f172a;
     font-family: var(--font-dm-sans, system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
+    /* 100dvh tracks the *dynamic* viewport so the page never extends behind
+       the mobile browser's collapsing URL bar (the classic "content cut off
+       at the bottom" on iOS Safari / Chrome Android). 100svh is the safe
+       fallback for engines without dvh. */
+    min-height: 100svh;
     min-height: 100dvh;
   }
   .dark body { background-color: #0a1628; color: #e2e8f4; }
@@ -134,6 +154,28 @@
   .line-clamp-3 { overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3; }
   .pb-safe { padding-bottom:max(8px,env(safe-area-inset-bottom)); }
   .text-balance { text-wrap:balance; }
+
+  /* ---- App chrome offsets (notch / home-indicator safe) ----------------
+     These coordinate the fixed Header (top) and mobile BottomNav (bottom)
+     so content is never hidden behind either, on any device. Because the
+     numbers live in CSS vars (--app-header-h / --app-bottomnav-h / --safe-*)
+     a single change keeps Header, <main> and the menu in lock-step — they
+     used to drift as hard-coded `pt-[68px]` / `top-[68px]` literals. */
+  .app-header {
+    top: 0;
+    height: calc(var(--app-header-h) + var(--safe-top));
+    padding-top: var(--safe-top);
+  }
+  .app-menu-top { top: calc(var(--app-header-h) + var(--safe-top)); }
+  .app-main {
+    padding-top: calc(var(--app-header-h) + var(--safe-top));
+    /* Reserve the BottomNav footprint = its 72px stack + the same
+       max(8px, inset-bottom) its own .pb-safe applies, so the last row of
+       content always clears the bar AND the iOS home indicator. */
+    padding-bottom: calc(var(--app-bottomnav-h) + max(8px, var(--safe-bottom)));
+  }
+  /* BottomNav is md:hidden — drop the reservation on desktop. */
+  @media (min-width: 768px) { .app-main { padding-bottom: 0; } }
 }
 
 @keyframes shimmer    { 0%{background-position:200% 0} 100%{background-position:-200% 0} }

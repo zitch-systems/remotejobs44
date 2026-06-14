@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-5 py-12">
+    <div className="min-h-[80dvh] flex items-center justify-center px-5 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 font-display font-bold text-xl text-stone-900 dark:text-stone-100">

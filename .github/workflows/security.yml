@@ -1,0 +1,77 @@
+name: Security
+
+# Defence-in-depth scanning that complements the functional CI in ci.yml:
+#   - dependency-review : blocks PRs that introduce known-vulnerable or
+#                         disallowed-license dependencies (supply chain).
+#   - npm-audit         : fails on a high/critical advisory in the lockfile.
+#   - codeql            : static analysis for injection / XSS / auth bugs in
+#                         the app + API route handlers.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly catch for advisories disclosed after a PR already merged.
+    - cron: "27 6 * * 1"
+
+# Least-privilege default: jobs opt into exactly what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency review (PR)
+    # PR-only: the action diffs the PR's dependency manifest against the base.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Reject copyleft/network licenses that would contaminate a
+          # proprietary SaaS codebase. Adjust to taste.
+          deny-licenses: AGPL-3.0, LGPL-3.0, GPL-3.0
+
+  npm-audit:
+    name: npm audit (high+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install (offline, from lockfile)
+        run: npm ci --ignore-scripts
+      - name: Audit production dependencies
+        # --omit=dev keeps dev-only advisories from blocking a deploy while
+        # still failing on anything that ships to users. Dependabot opens the
+        # remediation PRs surfaced here.
+        run: npm audit --omit=dev --audit-level=high
+
+  codeql:
+    name: CodeQL (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
