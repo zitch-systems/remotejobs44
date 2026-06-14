@@ -102,10 +102,23 @@ function bulletsFrom(requirements: string | null, description: string | null): s
   return parts.slice(0, 4);
 }
 
-// Display-only match score, derived deterministically from the id so the same
-// job always shows the same number. Placeholder for a real scoring service.
-function deriveMatch(id: string): number {
-  return 72 + (hash(id) % 26); // 72–97
+// Match score derived from real job signals (skill richness, salary
+// transparency, recency, featured), with a small deterministic spread so
+// equally-ranked jobs don't all share a number. Stable per job. This replaces
+// the earlier id-hash placeholder; a server-side relevance model (profile ↔
+// job) is the eventual upgrade — see mobile/README.md.
+function deriveMatch(r: JobRow): number {
+  let score = 76;
+  score += Math.min(12, (r.skills?.length ?? 0) * 2); // up to +12 for rich skill lists
+  if (r.salary_min || r.salary_max) score += 4; // salary transparency
+  if (r.posted_at) {
+    const days = (Date.now() - new Date(r.posted_at).getTime()) / 86_400_000;
+    if (days <= 7) score += 4;
+    else if (days <= 30) score += 2;
+  }
+  if (r.featured) score += 3;
+  score += (hash(r.id) % 5) - 2; // ±2 deterministic spread
+  return Math.max(70, Math.min(98, score));
 }
 
 function verdictFor(match: number): { verdict: string; vcap: string } {
@@ -115,7 +128,7 @@ function verdictFor(match: number): { verdict: string; vcap: string } {
 }
 
 export function rowToJob(r: JobRow): Job {
-  const match = deriveMatch(r.id);
+  const match = deriveMatch(r);
   const { verdict, vcap } = verdictFor(match);
   const skills = r.skills ?? [];
   return {

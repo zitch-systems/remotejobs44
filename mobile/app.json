@@ -37,6 +37,13 @@
             "imageWidth": 120
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-foreground.png",
+          "color": "#2563eb"
+        }
       ]
     ],
     "experiments": {

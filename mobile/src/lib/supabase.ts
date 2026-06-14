@@ -1,23 +1,24 @@
 // src/lib/supabase.ts — the native Supabase client.
 //
-// Reuses the SAME backend (auth, RLS, tables) as the web app. Session tokens
-// persist in AsyncStorage and auto-refresh while the app is foregrounded
-// (the AppState wiring below is the pattern from the Supabase RN guide).
-//
-// Security note: AsyncStorage is unencrypted. For production you may want a
-// SecureStore-backed adapter (expo-secure-store is already installed) — but
-// SecureStore has a ~2KB per-key limit and Supabase sessions can exceed it,
-// so it needs a chunking/`LargeSecureStore` adapter. Tracked in README.
+// Reuses the SAME backend (auth, RLS, tables) as the web app. The session is
+// persisted ENCRYPTED at rest (LargeSecureStore: AES key in the device
+// keystore, ciphertext in AsyncStorage) on native; web falls back to
+// AsyncStorage. PKCE flow is enabled for the native OAuth redirect (see
+// app/(auth)/sign-in.tsx).
 import 'react-native-url-polyfill/auto';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { LargeSecureStore } from './secure-store-adapter';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 /** True only when both public env vars are present (see .env.example). */
 export const isSupabaseConfigured = Boolean(url && anonKey);
+
+// Encrypted storage on device; plain AsyncStorage on web (no SecureStore there).
+const storage = Platform.OS === 'web' ? AsyncStorage : LargeSecureStore;
 
 // Fall back to harmless placeholders so createClient() doesn't throw at import
 // time when env is missing — the UI gates real calls on isSupabaseConfigured.
@@ -26,9 +27,11 @@ export const supabase = createClient(
   anonKey || 'placeholder-anon-key',
   {
     auth: {
-      storage: AsyncStorage,
+      storage,
       autoRefreshToken: true,
       persistSession: true,
+      // PKCE is the recommended flow for native OAuth deep-link redirects.
+      flowType: 'pkce',
       // No URL-based session detection on native (that's a web-only concern).
       detectSessionInUrl: false,
     },

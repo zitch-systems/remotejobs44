@@ -52,7 +52,8 @@ src/
     job/[id].tsx            # Job detail + apply
   components/               # ui.tsx primitives, JobCard, MatchRing
   theme/                    # tokens.ts (ported 1:1 from the web) + useTheme()
-  lib/                      # supabase, auth, jobs (live data), user-state, types, seed
+  lib/                      # supabase, auth, oauth, push, secure-store-adapter,
+                            #   jobs (live data), user-state, types, seed
   store/                    # zustand (saved / applied + hydrate/write-through)
 ```
 
@@ -81,20 +82,37 @@ RemoteJobs44 app icon + splash are generated from the brand mark (blue tile +
 chart-line + orange dot); regenerate with `node mobile/scripts/gen-icons.mjs`
 if the mark changes (uses the repo-root `sharp`).
 
+## Recently added
+
+- **Social sign-in** (`lib/oauth.ts`) — Google + LinkedIn via PKCE
+  (`signInWithOAuth` + `expo-web-browser` + `expo-auth-session`).
+  *Setup:* enable the Google / LinkedIn (OIDC) providers in Supabase Auth and
+  add the app redirect URL (printed by `makeRedirectUri`) to the allow-list.
+- **Encrypted session storage** (`lib/secure-store-adapter.ts`) — the Supabase
+  session is now AES-encrypted at rest (key in `expo-secure-store`, ciphertext
+  in AsyncStorage), and the client uses PKCE.
+- **Push notifications** (`lib/push.ts`) — permission + Expo push token
+  registration, token persisted to `device_push_tokens`
+  (`supabase/migration_v37_device_push_tokens.sql`), and tap-to-open-job
+  routing. *Setup:* apply the migration, run `eas init` (for the push token's
+  `projectId`), build a Dev Client (Expo Go can't receive remote push).
+- **Signal-based match score** — `lib/jobs.ts` now scores jobs from real
+  signals (skill richness, salary transparency, recency, featured) instead of a
+  random hash.
+
 ## Roadmap (next)
 
-1. **Social sign-in** — wire `supabase.auth.signInWithOAuth()` with
-   `expo-web-browser` + the official Google / LinkedIn provider config.
-2. **Push notifications** for job alerts (`expo-notifications`).
-3. **Secure session storage** — swap AsyncStorage for an
-   `expo-secure-store`-backed `LargeSecureStore` adapter (chunked, since
-   Supabase sessions exceed SecureStore's 2 KB/key limit).
-4. **Real match scoring** — replace the derived placeholder score in
-   `lib/jobs.ts` with a server-side relevance score.
+1. **Push sender** — an edge function / cron that finds new matching jobs per
+   user and calls Expo's push API using the stored `device_push_tokens`
+   (the only remaining server-side piece for alerts).
+2. **Server-side relevance model** — replace the client signal score with a
+   profile ↔ job relevance score (needs structured user skills, which the
+   `profiles` table doesn't store yet).
 
 ## Security notes (carried from the web audit)
 
-- Tokens persist in **AsyncStorage** (unencrypted) today — item 3 above hardens this.
+- The session is **encrypted at rest** (AES key in the device keystore via
+  `expo-secure-store`, ciphertext in AsyncStorage) — `lib/secure-store-adapter.ts`.
 - Only `EXPO_PUBLIC_*` values ship in the bundle; never put service-role keys here.
 - All data access stays behind Supabase **RLS** (same policies as the web app);
   saved/application writes are scoped to `auth.uid()`.
