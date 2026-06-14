@@ -49,6 +49,7 @@
   ],
   "exclude": [
     "node_modules",
-    "app/tailwind.config.ts"
+    "app/tailwind.config.ts",
+    "mobile"
   ]
 }

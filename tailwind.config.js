@@ -55,6 +55,20 @@ module.exports = {
         '3xl': ['38px', { lineHeight: '1.15' }],
         '4xl': ['50px', { lineHeight: '1.08' }],
         '5xl': ['64px', { lineHeight: '1.05' }],
+
+        // ---- Fluid display scale (clamp) -------------------------------
+        // Each token is clamp(min, rem-anchor + vw-slope, max). The rem
+        // anchor (not a bare vw) is what keeps the size responsive to the
+        // user's browser zoom / root font-size — pure `6vw` headings ignore
+        // that and fail WCAG 1.4.4 (Resize Text). Min sizes target a 360px
+        // phone, max sizes a ~1280px desktop, so headings scale smoothly
+        // between the two with no media queries. Tuned to land on the same
+        // visual sizes the landing page already used.
+        'display-1': ['clamp(2rem, 1.18rem + 4.1vw, 3.75rem)',   { lineHeight: '1.05', letterSpacing: '-0.02em' }],
+        'display-2': ['clamp(1.75rem, 1.2rem + 2.75vw, 3rem)',   { lineHeight: '1.1',  letterSpacing: '-0.02em' }],
+        'display-3': ['clamp(1.5rem, 1.18rem + 1.6vw, 2.25rem)', { lineHeight: '1.15', letterSpacing: '-0.01em' }],
+        'fluid-h2':  ['clamp(1.5rem, 1.29rem + 1.05vw, 2rem)',   { lineHeight: '1.2',  letterSpacing: '-0.01em' }],
+        'fluid-lead':['clamp(1.0625rem, 1.01rem + 0.28vw, 1.25rem)', { lineHeight: '1.6' }],
       },
       borderRadius: {
         sm:    '6px',

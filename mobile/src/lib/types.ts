@@ -1,0 +1,46 @@
+// src/lib/types.ts — domain types for the mobile app.
+// Mirrors the handoff's seed `JOBS` model. When wiring to live data, map the
+// Supabase `jobs` row onto this shape (or generate types from the DB).
+
+export type AppStatus = 'applied' | 'review' | 'interview';
+
+export interface MatchBar {
+  label: string; // e.g. "Skills"
+  value: string; // e.g. "Excellent"
+  pct: number; // 0–100 fill
+}
+
+export interface JobTag {
+  label: string;
+  variant: 'default' | 'blue';
+}
+
+export interface Job {
+  id: string;
+  role: string;
+  company: string;
+  logo: string; // single-letter initial for the gradient tile
+  grad: [string, string]; // company tile gradient [from, to]
+  match: number; // 0–100 match score
+  category: string;
+  verified: boolean;
+  salary: string; // "$140k" / "₦18m"
+  per: '/yr' | '/mo';
+  time: string; // "2d ago"
+  location: string;
+  type: string; // Full-time / Contract
+  level: string; // Senior / Mid
+  tags: JobTag[];
+  about: string;
+  duties: string[];
+  skills: string[];
+  verdict: string; // headline of the match verdict
+  vcap: string; // caption under the verdict
+  breakdown: MatchBar[]; // 3 bars for the detailed match band
+}
+
+export const STATUS_LABEL: Record<AppStatus, string> = {
+  applied: 'Applied',
+  review: 'In review',
+  interview: 'Interview',
+};

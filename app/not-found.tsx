@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: '404 – Page Not Found' };
 
 export default function NotFound() {
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-5">
+    <div className="min-h-[70dvh] flex items-center justify-center px-5">
       <div className="text-center max-w-md">
         <div className="font-display font-extrabold text-[120px] leading-none text-brand-100 dark:text-brand-900 select-none">
           404

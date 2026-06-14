@@ -151,7 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8faff] dark:bg-[#0f1e38]">
+      <div className="min-h-dvh flex items-center justify-center bg-[#f8faff] dark:bg-[#0f1e38]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full animate-spin"
             style={{ border: '3px solid #bfdbfe', borderTopColor: '#2563eb' }} />
@@ -162,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-dvh">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0a1628]">
         <div className="p-4 border-b border-slate-100 dark:border-[#1e2d4a]">
@@ -212,8 +212,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Mobile nav strip */}
-      <div className="md:hidden fixed top-[68px] left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2 overflow-x-auto no-scrollbar">
+      {/* Mobile nav strip — app-menu-top pins it under the safe-area-aware
+          header (was a hard-coded top-[68px] that overlapped the notch). */}
+      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2 overflow-x-auto no-scrollbar">
         <div className="flex gap-1 min-w-max">
           {NAV.filter(n => !n.indent).map(({ href, icon: Icon, label, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href);

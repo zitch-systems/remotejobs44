@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { waLink } from '@/lib/whatsapp';
 
 // High-res SVG social icons - crisp at any resolution
 const SOCIAL = [
@@ -35,7 +36,7 @@ const SOCIAL = [
   },
   {
     name: 'WhatsApp',
-    href: 'https://wa.me/2349169582776',
+    href: waLink(),
     color: '#25D366',
     svg: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">

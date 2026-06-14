@@ -68,6 +68,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   width: 'device-width', initialScale: 1, maximumScale: 5,
+  // viewport-fit=cover is what makes env(safe-area-inset-*) resolve to real
+  // values on notched iOS / Android. Without it the insets are 0 and the
+  // .pb-safe on the BottomNav + the .app-main offsets below are no-ops, which
+  // is exactly why content was clipping under the home indicator / nav bar.
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#2563eb' },
     { media: '(prefers-color-scheme: dark)',  color: '#0a1628' },
@@ -118,6 +123,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 'https://youtube.com/@remotejobs44'
               ],
               contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'hello@remotejobs44.com' }
+            },
+            {
+              // SoftwareApplication/WebApplication describes the PRODUCT
+              // itself (the PWA), distinct from the WebSite (the pages) and
+              // the Organization (the company). It's what lets Google show a
+              // pricing/app rich result and lets ChatGPT / Perplexity / Claude
+              // answer "how much is RemoteJobs44 / what does it do" with the
+              // canonical tiers + feature list instead of guessing.
+              // NOTE: no aggregateRating is emitted on purpose — we don't yet
+              // collect first-party reviews, and inventing star ratings
+              // violates Google's structured-data policy. Add it here once a
+              // real review pipeline exists.
+              '@type': 'WebApplication',
+              '@id': 'https://remotejobs44.com/#app',
+              name: 'RemoteJobs44',
+              url: 'https://remotejobs44.com',
+              applicationCategory: 'BusinessApplication',
+              applicationSubCategory: 'Job Search',
+              operatingSystem: 'Web, iOS, Android',
+              browserRequirements: 'Requires a modern browser. Installable as a PWA.',
+              inLanguage: 'en',
+              isAccessibleForFree: true,
+              publisher: { '@id': 'https://remotejobs44.com/#organization' },
+              description: 'Subscription remote job board for African talent applying to global companies — 70,000+ verified fully-remote roles, application tracking, AI CV review and AI interview prep.',
+              featureList: [
+                'Search 70,000+ verified fully-remote jobs from global companies',
+                'Filter by category, country, region, timezone, skill and salary',
+                'Application tracker',
+                'AI CV review with ATS keyword gaps and a 0–100 score',
+                'AI interview prep with role-specific questions',
+                'Installable Progressive Web App (offline-capable)',
+              ],
+              offers: [
+                { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'NGN', description: 'Browse all jobs and save favourites.' },
+                { '@type': 'Offer', name: 'Day Pass', price: '500', priceCurrency: 'NGN', description: '24-hour full access, 10 applications.' },
+                { '@type': 'Offer', name: 'Pro Monthly', price: '2999', priceCurrency: 'NGN', description: 'Unlimited applications, alerts and AI tools.' },
+                { '@type': 'Offer', name: 'Pro Annual', price: '29999', priceCurrency: 'NGN', description: 'Pro, billed yearly.' },
+              ],
             }
           ]
         }).replace(/</g, '\\u003c') }} />
@@ -145,7 +188,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Skip to content
             </a>
             <Header />
-            <main id="main-content" className="flex-1 pt-[68px] pb-[68px] md:pb-0">
+            {/* app-main (globals.css) reserves the fixed Header height +
+                safe-area-top above and the BottomNav footprint + safe-area-
+                bottom below, so children never sit under the notch or the
+                home indicator. Replaces the old flat pt-[68px] pb-[68px]. */}
+            <main id="main-content" className="flex-1 app-main">
               {children}
             </main>
             <Footer />

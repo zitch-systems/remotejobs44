@@ -1,5 +1,6 @@
 // components/home/CTASection.tsx — pure server component
 import Link from 'next/link';
+import { waLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 
 export function CTASection() {
   return (
@@ -9,8 +10,7 @@ export function CTASection() {
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-xs font-bold uppercase tracking-widest text-white/80 mb-6">
           🚀 Join 5,000+ job seekers
         </div>
-        <h2 className="font-display font-extrabold text-white tracking-tight mb-4 leading-tight"
-          style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)' }}>
+        <h2 className="font-display font-extrabold text-white mb-4 text-display-2">
           Your remote career<br />is one click away
         </h2>
         <p className="text-brand-200 mb-10 text-base max-w-md mx-auto leading-relaxed">
@@ -59,7 +59,7 @@ export function CTASection() {
               </svg>
             </a>
             <a
-              href="https://wa.me/2349169582776"
+              href={waLink()}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Chat with RemoteJobs44 on WhatsApp"
@@ -97,7 +97,7 @@ export function CTASection() {
           <p className="mt-4 text-xs text-white/60">
             <a href="mailto:hello@remotejobs44.com" className="hover:text-white transition-colors">hello@remotejobs44.com</a>
             <span className="mx-2 text-white/30">·</span>
-            <a href="https://wa.me/2349169582776" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">+234 916 958 2776</a>
+            <a href={waLink()} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">{WHATSAPP_DISPLAY}</a>
           </p>
         </div>
       </div>

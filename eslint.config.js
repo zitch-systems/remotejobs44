@@ -24,6 +24,10 @@ module.exports = [
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
+      // The Expo/React Native app is a self-contained subproject with its own
+      // tsconfig, ESLint (expo lint) and toolchain — keep the web lint/
+      // type-check out of it (it would choke on RN types + @/ aliases).
+      'mobile/**',
       // Generated files
       'next-env.d.ts',
       'public/**',
