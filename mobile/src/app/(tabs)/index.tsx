@@ -1,10 +1,11 @@
 // src/app/(tabs)/index.tsx — Home / Match feed (handoff §2).
 import React, { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Avatar, Card, Chip, Screen, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
+import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { SEED_JOBS, SEED_USER } from '@/lib/seed';
 import { useAppStore } from '@/store/app';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
@@ -62,6 +63,7 @@ function Promo() {
 
 export default function Feed() {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const strength = SEED_USER.profileStrength;
   const apps = useAppStore((s) => Object.keys(s.applied).length);
@@ -70,6 +72,11 @@ export default function Feed() {
     () => (filter === 'All' ? SEED_JOBS : SEED_JOBS.filter((j) => j.category === filter)),
     [filter],
   );
+
+  // Tablet / unfolded foldable → side-by-side master–detail (handoff §6).
+  // All hooks above run unconditionally so the hook order is stable across a
+  // fold/rotation that crosses the breakpoint.
+  if (width >= 840) return <FeedMasterDetail />;
 
   return (
     <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[2] }}>

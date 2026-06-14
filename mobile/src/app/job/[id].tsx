@@ -1,34 +1,15 @@
-// src/app/job/[id].tsx — full job detail + one-tap apply (handoff §3).
+// src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
+// apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bookmark, Check, Share2, Zap } from 'lucide-react-native';
-import { Card, IconButton, LogoTile, Pill, Txt } from '@/components/ui';
-import { MatchRing } from '@/components/MatchRing';
+import { IconButton, Txt } from '@/components/ui';
+import { JobDetailBody } from '@/components/JobDetailBody';
 import { SEED_JOBS } from '@/lib/seed';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
-
-function verdictKicker(match: number) {
-  if (match >= 85) return 'Strong match';
-  if (match >= 75) return 'Good match';
-  return 'Fair match';
-}
-
-function MetaCard({ label, value }: { label: string; value: string }) {
-  const { colors } = useTheme();
-  return (
-    <Card style={{ flex: 1, padding: spacing[3], gap: 2 }}>
-      <Txt variant="eyebrow" color={colors.fg4}>
-        {label}
-      </Txt>
-      <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
-        {value}
-      </Txt>
-    </Card>
-  );
-}
 
 export default function JobDetail() {
   const { colors } = useTheme();
@@ -86,72 +67,7 @@ export default function JobDetail() {
           </IconButton>
         </View>
 
-        {/* company row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-          <LogoTile initial={job.logo} grad={job.grad} size={54} radius={radii.lg} />
-          <View style={{ flex: 1 }}>
-            <Txt variant="h2" numberOfLines={2}>
-              {job.role}
-            </Txt>
-            <Txt variant="meta" color={colors.fg3}>
-              {job.company}
-              {job.verified ? ' · Verified employer' : ''}
-            </Txt>
-          </View>
-        </View>
-
-        {/* meta cards */}
-        <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-          <MetaCard label="Location" value={job.location.replace(/^Remote · /, '')} />
-          <MetaCard label="Type" value={job.type} />
-          <MetaCard label="Level" value={job.level} />
-        </View>
-
-        {/* match band */}
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4], padding: spacing[4] }}>
-          <MatchRing pct={job.match} size={78} />
-          <View style={{ flex: 1, gap: 3 }}>
-            <Txt variant="eyebrow" color={colors.success}>
-              {verdictKicker(job.match)}
-            </Txt>
-            <Txt variant="h3" color={colors.fg1}>
-              {job.verdict}
-            </Txt>
-            <Txt variant="meta" color={colors.fg3}>
-              {job.vcap}
-            </Txt>
-          </View>
-        </Card>
-
-        {/* about */}
-        <Section title="About the role">
-          <Txt color={colors.fg2} style={{ fontSize: 14, lineHeight: 22 }}>
-            {job.about}
-          </Txt>
-        </Section>
-
-        {/* duties */}
-        <Section title="What you'll do">
-          <View style={{ gap: spacing[2] }}>
-            {job.duties.map((d, i) => (
-              <View key={i} style={{ flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start' }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent, marginTop: 7 }} />
-                <Txt color={colors.fg2} style={{ flex: 1, fontSize: 14, lineHeight: 21 }}>
-                  {d}
-                </Txt>
-              </View>
-            ))}
-          </View>
-        </Section>
-
-        {/* skills */}
-        <Section title="Skills">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {job.skills.map((s) => (
-              <Pill key={s} label={s} bg={colors.infoBg} fg={colors.infoText} />
-            ))}
-          </View>
-        </Section>
+        <JobDetailBody job={job} />
       </ScrollView>
 
       {/* fixed apply bar */}
@@ -235,17 +151,5 @@ export default function JobDetail() {
         </View>
       ) : null}
     </SafeAreaView>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ gap: spacing[3] }}>
-      <Txt variant="h3" color={colors.fg1}>
-        {title}
-      </Txt>
-      {children}
-    </View>
   );
 }

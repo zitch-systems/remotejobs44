@@ -14,7 +14,7 @@ design handoff bundle).
 | Job detail | ✅ match ring, sections, one-tap apply + success burst |
 | Applications tracker | ✅ status pills, empty state |
 | Profile | ✅ strength, list groups, real sign-out |
-| Foldable / tablet master–detail | ⏳ planned (handoff §6) |
+| Foldable / tablet master–detail | ✅ responsive list + live detail pane (≥ 840px) |
 
 Data is currently the handoff's **seed set** (`src/lib/seed.ts`). Auth is real
 when env is configured; `saved`/`applied` live in a Zustand store and are not
@@ -62,16 +62,15 @@ src/
 
 1. **Live data** — replace `seed.ts` with Supabase queries; persist
    `saved` / `applied` to the user's rows (reuse the web RLS policies).
-2. **Foldable / tablet** master–detail layout (handoff §6) via a width breakpoint.
-3. **Social sign-in** — wire `supabase.auth.signInWithOAuth()` with
+2. **Social sign-in** — wire `supabase.auth.signInWithOAuth()` with
    `expo-web-browser` + the official Google / LinkedIn provider config.
-4. **Push notifications** for job alerts (`expo-notifications`).
-5. **Secure session storage** — swap AsyncStorage for an
+3. **Push notifications** for job alerts (`expo-notifications`).
+4. **Secure session storage** — swap AsyncStorage for an
    `expo-secure-store`-backed `LargeSecureStore` adapter (chunked, since
    Supabase sessions exceed SecureStore's 2 KB/key limit).
-6. **Real brand assets** — replace the placeholder Expo icon/splash with the
+5. **Real brand assets** — replace the placeholder Expo icon/splash with the
    RemoteJobs44 logo, and company gradient tiles with real images.
-7. **EAS** build/submit config for TestFlight + Play internal testing.
+6. **EAS** build/submit config for TestFlight + Play internal testing.
 
 ## Security notes (carried from the web audit)
 
