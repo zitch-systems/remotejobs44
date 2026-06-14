@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { ClipboardList, House, User, Zap } from 'lucide-react-native';
 import { useAuth } from '@/lib/auth';
+import { usePushNotifications } from '@/lib/push';
 import { fonts, shadows, useTheme } from '@/theme';
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -86,6 +87,8 @@ function TabBar({ state, navigation }: TabBarProps) {
 
 export default function TabsLayout() {
   const { authed } = useAuth();
+  // Registers for push + routes notification taps; no-ops until signed in.
+  usePushNotifications();
   if (!authed) return <Redirect href="/(auth)/sign-in" />;
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...(props as unknown as TabBarProps)} />}>

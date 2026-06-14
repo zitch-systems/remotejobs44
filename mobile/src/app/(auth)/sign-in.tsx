@@ -9,6 +9,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail, Search, ShieldCheck, User } from '
 import { Button, Divider, Field, Txt } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { signInWithProvider } from '@/lib/oauth';
 import { SEED_USER } from '@/lib/seed';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -109,12 +110,18 @@ export default function SignIn() {
     }
   }
 
-  function social(provider: 'google' | 'linkedin') {
+  async function social(provider: 'google' | 'linkedin') {
+    // No backend wired → demo straight in.
     if (!configured) return enterDemo();
-    Alert.alert(
-      'Connect a provider',
-      `Enable ${provider === 'google' ? 'Google' : 'LinkedIn'} in Supabase Auth, then wire supabase.auth.signInWithOAuth() with an expo-web-browser redirect.`,
-    );
+    try {
+      setBusy(true);
+      await signInWithProvider(provider === 'google' ? 'google' : 'linkedin_oidc');
+      // On success the auth listener flips `authed` and (auth)/_layout redirects.
+    } catch (e: any) {
+      Alert.alert('Sign-in failed', e?.message ?? 'Could not complete social sign-in.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
