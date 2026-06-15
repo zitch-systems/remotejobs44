@@ -1,7 +1,7 @@
 // src/lib/format.ts — pure, dependency-free helpers shared by the data layer.
 // Kept free of React/Supabase imports so they can be unit-tested directly
 // (see format.test.ts).
-import type { AppStatus, Job, JobTag } from './types';
+import type { AppNotification, AppStatus, Job, JobTag } from './types';
 
 // Deterministic company-tile gradients (picked per company name).
 export const GRADS: [string, string][] = [
@@ -115,6 +115,11 @@ export function personalizeJobs(jobs: Job[], userSkills: string[]): Job[] {
     if (!overlap) return j;
     return { ...j, match: Math.min(99, j.match + Math.min(8, overlap * 3)) };
   });
+}
+
+/** Count of unread notifications (drives the inbox bell badge). */
+export function unreadCount(items: AppNotification[]): number {
+  return items.reduce((n, x) => n + (x.read ? 0 : 1), 0);
 }
 
 // applications.status enum → AppStatus (same set); unknown values fall back.

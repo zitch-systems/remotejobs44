@@ -40,14 +40,24 @@ Deno.serve(async (req: Request) => {
   if (newCount === 0) return Response.json({ sent: 0, reason: 'no new jobs' });
   const topJobId = jobs![0].id as string;
 
-  // All registered device tokens.
-  const { data: tokens, error: tokErr } = await supabase.from('device_push_tokens').select('token');
+  // All registered device tokens (with their owner for the in-app inbox).
+  const { data: tokens, error: tokErr } = await supabase.from('device_push_tokens').select('user_id, token');
   if (tokErr) return Response.json({ error: tokErr.message }, { status: 500 });
+
+  const body = `${newCount} new verified role${newCount === 1 ? '' : 's'} just landed. Tap to view.`;
+
+  // Mirror the alert into each user's in-app inbox (migration_v42 notifications).
+  const userIds = [...new Set((tokens ?? []).map((t: { user_id: string }) => t.user_id).filter(Boolean))];
+  if (userIds.length) {
+    await supabase.from('notifications').insert(
+      userIds.map((uid) => ({ user_id: uid, type: 'job_alert', title: 'New remote jobs for you', body, job_id: topJobId })),
+    );
+  }
 
   const messages = (tokens ?? []).map((t: { token: string }) => ({
     to: t.token,
     title: 'New remote jobs for you',
-    body: `${newCount} new verified role${newCount === 1 ? '' : 's'} just landed. Tap to view.`,
+    body,
     data: { jobId: topJobId },
     sound: 'default',
   }));

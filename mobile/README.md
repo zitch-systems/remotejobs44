@@ -93,6 +93,12 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Notification inbox** (`app/inbox.tsx` + `store/notifications.ts`) — a Home
+  header bell with an unread badge opens an inbox of job alerts / application
+  updates / system messages; tap to mark read + open the related job, or "Mark
+  all read". Backed by the **`notifications`** table (`migration_v42`, RLS per
+  user); the **`send-job-alerts`** function now writes an inbox row per user
+  alongside the push. Pure `unreadCount` is unit-tested.
 - **Saved searches** (`app/(tabs)/jobs.tsx` + `lib/saved-search.ts`) — save the
   current query + filters as a chip on the Jobs tab and re-apply it with a tap
   (persisted, deduped, removable). Pure label / dedupe helpers are unit-tested.

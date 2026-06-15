@@ -12,6 +12,7 @@ import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
 import { RecentlyViewed } from '@/components/RecentlyViewed';
+import { NotificationBell } from '@/components/NotificationBell';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
@@ -141,7 +142,10 @@ export default function Feed() {
             Hi, <Txt variant="h2" color={colors.accent}>{firstName}</Txt>
           </Txt>
         </View>
-        <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+          <NotificationBell />
+          <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online />
+        </View>
       </View>
 
       {/* stats */}
