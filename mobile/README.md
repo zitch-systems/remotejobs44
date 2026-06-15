@@ -93,6 +93,9 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Saved searches** (`app/(tabs)/jobs.tsx` + `lib/saved-search.ts`) — save the
+  current query + filters as a chip on the Jobs tab and re-apply it with a tap
+  (persisted, deduped, removable). Pure label / dedupe helpers are unit-tested.
 - **Editable application status** (`app/(tabs)/applications.tsx`) — the tracker
   now spans the real pipeline (Applied → In review → Interview → Offer / Not
   selected / Withdrawn). Tap a row's status pill to move it; the store's
