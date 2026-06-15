@@ -1,0 +1,60 @@
+# EAS Build — Android APK (on demand).
+#
+# This is what makes "trigger from GitHub → get an APK" work. It does NOT run
+# on every push (EAS build minutes are limited); trigger it either by clicking
+# "Run workflow" on the Actions tab, or by pushing a tag like `mobile-v1`.
+#
+# PREREQUISITES (one-time, only you can do these — see mobile/BUILD.md):
+#   1. Add an Expo access token as the repo secret EXPO_TOKEN
+#      (Expo dashboard → Account/Org → Access tokens → create → copy into
+#       GitHub repo Settings → Secrets and variables → Actions).
+#   2. Link the project: run `eas init` in mobile/ once (writes owner +
+#      extra.eas.projectId into app.json) and commit it — otherwise the build
+#      can't resolve the EAS project in --non-interactive mode.
+#   3. Provide the app's env as EAS secrets (so the APK isn't demo-only):
+#      `eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value ...` etc.
+name: EAS Build (Android APK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        default: preview
+        options: [preview, production]
+  push:
+    tags:
+      - "mobile-v*"
+
+jobs:
+  android:
+    name: Build Android (${{ github.event.inputs.profile || 'preview' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Build APK
+        # --no-wait returns once the build is queued; the link to the running
+        # build (and the downloadable .apk) is printed in the logs and on the
+        # EAS dashboard. Drop --no-wait if you want the job to block until done.
+        run: eas build --platform android --profile ${{ github.event.inputs.profile || 'preview' }} --non-interactive --no-wait
