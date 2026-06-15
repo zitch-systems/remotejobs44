@@ -3,19 +3,21 @@
 // greeting/stats, and skill-personalised match ranking. Switches to the tablet
 // master–detail layout at ≥ 840px.
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
+import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { personalizeJobs, useJobs } from '@/lib/jobs';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
+import { useSearchHistory } from '@/store/search';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
@@ -68,6 +70,8 @@ export default function Feed() {
   const [sort, setSort] = useState<SortBy>('match');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [userSkills, setUserSkills] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const addSearch = useSearchHistory((s) => s.add);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return;
@@ -130,6 +134,13 @@ export default function Feed() {
             onChangeText={setQuery}
             placeholder="Search remote jobs…"
             placeholderTextColor={colors.fg4}
+            returnKeyType="search"
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            onSubmitEditing={() => {
+              addSearch(query);
+              setSearchFocused(false);
+            }}
             style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.fg1, paddingVertical: 0 }}
           />
         </Card>
@@ -144,6 +155,17 @@ export default function Feed() {
           <SlidersHorizontal size={18} color="#fff" />
         </Pressable>
       </View>
+
+      {searchFocused ? (
+        <SearchSuggestions
+          onSelect={(q) => {
+            setQuery(q);
+            addSearch(q);
+            setSearchFocused(false);
+            Keyboard.dismiss();
+          }}
+        />
+      ) : null}
 
       <Promo />
 
@@ -192,9 +214,25 @@ export default function Feed() {
               </Pressable>
             </View>
           ) : (
-            <Txt center color={colors.fg4} style={{ paddingVertical: spacing[8] }}>
-              No roles match your filters.
-            </Txt>
+            <View style={{ alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] }}>
+              <Txt center color={colors.fg4}>
+                No roles match your filters.
+              </Txt>
+              <Pressable
+                onPress={() => {
+                  setFilter('All');
+                  setType('Any');
+                  setSort('match');
+                  setQuery('');
+                }}
+                style={({ pressed }) => [
+                  { paddingHorizontal: spacing[5], paddingVertical: 10, borderRadius: radii.field, borderWidth: 1.5, borderColor: colors.border2 },
+                  pressed && { backgroundColor: colors.bgSection },
+                ]}
+              >
+                <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: colors.brand }}>Reset filters</Txt>
+              </Pressable>
+            </View>
           )
         }
         ListFooterComponent={

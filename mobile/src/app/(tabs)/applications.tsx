@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ClipboardList } from 'lucide-react-native';
-import { Pill, Screen, Txt } from '@/components/ui';
+import { Button, Pill, Screen, Txt } from '@/components/ui';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoader } from '@/components/BrandLoader';
 import { SEED_JOBS } from '@/lib/seed';
@@ -97,6 +97,7 @@ export default function Applications() {
           <Txt center color={colors.fg3} style={{ maxWidth: 260 }}>
             Apply to a role from the feed and track its progress here.
           </Txt>
+          <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)')} style={{ marginTop: spacing[2] }} />
         </View>
       ) : (
         <View style={{ gap: spacing[3] }}>
