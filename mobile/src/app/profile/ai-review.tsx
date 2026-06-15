@@ -7,7 +7,10 @@ import { ArrowLeft, Check, Sparkles, X } from 'lucide-react-native';
 import { Button, Card, IconButton, Pill, Txt } from '@/components/ui';
 import { BrandLoader } from '@/components/BrandLoader';
 import { MatchRing } from '@/components/MatchRing';
+import { PaywallCard } from '@/components/PaywallCard';
 import { reviewCv, type CvReview } from '@/lib/ai';
+import { useProfile } from '@/lib/profile';
+import { canUseAI } from '@/lib/entitlements';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fonts, spacing, useTheme } from '@/theme';
 
@@ -18,6 +21,8 @@ export default function AiReview() {
   const [cv, setCv] = useState('');
   const [busy, setBusy] = useState(false);
   const [review, setReview] = useState<CvReview | null>(null);
+  const { profile } = useProfile();
+  const gated = isSupabaseConfigured && !canUseAI(profile.plan);
 
   async function run() {
     if (!isSupabaseConfigured) {
@@ -47,6 +52,14 @@ export default function AiReview() {
         <Txt variant="h2">AI CV review</Txt>
       </View>
 
+      {gated ? (
+        <View style={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[6] }}>
+          <PaywallCard
+            title="AI CV review is a Pro feature"
+            subtitle="Upgrade to get an instant, recruiter-grade review — score, strengths, gaps, rewrite tips and missing ATS keywords."
+          />
+        </View>
+      ) : (
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -143,6 +156,7 @@ export default function AiReview() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
