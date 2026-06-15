@@ -1,7 +1,7 @@
 // src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
 // apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Linking, Pressable, ScrollView, Share, View } from 'react-native';
+import { Alert, Animated, Linking, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -12,7 +12,11 @@ import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
 import { useJob } from '@/lib/jobs';
 import { applyTarget } from '@/lib/apply';
+import { useProfile } from '@/lib/profile';
+import { canApply, FREE_DAILY_APPLICATIONS } from '@/lib/entitlements';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
+import { useUsage } from '@/store/usage';
 import { useRecentJobs } from '@/store/recent-jobs';
 import { toast } from '@/store/toast';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
@@ -30,6 +34,9 @@ export default function JobDetail() {
   const applyTo = useAppStore((s) => s.applyTo);
 
   const addRecent = useRecentJobs((s) => s.add);
+  const { profile } = useProfile();
+  const usedToday = useUsage((s) => s.todayApplications());
+  const bumpApplication = useUsage((s) => s.bumpApplication);
 
   const [burst, setBurst] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
@@ -66,6 +73,18 @@ export default function JobDetail() {
 
   async function onApply() {
     if (applied || !job) return;
+    // Free plan: cap applications per day (paid is unlimited).
+    if (isSupabaseConfigured && !canApply(profile.plan, usedToday)) {
+      Alert.alert(
+        'Daily limit reached',
+        `Free accounts can apply to ${FREE_DAILY_APPLICATIONS} roles a day. Upgrade to Pro for unlimited applications.`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/profile/plans') },
+        ],
+      );
+      return;
+    }
     if (target) {
       // External application: open the company site / email, then track it.
       try {
@@ -75,10 +94,12 @@ export default function JobDetail() {
         /* user dismissed / no handler */
       }
       applyTo(job);
+      bumpApplication();
       toast('Tracked in your applications.', 'success');
       return;
     }
     applyTo(job);
+    bumpApplication();
     setBurst(true);
   }
 

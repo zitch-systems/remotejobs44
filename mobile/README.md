@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Plan enforcement / paywall** (`lib/entitlements.ts`) — AI CV review +
+  interview prep are now **Pro features** (a `PaywallCard` with an Upgrade CTA
+  replaces the tool for Free users), and Free accounts have a **daily
+  application cap** (`store/usage.ts`, with an upgrade prompt at the limit).
+  Entitlement rules are pure + unit-tested.
 - **Smart job alerts** (`supabase/functions/send-job-alerts`) — the alert sender
   now matches new roles against **each user's skills / target role** and sends a
   personalised push + inbox row ("3 new roles match your skills"); users with no

@@ -6,7 +6,10 @@ import { useRouter } from 'expo-router';
 import { AlertTriangle, ArrowLeft, MessageSquare } from 'lucide-react-native';
 import { Button, Card, IconButton, Txt } from '@/components/ui';
 import { BrandLoader } from '@/components/BrandLoader';
+import { PaywallCard } from '@/components/PaywallCard';
 import { prepInterview, type InterviewPrep, type InterviewQuestion } from '@/lib/ai';
+import { useProfile } from '@/lib/profile';
+import { canUseAI } from '@/lib/entitlements';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fonts, radii, spacing, useTheme } from '@/theme';
 
@@ -19,6 +22,8 @@ export default function InterviewPrepScreen() {
   const [level, setLevel] = useState('Mid');
   const [busy, setBusy] = useState(false);
   const [prep, setPrep] = useState<InterviewPrep | null>(null);
+  const { profile } = useProfile();
+  const gated = isSupabaseConfigured && !canUseAI(profile.plan);
 
   async function run() {
     if (!isSupabaseConfigured) {
@@ -48,6 +53,14 @@ export default function InterviewPrepScreen() {
         <Txt variant="h2">AI interview prep</Txt>
       </View>
 
+      {gated ? (
+        <View style={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[6] }}>
+          <PaywallCard
+            title="AI interview prep is a Pro feature"
+            subtitle="Upgrade to generate tailored behavioural, technical and remote questions — with model answers and red flags."
+          />
+        </View>
+      ) : (
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -129,6 +142,7 @@ export default function InterviewPrepScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
