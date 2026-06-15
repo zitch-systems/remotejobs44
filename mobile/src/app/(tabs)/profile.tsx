@@ -2,7 +2,7 @@
 // Real profile data (name / avatar initial / server-computed strength) with a
 // seed fallback in demo; every row now navigates.
 import React from 'react';
-import { Alert, Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Bell, Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, SlidersHorizontal, Sun } from 'lucide-react-native';
@@ -87,11 +87,6 @@ export default function Profile() {
     mode === 'system' ? <Monitor size={18} color={colors.fg3} /> : mode === 'light' ? <Sun size={18} color={colors.fg3} /> : <Moon size={18} color={colors.fg3} />;
   const appearanceLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
 
-  function openCv() {
-    if (profile.cvUrl) Linking.openURL(profile.cvUrl).catch(() => {});
-    else Alert.alert('No CV yet', 'Upload your CV from the RemoteJobs44 web app to attach it to applications.');
-  }
-
   return (
     <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[4] }}>
       {/* identity */}
@@ -121,7 +116,7 @@ export default function Profile() {
       {/* primary list */}
       <Card style={{ paddingVertical: 2 }}>
         <Row icon={<Pencil size={18} color={colors.fg3} />} label="Edit profile" onPress={() => router.push('/profile/edit')} />
-        <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'View' : 'None'} onPress={openCv} />
+        <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'Added' : 'None'} onPress={() => router.push('/profile/cv')} />
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
         <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
