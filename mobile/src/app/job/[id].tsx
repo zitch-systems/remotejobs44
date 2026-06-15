@@ -5,12 +5,11 @@ import { Animated, Linking, Pressable, ScrollView, Share, View } from 'react-nat
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ArrowLeft, Bookmark, Check, ExternalLink, Flag, Share2, Zap } from 'lucide-react-native';
+import { ArrowLeft, Bookmark, Check, ExternalLink, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
-import { ReportSheet } from '@/components/ReportSheet';
 import { useJob } from '@/lib/jobs';
 import { applyTarget } from '@/lib/apply';
 import { useAppStore } from '@/store/app';
@@ -33,7 +32,6 @@ export default function JobDetail() {
   const addRecent = useRecentJobs((s) => s.add);
 
   const [burst, setBurst] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
 
   // Record the view once the role resolves (for Home's "Recently viewed").
@@ -113,22 +111,6 @@ export default function JobDetail() {
 
         <JobDetailBody job={job} />
         <SimilarRoles job={job} />
-
-        {/* report */}
-        <Pressable
-          onPress={() => setReportOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Report this job"
-          style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[3] },
-            pressed && { opacity: 0.6 },
-          ]}
-        >
-          <Flag size={14} color={colors.fg4} />
-          <Txt variant="meta" color={colors.fg4}>
-            Report this job
-          </Txt>
-        </Pressable>
       </ScrollView>
 
       {/* fixed apply bar */}
@@ -211,8 +193,6 @@ export default function JobDetail() {
           </Animated.View>
         </View>
       ) : null}
-
-      <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} jobId={job.id} />
     </SafeAreaView>
   );
 }
