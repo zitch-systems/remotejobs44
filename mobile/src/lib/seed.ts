@@ -191,7 +191,7 @@ export const SEED_JOBS: Job[] = [
 
 // Seed user state from the handoff (jobs 1,2,4 applied; job 3 saved).
 export const SEED_APPLIED: Record<string, import('./types').AppStatus> = {
-  '1': 'review',
+  '1': 'screening',
   '2': 'interview',
   '4': 'applied',
 };

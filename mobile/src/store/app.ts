@@ -3,10 +3,10 @@
 // and hydrates from Supabase on sign-in, with optimistic write-through on
 // every mutation.
 import { create } from 'zustand';
-import type { AppStatus, Job } from '@/lib/types';
+import { type AppStatus, type Job, STATUS_LABEL } from '@/lib/types';
 import { SEED_APPLIED, SEED_SAVED } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { applyRemote, setSavedRemote } from '@/lib/user-state';
+import { applyRemote, setSavedRemote, updateApplicationStatus } from '@/lib/user-state';
 import { captureError } from '@/lib/sentry';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import { toast } from '@/store/toast';
@@ -23,6 +23,8 @@ interface AppState {
   hydrate: (data: { saved: string[]; applied: Record<string, AppStatus> }) => void;
   toggleSaved: (id: string) => void;
   applyTo: (job: Job) => void;
+  /** Move an existing application to a new status (optimistic + write-through). */
+  updateStatus: (jobId: string, status: AppStatus) => void;
   /** Reset to a clean slate (sign-out). */
   reset: () => void;
 }
@@ -69,6 +71,22 @@ export const useAppStore = create<AppState>((set, get) => ({
           delete next[job.id];
           return { applied: next };
         });
+      });
+    }
+  },
+
+  updateStatus: (jobId, status) => {
+    const prev = get().applied[jobId];
+    if (prev === undefined || prev === status) return;
+    tapLight();
+    toast(`Marked as ${STATUS_LABEL[status].toLowerCase()}`, 'success');
+    set((s) => ({ applied: { ...s.applied, [jobId]: status } }));
+    const { userId } = get();
+    if (isSupabaseConfigured && userId) {
+      updateApplicationStatus(userId, jobId, status).catch((e) => {
+        captureError(e, { scope: 'updateStatus', id: jobId });
+        // Roll back on failure.
+        set((s) => ({ applied: { ...s.applied, [jobId]: prev } }));
       });
     }
   },

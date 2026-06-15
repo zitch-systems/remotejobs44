@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Editable application status** (`app/(tabs)/applications.tsx`) — the tracker
+  now spans the real pipeline (Applied → In review → Interview → Offer / Not
+  selected / Withdrawn). Tap a row's status pill to move it; the store's
+  `applied` map is the source of truth (optimistic + write-through to
+  `applications.status`, with rollback). `AppStatus` expanded 3 → 6 states.
 - **External apply** (`app/job/[id].tsx`) — when a role has an `apply_url` /
   `apply_email`, the apply bar becomes **"Apply on company site"** (opens the
   link / mailto, then tracks it); otherwise the in-app one-tap apply. Apply-target

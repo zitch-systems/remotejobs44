@@ -73,12 +73,17 @@ describe('personalizeJobs', () => {
 });
 
 describe('dbToStatus', () => {
-  it('maps the applications enum to the 3-state tracker', () => {
-    expect(dbToStatus('screening')).toBe('review');
+  it('passes through valid application statuses', () => {
+    expect(dbToStatus('screening')).toBe('screening');
     expect(dbToStatus('interview')).toBe('interview');
-    expect(dbToStatus('offer')).toBe('interview');
+    expect(dbToStatus('offer')).toBe('offer');
     expect(dbToStatus('applied')).toBe('applied');
-    expect(dbToStatus('rejected')).toBe('applied');
+    expect(dbToStatus('rejected')).toBe('rejected');
+    expect(dbToStatus('withdrawn')).toBe('withdrawn');
+  });
+  it('falls back to applied for unknown values', () => {
+    expect(dbToStatus('weird')).toBe('applied');
+    expect(dbToStatus('')).toBe('applied');
   });
 });
 
