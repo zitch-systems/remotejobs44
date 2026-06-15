@@ -15,36 +15,47 @@ import { fetchApplicationItems, type ApplicationItem } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
 import { radii, spacing, useTheme } from '@/theme';
 
-function useApplications(): { items: ApplicationItem[]; loading: boolean } {
+function useApplications(): { items: ApplicationItem[]; loading: boolean; refreshing: boolean; refresh: () => void } {
   const applied = useAppStore((s) => s.applied);
   const userId = useAppStore((s) => s.userId);
   const [state, setState] = useState<{ items: ApplicationItem[]; loading: boolean }>({
     items: [],
     loading: Boolean(isSupabaseConfigured && userId),
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) {
       const items = SEED_JOBS.filter((j) => j.id in applied).map((job) => ({ job, status: applied[job.id] }));
       setState({ items, loading: false });
+      setRefreshing(false);
       return;
     }
     let active = true;
     fetchApplicationItems(userId)
       .then((items) => active && setState({ items, loading: false }))
-      .catch(() => active && setState({ items: [], loading: false }));
+      .catch(() => active && setState((s) => ({ items: s.items, loading: false })))
+      .finally(() => active && setRefreshing(false));
     return () => {
       active = false;
     };
-  }, [userId, applied]);
+  }, [userId, applied, nonce]);
 
-  return state;
+  return {
+    ...state,
+    refreshing,
+    refresh: () => {
+      setRefreshing(true);
+      setNonce((n) => n + 1);
+    },
+  };
 }
 
 export default function Applications() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { items, loading } = useApplications();
+  const { items, loading, refreshing, refresh } = useApplications();
 
   const statusColors = (s: AppStatus) =>
     s === 'applied'
@@ -54,7 +65,7 @@ export default function Applications() {
         : { bg: colors.successBg, fg: colors.successText, border: colors.successBorder };
 
   return (
-    <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[2] }}>
+    <Screen scroll refreshing={refreshing} onRefresh={refresh} contentStyle={{ gap: spacing[4], paddingTop: spacing[2] }}>
       <View>
         <Txt variant="screenTitle">Applications</Txt>
         <Txt variant="meta" color={colors.fg3} style={{ marginTop: 2 }}>

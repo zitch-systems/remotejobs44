@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Appearance toggle** — System / Light / Dark, persisted (`store/theme.ts`);
+  `useTheme()` follows it. Cycle it from Profile → Appearance.
+- **Pull-to-refresh** on Saved + Applications (re-fetches without the full loader).
+- **Haptic feedback** (`lib/haptics.ts`) — a light tap on save, a success buzz on
+  apply (no-op where unsupported).
 - **Branded loading animation** (`components/BrandLoader.tsx`) — the logo mark
   (blue tile + chart-line + orange dot) pulses inside a spinning brand arc;
   shown wherever items load (feed, saved, applications, job detail, preferences,

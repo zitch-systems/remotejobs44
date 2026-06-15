@@ -1,8 +1,9 @@
 // src/theme/index.ts — theme barrel + the useTheme() hook.
-// Static design tokens (spacing/radii/fonts/etc.) are imported directly;
-// only the color set switches with the OS color scheme.
+// Static design tokens (spacing/radii/fonts/etc.) are imported directly; the
+// color set follows the user's appearance preference (System/Light/Dark).
 import { useColorScheme } from 'react-native';
 import { lightColors, darkColors, type Colors } from './tokens';
+import { useThemeMode } from '@/store/theme';
 
 export * from './tokens';
 
@@ -13,8 +14,10 @@ export type Theme = {
 };
 
 export function useTheme(): Theme {
-  // useColorScheme() can be 'light' | 'dark' | 'unspecified' | null; collapse
-  // anything that isn't an explicit 'dark' to 'light'.
-  const isDark = useColorScheme() === 'dark';
+  const mode = useThemeMode((s) => s.mode);
+  // useColorScheme() can be 'light' | 'dark' | 'unspecified' | null.
+  const systemDark = useColorScheme() === 'dark';
+  const isDark = mode === 'system' ? systemDark : mode === 'dark';
   return { colors: isDark ? darkColors : lightColors, scheme: isDark ? 'dark' : 'light', isDark };
 }
+

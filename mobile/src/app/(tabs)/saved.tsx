@@ -15,41 +15,60 @@ import { useAppStore } from '@/store/app';
 import { radii, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
-function useSavedJobs(): { jobs: Job[]; loading: boolean } {
+function useSavedJobs(): { jobs: Job[]; loading: boolean; refreshing: boolean; refresh: () => void } {
   const userId = useAppStore((s) => s.userId);
   const savedIds = useAppStore((s) => s.saved);
   const [fetched, setFetched] = useState<Job[]>([]);
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
+  const [refreshing, setRefreshing] = useState(false);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) {
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     let active = true;
-    setLoading(true);
+    if (nonce === 0) setLoading(true); // full loader only on first load
     fetchSavedJobs(userId)
-      .then((jobs) => active && (setFetched(jobs), setLoading(false)))
-      .catch(() => active && setLoading(false));
+      .then((jobs) => {
+        if (active) setFetched(jobs);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, nonce]);
 
   const jobs = useMemo(() => {
     const source = !isSupabaseConfigured || !userId ? SEED_JOBS : fetched;
     return source.filter((j) => savedIds.includes(j.id));
   }, [fetched, savedIds, userId]);
 
-  return { jobs, loading };
+  return {
+    jobs,
+    loading,
+    refreshing,
+    refresh: () => {
+      setRefreshing(true);
+      setNonce((n) => n + 1);
+    },
+  };
 }
 
 export default function Saved() {
   const { colors } = useTheme();
-  const { jobs, loading } = useSavedJobs();
+  const { jobs, loading, refreshing, refresh } = useSavedJobs();
 
   return (
-    <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[2] }}>
+    <Screen scroll refreshing={refreshing} onRefresh={refresh} contentStyle={{ gap: spacing[4], paddingTop: spacing[2] }}>
       <View>
         <Txt variant="screenTitle">Saved</Txt>
         <Txt variant="meta" color={colors.fg3} style={{ marginTop: 2 }}>
