@@ -93,6 +93,13 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **External apply + report a job** (`app/job/[id].tsx`) — when a role has an
+  `apply_url` / `apply_email`, the apply bar becomes **"Apply on company site"**
+  (opens the link / mailto, then tracks it); otherwise the in-app one-tap apply.
+  A **"Report this job"** action files a reason (scam / spam / expired / …) into
+  the new **`job_reports`** table (`supabase/migration_v41_job_reports.sql`, RLS
+  per reporter). Apply-target resolution is a pure, unit-tested helper
+  (`lib/apply.ts`); `bulletsFrom` now also accepts the live `text[]` requirements.
 - **Account & settings** (`app/profile/settings.tsx`) — change password (Supabase
   reset email), Privacy / Terms links, contact support, app version, and an
   in-app **Delete account** flow (Apple/Google requirement) backed by the

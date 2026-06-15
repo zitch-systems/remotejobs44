@@ -31,6 +31,8 @@ export interface Job {
   location: string;
   type: string; // Full-time / Contract
   level: string; // Senior / Mid
+  applyUrl?: string; // external apply link (company site), when available
+  applyEmail?: string; // apply-by-email address, when available
   tags: JobTag[];
   about: string;
   duties: string[];

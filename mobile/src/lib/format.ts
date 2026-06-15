@@ -59,8 +59,13 @@ export function tagsFrom(skills: string[] | null, category: string | null): JobT
   return base.map((label, i) => ({ label, variant: i === 0 ? 'blue' : 'default' }));
 }
 
-export function bulletsFrom(requirements: string | null, description: string | null): string[] {
-  const src = (requirements || description || '').trim();
+export function bulletsFrom(requirements: string[] | string | null, description: string | null): string[] {
+  // Live `requirements` is a text[]; use its items directly when present.
+  if (Array.isArray(requirements)) {
+    const items = requirements.map((s) => String(s).trim()).filter((s) => s.length > 0);
+    if (items.length) return items.slice(0, 4);
+  }
+  const src = ((typeof requirements === 'string' ? requirements : '') || description || '').trim();
   if (!src) return ['Collaborate with a distributed team to ship meaningful work.'];
   const parts = src
     .split(/\n|•|·|;|(?<=\.)\s+(?=[A-Z])/)

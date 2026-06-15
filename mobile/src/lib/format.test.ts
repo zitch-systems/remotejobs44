@@ -116,4 +116,8 @@ describe('tagsFrom / gradFor / bulletsFrom', () => {
     expect(bulletsFrom(null, null)).toHaveLength(1);
     expect(bulletsFrom('Own the roadmap.\nShip reliable services.', null).length).toBeGreaterThanOrEqual(2);
   });
+  it('bulletsFrom uses a string[] (live requirements) directly', () => {
+    expect(bulletsFrom(['Build APIs', 'Ship features', '  '], null)).toEqual(['Build APIs', 'Ship features']);
+    expect(bulletsFrom([], 'Fallback to description here.')).toHaveLength(1);
+  });
 });
