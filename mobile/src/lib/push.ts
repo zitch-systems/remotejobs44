@@ -17,6 +17,7 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { useAppStore } from '@/store/app';
+import { usePrefs } from '@/store/prefs';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -62,9 +63,11 @@ async function persistToken(userId: string, token: string): Promise<void> {
 export function usePushNotifications(): void {
   const router = useRouter();
   const userId = useAppStore((s) => s.userId);
+  const alertsMatches = usePrefs((s) => s.alertsMatches);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !userId) return;
+    // Only register a push token when signed in AND the user wants match alerts.
+    if (!isSupabaseConfigured || !userId || !alertsMatches) return;
     let active = true;
     registerForPushToken()
       .then((token) => {
@@ -74,7 +77,7 @@ export function usePushNotifications(): void {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, alertsMatches]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {

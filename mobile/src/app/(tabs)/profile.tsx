@@ -5,7 +5,7 @@ import React from 'react';
 import { Alert, Linking, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, SlidersHorizontal, Sun } from 'lucide-react-native';
+import { Bell, Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, SlidersHorizontal, Sun } from 'lucide-react-native';
 import { Avatar, Card, Divider, Screen, Txt } from '@/components/ui';
 import { useProfile } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
@@ -124,6 +124,7 @@ export default function Profile() {
         <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'View' : 'None'} onPress={openCv} />
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
+        <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
         <Row icon={appearanceIcon} label="Appearance" value={appearanceLabel} onPress={cycleTheme} last />
       </Card>
 
