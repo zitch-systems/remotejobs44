@@ -76,9 +76,14 @@ src/
 
 ```bash
 npm i -g eas-cli && eas login
-eas init                       # creates the EAS project, writes extra.eas.projectId
-eas build --profile preview    # internal-distribution build (TestFlight / Play internal)
+eas init                                   # creates the EAS project + extra.eas.projectId
+eas build -p android --profile preview     # → installable .apk (buildType: apk)
+eas build -p ios --profile preview         # → iOS internal build
 ```
+
+The `preview` profile is set to `android.buildType: apk`, so the Android build
+produces a directly-installable **APK** (sideload / Play internal). Production
+(`--profile production`) makes an `.aab` for the Play Store.
 
 Provide the Supabase env to builds via EAS secrets (or an `env` block per
 profile): `eas env:create --name EXPO_PUBLIC_SUPABASE_URL ...`. The
@@ -103,6 +108,11 @@ if the mark changes (uses the repo-root `sharp`).
 - **Signal-based match score** — `lib/jobs.ts` now scores jobs from real
   signals (skill richness, salary transparency, recency, featured) instead of a
   random hash.
+- **Error reporting** (`lib/sentry.ts`) — gated on `EXPO_PUBLIC_SENTRY_DSN`;
+  `initSentry()` + `withSentry()` in the root layout, `captureError()` wired
+  into the auth/store failure paths. No-op until a DSN is set.
+- **Unit tests** — pure logic extracted to `lib/format.ts` and covered by
+  `lib/format.test.ts` (jest-expo). `npm test` (also in CI).
 
 ## Deploy checklist (what's left to operate)
 
@@ -125,7 +135,9 @@ sandbox:
 
 - **Server-side relevance model** — replace the client signal+skills score with
   a learned profile ↔ job relevance score.
-- **Error reporting** (Sentry RN) + a small mobile test suite.
+- **Native crash + source maps** — add the `@sentry/react-native/expo` config
+  plugin (with org/project + `SENTRY_AUTH_TOKEN`) on top of the runtime init.
+- **Component/integration tests** — extend the unit suite to screens.
 
 ## Security notes (carried from the web audit)
 

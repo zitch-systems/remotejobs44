@@ -7,6 +7,7 @@ import type { AppStatus, Job } from '@/lib/types';
 import { SEED_APPLIED, SEED_SAVED } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { applyRemote, setSavedRemote } from '@/lib/user-state';
+import { captureError } from '@/lib/sentry';
 
 interface AppState {
   userId: string | null;
@@ -42,7 +43,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ saved: willSave ? [...s.saved, id] : s.saved.filter((x) => x !== id) }));
     const { userId } = get();
     if (isSupabaseConfigured && userId) {
-      setSavedRemote(userId, id, willSave).catch(() => {
+      setSavedRemote(userId, id, willSave).catch((e) => {
+        captureError(e, { scope: 'toggleSaved', id });
         // Roll back on failure.
         set((s) => ({ saved: willSave ? s.saved.filter((x) => x !== id) : [...s.saved, id] }));
       });
@@ -54,7 +56,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ applied: { ...s.applied, [job.id]: 'applied' } }));
     const { userId } = get();
     if (isSupabaseConfigured && userId) {
-      applyRemote(userId, job).catch(() => {
+      applyRemote(userId, job).catch((e) => {
+        captureError(e, { scope: 'applyTo', id: job.id });
         set((s) => {
           const next = { ...s.applied };
           delete next[job.id];

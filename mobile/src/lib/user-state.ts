@@ -3,17 +3,14 @@
 // RLS scopes every row to auth.uid(); we still pass user_id explicitly.
 import { supabase } from './supabase';
 import { rowToJob } from './jobs';
+import { dbToStatus } from './format';
 import type { AppStatus, Job } from './types';
+
+// Re-export so existing importers keep working.
+export { dbToStatus } from './format';
 
 const JOB_COLUMNS =
   'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
-
-// applications.status enum → the 3-state mobile tracker.
-export function dbToStatus(s: string): AppStatus {
-  if (s === 'screening') return 'review';
-  if (s === 'interview' || s === 'offer') return 'interview';
-  return 'applied'; // applied | rejected | withdrawn
-}
 
 export async function fetchSavedIds(userId: string): Promise<string[]> {
   const { data, error } = await supabase.from('saved_jobs').select('job_id').eq('user_id', userId);

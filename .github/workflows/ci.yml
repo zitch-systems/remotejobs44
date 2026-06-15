@@ -84,8 +84,8 @@ jobs:
   # The Expo app is excluded from the web type-check/lint (root tsconfig +
   # eslint ignore /mobile), so it needs its own gate — its own package-lock
   # and tsconfig.
-  mobile-type-check:
-    name: mobile · type-check
+  mobile-checks:
+    name: mobile · type-check + test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -106,3 +106,6 @@ jobs:
 
       - name: Type-check (mobile)
         run: npx tsc --noEmit
+
+      - name: Unit tests (mobile)
+        run: npm test
