@@ -2,6 +2,11 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Scope auto-included global @types to jest only. jest pulls @types/node
+    // transitively; auto-including it (an RN app uses no Node globals) corrupts
+    // global type resolution. React/Expo types load via imports + expo-env.d.ts
+    // /// references, unaffected by this list.
+    "types": ["jest"],
     "paths": {
       "@/*": [
         "./src/*"

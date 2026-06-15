@@ -8,6 +8,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { fetchAppliedMap, fetchSavedIds } from './user-state';
+import { captureError } from './sentry';
 import { useAppStore } from '@/store/app';
 
 interface AuthValue {
@@ -60,9 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(([saved, applied]) => {
         if (active) useAppStore.getState().hydrate({ saved, applied });
       })
-      .catch(() => {
-        /* keep optimistic local state on hydration failure */
-      });
+      .catch((e) => captureError(e, { scope: 'hydrate-user-state' }));
     return () => {
       active = false;
     };

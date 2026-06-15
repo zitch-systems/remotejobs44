@@ -16,10 +16,12 @@ import {
 } from '@expo-google-fonts/sora';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { AuthProvider } from '@/lib/auth';
+import { initSentry, withSentry } from '@/lib/sentry';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+initSentry();
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded] = useFonts({
     Sora_400Regular,
     Sora_500Medium,
@@ -52,3 +54,6 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Wrapped for Sentry routing/error instrumentation (no-op without a DSN).
+export default withSentry(RootLayout);
