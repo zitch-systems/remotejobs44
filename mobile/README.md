@@ -93,6 +93,12 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Account & settings** (`app/profile/settings.tsx`) — change password (Supabase
+  reset email), Privacy / Terms links, contact support, app version, and an
+  in-app **Delete account** flow (Apple/Google requirement) backed by the
+  **`delete-account` edge function** (`supabase/functions/delete-account`).
+  *Setup:* `supabase functions deploy delete-account` (no extra secrets — the
+  service-role key is injected by default).
 - **Recently viewed jobs** (`components/RecentlyViewed.tsx` + `store/recent-jobs.ts`)
   — opening a role records a compact snapshot (persisted, deduped, most-recent
   first); Home shows a horizontal "Recently viewed" strip (hidden while
