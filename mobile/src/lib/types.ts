@@ -53,3 +53,15 @@ export const STATUS_LABEL: Record<AppStatus, string> = {
 
 // The stages a user can set from the Applications tracker, in order.
 export const STATUS_FLOW: AppStatus[] = ['applied', 'screening', 'interview', 'offer', 'rejected', 'withdrawn'];
+
+export type NotificationType = 'job_alert' | 'application' | 'system';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  jobId: string | null;
+  read: boolean;
+  createdAt: string | null;
+}

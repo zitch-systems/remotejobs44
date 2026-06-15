@@ -10,8 +10,9 @@ import {
   salaryLabel,
   tagsFrom,
   timeAgo,
+  unreadCount,
 } from './format';
-import type { Job } from './types';
+import type { AppNotification, Job } from './types';
 
 describe('money', () => {
   it('formats thousands and millions', () => {
@@ -84,6 +85,15 @@ describe('dbToStatus', () => {
   it('falls back to applied for unknown values', () => {
     expect(dbToStatus('weird')).toBe('applied');
     expect(dbToStatus('')).toBe('applied');
+  });
+});
+
+describe('unreadCount', () => {
+  const note = (read: boolean): AppNotification => ({ id: Math.random().toString(), type: 'job_alert', title: 't', body: null, jobId: null, read, createdAt: null });
+  it('counts only unread notifications', () => {
+    expect(unreadCount([])).toBe(0);
+    expect(unreadCount([note(false), note(true), note(false)])).toBe(2);
+    expect(unreadCount([note(true), note(true)])).toBe(0);
   });
 });
 
