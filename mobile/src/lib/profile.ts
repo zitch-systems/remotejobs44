@@ -7,6 +7,7 @@ import { File } from 'expo-file-system';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { useAppStore } from '@/store/app';
 import { SEED_USER } from './seed';
+import { EMPTY_DETAILS, type ExperienceItem, type ProfileDetails, type ProfileLinks } from './profile-details';
 
 /**
  * Upload a picked CV file to the `cvs` storage bucket (under the user's folder)
@@ -102,6 +103,26 @@ export async function savePreferences(userId: string, prefs: UserPreferences): P
     .from('profiles')
     .update({ skills: prefs.skills, target_role: prefs.targetRole, headline: prefs.headline })
     .eq('id', userId);
+  if (error) throw error;
+}
+
+/** Best-effort structured profile (bio / links / experience). Migration_v43. */
+export async function fetchDetails(userId: string): Promise<ProfileDetails> {
+  try {
+    const { data, error } = await supabase.from('profiles').select('bio,links,experience').eq('id', userId).maybeSingle();
+    if (error) throw error;
+    return {
+      bio: (data?.bio as string | null) ?? '',
+      links: (data?.links as ProfileLinks | null) ?? {},
+      experience: (data?.experience as ExperienceItem[] | null) ?? [],
+    };
+  } catch {
+    return EMPTY_DETAILS;
+  }
+}
+
+export async function saveDetails(userId: string, d: ProfileDetails): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ bio: d.bio, links: d.links, experience: d.experience }).eq('id', userId);
   if (error) throw error;
 }
 
