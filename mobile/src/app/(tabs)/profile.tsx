@@ -2,17 +2,24 @@
 // Real profile data (name / avatar initial / server-computed strength) with a
 // seed fallback in demo; every row now navigates.
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Bell, Bookmark, ChevronRight, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun } from 'lucide-react-native';
-import { Avatar, Card, Divider, Screen, Txt } from '@/components/ui';
+import { Bell, Bookmark, ChevronRight, CreditCard, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
+import { Avatar, Card, Divider, Pill, Screen, Txt } from '@/components/ui';
 import { ProfileChecklist } from '@/components/ProfileChecklist';
-import { useProfile } from '@/lib/profile';
+import { useProfile, type Plan } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
 import { useThemeMode } from '@/store/theme';
 import { useAuth } from '@/lib/auth';
 import { fonts, radii, spacing, useTheme } from '@/theme';
+
+const PLAN_BADGE: Record<Plan, { label: string; paid: boolean }> = {
+  free: { label: 'Free plan', paid: false },
+  daily: { label: 'Day Pass', paid: true },
+  pro: { label: 'Pro', paid: true },
+  admin: { label: 'Admin', paid: true },
+};
 
 function StrengthBar({ pct }: { pct: number }) {
   const { colors } = useTheme();
@@ -53,6 +60,8 @@ function Row({
     <>
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={value ? `${label}, ${value}` : label}
         style={({ pressed }) => [
           { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 14, paddingHorizontal: spacing[4] },
           pressed && { backgroundColor: colors.bgSection },
@@ -84,6 +93,12 @@ export default function Profile() {
   const cycleTheme = useThemeMode((s) => s.cycle);
 
   const initial = (profile.name || profile.email || 'U').trim().charAt(0).toUpperCase();
+  const badge = PLAN_BADGE[profile.plan] ?? PLAN_BADGE.free;
+  const inviteFriends = () => {
+    Share.share({
+      message: 'Find verified remote jobs that pay in ₦ or $ on RemoteJobs44 — https://remotejobs44.com',
+    }).catch(() => {});
+  };
   const appearanceIcon =
     mode === 'system' ? <Monitor size={18} color={colors.fg3} /> : mode === 'light' ? <Sun size={18} color={colors.fg3} /> : <Moon size={18} color={colors.fg3} />;
   const appearanceLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
@@ -93,11 +108,25 @@ export default function Profile() {
       {/* identity */}
       <View style={{ alignItems: 'center', gap: spacing[3] }}>
         <Avatar initial={initial} size={56} />
-        <View style={{ alignItems: 'center', gap: 2 }}>
+        <View style={{ alignItems: 'center', gap: 6 }}>
           <Txt variant="h2">{profile.name || 'Your profile'}</Txt>
           <Txt variant="meta" color={colors.fg3}>
             {profile.email ?? ''}
           </Txt>
+          <Pressable
+            onPress={() => router.push('/profile/plans')}
+            accessibilityRole="button"
+            accessibilityLabel={`${badge.label}. View plans`}
+            style={({ pressed }) => [{ marginTop: 2 }, pressed && { opacity: 0.7 }]}
+          >
+            <Pill
+              label={badge.paid ? badge.label.toUpperCase() : badge.label}
+              icon={badge.paid ? <Sparkles size={11} color={colors.successText} /> : undefined}
+              bg={badge.paid ? colors.successBg : colors.bgSection}
+              fg={badge.paid ? colors.successText : colors.fg3}
+              border={badge.paid ? colors.successBorder : colors.border2}
+            />
+          </Pressable>
         </View>
       </View>
 
@@ -125,7 +154,13 @@ export default function Profile() {
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
         <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
+        <Row icon={<CreditCard size={18} color={colors.fg3} />} label="Plans" value={badge.label} onPress={() => router.push('/profile/plans')} />
         <Row icon={appearanceIcon} label="Appearance" value={appearanceLabel} onPress={cycleTheme} last />
+      </Card>
+
+      {/* invite — growth */}
+      <Card style={{ paddingVertical: 2 }}>
+        <Row icon={<UserPlus size={18} color={colors.brand} />} label="Invite friends" onPress={inviteFriends} last />
       </Card>
 
       {/* sign out */}

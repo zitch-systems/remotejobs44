@@ -50,6 +50,9 @@ function TabBar({ state, navigation }: TabBarProps) {
             <Pressable
               key={route.key}
               onPress={() => navigation.navigate(route.name)}
+              accessibilityRole="tab"
+              accessibilityLabel={LABELS[route.name]}
+              accessibilityState={{ selected: focused }}
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 48 }}
             >
               <Icon size={22} color={tint} />

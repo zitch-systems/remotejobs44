@@ -29,12 +29,15 @@ export async function uploadCv(userId: string, asset: { uri: string; name: strin
   return url;
 }
 
+export type Plan = 'free' | 'daily' | 'pro' | 'admin';
+
 export interface UserProfile {
   name: string;
   email: string | null;
   avatarUrl: string | null;
   completion: number; // profile_completion 0–100 (server-computed)
   cvUrl: string | null;
+  plan: Plan;
 }
 
 export interface UserPreferences {
@@ -49,12 +52,13 @@ const SEED_PROFILE: UserProfile = {
   avatarUrl: null,
   completion: SEED_USER.profileStrength,
   cvUrl: SEED_USER.cvName,
+  plan: 'free',
 };
 
 export async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('name,email,avatar_url,profile_completion,cv_url')
+    .select('name,email,avatar_url,profile_completion,cv_url,plan')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
@@ -65,6 +69,7 @@ export async function fetchProfile(userId: string): Promise<UserProfile | null> 
     avatarUrl: data.avatar_url ?? null,
     completion: data.profile_completion ?? 20,
     cvUrl: data.cv_url ?? null,
+    plan: (data.plan as Plan) ?? 'free',
   };
 }
 
