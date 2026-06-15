@@ -37,3 +37,10 @@ export async function prepInterview(role: string, level: string): Promise<Interv
   return data.prep as InterviewPrep;
 }
 
+export async function writeCoverLetter(role: string, cv: string, company?: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('ai-cover-letter', { body: { role, cv, company } });
+  if (error) throw new Error(error.message ?? 'Cover letter failed.');
+  if (data?.error) throw new Error(data.error);
+  return String(data.letter ?? '');
+}
+

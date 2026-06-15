@@ -93,6 +93,10 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **AI cover letter** (`app/profile/cover-letter.tsx`) — role + (optional)
+  company + your CV → a tailored, ready-to-send cover letter you can share. Runs
+  on the **`ai-cover-letter` edge function** (deployed; needs `AI_API_KEY`).
+  Pro-gated like the other AI tools.
 - **Plan enforcement / paywall** (`lib/entitlements.ts`) — AI CV review +
   interview prep are now **Pro features** (a `PaywallCard` with an Upgrade CTA
   replaces the tool for Free users), and Free accounts have a **daily
