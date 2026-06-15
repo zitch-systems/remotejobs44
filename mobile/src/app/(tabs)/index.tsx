@@ -7,7 +7,7 @@ import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Style
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
+import { ChevronRight, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
@@ -243,6 +243,30 @@ export default function Feed() {
       ) : null}
 
       <Promo />
+
+      {query.trim() === '' ? (
+        <Pressable
+          onPress={() => router.push('/for-you')}
+          accessibilityRole="button"
+          accessibilityLabel="Recommended for you"
+          style={({ pressed }) => [pressed && { transform: [{ scale: 0.99 }] }]}
+        >
+          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[4] }}>
+            <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Sparkles size={18} color={colors.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Txt variant="cardTitle" color={colors.fg1}>
+                Recommended for you
+              </Txt>
+              <Txt variant="meta" color={colors.fg3}>
+                Roles ranked from your skills
+              </Txt>
+            </View>
+            <ChevronRight size={18} color={colors.fg4} />
+          </Card>
+        </Pressable>
+      ) : null}
 
       {query.trim() === '' ? <RecentlyViewed /> : null}
 

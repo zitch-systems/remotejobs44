@@ -193,6 +193,51 @@ export function useJobs(pageSize = 20): JobsFeed {
   };
 }
 
+/** Server-side relevance: jobs ranked for the signed-in user (migration_v44). */
+export async function fetchRecommendedJobs(limit = 30): Promise<Job[]> {
+  const { data, error } = await supabase.rpc('recommended_jobs', { limit_n: limit });
+  if (error) throw error;
+  return ((data as JobRow[]) ?? []).map(rowToJob);
+}
+
+const seedRecommended = (): Job[] => [...SEED_JOBS].sort((a, b) => b.match - a.match);
+
+/** Personalised "For you" list (server-ranked live; seed fallback in demo). */
+export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean; error: string | null; refresh: () => void } {
+  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : seedRecommended());
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setJobs(seedRecommended());
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    fetchRecommendedJobs(limit)
+      .then((list) => {
+        if (!active) return;
+        setJobs(list.length ? list : seedRecommended());
+        setError(null);
+        setLoading(false);
+      })
+      .catch((e: any) => {
+        if (!active) return;
+        setJobs(seedRecommended());
+        setError(e?.message ?? 'Failed to load recommendations');
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [nonce, limit]);
+
+  return { jobs, loading, error, refresh: () => setNonce((n) => n + 1) };
+}
+
 /** Single job by id with seed fallback. */
 export function useJob(id?: string): { job: Job | null; loading: boolean } {
   const [state, setState] = useState<{ job: Job | null; loading: boolean }>({
