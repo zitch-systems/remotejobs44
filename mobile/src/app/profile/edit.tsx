@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native';
-import { Button, Card, Field, IconButton, Txt } from '@/components/ui';
-import { useProfile, saveName, fetchDetails, saveDetails } from '@/lib/profile';
+import * as DocumentPicker from 'expo-document-picker';
+import { ArrowLeft, Camera, Plus, Trash2 } from 'lucide-react-native';
+import { Avatar, Button, Card, Field, IconButton, Txt } from '@/components/ui';
+import { useProfile, saveName, fetchDetails, saveDetails, uploadAvatar } from '@/lib/profile';
 import { cleanExperience, cleanLinks, normalizeUrl, type ExperienceItem } from '@/lib/profile-details';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -25,6 +26,12 @@ export default function EditProfile() {
   const [website, setWebsite] = useState('');
   const [exp, setExp] = useState<ExperienceItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile.avatarUrl);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  useEffect(() => {
+    setAvatarUrl(profile.avatarUrl);
+  }, [profile.avatarUrl]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return;
@@ -45,6 +52,25 @@ export default function EditProfile() {
   const updateExp = (i: number, patch: Partial<ExperienceItem>) => setExp((arr) => arr.map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
   const addExp = () => setExp((arr) => [...arr, { title: '', company: '', period: '' }]);
   const removeExp = (i: number) => setExp((arr) => arr.filter((_, idx) => idx !== i));
+
+  async function changePhoto() {
+    if (!isSupabaseConfigured || !userId) {
+      Alert.alert('Demo mode', 'Connect Supabase to upload a photo.');
+      return;
+    }
+    const res = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true });
+    if (res.canceled) return;
+    try {
+      setPhotoBusy(true);
+      const url = await uploadAvatar(userId, res.assets[0]);
+      setAvatarUrl(url);
+      reload();
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message ?? 'Please try again.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   async function save() {
     if (!isSupabaseConfigured || !userId) {
@@ -81,6 +107,18 @@ export default function EditProfile() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[5], gap: spacing[5], paddingBottom: spacing[12] }}
       >
+        <View style={{ alignItems: 'center', gap: spacing[3] }}>
+          <Avatar initial={(name || profile.email || 'U').trim().charAt(0).toUpperCase()} size={84} uri={avatarUrl} />
+          <Button
+            label={avatarUrl ? 'Change photo' : 'Add photo'}
+            variant="ghost"
+            full={false}
+            loading={photoBusy}
+            icon={<Camera size={16} color={colors.fg2} />}
+            onPress={changePhoto}
+          />
+        </View>
+
         <Field label="Full name" placeholder="Your name" value={name} onChangeText={setName} autoCapitalize="words" />
 
         <View style={{ gap: 7 }}>

@@ -30,6 +30,27 @@ export async function uploadCv(userId: string, asset: { uri: string; name: strin
   return url;
 }
 
+/**
+ * Upload a picked image to the `avatars` bucket (under the user's folder) and
+ * save its URL as the profile photo. Requires migration_v45 (the bucket).
+ */
+export async function uploadAvatar(userId: string, asset: { uri: string; name?: string | null; mimeType?: string | null }): Promise<string> {
+  const ext = ((asset.name ?? '').split('.').pop() || 'jpg').toLowerCase();
+  const path = `${userId}/avatar-${Date.now()}.${ext}`;
+  const buffer = await new File(asset.uri).arrayBuffer();
+
+  const { error } = await supabase.storage.from('avatars').upload(path, buffer, {
+    contentType: asset.mimeType ?? 'image/jpeg',
+    upsert: true,
+  });
+  if (error) throw error;
+
+  const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  const { error: upErr } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId);
+  if (upErr) throw upErr;
+  return url;
+}
+
 export type Plan = 'free' | 'daily' | 'pro' | 'admin';
 
 export interface UserProfile {

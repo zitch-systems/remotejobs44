@@ -94,7 +94,7 @@ export default function Profile() {
     <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[4] }}>
       {/* identity */}
       <View style={{ alignItems: 'center', gap: spacing[3] }}>
-        <Avatar initial={initial} size={56} />
+        <Avatar initial={initial} size={56} uri={profile.avatarUrl} />
         <View style={{ alignItems: 'center', gap: 6 }}>
           <Txt variant="h2">{profile.name || 'Your profile'}</Txt>
           <Txt variant="meta" color={colors.fg3}>

@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { Image } from 'expo-image';
 import { fonts, fontSizes, radii, shadows, spacing, tracking, useTheme } from '@/theme';
 
 /* ------------------------------------------------------------------ Txt -- */
@@ -411,11 +412,15 @@ export function LogoTile({ initial, grad, size = 40, radius = radii.logo }: { in
 }
 
 /* --------------------------------------------------------------- Avatar -- */
-export function Avatar({ initial, size = 38, online }: { initial: string; size?: number; online?: boolean }) {
+export function Avatar({ initial, size = 38, online, uri }: { initial: string; size?: number; online?: boolean; uri?: string | null }) {
   const { colors } = useTheme();
   return (
     <View style={{ width: size, height: size }}>
-      <LogoTile initial={initial} grad={['#fb923c', '#f97316']} size={size} radius={radii.logo} />
+      {uri ? (
+        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: radii.logo, backgroundColor: colors.bgSection }} contentFit="cover" transition={120} accessibilityIgnoresInvertColors />
+      ) : (
+        <LogoTile initial={initial} grad={['#fb923c', '#f97316']} size={size} radius={radii.logo} />
+      )}
       {online ? (
         <View
           style={{

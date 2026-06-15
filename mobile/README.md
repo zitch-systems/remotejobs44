@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Profile photo** (`lib/profile.ts` `uploadAvatar` + Edit profile) — pick an
+  image → uploads to the public **`avatars`** bucket (`migration_v45`, RLS:
+  write only your own folder) → sets `avatar_url`. The `Avatar` primitive now
+  renders the photo (via `expo-image`) on Profile + the Home greeting, falling
+  back to the gradient initial.
 - **Server-side relevance + "For you" feed** (`app/for-you.tsx`) — a
   **`recommended_jobs`** SQL function (`migration_v44`) ranks active roles for
   the signed-in user by skill overlap + target role + featured + recency (DB-side
