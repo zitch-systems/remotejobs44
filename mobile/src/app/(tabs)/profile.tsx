@@ -4,9 +4,8 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Bell, Bookmark, ChevronRight, CreditCard, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
-import { Avatar, Card, Divider, Pill, Screen, Txt } from '@/components/ui';
+import { Bell, Bookmark, ChevronRight, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
+import { Avatar, Button, Card, Divider, Pill, Screen, Txt } from '@/components/ui';
 import { ProfileChecklist } from '@/components/ProfileChecklist';
 import { useProfile, type Plan } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
@@ -23,19 +22,12 @@ const PLAN_BADGE: Record<Plan, { label: string; paid: boolean }> = {
 
 function StrengthBar({ pct }: { pct: number }) {
   const { colors } = useTheme();
+  const w = Math.max(0, Math.min(100, pct));
+  // A plain clipped View — reliable on Android (a percentage-sized SVG <Rect
+  // rx> renders as an ellipse there). The rounded track does the corner shaping.
   return (
     <View style={{ height: 8, borderRadius: 999, backgroundColor: colors.bgSection, overflow: 'hidden' }}>
-      <View style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%' }}>
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="strength" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor="#34d399" />
-              <Stop offset="1" stopColor="#1ea05e" />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" rx={999} fill="url(#strength)" />
-        </Svg>
-      </View>
+      <View style={{ width: `${w}%`, height: '100%', borderRadius: 999, backgroundColor: colors.success }} />
     </View>
   );
 }
@@ -138,6 +130,37 @@ export default function Profile() {
         <StrengthBar pct={profile.completion} />
       </Card>
 
+      {/* subscription — current plan + resubscribe / manage */}
+      <Card style={{ padding: spacing[4], gap: spacing[3] }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 11,
+              backgroundColor: badge.paid ? colors.successBg : colors.infoBg,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Sparkles size={18} color={badge.paid ? colors.success : colors.brand} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Txt variant="cardTitle" color={colors.fg1}>
+              Subscription
+            </Txt>
+            <Txt variant="meta" color={colors.fg3}>
+              {badge.paid ? `You're on ${badge.label}.` : "You're on the Free plan."}
+            </Txt>
+          </View>
+        </View>
+        <Button
+          label={badge.paid ? 'Manage subscription' : 'Upgrade to Pro'}
+          variant={badge.paid ? 'ghost' : 'primary'}
+          onPress={() => router.push('/profile/plans')}
+        />
+      </Card>
+
       <ProfileChecklist />
 
       {/* primary list */}
@@ -149,7 +172,6 @@ export default function Profile() {
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
         <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
-        <Row icon={<CreditCard size={18} color={colors.fg3} />} label="Plans" value={badge.label} onPress={() => router.push('/profile/plans')} />
         <Row icon={appearanceIcon} label="Appearance" value={appearanceLabel} onPress={cycleTheme} last />
       </Card>
 

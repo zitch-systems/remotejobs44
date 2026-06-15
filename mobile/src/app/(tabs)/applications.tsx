@@ -97,7 +97,7 @@ export default function Applications() {
           <Txt center color={colors.fg3} style={{ maxWidth: 260 }}>
             Apply to a role from the feed and track its progress here.
           </Txt>
-          <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)')} style={{ marginTop: spacing[2] }} />
+          <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)/jobs')} style={{ marginTop: spacing[2] }} />
         </View>
       ) : (
         <View style={{ gap: spacing[3] }}>

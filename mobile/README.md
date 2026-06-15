@@ -17,7 +17,7 @@ design handoff bundle).
 | Profile | ✅ real name/avatar/strength + Edit profile + Job preferences (skills) + CV |
 | Foldable / tablet master–detail | ✅ responsive list + live detail pane (≥ 840px) |
 
-Bottom nav is now **Home · Saved · Applied · Profile** + the center quick-match FAB.
+Bottom nav is now **Home · Jobs · Saved · Applied · Profile** (five tabs).
 
 **Data:** live from Supabase when `EXPO_PUBLIC_SUPABASE_*` is configured —
 `jobs` (public read), with `saved_jobs` and `applications` persisted per-user
@@ -93,6 +93,17 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Jobs tab** (`app/(tabs)/jobs.tsx`) — a dedicated browse-everything list
+  (search + filter + pagination) beside Home, which stays the personalised
+  "Top matches" dashboard. The bottom bar is now five even tabs (the center ⚡
+  FAB was removed).
+- **Subscription on Profile** — a prominent Subscription card showing the
+  current plan with an Upgrade/Manage CTA into the Plans screen, so a lapsed
+  user can resubscribe in one tap.
+- **Alignment fixes** — the profile-strength bar rendered as an ellipse and the
+  "Weekly match" banner showed a white gap on Android (a percentage-sized SVG
+  doesn't fill reliably there); both now use a clipped View / a solid brand
+  background with a pixel-measured gradient.
 - **Referrals / invite loop** (`app/profile/invite.tsx` + `lib/referrals.ts`) —
   a shareable referral code (`profiles.referral_code`) with invite-count
   progress toward a Pro reward, read from the **`referrals`** table

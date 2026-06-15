@@ -3,7 +3,7 @@
 // greeting/stats, and skill-personalised match ranking. Switches to the tablet
 // master–detail layout at ≥ 840px.
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -39,20 +39,32 @@ function StatCard({ value, label, accent }: { value: string; label: string; acce
 }
 
 function Promo() {
+  // Solid brand background as a base (so it never flashes / overflows white),
+  // with the gradient drawn over it in MEASURED pixels — a percentage-sized SVG
+  // doesn't fill reliably on Android, which left a white gap on the right.
+  const [size, setSize] = useState({ w: 0, h: 0 });
   return (
-    <View style={[{ borderRadius: radii.promo, overflow: 'hidden', padding: spacing[5] }, shadows.primary]}>
-      <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
-        <Defs>
-          <LinearGradient id="promo" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={palette.brand700} />
-            <Stop offset="1" stopColor="#1e3a8a" />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#promo)" />
-      </Svg>
+    <View
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((s) => (s.w === width && s.h === height ? s : { w: width, h: height }));
+      }}
+      style={[{ borderRadius: radii.promo, overflow: 'hidden', padding: spacing[5], backgroundColor: palette.brand700 }, shadows.primary]}
+    >
+      {size.w > 0 ? (
+        <Svg width={size.w} height={size.h} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id="promo" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={palette.brand700} />
+              <Stop offset="1" stopColor="#1e3a8a" />
+            </LinearGradient>
+          </Defs>
+          <Rect width={size.w} height={size.h} fill="url(#promo)" />
+        </Svg>
+      ) : null}
       <Txt style={{ fontFamily: fonts.displayBold, fontSize: 10.5, letterSpacing: 1, color: 'rgba(255,255,255,0.7)' }}>YOUR WEEKLY MATCH</Txt>
       <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 18, color: '#fff', marginTop: 6, marginBottom: 4 }}>New roles that fit your profile</Txt>
-      <Txt style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12.5 }}>Hand-picked from verified employers hiring across Africa this week.</Txt>
+      <Txt style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12.5, lineHeight: 18 }}>Hand-picked from verified employers hiring across Africa this week.</Txt>
     </View>
   );
 }
