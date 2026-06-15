@@ -2,9 +2,9 @@
 // but a plain searchable / filterable list (no dashboard chrome), defaulting to
 // the most recent roles. Reuses useJobs + JobCard + FilterSheet.
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, SlidersHorizontal } from 'lucide-react-native';
+import { BookmarkPlus, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
@@ -12,7 +12,9 @@ import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { useJobs } from '@/lib/jobs';
 import { activeFilterCount, jobMatchesFilters, type ExperienceLevel } from '@/lib/filters';
+import { isEmptySearch, sameCriteria, searchLabel, type SearchCriteria } from '@/lib/saved-search';
 import { useSearchHistory } from '@/store/search';
+import { useSavedSearches } from '@/store/saved-searches';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
@@ -30,6 +32,9 @@ export default function Jobs() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const addSearch = useSearchHistory((s) => s.add);
+  const savedSearches = useSavedSearches((s) => s.items);
+  const addSavedSearch = useSavedSearches((s) => s.add);
+  const removeSavedSearch = useSavedSearches((s) => s.remove);
 
   const jobs = useMemo(() => {
     let list: Job[] = feed.jobs.filter((j) => jobMatchesFilters(j, { category: filter, type, level, query }));
@@ -47,6 +52,16 @@ export default function Jobs() {
     setFilter('All');
     setQuery('');
     resetSheet();
+  };
+
+  const criteria: SearchCriteria = { query, category: filter, type, level, sort };
+  const canSave = !isEmptySearch(criteria) && !savedSearches.some((s) => sameCriteria(s, criteria));
+  const applySaved = (s: SearchCriteria) => {
+    setQuery(s.query);
+    setFilter(s.category as (typeof FILTERS)[number]);
+    setType(s.type as JobType);
+    setLevel(s.level as ExperienceLevel);
+    setSort(s.sort as SortBy);
   };
 
   const header = (
@@ -128,6 +143,67 @@ export default function Jobs() {
           <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
         ))}
       </View>
+
+      {/* saved searches */}
+      {savedSearches.length > 0 || canSave ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ gap: spacing[2], paddingRight: spacing[2] }}
+        >
+          {canSave ? (
+            <Pressable
+              onPress={() => addSavedSearch(criteria)}
+              accessibilityRole="button"
+              accessibilityLabel="Save this search"
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  height: 32,
+                  paddingHorizontal: spacing[3],
+                  borderRadius: radii.field,
+                  backgroundColor: colors.infoBg,
+                  borderWidth: 1.5,
+                  borderColor: colors.infoBorder,
+                },
+                pressed && { transform: [{ scale: 0.97 }] },
+              ]}
+            >
+              <BookmarkPlus size={14} color={colors.brand} />
+              <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 12.5, color: colors.brand }}>Save search</Txt>
+            </Pressable>
+          ) : null}
+          {savedSearches.map((s) => (
+            <View
+              key={s.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                height: 32,
+                paddingLeft: spacing[3],
+                paddingRight: 6,
+                borderRadius: radii.field,
+                backgroundColor: colors.bgCard,
+                borderWidth: 1.5,
+                borderColor: colors.border2,
+              }}
+            >
+              <Pressable onPress={() => applySaved(s)} accessibilityRole="button" accessibilityLabel={`Apply saved search: ${searchLabel(s)}`} hitSlop={6}>
+                <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 12.5, color: colors.fg2 }} numberOfLines={1}>
+                  {searchLabel(s)}
+                </Txt>
+              </Pressable>
+              <Pressable onPress={() => removeSavedSearch(s.id)} accessibilityRole="button" accessibilityLabel={`Remove saved search: ${searchLabel(s)}`} hitSlop={6} style={{ padding: 2 }}>
+                <X size={12} color={colors.fg4} />
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 
