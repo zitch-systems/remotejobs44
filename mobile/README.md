@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Structured profile** (`app/profile/edit.tsx` + `lib/profile-details.ts`) —
+  Edit profile now captures a **bio**, **professional links** (GitHub / LinkedIn
+  / website, auto-`https://`'d) and a **work-experience list** (add / remove
+  rows), stored as `bio` / `links` / `experience` columns (`migration_v43`,
+  applied live). Pure normalize/clean helpers are unit-tested.
 - **AI cover letter** (`app/profile/cover-letter.tsx`) — role + (optional)
   company + your CV → a tailored, ready-to-send cover letter you can share. Runs
   on the **`ai-cover-letter` edge function** (deployed; needs `AI_API_KEY`).
