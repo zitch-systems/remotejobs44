@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Next.js 14 supports Node 18+; 20 is LTS as of this commit
           # and matches Vercel's default for production deploys.
@@ -95,7 +95,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
