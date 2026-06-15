@@ -93,6 +93,12 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Onboarding** — a 3-slide first-run intro (`app/onboarding.tsx`), shown once
+  (persisted `onboarded` flag in `store/prefs.ts`); the entry redirect waits for
+  prefs to hydrate before routing.
+- **Notification preferences** (`app/profile/notifications.tsx`) — toggles for
+  "New job matches" / "Application updates", persisted; the push registration
+  honours the matches toggle.
 - **Appearance toggle** — System / Light / Dark, persisted (`store/theme.ts`);
   `useTheme()` follows it. Cycle it from Profile → Appearance.
 - **Pull-to-refresh** on Saved + Applications (re-fetches without the full loader).
