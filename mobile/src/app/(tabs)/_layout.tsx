@@ -4,17 +4,18 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, Tabs, useRouter } from 'expo-router';
-import { ClipboardList, House, User, Zap } from 'lucide-react-native';
+import { Bookmark, ClipboardList, House, User, Zap } from 'lucide-react-native';
 import { useAuth } from '@/lib/auth';
 import { usePushNotifications } from '@/lib/push';
 import { fonts, shadows, useTheme } from '@/theme';
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   index: House,
+  saved: Bookmark,
   applications: ClipboardList,
   profile: User,
 };
-const LABELS: Record<string, string> = { index: 'Home', applications: 'Applied', profile: 'Profile' };
+const LABELS: Record<string, string> = { index: 'Home', saved: 'Saved', applications: 'Applied', profile: 'Profile' };
 
 // Minimal shape of the props expo-router/react-navigation passes to tabBar.
 type TabBarProps = {
@@ -93,6 +94,7 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...(props as unknown as TabBarProps)} />}>
       <Tabs.Screen name="index" />
+      <Tabs.Screen name="saved" />
       <Tabs.Screen name="applications" />
       <Tabs.Screen name="profile" />
     </Tabs>

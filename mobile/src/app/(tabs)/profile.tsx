@@ -1,10 +1,13 @@
 // src/app/(tabs)/profile.tsx — profile, CV, saved, preferences, sign out (§5).
+// Real profile data (name / avatar initial / server-computed strength) with a
+// seed fallback in demo; every row now navigates.
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Linking, Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { ChevronRight, FileText, LogOut, Pencil, SlidersHorizontal, Bookmark } from 'lucide-react-native';
+import { Bookmark, ChevronRight, FileText, LogOut, Pencil, SlidersHorizontal } from 'lucide-react-native';
 import { Avatar, Card, Divider, Screen, Txt } from '@/components/ui';
-import { SEED_USER } from '@/lib/seed';
+import { useProfile } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
 import { useAuth } from '@/lib/auth';
 import { fonts, radii, spacing, useTheme } from '@/theme';
@@ -13,7 +16,7 @@ function StrengthBar({ pct }: { pct: number }) {
   const { colors } = useTheme();
   return (
     <View style={{ height: 8, borderRadius: 999, backgroundColor: colors.bgSection, overflow: 'hidden' }}>
-      <View style={{ width: `${pct}%`, height: '100%' }}>
+      <View style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%' }}>
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id="strength" x1="0" y1="0" x2="1" y2="0">
@@ -71,18 +74,27 @@ function Row({
 
 export default function Profile() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { signOut } = useAuth();
+  const { profile } = useProfile();
   const savedCount = useAppStore((s) => s.saved.length);
+
+  const initial = (profile.name || profile.email || 'U').trim().charAt(0).toUpperCase();
+
+  function openCv() {
+    if (profile.cvUrl) Linking.openURL(profile.cvUrl).catch(() => {});
+    else Alert.alert('No CV yet', 'Upload your CV from the RemoteJobs44 web app to attach it to applications.');
+  }
 
   return (
     <Screen scroll contentStyle={{ gap: spacing[4], paddingTop: spacing[4] }}>
       {/* identity */}
       <View style={{ alignItems: 'center', gap: spacing[3] }}>
-        <Avatar initial="A" size={56} />
+        <Avatar initial={initial} size={56} />
         <View style={{ alignItems: 'center', gap: 2 }}>
-          <Txt variant="h2">{SEED_USER.name}</Txt>
+          <Txt variant="h2">{profile.name || 'Your profile'}</Txt>
           <Txt variant="meta" color={colors.fg3}>
-            {SEED_USER.title}
+            {profile.email ?? ''}
           </Txt>
         </View>
       </View>
@@ -94,18 +106,18 @@ export default function Profile() {
             Profile strength
           </Txt>
           <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 15, color: colors.success }}>
-            {SEED_USER.profileStrength}%
+            {profile.completion}%
           </Txt>
         </View>
-        <StrengthBar pct={SEED_USER.profileStrength} />
+        <StrengthBar pct={profile.completion} />
       </Card>
 
       {/* primary list */}
       <Card style={{ paddingVertical: 2 }}>
-        <Row icon={<Pencil size={18} color={colors.fg3} />} label="Edit profile" />
-        <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={SEED_USER.cvName} />
-        <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} />
-        <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" last />
+        <Row icon={<Pencil size={18} color={colors.fg3} />} label="Edit profile" onPress={() => router.push('/profile/edit')} />
+        <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'View' : 'None'} onPress={openCv} />
+        <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
+        <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} last />
       </Card>
 
       {/* sign out */}
