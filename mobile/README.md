@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Server-side relevance + "For you" feed** (`app/for-you.tsx`) — a
+  **`recommended_jobs`** SQL function (`migration_v44`) ranks active roles for
+  the signed-in user by skill overlap + target role + featured + recency (DB-side
+  instead of the client). Home gets a "Recommended for you" entry → a dedicated
+  feed; seed fallback in demo. A step toward a learned relevance model.
 - **Structured profile** (`app/profile/edit.tsx` + `lib/profile-details.ts`) —
   Edit profile now captures a **bio**, **professional links** (GitHub / LinkedIn
   / website, auto-`https://`'d) and a **work-experience list** (add / remove
