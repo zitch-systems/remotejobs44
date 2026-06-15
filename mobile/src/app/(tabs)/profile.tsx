@@ -5,10 +5,11 @@ import React from 'react';
 import { Alert, Linking, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Bookmark, ChevronRight, FileText, LogOut, Pencil, SlidersHorizontal } from 'lucide-react-native';
+import { Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, SlidersHorizontal, Sun } from 'lucide-react-native';
 import { Avatar, Card, Divider, Screen, Txt } from '@/components/ui';
 import { useProfile } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
+import { useThemeMode } from '@/store/theme';
 import { useAuth } from '@/lib/auth';
 import { fonts, radii, spacing, useTheme } from '@/theme';
 
@@ -78,8 +79,13 @@ export default function Profile() {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const savedCount = useAppStore((s) => s.saved.length);
+  const mode = useThemeMode((s) => s.mode);
+  const cycleTheme = useThemeMode((s) => s.cycle);
 
   const initial = (profile.name || profile.email || 'U').trim().charAt(0).toUpperCase();
+  const appearanceIcon =
+    mode === 'system' ? <Monitor size={18} color={colors.fg3} /> : mode === 'light' ? <Sun size={18} color={colors.fg3} /> : <Moon size={18} color={colors.fg3} />;
+  const appearanceLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
 
   function openCv() {
     if (profile.cvUrl) Linking.openURL(profile.cvUrl).catch(() => {});
@@ -117,7 +123,8 @@ export default function Profile() {
         <Row icon={<Pencil size={18} color={colors.fg3} />} label="Edit profile" onPress={() => router.push('/profile/edit')} />
         <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'View' : 'None'} onPress={openCv} />
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
-        <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} last />
+        <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
+        <Row icon={appearanceIcon} label="Appearance" value={appearanceLabel} onPress={cycleTheme} last />
       </Card>
 
       {/* sign out */}

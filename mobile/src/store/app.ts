@@ -8,6 +8,7 @@ import { SEED_APPLIED, SEED_SAVED } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { applyRemote, setSavedRemote } from '@/lib/user-state';
 import { captureError } from '@/lib/sentry';
+import { notifySuccess, tapLight } from '@/lib/haptics';
 
 interface AppState {
   userId: string | null;
@@ -39,6 +40,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleSaved: (id) => {
     const willSave = !get().saved.includes(id);
+    tapLight();
     // Optimistic local update.
     set((s) => ({ saved: willSave ? [...s.saved, id] : s.saved.filter((x) => x !== id) }));
     const { userId } = get();
@@ -53,6 +55,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   applyTo: (job) => {
     if (job.id in get().applied) return;
+    notifySuccess();
     set((s) => ({ applied: { ...s.applied, [job.id]: 'applied' } }));
     const { userId } = get();
     if (isSupabaseConfigured && userId) {

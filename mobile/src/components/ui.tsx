@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Pressable,
   type PressableProps,
+  RefreshControl,
   ScrollView,
   type StyleProp,
   StyleSheet,
@@ -97,6 +98,8 @@ export function Screen({
   padded = true,
   edges = ['top'],
   contentStyle,
+  refreshing,
+  onRefresh,
   ...rest
 }: {
   children: React.ReactNode;
@@ -104,6 +107,8 @@ export function Screen({
   padded?: boolean;
   edges?: Edge[];
   contentStyle?: StyleProp<ViewStyle>;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 } & ViewProps) {
   const { colors } = useTheme();
   const pad = padded ? { paddingHorizontal: spacing.screenX } : null;
@@ -113,6 +118,9 @@ export function Screen({
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[pad, { paddingBottom: spacing[10] }, contentStyle]}
+          refreshControl={
+            onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} /> : undefined
+          }
         >
           {children}
         </ScrollView>
