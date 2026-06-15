@@ -15,7 +15,7 @@ import type { Job } from './types';
 export { personalizeJobs } from './format';
 
 const SAFE_COLUMNS =
-  'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
+  'id,title,company,logo,category,type,level,location,apply_url,apply_email,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
 
 interface JobRow {
   id: string;
@@ -26,8 +26,10 @@ interface JobRow {
   type: string | null;
   level: string | null;
   location: string | null;
+  apply_url: string | null;
+  apply_email: string | null;
   description: string | null;
-  requirements: string | null;
+  requirements: string[] | string | null;
   skills: string[] | null;
   salary_min: number | null;
   salary_max: number | null;
@@ -59,6 +61,8 @@ export function rowToJob(r: JobRow): Job {
     location: r.remote ? `Remote · ${r.location ?? 'Worldwide'}` : (r.location ?? 'Worldwide'),
     type: r.type ?? 'Full-time',
     level: r.level ?? 'Mid–Senior',
+    applyUrl: r.apply_url ?? undefined,
+    applyEmail: r.apply_email ?? undefined,
     tags: tagsFrom(skills, r.category),
     about: (r.description ?? '').trim().slice(0, 700) || 'Join a remote-first team building for a global audience.',
     duties: bulletsFrom(r.requirements, r.description),

@@ -19,6 +19,7 @@ export const SEED_JOBS: Job[] = [
     location: 'Remote · 🌍 Worldwide',
     type: 'Full-time',
     level: 'Senior',
+    applyUrl: 'https://vercel.com/careers',
     tags: [
       { label: 'React', variant: 'blue' },
       { label: 'TypeScript', variant: 'blue' },
@@ -91,6 +92,7 @@ export const SEED_JOBS: Job[] = [
     location: 'Remote · Africa',
     type: 'Full-time',
     level: 'Senior',
+    applyEmail: 'careers@flutterwave.com',
     tags: [
       { label: 'Go', variant: 'blue' },
       { label: 'Postgres', variant: 'default' },
@@ -163,6 +165,7 @@ export const SEED_JOBS: Job[] = [
     location: 'Remote · 🌍 Worldwide',
     type: 'Contract',
     level: 'Senior',
+    applyUrl: 'https://andela.com/careers',
     tags: [
       { label: 'React', variant: 'blue' },
       { label: 'Node', variant: 'default' },

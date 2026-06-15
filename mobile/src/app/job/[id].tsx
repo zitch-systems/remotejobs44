@@ -1,17 +1,21 @@
 // src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
 // apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, Share, View } from 'react-native';
+import { Animated, Linking, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Bookmark, Check, Share2, Zap } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { ArrowLeft, Bookmark, Check, ExternalLink, Flag, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
+import { ReportSheet } from '@/components/ReportSheet';
 import { useJob } from '@/lib/jobs';
+import { applyTarget } from '@/lib/apply';
 import { useAppStore } from '@/store/app';
 import { useRecentJobs } from '@/store/recent-jobs';
+import { toast } from '@/store/toast';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 
 export default function JobDetail() {
@@ -29,6 +33,7 @@ export default function JobDetail() {
   const addRecent = useRecentJobs((s) => s.add);
 
   const [burst, setBurst] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
 
   // Record the view once the role resolves (for Home's "Recently viewed").
@@ -59,8 +64,22 @@ export default function JobDetail() {
     );
   }
 
-  function onApply() {
+  const target = applyTarget(job);
+
+  async function onApply() {
     if (applied || !job) return;
+    if (target) {
+      // External application: open the company site / email, then track it.
+      try {
+        if (target.type === 'url') await WebBrowser.openBrowserAsync(target.value);
+        else await Linking.openURL(`mailto:${target.value}?subject=${encodeURIComponent(`Application: ${job.role}`)}`);
+      } catch {
+        /* user dismissed / no handler */
+      }
+      applyTo(job);
+      toast('Tracked in your applications.', 'success');
+      return;
+    }
     applyTo(job);
     setBurst(true);
   }
@@ -94,6 +113,22 @@ export default function JobDetail() {
 
         <JobDetailBody job={job} />
         <SimilarRoles job={job} />
+
+        {/* report */}
+        <Pressable
+          onPress={() => setReportOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Report this job"
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[3] },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Flag size={14} color={colors.fg4} />
+          <Txt variant="meta" color={colors.fg4}>
+            Report this job
+          </Txt>
+        </Pressable>
       </ScrollView>
 
       {/* fixed apply bar */}
@@ -150,9 +185,9 @@ export default function JobDetail() {
             pressed && { transform: [{ scale: 0.98 }] },
           ]}
         >
-          {applied ? <Check size={18} color="#fff" /> : <Zap size={18} color="#fff" fill="#fff" />}
+          {applied ? <Check size={18} color="#fff" /> : target ? <ExternalLink size={18} color="#fff" /> : <Zap size={18} color="#fff" fill="#fff" />}
           <Txt style={{ fontFamily: fonts.displayBold, fontSize: 14, color: '#fff' }}>
-            {applied ? 'Applied' : 'Apply in one tap'}
+            {applied ? 'Applied' : target ? 'Apply on company site' : 'Apply in one tap'}
           </Txt>
         </Pressable>
       </View>
@@ -176,6 +211,8 @@ export default function JobDetail() {
           </Animated.View>
         </View>
       ) : null}
+
+      <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} jobId={job.id} />
     </SafeAreaView>
   );
 }
