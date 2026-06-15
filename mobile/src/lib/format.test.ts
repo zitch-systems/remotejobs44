@@ -1,4 +1,16 @@
-import { bulletsFrom, deriveMatch, dbToStatus, gradFor, money, personalizeJobs, salaryLabel, tagsFrom, timeAgo } from './format';
+import {
+  bulletsFrom,
+  deriveMatch,
+  dbToStatus,
+  gradFor,
+  money,
+  personalizeJobs,
+  referralLink,
+  rewardProgress,
+  salaryLabel,
+  tagsFrom,
+  timeAgo,
+} from './format';
 import type { Job } from './types';
 
 describe('money', () => {
@@ -67,6 +79,25 @@ describe('dbToStatus', () => {
     expect(dbToStatus('offer')).toBe('interview');
     expect(dbToStatus('applied')).toBe('applied');
     expect(dbToStatus('rejected')).toBe('applied');
+  });
+});
+
+describe('referralLink', () => {
+  it('builds the /r/ invite URL and encodes the code', () => {
+    expect(referralLink('RJ44ABCD')).toBe('https://remotejobs44.com/r/RJ44ABCD');
+    expect(referralLink('a b')).toBe('https://remotejobs44.com/r/a%20b');
+  });
+});
+
+describe('rewardProgress', () => {
+  it('reports remaining, percentage, and whether the goal is reached', () => {
+    expect(rewardProgress(0, 3)).toEqual({ remaining: 3, pct: 0, reached: false });
+    expect(rewardProgress(2, 3)).toEqual({ remaining: 1, pct: 67, reached: false });
+    expect(rewardProgress(3, 3)).toEqual({ remaining: 0, pct: 100, reached: true });
+  });
+  it('clamps overshoot and guards bad input', () => {
+    expect(rewardProgress(5, 3)).toEqual({ remaining: 0, pct: 100, reached: true });
+    expect(rewardProgress(-2, 0)).toEqual({ remaining: 1, pct: 0, reached: false });
   });
 });
 

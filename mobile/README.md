@@ -93,6 +93,18 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Referrals / invite loop** (`app/profile/invite.tsx` + `lib/referrals.ts`) —
+  a shareable referral code (`profiles.referral_code`) with invite-count
+  progress toward a Pro reward, read from the **`referrals`** table
+  (**`supabase/migration_v40_referrals.sql`**). Attribution + reward grants are
+  server-side; the app shares the code and shows progress. Degrades to a derived
+  code / count 0 if the migration isn't applied yet.
+- **Plans / upgrade** (`app/profile/plans.tsx`) — tiers + current-plan highlight;
+  Upgrade / Manage-billing opens the web (Paystack) so no payment SDK ships. A
+  `plan` field on the profile drives a badge on the Profile screen.
+- **Accessibility pass** — roles / labels / state on the shared primitives
+  (Button, IconButton, Chip), the job card + save toggle, the bottom tabs, and
+  the profile rows (TalkBack / VoiceOver friendly).
 - **AI interview prep** (`app/profile/interview-prep.tsx`) — role + level →
   behavioural / technical / remote questions with tips + red flags, via the
   **`ai-interview-prep` edge function** (deploy + `AI_API_KEY` to enable).
@@ -163,8 +175,13 @@ if the mark changes (uses the repo-root `sharp`).
 The app code is complete; these are infra/ops steps that can't be done from a
 sandbox:
 
-1. **Apply migrations** — `migration_v37_device_push_tokens.sql` (push tokens)
-   and `migration_v38_profile_preferences.sql` (skills/target_role/headline).
+1. **Apply migrations** — `migration_v37_device_push_tokens.sql` (push tokens),
+   `migration_v38_profile_preferences.sql` (skills/target_role/headline),
+   `migration_v39_cv_storage.sql` (CV bucket), and
+   `migration_v40_referrals.sql` (referral code + `referrals` ledger). A
+   `profiles.plan` column should also exist for the Plans badge to reflect real
+   entitlement (otherwise everyone reads as `free`). Referral attribution
+   (inserting a `referrals` row on signup via `?ref=CODE`) is a web/backend job.
 2. **Deploy the push sender** — `supabase functions deploy send-job-alerts`,
    set `PUSH_CRON_SECRET`, and schedule it (pg_cron). It reads
    `device_push_tokens` and calls Expo's push API. (Code:

@@ -2,7 +2,7 @@
 // Real profile data (name / avatar initial / server-computed strength) with a
 // seed fallback in demo; every row now navigates.
 import React from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Bell, Bookmark, ChevronRight, CreditCard, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
@@ -94,11 +94,6 @@ export default function Profile() {
 
   const initial = (profile.name || profile.email || 'U').trim().charAt(0).toUpperCase();
   const badge = PLAN_BADGE[profile.plan] ?? PLAN_BADGE.free;
-  const inviteFriends = () => {
-    Share.share({
-      message: 'Find verified remote jobs that pay in ₦ or $ on RemoteJobs44 — https://remotejobs44.com',
-    }).catch(() => {});
-  };
   const appearanceIcon =
     mode === 'system' ? <Monitor size={18} color={colors.fg3} /> : mode === 'light' ? <Sun size={18} color={colors.fg3} /> : <Moon size={18} color={colors.fg3} />;
   const appearanceLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
@@ -160,7 +155,7 @@ export default function Profile() {
 
       {/* invite — growth */}
       <Card style={{ paddingVertical: 2 }}>
-        <Row icon={<UserPlus size={18} color={colors.brand} />} label="Invite friends" onPress={inviteFriends} last />
+        <Row icon={<UserPlus size={18} color={colors.brand} />} label="Invite friends" onPress={() => router.push('/profile/invite')} last />
       </Card>
 
       {/* sign out */}

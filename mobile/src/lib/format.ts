@@ -118,3 +118,25 @@ export function dbToStatus(s: string): AppStatus {
   if (s === 'interview' || s === 'offer') return 'interview';
   return 'applied'; // applied | rejected | withdrawn
 }
+
+// The public invite URL the web resolves to attribute a signup (?ref / /r/).
+export function referralLink(code: string): string {
+  return `https://remotejobs44.com/r/${encodeURIComponent(code)}`;
+}
+
+export interface RewardProgress {
+  remaining: number; // invites still needed to unlock the reward
+  pct: number; // 0..100 progress toward the goal
+  reached: boolean; // goal met (reward unlocked)
+}
+
+// Progress toward the invite reward (e.g. 1 month of Pro at goal invites).
+export function rewardProgress(count: number, goal: number): RewardProgress {
+  const c = Math.max(0, Math.floor(count || 0));
+  const g = Math.max(1, Math.floor(goal || 1));
+  return {
+    remaining: Math.max(0, g - c),
+    pct: Math.min(100, Math.round((c / g) * 100)),
+    reached: c >= g,
+  };
+}
