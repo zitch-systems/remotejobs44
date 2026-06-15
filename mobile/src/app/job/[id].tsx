@@ -11,6 +11,7 @@ import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
 import { useJob } from '@/lib/jobs';
 import { useAppStore } from '@/store/app';
+import { useRecentJobs } from '@/store/recent-jobs';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 
 export default function JobDetail() {
@@ -25,8 +26,15 @@ export default function JobDetail() {
   const toggleSaved = useAppStore((s) => s.toggleSaved);
   const applyTo = useAppStore((s) => s.applyTo);
 
+  const addRecent = useRecentJobs((s) => s.add);
+
   const [burst, setBurst] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
+
+  // Record the view once the role resolves (for Home's "Recently viewed").
+  useEffect(() => {
+    if (job) addRecent(job);
+  }, [job?.id, addRecent]);
 
   useEffect(() => {
     if (!burst) return;

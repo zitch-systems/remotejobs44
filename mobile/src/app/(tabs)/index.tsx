@@ -11,6 +11,7 @@ import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
+import { RecentlyViewed } from '@/components/RecentlyViewed';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
@@ -238,6 +239,8 @@ export default function Feed() {
       ) : null}
 
       <Promo />
+
+      {query.trim() === '' ? <RecentlyViewed /> : null}
 
       {/* section + chips */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

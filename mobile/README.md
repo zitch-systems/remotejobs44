@@ -93,6 +93,10 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Recently viewed jobs** (`components/RecentlyViewed.tsx` + `store/recent-jobs.ts`)
+  — opening a role records a compact snapshot (persisted, deduped, most-recent
+  first); Home shows a horizontal "Recently viewed" strip (hidden while
+  searching). Pure list logic in `lib/recent.ts` is unit-tested.
 - **Richer search filters** (`lib/filters.ts`) — the filter sheet now has an
   **Experience level** (Entry / Mid / Senior / Lead, keyword-bucketed from the
   free-form `level`) alongside Job type + Sort, a Reset / "Show results" footer,
