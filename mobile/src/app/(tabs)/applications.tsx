@@ -2,11 +2,12 @@
 // Demo mode resolves seed jobs by the local applied map; live mode reads the
 // applications table joined to jobs.
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ClipboardList } from 'lucide-react-native';
 import { Pill, Screen, Txt } from '@/components/ui';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { BrandLoader } from '@/components/BrandLoader';
 import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_LABEL, type AppStatus } from '@/lib/types';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -63,7 +64,7 @@ export default function Applications() {
 
       {loading ? (
         <View style={{ paddingVertical: spacing[16], alignItems: 'center' }}>
-          <ActivityIndicator color={colors.brand} />
+          <BrandLoader label="Loading applications…" />
         </View>
       ) : items.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[16], gap: spacing[3] }}>

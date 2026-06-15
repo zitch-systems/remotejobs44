@@ -1,11 +1,12 @@
 // src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
 // apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, ScrollView, View } from 'react-native';
+import { Animated, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bookmark, Check, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
+import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { useJob } from '@/lib/jobs';
 import { useAppStore } from '@/store/app';
@@ -35,11 +36,7 @@ export default function JobDetail() {
   }, [burst, burstAnim]);
 
   if (loading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgApp, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.brand} />
-      </SafeAreaView>
-    );
+    return <BrandLoaderScreen label="Loading role…" />;
   }
 
   if (!job) {
@@ -59,6 +56,17 @@ export default function JobDetail() {
     setBurst(true);
   }
 
+  async function onShare() {
+    if (!job) return;
+    try {
+      await Share.share({
+        message: `${job.role} at ${job.company} — found on RemoteJobs44. https://remotejobs44.com/jobs/${job.id}`,
+      });
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  }
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <ScrollView
@@ -70,7 +78,7 @@ export default function JobDetail() {
           <IconButton onPress={() => router.back()}>
             <ArrowLeft size={18} color={colors.fg1} />
           </IconButton>
-          <IconButton>
+          <IconButton onPress={onShare}>
             <Share2 size={17} color={colors.fg1} />
           </IconButton>
         </View>

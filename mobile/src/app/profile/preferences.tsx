@@ -2,11 +2,12 @@
 // Skills personalise the feed's match score (see lib/jobs.ts). Persisted to
 // profiles (migration_v38); demo mode keeps them in memory only.
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { Button, Field, IconButton, Txt } from '@/components/ui';
+import { BrandLoader } from '@/components/BrandLoader';
 import { fetchPreferences, savePreferences } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -73,7 +74,7 @@ export default function Preferences() {
 
       {loading ? (
         <View style={{ paddingTop: spacing[16], alignItems: 'center' }}>
-          <ActivityIndicator color={colors.brand} />
+          <BrandLoader />
         </View>
       ) : (
         <ScrollView

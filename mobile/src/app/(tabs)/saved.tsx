@@ -5,7 +5,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Bookmark } from 'lucide-react-native';
-import { JobCard, JobCardSkeleton } from '@/components/JobCard';
+import { JobCard } from '@/components/JobCard';
+import { BrandLoader } from '@/components/BrandLoader';
 import { Screen, Txt } from '@/components/ui';
 import { SEED_JOBS } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -57,10 +58,8 @@ export default function Saved() {
       </View>
 
       {loading ? (
-        <View style={{ gap: spacing[3] }}>
-          {[0, 1, 2].map((i) => (
-            <JobCardSkeleton key={i} />
-          ))}
+        <View style={{ paddingVertical: spacing[16], alignItems: 'center' }}>
+          <BrandLoader label="Loading saved jobs…" />
         </View>
       ) : jobs.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[16], gap: spacing[3] }}>
