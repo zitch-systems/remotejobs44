@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
-import { JobCard, JobCardSkeleton } from '@/components/JobCard';
+import { JobCard } from '@/components/JobCard';
+import { BrandLoader } from '@/components/BrandLoader';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { personalizeJobs, useJobs } from '@/lib/jobs';
@@ -178,10 +179,8 @@ export default function Feed() {
         onEndReached={feed.loadMore}
         ListEmptyComponent={
           feed.loading ? (
-            <View style={{ gap: spacing[3] }}>
-              {[0, 1, 2].map((i) => (
-                <JobCardSkeleton key={i} />
-              ))}
+            <View style={{ paddingVertical: spacing[12], alignItems: 'center' }}>
+              <BrandLoader label="Finding remote jobs…" />
             </View>
           ) : feed.error ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] }}>

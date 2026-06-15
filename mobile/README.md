@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Branded loading animation** (`components/BrandLoader.tsx`) — the logo mark
+  (blue tile + chart-line + orange dot) pulses inside a spinning brand arc;
+  shown wherever items load (feed, saved, applications, job detail, preferences,
+  app entry).
+- **Share a job** — the job-detail share button uses the native share sheet.
 - **Social sign-in** (`lib/oauth.ts`) — Google + LinkedIn via PKCE
   (`signInWithOAuth` + `expo-web-browser` + `expo-auth-session`).
   *Setup:* enable the Google / LinkedIn (OIDC) providers in Supabase Auth and
