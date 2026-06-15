@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Smart job alerts** (`supabase/functions/send-job-alerts`) — the alert sender
+  now matches new roles against **each user's skills / target role** and sends a
+  personalised push + inbox row ("3 new roles match your skills"); users with no
+  skills set still get the generic "new jobs" alert, and users with preferences
+  but no matches aren't spammed. Redeployed live (v3).
 - **Notification inbox** (`app/inbox.tsx` + `store/notifications.ts`) — a Home
   header bell with an unread badge opens an inbox of job alerts / application
   updates / system messages; tap to mark read + open the related job, or "Mark
