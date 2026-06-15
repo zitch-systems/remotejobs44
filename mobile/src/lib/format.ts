@@ -117,11 +117,10 @@ export function personalizeJobs(jobs: Job[], userSkills: string[]): Job[] {
   });
 }
 
-// applications.status enum → the 3-state mobile tracker.
+// applications.status enum → AppStatus (same set); unknown values fall back.
+const APP_STATUSES: readonly string[] = ['applied', 'screening', 'interview', 'offer', 'rejected', 'withdrawn'];
 export function dbToStatus(s: string): AppStatus {
-  if (s === 'screening') return 'review';
-  if (s === 'interview' || s === 'offer') return 'interview';
-  return 'applied'; // applied | rejected | withdrawn
+  return APP_STATUSES.includes(s) ? (s as AppStatus) : 'applied';
 }
 
 // The public invite URL the web resolves to attribute a signup (?ref / /r/).

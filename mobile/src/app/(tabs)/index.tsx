@@ -121,7 +121,7 @@ export default function Feed() {
 
   const firstName = (profile.name || '').trim().split(/\s+/)[0] || 'there';
   const appsCount = Object.keys(applied).length;
-  const interviews = Object.values(applied).filter((s) => s === 'interview').length;
+  const interviews = Object.values(applied).filter((s) => s === 'interview' || s === 'offer').length;
   const fCount = activeFilterCount(type, level);
   const resetFilters = () => {
     setType('Any');

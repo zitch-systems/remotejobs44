@@ -2,7 +2,7 @@
 // Mirrors the handoff's seed `JOBS` model. When wiring to live data, map the
 // Supabase `jobs` row onto this shape (or generate types from the DB).
 
-export type AppStatus = 'applied' | 'review' | 'interview';
+export type AppStatus = 'applied' | 'screening' | 'interview' | 'offer' | 'rejected' | 'withdrawn';
 
 export interface MatchBar {
   label: string; // e.g. "Skills"
@@ -44,6 +44,12 @@ export interface Job {
 
 export const STATUS_LABEL: Record<AppStatus, string> = {
   applied: 'Applied',
-  review: 'In review',
+  screening: 'In review',
   interview: 'Interview',
+  offer: 'Offer',
+  rejected: 'Not selected',
+  withdrawn: 'Withdrawn',
 };
+
+// The stages a user can set from the Applications tracker, in order.
+export const STATUS_FLOW: AppStatus[] = ['applied', 'screening', 'interview', 'offer', 'rejected', 'withdrawn'];

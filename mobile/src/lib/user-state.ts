@@ -48,6 +48,12 @@ export async function applyRemote(userId: string, job: Job): Promise<void> {
   if (error) throw error;
 }
 
+/** Update the status of an existing application. */
+export async function updateApplicationStatus(userId: string, jobId: string, status: AppStatus): Promise<void> {
+  const { error } = await supabase.from('applications').update({ status }).eq('user_id', userId).eq('job_id', jobId);
+  if (error) throw error;
+}
+
 export interface ApplicationItem {
   job: Job;
   status: AppStatus;
