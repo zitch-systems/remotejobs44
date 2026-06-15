@@ -4,7 +4,7 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Bookmark, ChevronRight, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, Settings, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
+import { Bell, Bookmark, ChevronRight, FileText, LogOut, MessageSquare, Monitor, Moon, Pencil, PenLine, Settings, Sparkles, SlidersHorizontal, Sun, UserPlus } from 'lucide-react-native';
 import { Avatar, Button, Card, Divider, Pill, Screen, Txt } from '@/components/ui';
 import { ProfileChecklist } from '@/components/ProfileChecklist';
 import { useProfile, type Plan } from '@/lib/profile';
@@ -169,6 +169,7 @@ export default function Profile() {
         <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'Added' : 'None'} onPress={() => router.push('/profile/cv')} />
         <Row icon={<Sparkles size={18} color={colors.fg3} />} label="AI CV review" onPress={() => router.push('/profile/ai-review')} />
         <Row icon={<MessageSquare size={18} color={colors.fg3} />} label="AI interview prep" onPress={() => router.push('/profile/interview-prep')} />
+        <Row icon={<PenLine size={18} color={colors.fg3} />} label="AI cover letter" onPress={() => router.push('/profile/cover-letter')} />
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
         <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
