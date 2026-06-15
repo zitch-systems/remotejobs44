@@ -1,10 +1,11 @@
 // src/components/FilterSheet.tsx — bottom-sheet filters for the feed
-// (job type + sort). Opened by the feed's filter button.
+// (job type + experience level + sort). Opened by the feed's filter button.
 import React from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
-import { Txt } from './ui';
+import { Button, Txt } from './ui';
+import { EXPERIENCE_LEVELS, type ExperienceLevel } from '@/lib/filters';
 import { fonts, radii, spacing, useTheme } from '@/theme';
 
 export type JobType = 'Any' | 'Full-time' | 'Contract' | 'Part-time';
@@ -21,15 +22,21 @@ export function FilterSheet({
   onClose,
   type,
   setType,
+  level,
+  setLevel,
   sort,
   setSort,
+  onReset,
 }: {
   visible: boolean;
   onClose: () => void;
   type: JobType;
   setType: (t: JobType) => void;
+  level: ExperienceLevel;
+  setLevel: (l: ExperienceLevel) => void;
   sort: SortBy;
   setSort: (s: SortBy) => void;
+  onReset?: () => void;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -37,6 +44,9 @@ export function FilterSheet({
   const OptionRow = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       style={({ pressed }) => [
         {
           flexDirection: 'row',
@@ -81,11 +91,33 @@ export function FilterSheet({
           <OptionRow key={t} label={t} selected={type === t} onPress={() => setType(t)} />
         ))}
         <Txt variant="eyebrow" color={colors.fg4} style={{ marginTop: spacing[3] }}>
+          Experience level
+        </Txt>
+        {EXPERIENCE_LEVELS.map((l) => (
+          <OptionRow key={l} label={l} selected={level === l} onPress={() => setLevel(l)} />
+        ))}
+        <Txt variant="eyebrow" color={colors.fg4} style={{ marginTop: spacing[3] }}>
           Sort by
         </Txt>
         {SORTS.map((s) => (
           <OptionRow key={s.key} label={s.label} selected={sort === s.key} onPress={() => setSort(s.key)} />
         ))}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[4] }}>
+          {onReset ? (
+            <Pressable
+              onPress={onReset}
+              accessibilityRole="button"
+              accessibilityLabel="Reset filters"
+              style={({ pressed }) => [{ paddingVertical: 12, paddingHorizontal: spacing[2] }, pressed && { opacity: 0.6 }]}
+            >
+              <Txt style={{ fontFamily: fonts.displayBold, fontSize: 14, color: colors.fg2 }}>Reset</Txt>
+            </Pressable>
+          ) : null}
+          <View style={{ flex: 1 }}>
+            <Button label="Show results" onPress={onClose} />
+          </View>
+        </View>
       </View>
     </Modal>
   );

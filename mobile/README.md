@@ -93,6 +93,11 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Richer search filters** (`lib/filters.ts`) — the filter sheet now has an
+  **Experience level** (Entry / Mid / Senior / Lead, keyword-bucketed from the
+  free-form `level`) alongside Job type + Sort, a Reset / "Show results" footer,
+  and an active-filter **count badge** on the filter button. The predicate is a
+  pure, unit-tested helper shared by Home + the Jobs tab.
 - **Jobs tab** (`app/(tabs)/jobs.tsx`) — a dedicated browse-everything list
   (search + filter + pagination) beside Home, which stays the personalised
   "Top matches" dashboard. The bottom bar is now five even tabs (the center ⚡

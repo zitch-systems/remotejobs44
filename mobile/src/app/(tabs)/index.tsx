@@ -15,6 +15,7 @@ import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { personalizeJobs, useJobs } from '@/lib/jobs';
+import { activeFilterCount, jobMatchesFilters, type ExperienceLevel } from '@/lib/filters';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -81,6 +82,7 @@ export default function Feed() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [query, setQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
+  const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('match');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [userSkills, setUserSkills] = useState<string[]>([]);
@@ -108,16 +110,10 @@ export default function Feed() {
   const showSkillsNudge = isSupabaseConfigured && Boolean(userId) && skillsLoaded && userSkills.length === 0 && !nudgeDismissed;
 
   const jobs = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list: Job[] = personalizeJobs(feed.jobs, userSkills).filter(
-      (j) =>
-        (filter === 'All' || j.category === filter) &&
-        (type === 'Any' || j.type.toLowerCase() === type.toLowerCase()) &&
-        (q === '' || j.role.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)),
-    );
+    let list: Job[] = personalizeJobs(feed.jobs, userSkills).filter((j) => jobMatchesFilters(j, { category: filter, type, level, query }));
     if (sort === 'match') list = [...list].sort((a, b) => b.match - a.match);
     return list;
-  }, [feed.jobs, userSkills, filter, type, query, sort]);
+  }, [feed.jobs, userSkills, filter, type, level, query, sort]);
 
   // Tablet / unfolded foldable → master–detail (hooks above run unconditionally).
   if (width >= 840) return <FeedMasterDetail />;
@@ -125,6 +121,12 @@ export default function Feed() {
   const firstName = (profile.name || '').trim().split(/\s+/)[0] || 'there';
   const appsCount = Object.keys(applied).length;
   const interviews = Object.values(applied).filter((s) => s === 'interview').length;
+  const fCount = activeFilterCount(type, level);
+  const resetFilters = () => {
+    setType('Any');
+    setLevel('Any');
+    setSort('match');
+  };
 
   const header = (
     <View style={{ gap: spacing[4], paddingTop: spacing[2] }}>
@@ -169,6 +171,8 @@ export default function Feed() {
         </Card>
         <Pressable
           onPress={() => setSheetOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={fCount > 0 ? `Filter and sort, ${fCount} active` : 'Filter and sort'}
           style={({ pressed }) => [
             { width: 48, height: 48, borderRadius: radii.field, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
             shadows.primary,
@@ -176,6 +180,26 @@ export default function Feed() {
           ]}
         >
           <SlidersHorizontal size={18} color="#fff" />
+          {fCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -5,
+                right: -5,
+                minWidth: 18,
+                height: 18,
+                paddingHorizontal: 4,
+                borderRadius: 999,
+                backgroundColor: colors.accent,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: colors.bgApp,
+              }}
+            >
+              <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 10, color: '#fff' }}>{fCount}</Txt>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
@@ -218,8 +242,8 @@ export default function Feed() {
       {/* section + chips */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Txt variant="h2">Top matches</Txt>
-        {(type !== 'Any' || sort !== 'match') && (
-          <Pressable onPress={() => { setType('Any'); setSort('match'); }}>
+        {(type !== 'Any' || level !== 'Any' || sort !== 'match') && (
+          <Pressable onPress={resetFilters}>
             <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 13, color: colors.brand }}>Reset</Txt>
           </Pressable>
         )}
@@ -267,9 +291,8 @@ export default function Feed() {
               <Pressable
                 onPress={() => {
                   setFilter('All');
-                  setType('Any');
-                  setSort('match');
                   setQuery('');
+                  resetFilters();
                 }}
                 style={({ pressed }) => [
                   { paddingHorizontal: spacing[5], paddingVertical: 10, borderRadius: radii.field, borderWidth: 1.5, borderColor: colors.border2 },
@@ -289,7 +312,17 @@ export default function Feed() {
           ) : null
         }
       />
-      <FilterSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} type={type} setType={setType} sort={sort} setSort={setSort} />
+      <FilterSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        type={type}
+        setType={setType}
+        level={level}
+        setLevel={setLevel}
+        sort={sort}
+        setSort={setSort}
+        onReset={resetFilters}
+      />
     </SafeAreaView>
   );
 }

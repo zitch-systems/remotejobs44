@@ -11,6 +11,7 @@ import { BrandLoader } from '@/components/BrandLoader';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { useJobs } from '@/lib/jobs';
+import { activeFilterCount, jobMatchesFilters, type ExperienceLevel } from '@/lib/filters';
 import { useSearchHistory } from '@/store/search';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
@@ -24,28 +25,28 @@ export default function Jobs() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [query, setQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
+  const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('recent');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const addSearch = useSearchHistory((s) => s.add);
 
   const jobs = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list: Job[] = feed.jobs.filter(
-      (j) =>
-        (filter === 'All' || j.category === filter) &&
-        (type === 'Any' || j.type.toLowerCase() === type.toLowerCase()) &&
-        (q === '' || j.role.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)),
-    );
+    let list: Job[] = feed.jobs.filter((j) => jobMatchesFilters(j, { category: filter, type, level, query }));
     if (sort === 'match') list = [...list].sort((a, b) => b.match - a.match);
     return list;
-  }, [feed.jobs, filter, type, query, sort]);
+  }, [feed.jobs, filter, type, level, query, sort]);
 
-  const resetFilters = () => {
-    setFilter('All');
+  const fCount = activeFilterCount(type, level);
+  const resetSheet = () => {
     setType('Any');
+    setLevel('Any');
     setSort('recent');
+  };
+  const resetAll = () => {
+    setFilter('All');
     setQuery('');
+    resetSheet();
   };
 
   const header = (
@@ -79,7 +80,7 @@ export default function Jobs() {
         <Pressable
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Filter and sort"
+          accessibilityLabel={fCount > 0 ? `Filter and sort, ${fCount} active` : 'Filter and sort'}
           style={({ pressed }) => [
             { width: 48, height: 48, borderRadius: radii.field, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
             shadows.primary,
@@ -87,6 +88,26 @@ export default function Jobs() {
           ]}
         >
           <SlidersHorizontal size={18} color="#fff" />
+          {fCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -5,
+                right: -5,
+                minWidth: 18,
+                height: 18,
+                paddingHorizontal: 4,
+                borderRadius: 999,
+                backgroundColor: colors.accent,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: colors.bgApp,
+              }}
+            >
+              <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 10, color: '#fff' }}>{fCount}</Txt>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
@@ -144,7 +165,7 @@ export default function Jobs() {
                 No roles match your search.
               </Txt>
               <Pressable
-                onPress={resetFilters}
+                onPress={resetAll}
                 style={({ pressed }) => [
                   { paddingHorizontal: spacing[5], paddingVertical: 10, borderRadius: radii.field, borderWidth: 1.5, borderColor: colors.border2 },
                   pressed && { backgroundColor: colors.bgSection },
@@ -163,7 +184,17 @@ export default function Jobs() {
           ) : null
         }
       />
-      <FilterSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} type={type} setType={setType} sort={sort} setSort={setSort} />
+      <FilterSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        type={type}
+        setType={setType}
+        level={level}
+        setLevel={setLevel}
+        sort={sort}
+        setSort={setSort}
+        onReset={resetSheet}
+      />
     </SafeAreaView>
   );
 }
