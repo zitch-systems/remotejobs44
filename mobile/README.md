@@ -93,6 +93,13 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **AI interview prep** (`app/profile/interview-prep.tsx`) — role + level →
+  behavioural / technical / remote questions with tips + red flags, via the
+  **`ai-interview-prep` edge function** (deploy + `AI_API_KEY` to enable).
+- **Profile completion checklist** (`components/ProfileChecklist.tsx`) — the
+  remaining in-app steps (name, CV, skills, target role) on the Profile screen.
+- **"Add your skills" nudge** — a dismissible banner on the feed when no skills
+  are set, linking to Job preferences (drives the personalised match score).
 - **AI CV review** (`app/profile/ai-review.tsx` + `lib/ai.ts`) — paste your CV +
   target role → score, strengths, gaps, rewrite tips, missing ATS keywords. Runs
   on the **`ai-cv-review` edge function** (`supabase/functions/ai-cv-review`,

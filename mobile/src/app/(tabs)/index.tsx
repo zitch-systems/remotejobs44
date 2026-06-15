@@ -5,8 +5,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Search, SlidersHorizontal } from 'lucide-react-native';
+import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
@@ -58,6 +59,7 @@ function Promo() {
 
 export default function Feed() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const feed = useJobs();
   const { profile } = useProfile();
@@ -70,19 +72,28 @@ export default function Feed() {
   const [sort, setSort] = useState<SortBy>('match');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [userSkills, setUserSkills] = useState<string[]>([]);
+  const [skillsLoaded, setSkillsLoaded] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const addSearch = useSearchHistory((s) => s.add);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return;
     let active = true;
     fetchPreferences(userId)
-      .then((p) => active && setUserSkills(p.skills))
-      .catch(() => {});
+      .then((p) => {
+        if (active) {
+          setUserSkills(p.skills);
+          setSkillsLoaded(true);
+        }
+      })
+      .catch(() => active && setSkillsLoaded(true));
     return () => {
       active = false;
     };
   }, [userId]);
+
+  const showSkillsNudge = isSupabaseConfigured && Boolean(userId) && skillsLoaded && userSkills.length === 0 && !nudgeDismissed;
 
   const jobs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -165,6 +176,29 @@ export default function Feed() {
             Keyboard.dismiss();
           }}
         />
+      ) : null}
+
+      {showSkillsNudge ? (
+        <Pressable
+          onPress={() => router.push('/profile/preferences')}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[4], borderRadius: radii.card, backgroundColor: colors.infoBg, borderWidth: 1.5, borderColor: colors.infoBorder },
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <Sparkles size={20} color={colors.brand} />
+          <View style={{ flex: 1 }}>
+            <Txt variant="cardTitle" color={colors.fg1}>
+              Sharper matches
+            </Txt>
+            <Txt variant="meta" color={colors.fg3}>
+              Add your skills so we can rank roles for you.
+            </Txt>
+          </View>
+          <Pressable hitSlop={8} onPress={() => setNudgeDismissed(true)}>
+            <X size={16} color={colors.fg4} />
+          </Pressable>
+        </Pressable>
       ) : null}
 
       <Promo />
