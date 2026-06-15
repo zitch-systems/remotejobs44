@@ -144,7 +144,7 @@ export default function Feed() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
           <NotificationBell />
-          <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online />
+          <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online uri={profile.avatarUrl} />
         </View>
       </View>
 
