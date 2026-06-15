@@ -48,6 +48,9 @@ export function JobCard({ job }: { job: Job }) {
     <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
     <Pressable
       onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${job.role} at ${job.company}, ${job.match}% match, ${job.salary}${job.per ? ' ' + job.per : ''}`}
+      accessibilityHint="Opens the job details"
       style={({ pressed }) => [pressed && { transform: [{ scale: 0.985 }] }]}
     >
       <Card style={{ padding: spacing[4], gap: spacing[3] }}>
@@ -76,6 +79,9 @@ export function JobCard({ job }: { job: Job }) {
             <Pressable
               hitSlop={8}
               onPress={() => toggleSaved(job.id)}
+              accessibilityRole="button"
+              accessibilityLabel={saved ? `Remove ${job.role} from saved` : `Save ${job.role}`}
+              accessibilityState={{ selected: saved }}
               style={({ pressed }) => [{ padding: 2 }, pressed && { transform: [{ scale: 0.9 }] }]}
             >
               <Bookmark

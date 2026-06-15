@@ -188,6 +188,9 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [
         {
           height: 50,
@@ -226,16 +229,20 @@ export function IconButton({
   onPress,
   size = 34,
   style,
+  accessibilityLabel,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         {
           width: size,
@@ -262,6 +269,9 @@ export function Chip({ label, active, onPress }: { label: string; active?: boole
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
       style={({ pressed }) => [
         {
           height: 34,
