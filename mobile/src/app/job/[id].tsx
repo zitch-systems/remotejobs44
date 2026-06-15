@@ -8,6 +8,7 @@ import { ArrowLeft, Bookmark, Check, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
+import { SimilarRoles } from '@/components/SimilarRoles';
 import { useJob } from '@/lib/jobs';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
@@ -84,6 +85,7 @@ export default function JobDetail() {
         </View>
 
         <JobDetailBody job={job} />
+        <SimilarRoles job={job} />
       </ScrollView>
 
       {/* fixed apply bar */}

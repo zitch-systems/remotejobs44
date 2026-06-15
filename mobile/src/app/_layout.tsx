@@ -17,6 +17,7 @@ import {
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { AuthProvider } from '@/lib/auth';
 import { initSentry, withSentry } from '@/lib/sentry';
+import { Toaster } from '@/components/Toaster';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 initSentry();
@@ -49,6 +50,7 @@ function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="job/[id]" options={{ presentation: 'card' }} />
           </Stack>
+          <Toaster />
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

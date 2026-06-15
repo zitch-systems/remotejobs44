@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { SEED_JOBS } from './seed';
+import { loadFeedCache, saveFeedCache } from './feed-cache';
 import { bulletsFrom, deriveMatch, gradFor, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
 import type { Job } from './types';
 
@@ -92,6 +93,20 @@ export async function fetchJobById(id: string): Promise<Job | null> {
   return data ? rowToJob(data as JobRow) : null;
 }
 
+/** Other active roles in the same category (for the detail "more like this"). */
+export async function fetchSimilarJobs(category: string, excludeId: string, limit = 4): Promise<Job[]> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(SAFE_COLUMNS)
+    .eq('is_active', true)
+    .eq('category', category)
+    .neq('id', excludeId)
+    .order('posted_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as JobRow[]).map(rowToJob);
+}
+
 export interface JobsFeed {
   jobs: Job[];
   loading: boolean; // first page
@@ -110,6 +125,7 @@ export function useJobs(pageSize = 20): JobsFeed {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(isSupabaseConfigured);
   const busy = useRef(false);
+  const gotFresh = useRef(false);
 
   const load = useCallback(
     async (offset: number, mode: 'initial' | 'refresh' | 'more') => {
@@ -122,8 +138,12 @@ export function useJobs(pageSize = 20): JobsFeed {
         setError(null);
         setHasMore(batch.length === pageSize);
         setJobs((prev) => (mode === 'more' ? [...prev, ...batch] : batch));
-      } catch (e: any) {
         if (mode !== 'more') {
+          gotFresh.current = true;
+          saveFeedCache(batch);
+        }
+      } catch (e: any) {
+        if (mode !== 'more' && !gotFresh.current) {
           setJobs(SEED_JOBS);
           setHasMore(false);
         }
@@ -136,6 +156,21 @@ export function useJobs(pageSize = 20): JobsFeed {
     },
     [pageSize],
   );
+
+  // Show the last cached page instantly on cold start (until fresh data lands).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    loadFeedCache().then((cached) => {
+      if (active && cached?.length && !gotFresh.current) {
+        setJobs(cached);
+        setLoading(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     load(0, 'initial');

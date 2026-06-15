@@ -93,6 +93,15 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **In-app toasts** (`store/toast.ts` + `components/Toaster.tsx`) — lightweight
+  feedback on save / apply, mounted once in the root layout.
+- **Similar roles** — the job detail lists other roles in the same category
+  (`components/SimilarRoles.tsx`).
+- **Offline feed cache** (`lib/feed-cache.ts`) — the last feed page is persisted
+  and shown instantly on cold start while fresh data loads.
+- **CV upload** (`app/profile/cv.tsx`) — pick a PDF/Word doc (`expo-document-picker`)
+  → uploads to the `cvs` storage bucket (**`supabase/migration_v39_cv_storage.sql`**)
+  → saves the URL on the profile.
 - **Onboarding** — a 3-slide first-run intro (`app/onboarding.tsx`), shown once
   (persisted `onboarded` flag in `store/prefs.ts`); the entry redirect waits for
   prefs to hydrate before routing.

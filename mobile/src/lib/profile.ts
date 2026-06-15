@@ -3,9 +3,31 @@
 // headline) come from migration_v38 and are read/written best-effort so the
 // app degrades gracefully if that migration hasn't been applied yet.
 import { useEffect, useState } from 'react';
+import { File } from 'expo-file-system';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { useAppStore } from '@/store/app';
 import { SEED_USER } from './seed';
+
+/**
+ * Upload a picked CV file to the `cvs` storage bucket (under the user's folder)
+ * and save its URL on the profile. Requires migration_v39 (the bucket).
+ */
+export async function uploadCv(userId: string, asset: { uri: string; name: string; mimeType?: string | null }): Promise<string> {
+  const ext = (asset.name.split('.').pop() || 'pdf').toLowerCase();
+  const path = `${userId}/cv-${Date.now()}.${ext}`;
+  const buffer = await new File(asset.uri).arrayBuffer();
+
+  const { error } = await supabase.storage.from('cvs').upload(path, buffer, {
+    contentType: asset.mimeType ?? 'application/octet-stream',
+    upsert: true,
+  });
+  if (error) throw error;
+
+  const url = supabase.storage.from('cvs').getPublicUrl(path).data.publicUrl;
+  const { error: upErr } = await supabase.from('profiles').update({ cv_url: url }).eq('id', userId);
+  if (upErr) throw upErr;
+  return url;
+}
 
 export interface UserProfile {
   name: string;
