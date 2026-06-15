@@ -5,7 +5,7 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Bell, Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, SlidersHorizontal, Sun } from 'lucide-react-native';
+import { Bell, Bookmark, ChevronRight, FileText, LogOut, Monitor, Moon, Pencil, Sparkles, SlidersHorizontal, Sun } from 'lucide-react-native';
 import { Avatar, Card, Divider, Screen, Txt } from '@/components/ui';
 import { useProfile } from '@/lib/profile';
 import { useAppStore } from '@/store/app';
@@ -117,6 +117,7 @@ export default function Profile() {
       <Card style={{ paddingVertical: 2 }}>
         <Row icon={<Pencil size={18} color={colors.fg3} />} label="Edit profile" onPress={() => router.push('/profile/edit')} />
         <Row icon={<FileText size={18} color={colors.fg3} />} label="My CV" value={profile.cvUrl ? 'Added' : 'None'} onPress={() => router.push('/profile/cv')} />
+        <Row icon={<Sparkles size={18} color={colors.fg3} />} label="AI CV review" onPress={() => router.push('/profile/ai-review')} />
         <Row icon={<Bookmark size={18} color={colors.fg3} />} label="Saved jobs" value={String(savedCount)} onPress={() => router.push('/(tabs)/saved')} />
         <Row icon={<SlidersHorizontal size={18} color={colors.fg3} />} label="Job preferences" onPress={() => router.push('/profile/preferences')} />
         <Row icon={<Bell size={18} color={colors.fg3} />} label="Notifications" onPress={() => router.push('/profile/notifications')} />

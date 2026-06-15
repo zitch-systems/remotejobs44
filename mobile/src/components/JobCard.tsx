@@ -1,6 +1,6 @@
 // src/components/JobCard.tsx — the feed job card (handoff §2 "Job Card").
-import React from 'react';
-import { type DimensionValue, Pressable, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, type DimensionValue, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BadgeCheck, Bookmark } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
@@ -38,7 +38,14 @@ export function JobCard({ job }: { job: Job }) {
   const saved = useAppStore((s) => s.saved.includes(job.id));
   const toggleSaved = useAppStore((s) => s.toggleSaved);
 
+  // Subtle fade + rise as the card mounts (incl. as it scrolls into view).
+  const enter = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(enter, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+  }, [enter]);
+
   return (
+    <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
     <Pressable
       onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
       style={({ pressed }) => [pressed && { transform: [{ scale: 0.985 }] }]}
@@ -118,5 +125,6 @@ export function JobCard({ job }: { job: Job }) {
         </View>
       </Card>
     </Pressable>
+    </Animated.View>
   );
 }

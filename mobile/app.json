@@ -10,7 +10,8 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.remotejobs44.app"
+      "bundleIdentifier": "com.remotejobs44.app",
+      "associatedDomains": ["applinks:remotejobs44.com"]
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,15 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "package": "com.remotejobs44.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "https", "host": "remotejobs44.com", "pathPrefix": "/jobs" }]
+        }
+      ]
     },
     "web": {
       "output": "static",

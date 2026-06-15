@@ -4,10 +4,11 @@
 // instantly.
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Bookmark } from 'lucide-react-native';
 import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
-import { Screen, Txt } from '@/components/ui';
+import { Button, Screen, Txt } from '@/components/ui';
 import { SEED_JOBS } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchSavedJobs } from '@/lib/user-state';
@@ -65,6 +66,7 @@ function useSavedJobs(): { jobs: Job[]; loading: boolean; refreshing: boolean; r
 
 export default function Saved() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { jobs, loading, refreshing, refresh } = useSavedJobs();
 
   return (
@@ -100,6 +102,7 @@ export default function Saved() {
           <Txt center color={colors.fg3} style={{ maxWidth: 260 }}>
             Tap the bookmark on any role to save it for later.
           </Txt>
+          <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)')} style={{ marginTop: spacing[2] }} />
         </View>
       ) : (
         <View style={{ gap: spacing[3] }}>

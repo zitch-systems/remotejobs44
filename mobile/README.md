@@ -93,6 +93,18 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **AI CV review** (`app/profile/ai-review.tsx` + `lib/ai.ts`) — paste your CV +
+  target role → score, strengths, gaps, rewrite tips, missing ATS keywords. Runs
+  on the **`ai-cv-review` edge function** (`supabase/functions/ai-cv-review`,
+  any OpenAI-compatible API); deploy it + set `AI_API_KEY` to enable.
+- **Search history & suggestions** — recent + popular terms under the feed
+  search (`store/search.ts` + `components/SearchSuggestions.tsx`).
+- **Empty-state CTAs** — "Reset filters" on the feed, "Browse jobs" on
+  Saved/Applications.
+- **Deep links** — `remotejobs44.com/jobs/:id` (and `remotejobs44://job/:id`)
+  open the job detail (`app/jobs/[id].tsx` + app.json intent filters /
+  associated domains; host the `.well-known` files on the web for verification).
+- **List fade-in** — job cards gently fade + rise as they appear.
 - **In-app toasts** (`store/toast.ts` + `components/Toaster.tsx`) — lightweight
   feedback on save / apply, mounted once in the root layout.
 - **Similar roles** — the job detail lists other roles in the same category
