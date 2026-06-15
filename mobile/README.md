@@ -93,6 +93,10 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Applications insights + status filter** (`lib/stats.ts`) — the tracker now
+  shows a pipeline strip (interviews / offers / **response rate**) and **filter
+  chips** (All / Active / Interviewing / Offers / Closed). Pure stat + filter
+  helpers are unit-tested.
 - **Profile photo** (`lib/profile.ts` `uploadAvatar` + Edit profile) — pick an
   image → uploads to the public **`avatars`** bucket (`migration_v45`, RLS:
   write only your own folder) → sets `avatar_url`. The `Avatar` primitive now

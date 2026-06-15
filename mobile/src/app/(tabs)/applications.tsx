@@ -8,11 +8,12 @@ import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check, ClipboardList } from 'lucide-react-native';
-import { Button, Pill, Screen, Txt } from '@/components/ui';
+import { Button, Card, Chip, Pill, Screen, Txt } from '@/components/ui';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoader } from '@/components/BrandLoader';
 import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_FLOW, STATUS_LABEL, type AppStatus } from '@/lib/types';
+import { applicationStats, inStatusFilter, STATUS_FILTERS, type StatusFilter } from '@/lib/stats';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchApplicationItems } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
@@ -127,6 +128,20 @@ function StatusSheet({ editing, onClose, onPick }: { editing: { jobId: string; c
   );
 }
 
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <Card style={{ flex: 1, padding: spacing[3], gap: 2, ...(accent ? { backgroundColor: colors.successBg, borderColor: colors.successBorder } : null) }}>
+      <Txt variant="stat" color={accent ? colors.successText : colors.fg1}>
+        {value}
+      </Txt>
+      <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
+        {label}
+      </Txt>
+    </Card>
+  );
+}
+
 export default function Applications() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -135,13 +150,16 @@ export default function Applications() {
   const appliedKey = Object.keys(applied).sort().join(',');
   const { jobsById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
   const [editing, setEditing] = useState<{ jobId: string; current: AppStatus } | null>(null);
+  const [filter, setFilter] = useState<StatusFilter>('all');
 
+  const stats = applicationStats(applied);
   const items = useMemo(() => {
     return Object.keys(applied)
       .map((id) => ({ job: jobsById[id], status: applied[id] }))
       .filter((it): it is { job: Job; status: AppStatus } => Boolean(it.job))
       .sort((a, b) => STATUS_FLOW.indexOf(a.status) - STATUS_FLOW.indexOf(b.status));
   }, [applied, jobsById]);
+  const visible = useMemo(() => items.filter((it) => inStatusFilter(it.status, filter)), [items, filter]);
 
   const statusStyle = (s: AppStatus): { bg: string; fg: string; border?: string } => {
     switch (s) {
@@ -187,50 +205,72 @@ export default function Applications() {
           <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)/jobs')} style={{ marginTop: spacing[2] }} />
         </View>
       ) : (
-        <View style={{ gap: spacing[3] }}>
-          {items.map(({ job, status }) => {
-            const c = statusStyle(status);
-            return (
-              <Pressable
-                key={job.id}
-                onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
-                accessibilityRole="button"
-                accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}`}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing[3],
-                    padding: spacing[3],
-                    borderRadius: radii.row,
-                    backgroundColor: colors.bgCard,
-                    borderWidth: 1.5,
-                    borderColor: colors.border1,
-                  },
-                  pressed && { transform: [{ scale: 0.99 }] },
-                ]}
-              >
-                <CompanyLogo job={job} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
-                    {job.role}
-                  </Txt>
-                  <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
-                    {job.company} · {job.location}
-                  </Txt>
-                </View>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => setEditing({ jobId: job.id, current: status })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Status: ${STATUS_LABEL[status]}. Tap to change`}
-                >
-                  <Pill label={STATUS_LABEL[status]} bg={c.bg} fg={c.fg} border={c.border} small />
-                </Pressable>
-              </Pressable>
-            );
-          })}
-        </View>
+        <>
+          {/* insights */}
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <Stat label="Interviews" value={String(stats.interviewing)} />
+            <Stat label="Offers" value={String(stats.offers)} />
+            <Stat label="Response" value={`${stats.responseRate}%`} accent />
+          </View>
+
+          {/* status filter */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+            {STATUS_FILTERS.map((f) => (
+              <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
+            ))}
+          </View>
+
+          {visible.length === 0 ? (
+            <Txt center color={colors.fg4} style={{ paddingVertical: spacing[10] }}>
+              No applications in this view.
+            </Txt>
+          ) : (
+            <View style={{ gap: spacing[3] }}>
+              {visible.map(({ job, status }) => {
+                const c = statusStyle(status);
+                return (
+                  <Pressable
+                    key={job.id}
+                    onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}`}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing[3],
+                        padding: spacing[3],
+                        borderRadius: radii.row,
+                        backgroundColor: colors.bgCard,
+                        borderWidth: 1.5,
+                        borderColor: colors.border1,
+                      },
+                      pressed && { transform: [{ scale: 0.99 }] },
+                    ]}
+                  >
+                    <CompanyLogo job={job} size={36} />
+                    <View style={{ flex: 1 }}>
+                      <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
+                        {job.role}
+                      </Txt>
+                      <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
+                        {job.company} · {job.location}
+                      </Txt>
+                    </View>
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => setEditing({ jobId: job.id, current: status })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Status: ${STATUS_LABEL[status]}. Tap to change`}
+                    >
+                      <Pill label={STATUS_LABEL[status]} bg={c.bg} fg={c.fg} border={c.border} small />
+                    </Pressable>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </>
       )}
 
       <StatusSheet
