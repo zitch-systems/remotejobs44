@@ -234,7 +234,9 @@ if the mark changes (uses the repo-root `sharp`).
 - **Social sign-in** (`lib/oauth.ts`) — Google + LinkedIn via PKCE
   (`signInWithOAuth` + `expo-web-browser` + `expo-auth-session`).
   *Setup:* enable the Google / LinkedIn (OIDC) providers in Supabase Auth and
-  add the app redirect URL (printed by `makeRedirectUri`) to the allow-list.
+  add `remotejobs44://**` (the `makeRedirectUri` value) to **Auth → URL
+  Configuration → Redirect URLs** — without it the browser opens but never
+  returns. Native OAuth only works in a dev build / APK, not Expo Go.
 - **Encrypted session storage** (`lib/secure-store-adapter.ts`) — the Supabase
   session is now AES-encrypted at rest (key in `expo-secure-store`, ciphertext
   in AsyncStorage), and the client uses PKCE.
@@ -269,7 +271,10 @@ sandbox:
    `device_push_tokens` and calls Expo's push API. (Code:
    `supabase/functions/send-job-alerts/index.ts`.)
 3. **Enable OAuth providers** (Google + LinkedIn OIDC) in Supabase Auth and add
-   the `makeRedirectUri` URL to the redirect allow-list.
+   `remotejobs44://**` to **Auth → URL Configuration → Redirect URLs** (the
+   `makeRedirectUri` value). Missing this = the OAuth browser opens but never
+   returns to the app. Test the round-trip on a dev build / APK (Expo Go's
+   `exp://` redirect can't deep-link back).
 4. **`eas init`** for the EAS `projectId` (needed for Expo push tokens) and a
    **Dev Client** build (Expo Go can't receive remote push).
 5. **On-device QA** — OAuth round-trip, push delivery, encrypted-storage I/O.

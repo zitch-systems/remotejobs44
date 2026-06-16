@@ -78,6 +78,8 @@ that would burn build minutes.)
 - Install on a device (sideload the `.apk`, or use the EAS internal link).
 - For full functionality (not demo), also do `README.md` → **Deploy checklist**:
   apply migrations **v37 + v38**, deploy + schedule the **push function**, and
-  enable the **OAuth providers**.
+  enable the **OAuth providers**. For Google / LinkedIn specifically, add
+  `remotejobs44://**` to **Supabase → Auth → URL Configuration → Redirect
+  URLs** — without it the sign-in browser opens but never returns to the app.
 - For the Play Store, build with `--profile production` (outputs an `.aab`) and
   `eas submit -p android`.
