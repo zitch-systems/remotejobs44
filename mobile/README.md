@@ -233,8 +233,13 @@ if the mark changes (uses the repo-root `sharp`).
 - **Share a job** — the job-detail share button uses the native share sheet.
 - **Social sign-in** (`lib/oauth.ts`) — Google + LinkedIn via PKCE
   (`signInWithOAuth` + `expo-web-browser` + `expo-auth-session`).
-  *Setup:* enable the Google / LinkedIn (OIDC) providers in Supabase Auth and
-  add the app redirect URL (printed by `makeRedirectUri`) to the allow-list.
+  *Setup:* enable the Google / LinkedIn (OIDC) providers in Supabase Auth **and
+  add `remotejobs44://**` to Auth → URL Configuration → Redirect URLs.** If that
+  redirect isn't allow-listed, Supabase bounces back to the Site URL
+  (remotejobs44.com) after the provider — the in-app browser stalls on the
+  website and "Google opens but never returns". Requires a **dev/standalone
+  build**; native OAuth can't work in Expo Go (the `remotejobs44://` scheme
+  doesn't exist there), and `lib/oauth.ts` fails fast with that message.
 - **Encrypted session storage** (`lib/secure-store-adapter.ts`) — the Supabase
   session is now AES-encrypted at rest (key in `expo-secure-store`, ciphertext
   in AsyncStorage), and the client uses PKCE.
@@ -269,7 +274,8 @@ sandbox:
    `device_push_tokens` and calls Expo's push API. (Code:
    `supabase/functions/send-job-alerts/index.ts`.)
 3. **Enable OAuth providers** (Google + LinkedIn OIDC) in Supabase Auth and add
-   the `makeRedirectUri` URL to the redirect allow-list.
+   `remotejobs44://**` to the redirect allow-list (Auth → URL Configuration →
+   Redirect URLs). Test on a dev/standalone build — not Expo Go.
 4. **`eas init`** for the EAS `projectId` (needed for Expo push tokens) and a
    **Dev Client** build (Expo Go can't receive remote push).
 5. **On-device QA** — OAuth round-trip, push delivery, encrypted-storage I/O.
