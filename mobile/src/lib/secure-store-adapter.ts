@@ -14,40 +14,55 @@ import aesjs from 'aes-js';
 // 256-bit key, AES-CTR.
 const KEY_BYTES = 256 / 8;
 
-async function encrypt(key: string, value: string): Promise<string> {
-  const encryptionKey = Crypto.getRandomBytes(KEY_BYTES);
-  const cipher = new aesjs.ModeOfOperation.ctr(encryptionKey, new aesjs.Counter(1));
-  const encryptedBytes = cipher.encrypt(aesjs.utils.utf8.toBytes(value));
-  // Stash the per-value key in the secure keystore, keyed by the same name.
-  await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey));
-  return aesjs.utils.hex.fromBytes(encryptedBytes);
-}
-
-async function decrypt(key: string, value: string): Promise<string | null> {
-  const encryptionKeyHex = await SecureStore.getItemAsync(key);
-  if (!encryptionKeyHex) return null;
-  const cipher = new aesjs.ModeOfOperation.ctr(aesjs.utils.hex.toBytes(encryptionKeyHex), new aesjs.Counter(1));
-  const decryptedBytes = cipher.decrypt(aesjs.utils.hex.toBytes(value));
-  return aesjs.utils.utf8.fromBytes(decryptedBytes);
-}
-
+/**
+ * Resilient storage: encrypt at rest when the crypto + secure-store native
+ * modules are available; otherwise fall back to plain AsyncStorage so a missing
+ * keystore / crypto module can NEVER crash auth or lose the session. The
+ * presence of a SecureStore key for `key` tells getItem which path was used.
+ */
 export const LargeSecureStore = {
   async getItem(key: string): Promise<string | null> {
-    const encrypted = await AsyncStorage.getItem(key);
-    if (!encrypted) return null;
+    const stored = await AsyncStorage.getItem(key);
+    if (stored == null) return null;
+    let keyHex: string | null = null;
     try {
-      return await decrypt(key, encrypted);
+      keyHex = await SecureStore.getItemAsync(key);
     } catch {
-      // Corrupt/rotated key — treat as no session rather than throwing.
+      keyHex = null;
+    }
+    if (!keyHex) return stored; // stored as plaintext (no/failed encryption)
+    try {
+      const cipher = new aesjs.ModeOfOperation.ctr(aesjs.utils.hex.toBytes(keyHex), new aesjs.Counter(1));
+      return aesjs.utils.utf8.fromBytes(cipher.decrypt(aesjs.utils.hex.toBytes(stored)));
+    } catch {
+      // Corrupt / rotated key — treat as no session rather than throwing.
       return null;
     }
   },
   async setItem(key: string, value: string): Promise<void> {
-    const encrypted = await encrypt(key, value);
-    await AsyncStorage.setItem(key, encrypted);
+    try {
+      const encryptionKey = Crypto.getRandomBytes(KEY_BYTES);
+      const cipher = new aesjs.ModeOfOperation.ctr(encryptionKey, new aesjs.Counter(1));
+      const ciphertext = aesjs.utils.hex.fromBytes(cipher.encrypt(aesjs.utils.utf8.toBytes(value)));
+      await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey));
+      await AsyncStorage.setItem(key, ciphertext);
+    } catch {
+      // Crypto / keystore unavailable on this device/build — persist plaintext
+      // so sign-in still works (clear any stale key so getItem reads it raw).
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch {
+        /* ignore */
+      }
+      await AsyncStorage.setItem(key, value);
+    }
   },
   async removeItem(key: string): Promise<void> {
     await AsyncStorage.removeItem(key);
-    await SecureStore.deleteItemAsync(key);
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      /* ignore */
+    }
   },
 };

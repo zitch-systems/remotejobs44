@@ -38,10 +38,10 @@ type TxtVariant =
 
 const VARIANT: Record<TxtVariant, { font: string; size: number; lh: number; ls?: number; upper?: boolean }> = {
   screenTitle: { font: fonts.displayExtrabold, size: fontSizes.xl, lh: 1.1, ls: tracking.tight },
-  h1: { font: fonts.displayExtrabold, size: 23, lh: 1.12, ls: tracking.tight },
+  h1: { font: fonts.displayExtrabold, size: 25, lh: 1.12, ls: tracking.tight },
   h2: { font: fonts.displayExtrabold, size: fontSizes.md, lh: 1.2, ls: tracking.tight },
   h3: { font: fonts.displayBold, size: fontSizes.base, lh: 1.3 },
-  cardTitle: { font: fonts.displayBold, size: 13.5, lh: 1.3 },
+  cardTitle: { font: fonts.displayBold, size: 15, lh: 1.3 },
   bodyLg: { font: fonts.body, size: fontSizes.base, lh: 1.55 },
   body: { font: fonts.body, size: fontSizes.sm, lh: 1.55 },
   label: { font: fonts.displayBold, size: fontSizes.xs, lh: 1.3 },
@@ -217,7 +217,7 @@ export function Button({
       ) : (
         <>
           {icon}
-          <Text style={{ fontFamily: fonts.displayBold, fontSize: 14, color: fg }}>{label}</Text>
+          <Text style={{ fontFamily: fonts.displayBold, fontSize: 15, color: fg }}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -290,7 +290,7 @@ export function Chip({ label, active, onPress }: { label: string; active?: boole
       <Text
         style={{
           fontFamily: fonts.displaySemibold,
-          fontSize: 13,
+          fontSize: 14,
           color: active ? '#ffffff' : colors.fg2,
         }}
       >
@@ -377,7 +377,7 @@ export function Field({
       >
         {leading}
         <TextInput
-          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.fg1, paddingVertical: 0 }}
+          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.fg1, paddingVertical: 0 }}
           placeholderTextColor={colors.fg4}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

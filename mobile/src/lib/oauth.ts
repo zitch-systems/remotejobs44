@@ -19,7 +19,10 @@ WebBrowser.maybeCompleteAuthSession();
 export type OAuthProvider = 'google' | 'linkedin_oidc';
 
 export async function signInWithProvider(provider: OAuthProvider): Promise<void> {
-  const redirectTo = makeRedirectUri();
+  // Deterministic standalone redirect: remotejobs44:// . This EXACT value must be
+  // in Supabase → Auth → URL Configuration → Redirect URLs, or the provider
+  // won't redirect back into the app after sign-in.
+  const redirectTo = makeRedirectUri({ scheme: 'remotejobs44' });
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,

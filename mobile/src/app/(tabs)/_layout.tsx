@@ -56,7 +56,7 @@ function TabBar({ state, navigation }: TabBarProps) {
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 48 }}
             >
               <Icon size={22} color={tint} />
-              <Text style={{ fontFamily: fonts.displayMedium, fontSize: 10, color: tint }}>{LABELS[route.name]}</Text>
+              <Text style={{ fontFamily: fonts.displayMedium, fontSize: 11, color: tint }}>{LABELS[route.name]}</Text>
             </Pressable>
           );
         })}
