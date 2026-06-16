@@ -54,23 +54,30 @@ export async function updateApplicationStatus(userId: string, jobId: string, sta
   if (error) throw error;
 }
 
+/** Save the free-text note on an application (migration_v46). */
+export async function updateApplicationNote(userId: string, jobId: string, notes: string): Promise<void> {
+  const { error } = await supabase.from('applications').update({ notes }).eq('user_id', userId).eq('job_id', jobId);
+  if (error) throw error;
+}
+
 export interface ApplicationItem {
   job: Job;
   status: AppStatus;
+  notes: string | null;
 }
 
 /** Authoritative tracker data: applications joined to their jobs. */
 export async function fetchApplicationItems(userId: string): Promise<ApplicationItem[]> {
   const { data, error } = await supabase
     .from('applications')
-    .select(`status, jobs(${JOB_COLUMNS})`)
+    .select(`status, notes, jobs(${JOB_COLUMNS})`)
     .eq('user_id', userId)
     .order('applied_at', { ascending: false });
   if (error) throw error;
   const items: ApplicationItem[] = [];
   for (const row of (data ?? []) as any[]) {
     if (!row.jobs) continue;
-    items.push({ job: rowToJob(row.jobs), status: dbToStatus(row.status) });
+    items.push({ job: rowToJob(row.jobs), status: dbToStatus(row.status), notes: (row.notes as string | null) ?? null });
   }
   return items;
 }

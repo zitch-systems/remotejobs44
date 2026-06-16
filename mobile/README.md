@@ -93,6 +93,10 @@ if the mark changes (uses the repo-root `sharp`).
 
 ## Recently added
 
+- **Application notes** (`app/(tabs)/applications.tsx`) — the status sheet is now
+  a "manage application" sheet: change status **and** jot a free-text note
+  (recruiter, next step, salary). Notes persist to `applications.notes`
+  (`migration_v46`, applied live) and preview on the row.
 - **Applications insights + status filter** (`lib/stats.ts`) — the tracker now
   shows a pipeline strip (interviews / offers / **response rate**) and **filter
   chips** (All / Active / Interviewing / Offers / Closed). Pure stat + filter

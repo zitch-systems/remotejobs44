@@ -4,7 +4,7 @@
 // The store's `applied` map is the source of truth (optimistic + write-through);
 // job objects are resolved from the user's fetched applications (or the seed).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check, ClipboardList } from 'lucide-react-native';
@@ -15,15 +15,23 @@ import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_FLOW, STATUS_LABEL, type AppStatus } from '@/lib/types';
 import { applicationStats, inStatusFilter, STATUS_FILTERS, type StatusFilter } from '@/lib/stats';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { fetchApplicationItems } from '@/lib/user-state';
+import { fetchApplicationItems, updateApplicationNote } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
+import { toast } from '@/store/toast';
 import { fonts, radii, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
 /** The job objects behind the user's applications, keyed by id (+ loading). */
-function useApplicationJobs(appliedKey: string): { jobsById: Record<string, Job>; loading: boolean; refreshing: boolean; refresh: () => void } {
+function useApplicationJobs(appliedKey: string): {
+  jobsById: Record<string, Job>;
+  notesById: Record<string, string>;
+  loading: boolean;
+  refreshing: boolean;
+  refresh: () => void;
+} {
   const userId = useAppStore((s) => s.userId);
   const [jobsById, setJobsById] = useState<Record<string, Job>>({});
+  const [notesById, setNotesById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
   const [refreshing, setRefreshing] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -33,6 +41,7 @@ function useApplicationJobs(appliedKey: string): { jobsById: Record<string, Job>
       const map: Record<string, Job> = {};
       for (const j of SEED_JOBS) map[j.id] = j;
       setJobsById(map);
+      setNotesById({});
       setLoading(false);
       setRefreshing(false);
       return;
@@ -43,8 +52,13 @@ function useApplicationJobs(appliedKey: string): { jobsById: Record<string, Job>
       .then((items) => {
         if (!active) return;
         const map: Record<string, Job> = {};
-        for (const it of items) map[it.job.id] = it.job;
+        const notes: Record<string, string> = {};
+        for (const it of items) {
+          map[it.job.id] = it.job;
+          if (it.notes) notes[it.job.id] = it.notes;
+        }
         setJobsById(map);
+        setNotesById(notes);
       })
       .catch(() => {})
       .finally(() => {
@@ -62,6 +76,7 @@ function useApplicationJobs(appliedKey: string): { jobsById: Record<string, Job>
 
   return {
     jobsById,
+    notesById,
     loading,
     refreshing,
     refresh: () => {
@@ -71,9 +86,24 @@ function useApplicationJobs(appliedKey: string): { jobsById: Record<string, Job>
   };
 }
 
-function StatusSheet({ editing, onClose, onPick }: { editing: { jobId: string; current: AppStatus } | null; onClose: () => void; onPick: (s: AppStatus) => void }) {
+function ManageSheet({
+  editing,
+  onClose,
+  onPickStatus,
+  onSaveNote,
+}: {
+  editing: { jobId: string; current: AppStatus; note: string } | null;
+  onClose: () => void;
+  onPickStatus: (s: AppStatus) => void;
+  onSaveNote: (note: string) => void;
+}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    setNote(editing?.note ?? '');
+  }, [editing?.jobId]);
+
   return (
     <Modal visible={!!editing} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: colors.overlay }} onPress={onClose} />
@@ -101,7 +131,7 @@ function StatusSheet({ editing, onClose, onPick }: { editing: { jobId: string; c
           return (
             <Pressable
               key={s}
-              onPress={() => onPick(s)}
+              onPress={() => onPickStatus(s)}
               accessibilityRole="button"
               accessibilityLabel={STATUS_LABEL[s]}
               accessibilityState={{ selected }}
@@ -123,6 +153,23 @@ function StatusSheet({ editing, onClose, onPick }: { editing: { jobId: string; c
             </Pressable>
           );
         })}
+
+        <Txt variant="eyebrow" color={colors.fg4} style={{ marginTop: spacing[3] }}>
+          Notes
+        </Txt>
+        <Card style={{ padding: spacing[4] }}>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="Recruiter, next step, salary discussed…"
+            placeholderTextColor={colors.fg4}
+            multiline
+            maxLength={1000}
+            textAlignVertical="top"
+            style={{ minHeight: 64, fontFamily: fonts.body, fontSize: 13, color: colors.fg1, lineHeight: 20 }}
+          />
+        </Card>
+        <Button label="Save" onPress={() => onSaveNote(note)} style={{ marginTop: spacing[3] }} />
       </View>
     </Modal>
   );
@@ -147,10 +194,13 @@ export default function Applications() {
   const router = useRouter();
   const applied = useAppStore((s) => s.applied);
   const updateStatus = useAppStore((s) => s.updateStatus);
+  const userId = useAppStore((s) => s.userId);
   const appliedKey = Object.keys(applied).sort().join(',');
-  const { jobsById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
-  const [editing, setEditing] = useState<{ jobId: string; current: AppStatus } | null>(null);
+  const { jobsById, notesById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
+  const [editing, setEditing] = useState<{ jobId: string; current: AppStatus; note: string } | null>(null);
+  const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const noteFor = (jobId: string) => noteOverrides[jobId] ?? notesById[jobId] ?? '';
 
   const stats = applicationStats(applied);
   const items = useMemo(() => {
@@ -256,12 +306,17 @@ export default function Applications() {
                       <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
                         {job.company} · {job.location}
                       </Txt>
+                      {noteFor(job.id) ? (
+                        <Txt variant="meta" color={colors.fg4} numberOfLines={1} style={{ marginTop: 1, fontStyle: 'italic' }}>
+                          {noteFor(job.id)}
+                        </Txt>
+                      ) : null}
                     </View>
                     <Pressable
                       hitSlop={8}
-                      onPress={() => setEditing({ jobId: job.id, current: status })}
+                      onPress={() => setEditing({ jobId: job.id, current: status, note: noteFor(job.id) })}
                       accessibilityRole="button"
-                      accessibilityLabel={`Status: ${STATUS_LABEL[status]}. Tap to change`}
+                      accessibilityLabel={`Status: ${STATUS_LABEL[status]}. Tap to manage`}
                     >
                       <Pill label={STATUS_LABEL[status]} bg={c.bg} fg={c.fg} border={c.border} small />
                     </Pressable>
@@ -273,11 +328,20 @@ export default function Applications() {
         </>
       )}
 
-      <StatusSheet
+      <ManageSheet
         editing={editing}
         onClose={() => setEditing(null)}
-        onPick={(s) => {
-          if (editing) updateStatus(editing.jobId, s);
+        onPickStatus={(s) => {
+          if (!editing) return;
+          updateStatus(editing.jobId, s);
+          setEditing({ ...editing, current: s });
+        }}
+        onSaveNote={(note) => {
+          if (!editing) return;
+          const jobId = editing.jobId;
+          setNoteOverrides((m) => ({ ...m, [jobId]: note }));
+          if (isSupabaseConfigured && userId) updateApplicationNote(userId, jobId, note).catch(() => {});
+          toast('Note saved', 'success');
           setEditing(null);
         }}
       />
