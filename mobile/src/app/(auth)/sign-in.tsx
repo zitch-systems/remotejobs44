@@ -8,7 +8,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Search, ShieldCheck, User } from 'lucide-react-native';
 import { Button, Divider, Field, Txt } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { signInWithProvider } from '@/lib/oauth';
 import { SEED_USER } from '@/lib/seed';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
@@ -72,7 +72,8 @@ export default function SignIn() {
 
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState(SEED_USER.email);
+  // Only pre-fill the demo email in demo mode; real builds start empty.
+  const [email, setEmail] = useState(isSupabaseConfigured ? '' : SEED_USER.email);
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -143,6 +144,7 @@ export default function SignIn() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: spacing.authX,
