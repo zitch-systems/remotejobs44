@@ -132,16 +132,19 @@ export const fonts = {
   bodyBold: 'DMSans_700Bold',
 } as const;
 
+// Sizes are bumped ~1 step up from the web 1:1 port: pixel sizes that read fine
+// in a desktop browser are too small on a phone held at arm's length. Keep the
+// scale's rhythm; just shift the reading sizes (xs–xl) up a couple px.
 export const fontSizes = {
-  '2xs': 10,
-  xs: 11,
-  sm: 13,
-  base: 15,
-  md: 17,
-  lg: 20,
-  xl: 24,
-  '2xl': 30,
-  '3xl': 38,
+  '2xs': 11,
+  xs: 12,
+  sm: 14,
+  base: 16,
+  md: 18,
+  lg: 21,
+  xl: 25,
+  '2xl': 31,
+  '3xl': 39,
   '4xl': 50,
   '5xl': 64,
 } as const;

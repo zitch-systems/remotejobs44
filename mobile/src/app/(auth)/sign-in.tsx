@@ -51,7 +51,7 @@ function Segmented({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void
           active && { backgroundColor: colors.bgCard, ...shadows.field },
         ]}
       >
-        <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 13, color: active ? colors.fg1 : colors.fg3 }}>
+        <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 14, color: active ? colors.fg1 : colors.fg3 }}>
           {label}
         </Txt>
       </Pressable>
@@ -158,7 +158,7 @@ export default function SignIn() {
             <Txt variant="h1" center>
               {isSignup ? 'Create your account' : 'Welcome back'}
             </Txt>
-            <Txt center color={colors.fg3} style={{ fontSize: 12.5 }}>
+            <Txt center color={colors.fg3} style={{ fontSize: 13.5 }}>
               {isSignup
                 ? 'Join 40,000+ remote workers finding verified roles across Africa.'
                 : 'Sign in to pick up your job search where you left off.'}
@@ -205,7 +205,7 @@ export default function SignIn() {
             />
             {!isSignup ? (
               <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => Alert.alert('Reset password', 'Password reset flow goes here.')}>
-                <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 11.5, color: colors.brand }}>Forgot password?</Txt>
+                <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 12.5, color: colors.brand }}>Forgot password?</Txt>
               </Pressable>
             ) : null}
 
@@ -235,9 +235,9 @@ export default function SignIn() {
           {/* footer toggle */}
           <View style={{ marginTop: 'auto', paddingTop: spacing[8], alignItems: 'center', gap: spacing[3] }}>
             <Pressable onPress={() => setMode(isSignup ? 'signin' : 'signup')}>
-              <Txt center color={colors.fg3} style={{ fontSize: 12.5 }}>
+              <Txt center color={colors.fg3} style={{ fontSize: 13.5 }}>
                 {isSignup ? 'Already have an account? ' : 'New to RemoteJobs44? '}
-                <Txt style={{ fontFamily: fonts.displayBold, fontSize: 12.5, color: colors.brandStrong }}>
+                <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13.5, color: colors.brandStrong }}>
                   {isSignup ? 'Sign in' : 'Create account'}
                 </Txt>
               </Txt>
@@ -304,7 +304,7 @@ function SocialButton({
       >
         <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 11, color: markColor }}>{mark}</Txt>
       </View>
-      <Txt style={{ fontFamily: fonts.displayBold, fontSize: 12.5, color: colors.fg2 }}>{label}</Txt>
+      <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13.5, color: colors.fg2 }}>{label}</Txt>
     </Pressable>
   );
 }

@@ -171,7 +171,7 @@ export default function Feed() {
               addSearch(query);
               setSearchFocused(false);
             }}
-            style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.fg1, paddingVertical: 0 }}
+            style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.fg1, paddingVertical: 0 }}
           />
         </Card>
         <Pressable
