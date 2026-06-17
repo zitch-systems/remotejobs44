@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Search, ShieldCheck, User } from 'lucide-react-native';
 import { Button, Divider, Field, Txt } from '@/components/ui';
@@ -215,7 +216,7 @@ export default function SignIn() {
               }
             />
             {!isSignup ? (
-              <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => Alert.alert('Reset password', 'Password reset flow goes here.')}>
+              <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => router.push('/forgot-password')}>
                 <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 12.5, color: colors.brand }}>Forgot password?</Txt>
               </Pressable>
             ) : null}

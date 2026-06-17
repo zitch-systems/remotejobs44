@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/sora';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { AuthProvider } from '@/lib/auth';
+import { usePasswordRecoveryLink } from '@/lib/password-reset';
 import { initSentry, withSentry } from '@/lib/sentry';
 import { Toaster } from '@/components/Toaster';
 
@@ -40,6 +41,9 @@ function RootLayout() {
     if (loaded) SplashScreen.hideAsync().catch(() => {});
   }, [loaded]);
 
+  // Catch the password-recovery deep link and route to /reset-password.
+  usePasswordRecoveryLink();
+
   if (!loaded) return null;
 
   return (
@@ -50,6 +54,7 @@ function RootLayout() {
           <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" />
+            <Stack.Screen name="reset-password" options={{ presentation: 'card' }} />
             <Stack.Screen name="job/[id]" options={{ presentation: 'card' }} />
           </Stack>
           <Toaster />
