@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Search, ShieldCheck, User } from 'lucide-react-native';
 import { Button, Divider, Field, Txt } from '@/components/ui';
@@ -69,6 +69,7 @@ function Segmented({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void
 export default function SignIn() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { configured, enterDemo } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
@@ -106,18 +107,7 @@ export default function SignIn() {
       }
       // On success the auth listener flips `authed` and (auth)/_layout redirects.
     } catch (e: any) {
-      // Accounts created via Google/LinkedIn have no password, so a password
-      // attempt fails with "Invalid login credentials". Point those users at
-      // the social buttons rather than leaving them stuck on this form (the
-      // "Forgot password?" link can't help — they never had a password).
-      const msg = String(e?.message ?? '');
-      const isCred = /invalid/i.test(msg) || /credential/i.test(msg);
-      Alert.alert(
-        'Sign-in failed',
-        isCred
-          ? 'Invalid email or password. If you created this account with Google or LinkedIn, use the buttons below to continue instead.'
-          : msg || 'Please try again.',
-      );
+      Alert.alert('Sign-in failed', e?.message ?? 'Please try again.');
     } finally {
       setBusy(false);
     }
@@ -153,7 +143,10 @@ export default function SignIn() {
           opacity: 0.6,
         }}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* behavior must be set on Android too: with SDK 56 edge-to-edge the OS
+          adjustResize often doesn't fire, so without this the keyboard covers
+          the lower fields (password) and they can't be used. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -216,7 +209,7 @@ export default function SignIn() {
               }
             />
             {!isSignup ? (
-              <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => router.push('/forgot-password')}>
+              <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => router.push('/(auth)/forgot-password')}>
                 <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 12.5, color: colors.brand }}>Forgot password?</Txt>
               </Pressable>
             ) : null}
