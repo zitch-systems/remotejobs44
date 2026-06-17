@@ -139,8 +139,13 @@ function LoginForm() {
           msg.includes('password') ||
           msg.includes('not confirmed') ||
           msg.includes('not found');
+        // Generic, enumeration-safe nudge: accounts created via Google have no
+        // password, so a password attempt always fails here. Pointing every
+        // failed attempt at "Continue with Google" reveals nothing about which
+        // emails exist, but rescues OAuth users who don't realise they never
+        // set a password.
         setErrorMsg(isCredOrConfirm
-          ? 'Invalid email or password. Please try again.'
+          ? 'Invalid email or password. If you signed up with Google, use “Continue with Google” above.'
           : 'Sign-in failed. Please try again.');
         return;
       }
