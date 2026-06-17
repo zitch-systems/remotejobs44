@@ -50,6 +50,9 @@ function RootLayout() {
           <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" />
+            {/* Root-level (not in (auth)) so the recovery session doesn't bounce
+                the user off before they can set a new password. */}
+            <Stack.Screen name="reset-password" />
             <Stack.Screen name="job/[id]" options={{ presentation: 'card' }} />
           </Stack>
           <Toaster />
