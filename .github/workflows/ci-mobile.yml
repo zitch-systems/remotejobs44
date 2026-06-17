@@ -1,0 +1,47 @@
+name: CI Mobile
+
+# Only runs when the Expo app changes. The web checks live in ci.yml and are
+# path-filtered to skip mobile/**, so the two never both run for a single PR.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The Expo app is excluded from the web type-check/lint (root tsconfig +
+  # eslint ignore /mobile), so it needs its own gate — its own package-lock
+  # and tsconfig.
+  mobile-checks:
+    name: mobile · type-check + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install (mobile)
+        run: npm ci
+
+      - name: Type-check (mobile)
+        run: npx tsc --noEmit
+
+      - name: Unit tests (mobile)
+        run: npm test

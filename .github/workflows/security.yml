@@ -9,8 +9,14 @@ name: Security
 on:
   push:
     branches: [main]
+    # Mobile-only changes can't affect the root lockfile this job audits, so
+    # skip them here — the weekly schedule below still re-audits everything.
+    paths-ignore:
+      - 'mobile/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'mobile/**'
   schedule:
     # Weekly catch for advisories disclosed after a PR already merged.
     - cron: "27 6 * * 1"

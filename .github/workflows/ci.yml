@@ -1,10 +1,18 @@
 name: CI
 
+# Path-filtered so a change only spends minutes on the checks it can affect:
+# web changes (anything outside mobile/) run this workflow; mobile/** changes
+# run ci-mobile.yml instead. Stops every mobile-only PR from paying for the
+# slow Next.js build, and every web PR from running the Expo checks.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'mobile/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'mobile/**'
 
 # Cancel older runs on the same branch when a new push lands. Saves
 # CI minutes when a contributor pushes a fix on top of a still-running
@@ -80,32 +88,3 @@ jobs:
           PAYSTACK_SECRET_KEY:           'ci-placeholder-paystack-secret'
           CRON_SECRET:                   'ci-placeholder-cron-secret-min-16-chars'
         run: npm run build
-
-  # The Expo app is excluded from the web type-check/lint (root tsconfig +
-  # eslint ignore /mobile), so it needs its own gate — its own package-lock
-  # and tsconfig.
-  mobile-checks:
-    name: mobile · type-check + test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: mobile
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-
-      - name: Install (mobile)
-        run: npm ci
-
-      - name: Type-check (mobile)
-        run: npx tsc --noEmit
-
-      - name: Unit tests (mobile)
-        run: npm test
