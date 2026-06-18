@@ -1,7 +1,7 @@
 // src/app/(tabs)/jobs.tsx — browse every remote role. Same live feed as Home,
 // but a plain searchable / filterable list (no dashboard chrome), defaulting to
 // the most recent roles. Reuses useJobs + JobCard + FilterSheet.
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarkPlus, Search, SlidersHorizontal, X } from 'lucide-react-native';
@@ -10,25 +10,28 @@ import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
-import { useJobs } from '@/lib/jobs';
-import { activeFilterCount, jobMatchesFilters, type ExperienceLevel } from '@/lib/filters';
+import { useJobs, type JobQuery } from '@/lib/jobs';
+import { activeFilterCount, CATEGORY_OPTIONS, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { isEmptySearch, sameCriteria, searchLabel, type SearchCriteria } from '@/lib/saved-search';
 import { useSearchHistory } from '@/store/search';
 import { useSavedSearches } from '@/store/saved-searches';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
-const FILTERS = ['All', 'Engineering', 'Design', 'Marketing'] as const;
+// Category chips mirror the full DB category set (see CATEGORY_OPTIONS).
+const CATEGORY_LABELS = CATEGORY_OPTIONS.map((o) => o.label);
 
 export default function Jobs() {
   const { colors } = useTheme();
-  const feed = useJobs();
 
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
+  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
   const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('recent');
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [dateLabel, setDateLabel] = useState('Any time');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const addSearch = useSearchHistory((s) => s.add);
@@ -36,17 +39,43 @@ export default function Jobs() {
   const addSavedSearch = useSavedSearches((s) => s.add);
   const removeSavedSearch = useSavedSearches((s) => s.remove);
 
-  const jobs = useMemo(() => {
-    let list: Job[] = feed.jobs.filter((j) => jobMatchesFilters(j, { category: filter, type, level, query }));
-    if (sort === 'match') list = [...list].sort((a, b) => b.match - a.match);
-    return list;
-  }, [feed.jobs, filter, type, level, query, sort]);
+  // Debounce the text input so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
-  const fCount = activeFilterCount(type, level);
+  const postedWithinDays = DATE_OPTIONS.find((o) => o.label === dateLabel)?.days;
+
+  // Server-side query: filters run across the whole table, not just the page.
+  const jobQuery: JobQuery = useMemo(
+    () => ({
+      text: debouncedQuery || undefined,
+      category: CATEGORY_OPTIONS.find((o) => o.label === filter)?.value,
+      type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
+      level: level === 'Any' ? undefined : level,
+      remoteOnly: remoteOnly || undefined,
+      postedWithinDays,
+    }),
+    [debouncedQuery, filter, type, level, remoteOnly, postedWithinDays],
+  );
+
+  const feed = useJobs(20, jobQuery);
+
+  // Only client-side step left is the optional "Top match" re-ordering of the
+  // loaded page (match is computed client-side from the user's skills).
+  const jobs = useMemo(() => {
+    if (sort === 'match') return [...feed.jobs].sort((a, b) => b.match - a.match);
+    return feed.jobs;
+  }, [feed.jobs, sort]);
+
+  const fCount = activeFilterCount(type, level, remoteOnly, postedWithinDays);
   const resetSheet = () => {
     setType('Any');
     setLevel('Any');
     setSort('recent');
+    setRemoteOnly(false);
+    setDateLabel('Any time');
   };
   const resetAll = () => {
     setFilter('All');
@@ -58,10 +87,12 @@ export default function Jobs() {
   const canSave = !isEmptySearch(criteria) && !savedSearches.some((s) => sameCriteria(s, criteria));
   const applySaved = (s: SearchCriteria) => {
     setQuery(s.query);
-    setFilter(s.category as (typeof FILTERS)[number]);
+    setFilter(s.category);
     setType(s.type as JobType);
     setLevel(s.level as ExperienceLevel);
     setSort(s.sort as SortBy);
+    setRemoteOnly(false);
+    setDateLabel('Any time');
   };
 
   const header = (
@@ -86,6 +117,7 @@ export default function Jobs() {
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onSubmitEditing={() => {
+              setDebouncedQuery(query.trim()); // search now, don't wait for debounce
               addSearch(query);
               setSearchFocused(false);
             }}
@@ -139,7 +171,7 @@ export default function Jobs() {
 
       {/* category chips */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-        {FILTERS.map((f) => (
+        {CATEGORY_LABELS.map((f) => (
           <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
         ))}
       </View>
@@ -269,6 +301,10 @@ export default function Jobs() {
         setLevel={setLevel}
         sort={sort}
         setSort={setSort}
+        remoteOnly={remoteOnly}
+        setRemoteOnly={setRemoteOnly}
+        dateLabel={dateLabel}
+        setDateLabel={setDateLabel}
         onReset={resetSheet}
       />
     </SafeAreaView>
