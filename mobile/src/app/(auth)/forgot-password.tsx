@@ -10,7 +10,7 @@
 // error leaks account existence (the same enumeration vector the web app
 // closes). Real failures are logged for support, not surfaced to the user.
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowRight, Mail, MailCheck } from 'lucide-react-native';
@@ -58,7 +58,8 @@ export default function ForgotPassword() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      {/* Android relies on softwareKeyboardLayoutMode:"pan" (app.json); iOS uses padding KAV. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

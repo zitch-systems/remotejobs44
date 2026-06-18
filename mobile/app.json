@@ -18,6 +18,7 @@
         "backgroundColor": "#2563eb",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
+      "softwareKeyboardLayoutMode": "pan",
       "package": "com.remotejobs44.app",
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
