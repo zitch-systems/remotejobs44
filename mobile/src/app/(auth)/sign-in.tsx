@@ -143,10 +143,13 @@ export default function SignIn() {
           opacity: 0.6,
         }}
       />
-      {/* behavior must be set on Android too: with SDK 56 edge-to-edge the OS
-          adjustResize often doesn't fire, so without this the keyboard covers
-          the lower fields (password) and they can't be used. */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* Keyboard handling. Android: NO KeyboardAvoidingView — with SDK 56
+          edge-to-edge, adjustResize doesn't reliably fire, so KAV either did
+          nothing (keyboard covers the field) or, with "height", dropped focus
+          and snapped the keyboard shut. Instead the field is kept visible by
+          the native softwareKeyboardLayoutMode:"pan" set in app.json. iOS has
+          no such resize quirk, so it keeps the standard padding KAV. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

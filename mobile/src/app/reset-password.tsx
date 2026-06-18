@@ -163,7 +163,8 @@ export default function ResetPassword() {
   // phase === 'ready'
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* Android relies on softwareKeyboardLayoutMode:"pan" (app.json); iOS uses padding KAV. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
