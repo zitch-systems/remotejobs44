@@ -54,6 +54,21 @@ export function timeAgo(iso: string | null, now: number = Date.now()): string {
   return `${Math.floor(d / 30)}mo ago`;
 }
 
+// Absolute calendar date for an application's "Applied on" line. Drops the year
+// for dates in the current year (e.g. "12 Jun") and keeps it otherwise
+// ("12 Jun 2025"). Returns '' when there is no timestamp (e.g. seed/demo rows).
+export function appliedDateLabel(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
+}
+
 export function tagsFrom(skills: string[] | null, category: string | null): JobTag[] {
   const base = (skills && skills.length ? skills : category ? [category] : []).slice(0, 3);
   return base.map((label, i) => ({ label, variant: i === 0 ? 'blue' : 'default' }));
