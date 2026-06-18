@@ -14,7 +14,7 @@
 //      the web /auth/callback fallback), then reveal the password form.
 //   3. updateUser({ password }) sets the new password on the recovery session.
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
@@ -163,7 +163,7 @@ export default function ResetPassword() {
   // phase === 'ready'
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

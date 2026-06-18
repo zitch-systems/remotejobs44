@@ -2,7 +2,7 @@
 // Segmented Sign in / Create account, email+password (real Supabase auth when
 // configured, demo otherwise), social placeholders, footer toggle + trust line.
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -143,10 +143,12 @@ export default function SignIn() {
           opacity: 0.6,
         }}
       />
-      {/* behavior must be set on Android too: with SDK 56 edge-to-edge the OS
-          adjustResize often doesn't fire, so without this the keyboard covers
-          the lower fields (password) and they can't be used. */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* Keyboard handling: use "padding" on BOTH platforms. On Android with
+          SDK 56 edge-to-edge, "height" resized the KAV container when the
+          keyboard opened, which dropped the focused input and snapped the
+          keyboard shut ("opens then immediately closes"). "padding" lifts the
+          field above the keyboard without that resize, so focus is kept. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
