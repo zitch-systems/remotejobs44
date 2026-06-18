@@ -370,9 +370,12 @@ export function Field({
           backgroundColor: colors.bgCard,
           borderWidth: 1.5,
           borderColor: focused ? colors.brand : colors.border2,
-          ...(focused
-            ? { shadowColor: colors.brand, shadowOpacity: 0.14, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 2 }
-            : null),
+          // NOTE: do NOT toggle `elevation`/shadow on focus here. On Android,
+          // changing elevation promotes the view to a hardware layer and
+          // recreates the native view — which drops the focus of the child
+          // TextInput the instant it gains focus, so the keyboard opens and
+          // immediately closes. The border-color change above is safe (it does
+          // not recreate the view) and is enough to signal focus.
         }}
       >
         {leading}
