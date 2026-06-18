@@ -127,6 +127,15 @@ export default function SignIn() {
     }
   }
 
+  // Android: render the form WITHOUT KeyboardAvoidingView. RN's KAV stays
+  // mounted and re-renders the whole subtree on every keyboard show/hide event
+  // even when behavior is undefined — and under SDK 56's New Architecture that
+  // re-render at keyboard-show time blurs the focused input, so the keyboard
+  // closed the instant it opened. Native softwareKeyboardLayoutMode:"pan"
+  // (app.json) keeps the field visible on Android instead. iOS keeps KAV.
+  const Wrap: any = Platform.OS === 'ios' ? KeyboardAvoidingView : React.Fragment;
+  const wrapProps: any = Platform.OS === 'ios' ? { style: { flex: 1 }, behavior: 'padding' } : {};
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       {/* soft blue radial glow behind the top */}
@@ -143,14 +152,9 @@ export default function SignIn() {
           opacity: 0.6,
         }}
       />
-      {/* Keyboard handling. Android: NO KeyboardAvoidingView — with SDK 56
-          edge-to-edge, adjustResize doesn't reliably fire, so KAV either did
-          nothing (keyboard covers the field) or, with "height", dropped focus
-          and snapped the keyboard shut. Instead the field is kept visible by
-          the native softwareKeyboardLayoutMode:"pan" set in app.json. iOS has
-          no such resize quirk, so it keeps the standard padding KAV. */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Wrap {...wrapProps}>
         <ScrollView
+          style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -258,7 +262,7 @@ export default function SignIn() {
             </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </Wrap>
     </View>
   );
 }

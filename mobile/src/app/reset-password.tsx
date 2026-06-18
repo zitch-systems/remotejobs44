@@ -161,11 +161,16 @@ export default function ResetPassword() {
   }
 
   // phase === 'ready'
+  // Android: no KeyboardAvoidingView — its keyboard-show re-render blurs the
+  // focused input under SDK 56 New Arch. Native pan (app.json) handles it. iOS keeps KAV.
+  const Wrap: any = Platform.OS === 'ios' ? KeyboardAvoidingView : React.Fragment;
+  const wrapProps: any = Platform.OS === 'ios' ? { style: { flex: 1 }, behavior: 'padding' } : {};
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
-      {/* Android relies on softwareKeyboardLayoutMode:"pan" (app.json); iOS uses padding KAV. */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Wrap {...wrapProps}>
         <ScrollView
+          style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -234,7 +239,7 @@ export default function ResetPassword() {
             style={{ marginTop: spacing[5] }}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </Wrap>
     </View>
   );
 }
