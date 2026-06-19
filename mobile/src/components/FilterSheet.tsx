@@ -4,9 +4,9 @@
 // (rendered only when their setters are passed), so the Home feed can use the
 // lighter set while the Jobs tab uses the full set.
 import React from 'react';
-import { Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check } from 'lucide-react-native';
+import { Check, MapPin } from 'lucide-react-native';
 import { Button, Txt } from './ui';
 import { DATE_OPTIONS, EXPERIENCE_LEVELS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { fonts, radii, spacing, useTheme } from '@/theme';
@@ -34,6 +34,8 @@ export function FilterSheet({
   setRemoteOnly,
   dateLabel,
   setDateLabel,
+  location,
+  setLocation,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -49,6 +51,8 @@ export function FilterSheet({
   setRemoteOnly?: (b: boolean) => void;
   dateLabel?: string;
   setDateLabel?: (l: string) => void;
+  location?: string;
+  setLocation?: (l: string) => void;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -124,6 +128,35 @@ export function FilterSheet({
                   onPress={() => setDateLabel(d.label)}
                 />
               ))}
+            </>
+          ) : null}
+
+          {setLocation ? (
+            <>
+              <Heading>Location</Heading>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing[3],
+                  height: 46,
+                  paddingHorizontal: spacing[4],
+                  borderRadius: radii.field,
+                  backgroundColor: colors.bgSection,
+                  borderWidth: 1.5,
+                  borderColor: colors.border2,
+                }}
+              >
+                <MapPin size={16} color={colors.fg4} />
+                <TextInput
+                  value={location ?? ''}
+                  onChangeText={setLocation}
+                  placeholder="City or country, e.g. London, Lagos, Remote"
+                  placeholderTextColor={colors.fg4}
+                  autoCapitalize="words"
+                  style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13.5, color: colors.fg1, paddingVertical: 0 }}
+                />
+              </View>
             </>
           ) : null}
 

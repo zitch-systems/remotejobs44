@@ -24,7 +24,9 @@ const CATEGORY_LABELS = CATEGORY_OPTIONS.map((o) => o.label);
 export default function Jobs() {
   const { colors } = useTheme();
 
-  const [filter, setFilter] = useState<string>('All');
+  // Multi-select category labels (empty = "All"). Stored as labels; mapped to
+  // lowercase DB values when building the query.
+  const [categories, setCategories] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
@@ -32,6 +34,8 @@ export default function Jobs() {
   const [sort, setSort] = useState<SortBy>('recent');
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [dateLabel, setDateLabel] = useState('Any time');
+  const [location, setLocation] = useState('');
+  const [debouncedLocation, setDebouncedLocation] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const addSearch = useSearchHistory((s) => s.add);
@@ -39,25 +43,37 @@ export default function Jobs() {
   const addSavedSearch = useSavedSearches((s) => s.add);
   const removeSavedSearch = useSavedSearches((s) => s.remove);
 
-  // Debounce the text input so typing doesn't fire a query per keystroke.
+  // Debounce the text inputs so typing doesn't fire a query per keystroke.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
     return () => clearTimeout(t);
   }, [query]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLocation(location.trim()), 350);
+    return () => clearTimeout(t);
+  }, [location]);
+
+  const toggleCategory = (label: string) =>
+    setCategories((prev) => (prev.includes(label) ? prev.filter((c) => c !== label) : [...prev, label]));
 
   const postedWithinDays = DATE_OPTIONS.find((o) => o.label === dateLabel)?.days;
+  const categoryValues = useMemo(
+    () => categories.map((l) => CATEGORY_OPTIONS.find((o) => o.label === l)?.value).filter((v): v is string => Boolean(v)),
+    [categories],
+  );
 
   // Server-side query: filters run across the whole table, not just the page.
   const jobQuery: JobQuery = useMemo(
     () => ({
       text: debouncedQuery || undefined,
-      category: CATEGORY_OPTIONS.find((o) => o.label === filter)?.value,
+      categories: categoryValues.length ? categoryValues : undefined,
       type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
       level: level === 'Any' ? undefined : level,
       remoteOnly: remoteOnly || undefined,
+      location: debouncedLocation || undefined,
       postedWithinDays,
     }),
-    [debouncedQuery, filter, type, level, remoteOnly, postedWithinDays],
+    [debouncedQuery, categoryValues, type, level, remoteOnly, debouncedLocation, postedWithinDays],
   );
 
   const feed = useJobs(20, jobQuery);
@@ -69,30 +85,34 @@ export default function Jobs() {
     return feed.jobs;
   }, [feed.jobs, sort]);
 
-  const fCount = activeFilterCount(type, level, remoteOnly, postedWithinDays);
+  const fCount =
+    activeFilterCount(type, level, remoteOnly, postedWithinDays) + (debouncedLocation.trim() ? 1 : 0) + categories.length;
   const resetSheet = () => {
     setType('Any');
     setLevel('Any');
     setSort('recent');
     setRemoteOnly(false);
     setDateLabel('Any time');
+    setLocation('');
   };
   const resetAll = () => {
-    setFilter('All');
+    setCategories([]);
     setQuery('');
     resetSheet();
   };
 
-  const criteria: SearchCriteria = { query, category: filter, type, level, sort };
+  // Saved searches persist the category list as a comma-joined string.
+  const criteria: SearchCriteria = { query, category: categories.join(', '), type, level, sort };
   const canSave = !isEmptySearch(criteria) && !savedSearches.some((s) => sameCriteria(s, criteria));
   const applySaved = (s: SearchCriteria) => {
     setQuery(s.query);
-    setFilter(s.category);
+    setCategories(s.category ? s.category.split(', ').filter(Boolean) : []);
     setType(s.type as JobType);
     setLevel(s.level as ExperienceLevel);
     setSort(s.sort as SortBy);
     setRemoteOnly(false);
     setDateLabel('Any time');
+    setLocation('');
   };
 
   const header = (
@@ -169,11 +189,12 @@ export default function Jobs() {
         />
       ) : null}
 
-      {/* category chips */}
+      {/* category chips (multi-select; "All" clears the selection) */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-        {CATEGORY_LABELS.map((f) => (
-          <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
-        ))}
+        {CATEGORY_LABELS.map((f) => {
+          const active = f === 'All' ? categories.length === 0 : categories.includes(f);
+          return <Chip key={f} label={f} active={active} onPress={() => (f === 'All' ? setCategories([]) : toggleCategory(f))} />;
+        })}
       </View>
 
       {/* saved searches */}
@@ -305,6 +326,8 @@ export default function Jobs() {
         setRemoteOnly={setRemoteOnly}
         dateLabel={dateLabel}
         setDateLabel={setDateLabel}
+        location={location}
+        setLocation={setLocation}
         onReset={resetSheet}
       />
     </SafeAreaView>

@@ -16,17 +16,24 @@ import type { Job } from './types';
 // category/type are the lowercase DB values (see CATEGORY_OPTIONS/TYPE_OPTIONS).
 export interface JobQuery {
   text?: string; // free-text match on title + company
-  category?: string; // lowercase category, e.g. 'engineering'
+  categories?: string[]; // lowercase categories (OR'd), e.g. ['engineering','data']
   type?: string; // lowercase job type, e.g. 'full-time'
   level?: ExperienceLevel; // experience bucket (matched against the free-form level)
   remoteOnly?: boolean; // only remote=true roles
+  location?: string; // free-text location match (ilike on the location column)
   postedWithinDays?: number; // max posting age in days
 }
 
 /** True when no filters are set — lets the default feed reuse the disk cache. */
 export function isDefaultQuery(q: JobQuery): boolean {
   return (
-    !q.text?.trim() && !q.category && !q.type && (!q.level || q.level === 'Any') && !q.remoteOnly && !q.postedWithinDays
+    !q.text?.trim() &&
+    !q.categories?.length &&
+    !q.type &&
+    (!q.level || q.level === 'Any') &&
+    !q.remoteOnly &&
+    !q.location?.trim() &&
+    !q.postedWithinDays
   );
 }
 
@@ -110,9 +117,11 @@ export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; of
 
   const text = sanitizeText(query.text ?? '');
   if (text) q = q.or(`title.ilike.%${text}%,company.ilike.%${text}%`);
-  if (query.category) q = q.eq('category', query.category);
+  if (query.categories?.length) q = q.in('category', query.categories);
   if (query.type) q = q.eq('type', query.type);
   if (query.remoteOnly) q = q.eq('remote', true);
+  const location = sanitizeText(query.location ?? '');
+  if (location) q = q.ilike('location', `%${location}%`);
   if (query.postedWithinDays) {
     const since = new Date(Date.now() - query.postedWithinDays * 86_400_000).toISOString();
     q = q.gte('posted_at', since);
