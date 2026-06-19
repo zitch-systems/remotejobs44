@@ -17,7 +17,7 @@ import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { personalizeJobs, useJobs, type JobQuery } from '@/lib/jobs';
-import { activeFilterCount, CATEGORY_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
+import { activeFilterCount, CATEGORY_OPTIONS, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -86,6 +86,10 @@ export default function Feed() {
   const [type, setType] = useState<JobType>('Any');
   const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('match');
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [dateLabel, setDateLabel] = useState('Any time');
+  const [location, setLocation] = useState('');
+  const [debouncedLocation, setDebouncedLocation] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [userSkills, setUserSkills] = useState<string[]>([]);
   const [skillsLoaded, setSkillsLoaded] = useState(false);
@@ -109,14 +113,20 @@ export default function Feed() {
     };
   }, [userId]);
 
-  // Debounce search so typing doesn't fire a query per keystroke.
+  // Debounce the text inputs so typing doesn't fire a query per keystroke.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
     return () => clearTimeout(t);
   }, [query]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLocation(location.trim()), 350);
+    return () => clearTimeout(t);
+  }, [location]);
 
-  // Server-side query: search + category/type/level run across the whole table,
-  // not just the loaded page (so Home search/filter actually find everything).
+  const postedWithinDays = DATE_OPTIONS.find((o) => o.label === dateLabel)?.days;
+
+  // Server-side query: search + all filters run across the whole table, not just
+  // the loaded page (so Home search/filter actually find everything).
   const jobQuery: JobQuery = useMemo(() => {
     const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
     return {
@@ -124,8 +134,11 @@ export default function Feed() {
       categories: cat ? [cat] : undefined,
       type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
       level: level === 'Any' ? undefined : level,
+      remoteOnly: remoteOnly || undefined,
+      location: debouncedLocation || undefined,
+      postedWithinDays,
     };
-  }, [debouncedQuery, filter, type, level]);
+  }, [debouncedQuery, filter, type, level, remoteOnly, debouncedLocation, postedWithinDays]);
   const feed = useJobs(20, jobQuery);
 
   const showSkillsNudge = isSupabaseConfigured && Boolean(userId) && skillsLoaded && userSkills.length === 0 && !nudgeDismissed;
@@ -143,11 +156,14 @@ export default function Feed() {
   const firstName = (profile.name || '').trim().split(/\s+/)[0] || 'there';
   const appsCount = Object.keys(applied).length;
   const interviews = Object.values(applied).filter((s) => s === 'interview' || s === 'offer').length;
-  const fCount = activeFilterCount(type, level);
+  const fCount = activeFilterCount(type, level, remoteOnly, postedWithinDays) + (debouncedLocation.trim() ? 1 : 0);
   const resetFilters = () => {
     setType('Any');
     setLevel('Any');
     setSort('match');
+    setRemoteOnly(false);
+    setDateLabel('Any time');
+    setLocation('');
   };
 
   const header = (
@@ -371,6 +387,12 @@ export default function Feed() {
         setLevel={setLevel}
         sort={sort}
         setSort={setSort}
+        remoteOnly={remoteOnly}
+        setRemoteOnly={setRemoteOnly}
+        dateLabel={dateLabel}
+        setDateLabel={setDateLabel}
+        location={location}
+        setLocation={setLocation}
         onReset={resetFilters}
       />
     </SafeAreaView>
