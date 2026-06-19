@@ -7,6 +7,7 @@ import { HowItWorks }        from '@/components/home/HowItWorks';
 import { PricingPreview }    from '@/components/home/PricingPreview';
 import { GetTheAppSection }  from '@/components/home/GetTheAppSection';
 import { CTASection }        from '@/components/home/CTASection';
+import { MobileHelpSocial }  from '@/components/home/MobileHelpSocial';
 
 export const metadata: Metadata = {
   title: 'RemoteJobs44 – Global Remote Jobs',
@@ -24,6 +25,8 @@ export default function HomePage() {
       <PricingPreview />
       <GetTheAppSection />
       <CTASection />
+      {/* Help + social at the page foot for mobile (desktop has the footer). */}
+      <MobileHelpSocial />
     </>
   );
 }
