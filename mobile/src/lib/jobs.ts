@@ -109,6 +109,18 @@ export function rowToJob(r: JobRow): Job {
   };
 }
 
+// In-memory cache of jobs we've already mapped (keyed by id). Lets the detail
+// screen paint instantly from the list data the user just tapped, instead of
+// waiting on a fresh fetch. Refreshed whenever a list or the detail re-fetches.
+const jobCache = new Map<string, Job>();
+function cacheJobs(jobs: Job[]): Job[] {
+  for (const j of jobs) jobCache.set(j.id, j);
+  return jobs;
+}
+export function getCachedJob(id?: string): Job | undefined {
+  return id ? jobCache.get(id) : undefined;
+}
+
 export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; offset?: number } = {}): Promise<Job[]> {
   const limit = opts.limit ?? 20;
   const offset = opts.offset ?? 0;
@@ -138,13 +150,15 @@ export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; of
     .order('posted_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
-  return (data as JobRow[]).map(rowToJob);
+  return cacheJobs((data as JobRow[]).map(rowToJob));
 }
 
 export async function fetchJobById(id: string): Promise<Job | null> {
   const { data, error } = await supabase.from('jobs').select(SAFE_COLUMNS).eq('id', id).maybeSingle();
   if (error) throw error;
-  return data ? rowToJob(data as JobRow) : null;
+  if (!data) return null;
+  const [job] = cacheJobs([rowToJob(data as JobRow)]);
+  return job;
 }
 
 /** Other active roles in the same category (for the detail "more like this"). */
@@ -301,19 +315,26 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
   return { jobs, loading, error, refresh: () => setNonce((n) => n + 1) };
 }
 
-/** Single job by id with seed fallback. */
+/** Single job by id. Paints instantly from the cache (the list the user just
+ *  tapped), then refreshes from the server in the background. */
 export function useJob(id?: string): { job: Job | null; loading: boolean } {
+  // Seed from the in-memory cache so opening a role from a list is instant.
+  const cached = getCachedJob(id) ?? (isSupabaseConfigured ? null : SEED_JOBS.find((j) => j.id === id) ?? null);
   const [state, setState] = useState<{ job: Job | null; loading: boolean }>({
-    job: isSupabaseConfigured ? null : (SEED_JOBS.find((j) => j.id === id) ?? null),
-    loading: Boolean(isSupabaseConfigured && id),
+    job: cached,
+    // Only show a loader when we have nothing to display yet.
+    loading: Boolean(isSupabaseConfigured && id && !cached),
   });
 
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
     let active = true;
+    // Re-seed synchronously when the id changes (cache may already have it).
+    const seed = getCachedJob(id);
+    if (seed) setState({ job: seed, loading: false });
     fetchJobById(id)
-      .then((job) => active && setState({ job, loading: false }))
-      .catch(() => active && setState({ job: SEED_JOBS.find((j) => j.id === id) ?? null, loading: false }));
+      .then((job) => active && job && setState({ job, loading: false }))
+      .catch(() => active && setState((s) => (s.job ? { ...s, loading: false } : { job: SEED_JOBS.find((j) => j.id === id) ?? null, loading: false })));
     return () => {
       active = false;
     };
