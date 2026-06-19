@@ -256,7 +256,7 @@
 .anim-spin3d  { animation: spin3d 16s linear      infinite; }
 
 /* Cards: subtle 3D lift + tilt on hover (works everywhere). */
-.card-3d { transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease; transform-style:preserve-3d; }
+.card-3d { transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease, border-color .2s ease; transform-style:preserve-3d; }
 .card-3d:hover { transform: perspective(900px) rotateX(4deg) rotateY(-5deg) translateY(-6px) scale(1.02); box-shadow: 0 22px 50px -18px rgba(37,99,235,0.35); }
 
 /* Cards: 3D "rotate up into place" as they scroll into view. Progressive

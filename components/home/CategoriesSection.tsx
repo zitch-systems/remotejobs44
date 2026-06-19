@@ -60,7 +60,7 @@ export function CategoriesSection() {
                 // not the faceted /jobs?category= URL — same reason the
                 // Footer + JobCard chips got rewritten.
                 href={`/jobs/category/${cat}`}
-                className="group flex flex-col items-center gap-3 p-4 rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] hover:border-brand-500 dark:hover:border-brand-600 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
+                className="card-3d reveal-3d group flex flex-col items-center gap-3 p-4 rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] hover:border-brand-500 dark:hover:border-brand-600"
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${meta.bg} ${meta.text} group-hover:scale-110 transition-transform duration-200`}>
                   {meta.icon}

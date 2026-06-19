@@ -45,8 +45,8 @@ export function HowItWorks() {
           {steps.map((s) => {
             const Icon = s.icon;
             return (
-              <div key={s.num} className="flex flex-col items-center text-center">
-                <div className={`w-20 h-20 rounded-2xl ${s.iconBg} border border-stone-100 dark:border-[#1e3a5f] flex flex-col items-center justify-center mb-5 shadow-sm`}>
+              <div key={s.num} className="reveal-3d flex flex-col items-center text-center">
+                <div className={`card-3d w-20 h-20 rounded-2xl ${s.iconBg} border border-stone-100 dark:border-[#1e3a5f] flex flex-col items-center justify-center mb-5 shadow-sm`}>
                   <Icon className={`w-7 h-7 ${s.iconColor}`} strokeWidth={1.75} />
                   <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 mt-1.5 tracking-widest">{s.num}</span>
                 </div>
