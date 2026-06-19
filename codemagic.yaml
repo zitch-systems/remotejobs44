@@ -34,7 +34,7 @@ definitions:
 workflows:
   android-apk:
     name: RemoteJobs44 · Android APK (internal / sideload)
-    instance_type: linux_x2
+    instance_type: mac_mini_m1
     max_build_duration: 60
     working_directory: mobile
     environment:
@@ -72,7 +72,7 @@ workflows:
 
   android-aab:
     name: RemoteJobs44 · Android AAB (Play Store)
-    instance_type: linux_x2
+    instance_type: mac_mini_m1
     max_build_duration: 60
     working_directory: mobile
     environment:
