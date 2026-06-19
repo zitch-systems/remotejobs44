@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarkPlus, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
-import { BrandLoader } from '@/components/BrandLoader';
+import { JobListSkeleton } from '@/components/JobCardSkeleton';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { useJobs, type JobQuery } from '@/lib/jobs';
@@ -263,7 +263,9 @@ export default function Jobs() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <FlatList
-        data={feed.loading ? [] : jobs}
+        // Keep the current list visible while a filter/search refetches; only
+        // blank to skeletons when we have nothing yet.
+        data={feed.loading && jobs.length === 0 ? [] : jobs}
         keyExtractor={(j) => j.id}
         renderItem={({ item }) => <JobCard job={item} />}
         ListHeaderComponent={header}
@@ -276,9 +278,7 @@ export default function Jobs() {
         onEndReached={feed.loadMore}
         ListEmptyComponent={
           feed.loading ? (
-            <View style={{ paddingVertical: spacing[12], alignItems: 'center' }}>
-              <BrandLoader label="Loading remote jobs…" />
-            </View>
+            <JobListSkeleton />
           ) : feed.error ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] }}>
               <Txt center color={colors.fg3}>
