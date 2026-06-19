@@ -13,6 +13,8 @@ interface UsageState {
   /** Applications submitted today (0 once the day rolls over). */
   todayApplications: () => number;
   bumpApplication: () => void;
+  /** Undo a bump (e.g. the application's remote insert failed and rolled back). */
+  unbumpApplication: () => void;
 }
 
 export const useUsage = create<UsageState>()(
@@ -23,6 +25,8 @@ export const useUsage = create<UsageState>()(
       todayApplications: () => (get().date === today() ? get().applications : 0),
       bumpApplication: () =>
         set((s) => (s.date === today() ? { applications: s.applications + 1 } : { date: today(), applications: 1 })),
+      unbumpApplication: () =>
+        set((s) => (s.date === today() ? { applications: Math.max(0, s.applications - 1) } : s)),
     }),
     { name: 'rj44-usage', storage: createJSONStorage(() => AsyncStorage) },
   ),

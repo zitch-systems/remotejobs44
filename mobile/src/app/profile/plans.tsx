@@ -58,7 +58,8 @@ export default function Plans() {
       const result = await startSubscription(tier as PaystackPlan);
       if (result.status === 'success') {
         reload();
-        toast("You're all set — welcome to Pro! 🎉", 'success');
+        const msg = result.plan === 'daily' ? "Day Pass active — you're all set for 24h! 🎉" : "You're all set — welcome to Pro! 🎉";
+        toast(msg, 'success');
       }
       // 'cancelled' → stay quiet.
     } catch (e) {

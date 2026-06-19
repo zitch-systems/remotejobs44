@@ -10,6 +10,7 @@ import { applyRemote, setSavedRemote, updateApplicationStatus } from '@/lib/user
 import { captureError } from '@/lib/sentry';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import { toast } from '@/store/toast';
+import { useUsage } from '@/store/usage';
 
 interface AppState {
   userId: string | null;
@@ -58,21 +59,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   applyTo: (job) => {
-    if (job.id in get().applied) return;
+    if (job.id in get().applied) return; // already applied — don't double-count
     notifySuccess();
     toast('Application sent', 'success');
     set((s) => ({ applied: { ...s.applied, [job.id]: 'applied' } }));
+    // Count the application here (exactly when a new one is created), so the
+    // daily limit can't be over-counted by re-taps or rolled-back failures.
+    useUsage.getState().bumpApplication();
     const { userId } = get();
     if (isSupabaseConfigured && userId) {
       applyRemote(userId, job).catch((e) => {
         captureError(e, { scope: 'applyTo', id: job.id });
-        // Roll back the optimistic apply AND tell the user it didn't go through
-        // (otherwise "Application sent" shows, then the entry silently vanishes).
+        // Roll back the optimistic apply + the count, and tell the user it
+        // didn't go through (otherwise "Application sent" shows, then vanishes).
         set((s) => {
           const next = { ...s.applied };
           delete next[job.id];
           return { applied: next };
         });
+        useUsage.getState().unbumpApplication();
         toast("Couldn't send your application. Please try again.", 'error');
       });
     }

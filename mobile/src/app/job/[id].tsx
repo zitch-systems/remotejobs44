@@ -37,7 +37,6 @@ export default function JobDetail() {
   const addRecent = useRecentJobs((s) => s.add);
   const { profile } = useProfile();
   const usedToday = useUsage((s) => s.todayApplications());
-  const bumpApplication = useUsage((s) => s.bumpApplication);
 
   const [burst, setBurst] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
@@ -94,14 +93,12 @@ export default function JobDetail() {
       } catch {
         /* user dismissed / no handler */
       }
-      applyTo(job);
-      bumpApplication();
+      applyTo(job); // applyTo now bumps the daily counter itself (new applies only)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast('Tracked in your applications.', 'success');
       return;
     }
     applyTo(job);
-    bumpApplication();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setBurst(true);
   }

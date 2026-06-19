@@ -1,13 +1,24 @@
 // supabase/functions/paystack-verify/index.ts
 //
-// Verifies a Paystack transaction by reference and, on success, upgrades the
-// signed-in user's plan (plan + plan_expires_at + paystack_customer_code). The
-// plan/duration are read from the server-set transaction metadata, never from
-// the client, so the amount paid can't be spoofed.
+// Verifies a Paystack transaction by reference and, on the FIRST successful
+// verification, upgrades the signed-in user's plan. Hardened against:
+//   - replay/double-grant: each reference is recorded in paystack_transactions
+//     (primary key) and only the first insert grants the plan (idempotent).
+//   - cross-account grant: the transaction's server-set metadata.user_id MUST
+//     equal the caller (reject when absent).
+//   - amount tampering: tx.amount + currency must match the canonical price for
+//     the resolved plan.
 //
 // Deploy: supabase functions deploy paystack-verify
 // Required secret: PAYSTACK_SECRET_KEY.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Canonical prices (kobo) + duration. Must match paystack-initialize.
+const PLANS: Record<string, { amount: number; days: number; plan: 'daily' | 'pro' }> = {
+  daily: { amount: 50_000, days: 1, plan: 'daily' },
+  pro: { amount: 299_900, days: 30, plan: 'pro' },
+  annual: { amount: 2_999_900, days: 365, plan: 'pro' },
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
@@ -40,21 +51,48 @@ Deno.serve(async (req: Request) => {
     return Response.json({ ok: false, error: 'Payment not completed.' }, { status: 402 });
   }
 
-  // Trust only the server-set metadata, and confirm the charge is for this user.
+  // The charge must belong to this user (metadata is server-set at initialize).
   const meta = tx.metadata ?? {};
-  if (meta.user_id && meta.user_id !== user.id) {
+  if (meta.user_id !== user.id) {
     return Response.json({ ok: false, error: 'Reference does not match this account.' }, { status: 403 });
   }
-  const days = Number(meta.days) || 30;
-  const plan = meta.plan === 'daily' ? 'daily' : 'pro';
-  const expires = new Date(Date.now() + days * 86_400_000).toISOString();
+  // Resolve the plan and validate the amount actually paid.
+  const cfg = PLANS[meta.selection as string];
+  if (!cfg) return Response.json({ ok: false, error: 'Unknown plan.' }, { status: 400 });
+  if (tx.amount !== cfg.amount || tx.currency !== 'NGN') {
+    return Response.json({ ok: false, error: 'Payment amount mismatch.' }, { status: 400 });
+  }
 
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { error } = await admin
-    .from('profiles')
-    .update({ plan, plan_expires_at: expires, paystack_customer_code: tx.customer?.customer_code ?? null })
-    .eq('id', user.id);
-  if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
 
-  return Response.json({ ok: true, plan, plan_expires_at: expires });
+  // Idempotency gate: claim the reference. A duplicate (23505) means it was
+  // already processed → return success WITHOUT re-extending the plan.
+  const { error: claimErr } = await admin.from('paystack_transactions').insert({
+    reference,
+    user_id: user.id,
+    plan: cfg.plan,
+    selection: meta.selection,
+    amount: tx.amount,
+    currency: tx.currency,
+  });
+  if (claimErr) {
+    if ((claimErr as { code?: string }).code === '23505') {
+      return Response.json({ ok: true, plan: cfg.plan, already: true });
+    }
+    return Response.json({ ok: false, error: claimErr.message }, { status: 500 });
+  }
+
+  // First time → grant the plan.
+  const expires = new Date(Date.now() + cfg.days * 86_400_000).toISOString();
+  const { error: upErr } = await admin
+    .from('profiles')
+    .update({ plan: cfg.plan, plan_expires_at: expires, paystack_customer_code: tx.customer?.customer_code ?? null })
+    .eq('id', user.id);
+  if (upErr) {
+    // Release the claim so the user can retry.
+    await admin.from('paystack_transactions').delete().eq('reference', reference);
+    return Response.json({ ok: false, error: upErr.message }, { status: 500 });
+  }
+
+  return Response.json({ ok: true, plan: cfg.plan, plan_expires_at: expires });
 });
