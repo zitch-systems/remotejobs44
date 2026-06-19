@@ -83,7 +83,7 @@ export function PricingPreview() {
           {PLANS.map((plan) => (
             <div
               key={plan.id}
-              className={`bg-white dark:bg-[#0d1a2e] border rounded-xl flex flex-col p-6 transition-all duration-200 ${
+              className={`card-3d reveal-3d bg-white dark:bg-[#0d1a2e] border rounded-xl flex flex-col p-6 ${
                 plan.highlight
                   ? 'border-brand-600 dark:border-brand-500'
                   : 'border-stone-200 dark:border-[#1e3a5f]'
