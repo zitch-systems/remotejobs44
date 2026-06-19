@@ -21,7 +21,7 @@
 
 definitions:
   env_versions: &env_versions
-    node: 20.18.0
+    node: 22         # Expo SDK 56 requires Node >= 20.19.4; use current 22 LTS
     java: 17
   base_scripts:
     install: &install
