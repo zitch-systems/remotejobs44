@@ -202,15 +202,22 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const [hasMore, setHasMore] = useState(isSupabaseConfigured);
   const busy = useRef(false);
   const gotFresh = useRef(false);
+  const reqRef = useRef(0); // "latest wins" token so query changes can't be dropped
 
   const load = useCallback(
     async (offset: number, mode: 'initial' | 'refresh' | 'more') => {
-      if (!isSupabaseConfigured || busy.current) return;
+      if (!isSupabaseConfigured) return;
+      // Only block a concurrent loadMore (pagination). A query change (initial/
+      // refresh) must ALWAYS supersede an in-flight load, or rapid filter/search
+      // edits get silently dropped and the feed shows stale results.
+      if (mode === 'more' && busy.current) return;
+      const reqId = ++reqRef.current;
       busy.current = true;
       if (mode === 'refresh') setRefreshing(true);
       else if (mode === 'initial') setLoading(true);
       try {
         const batch = await fetchJobs(query, { limit: pageSize, offset });
+        if (reqId !== reqRef.current) return; // superseded by a newer query → discard
         setError(null);
         setHasMore(batch.length === pageSize);
         setJobs((prev) => (mode === 'more' ? [...prev, ...batch] : batch));
@@ -219,6 +226,7 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
           if (isDefault) saveFeedCache(batch); // only cache the default feed
         }
       } catch (e: any) {
+        if (reqId !== reqRef.current) return; // stale failure → ignore
         if (mode !== 'more' && !gotFresh.current && isDefault) {
           setJobs(SEED_JOBS);
           setHasMore(false);
@@ -228,9 +236,12 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
         }
         setError(e?.message ?? 'Failed to load jobs');
       } finally {
-        busy.current = false;
-        setLoading(false);
-        setRefreshing(false);
+        // Only the latest request owns the shared busy/loading flags.
+        if (reqId === reqRef.current) {
+          busy.current = false;
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     // queryKey stands in for `query` (a fresh object each render); changing any
