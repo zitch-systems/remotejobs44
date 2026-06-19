@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v37
--- Run AFTER migration_v36.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v47
+-- Run AFTER migration_v46_application_notes.sql in: Supabase Dashboard → SQL Editor.
 --
 -- Two changes, both applied to production on 2026-06-18:
 --

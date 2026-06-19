@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v39
--- Run AFTER migration_v38.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v49
+-- Run AFTER migration_v48.sql in: Supabase Dashboard → SQL Editor.
 --
 -- The mobile/web job feed sorts by `featured DESC, posted_at DESC` over ~54k
 -- active rows, but no index covered that exact two-column sort (v37 only added

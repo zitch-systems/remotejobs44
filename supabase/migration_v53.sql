@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v43
--- Run AFTER migration_v42.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v53
+-- Run AFTER migration_v52.sql in: Supabase Dashboard → SQL Editor.
 --
 -- Security advisor: audit_profile_role_change() is a SECURITY DEFINER *trigger*
 -- function that was also callable as a public RPC (/rest/v1/rpc/...). Triggers

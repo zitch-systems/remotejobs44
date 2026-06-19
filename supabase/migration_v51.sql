@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v41
--- Run AFTER migration_v40.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v51
+-- Run AFTER migration_v50.sql in: Supabase Dashboard → SQL Editor.
 --
 -- Performance: wrap auth.uid() in a subselect in the mobile_devices policies so
 -- Postgres evaluates it once per query instead of once per row (clears the

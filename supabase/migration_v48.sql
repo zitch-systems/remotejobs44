@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v38
--- Run AFTER migration_v37.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v48
+-- Run AFTER migration_v47.sql in: Supabase Dashboard → SQL Editor.
 --
 -- 1) site_settings — the admin portal's singleton settings row (id = 1). The
 --    settings API previously fell back to localStorage because this table did

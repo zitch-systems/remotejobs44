@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v40
--- Run AFTER migration_v39.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v50
+-- Run AFTER migration_v49.sql in: Supabase Dashboard → SQL Editor.
 --
 -- Consumed-reference ledger so the paystack-verify edge function is idempotent:
 -- a successful Paystack reference can be redeemed exactly once. Without this a

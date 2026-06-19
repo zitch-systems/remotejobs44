@@ -1,6 +1,6 @@
 -- ============================================================
--- RemoteJobs44 — Migration v42
--- Run AFTER migration_v41.sql in: Supabase Dashboard → SQL Editor.
+-- RemoteJobs44 — Migration v52
+-- Run AFTER migration_v51.sql in: Supabase Dashboard → SQL Editor.
 --
 -- Performance advisor cleanup (zero access-logic change):
 --  1) Wrap auth.uid() in a subselect in the two remaining unwrapped policies so
