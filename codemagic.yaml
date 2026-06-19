@@ -61,7 +61,11 @@ workflows:
             -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$CM_KEY_PASSWORD"
     artifacts:
+      # Match regardless of whether globs resolve from the repo root or the
+      # workflow's working_directory (mobile/).
+      - android/app/build/outputs/**/*.apk
       - mobile/android/app/build/outputs/**/*.apk
+      - '**/*.apk'
     publishing:
       email:
         recipients:
@@ -99,7 +103,9 @@ workflows:
             -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$CM_KEY_PASSWORD"
     artifacts:
+      - android/app/build/outputs/**/*.aab
       - mobile/android/app/build/outputs/**/*.aab
+      - '**/*.aab'
     publishing:
       email:
         recipients:
