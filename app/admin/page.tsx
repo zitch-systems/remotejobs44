@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Briefcase, Users, TrendingUp, DollarSign, Rss, PlusCircle, RefreshCw, ArrowRight, Zap, Search, Activity, CheckCircle, AlertCircle, Shield, Globe, Trash2, Star, Eye } from 'lucide-react';
+import { Briefcase, Users, TrendingUp, DollarSign, Rss, PlusCircle, RefreshCw, ArrowRight, Zap, Search, Activity, CheckCircle, AlertCircle, Shield, Globe, Trash2, Star, Eye, Smartphone } from 'lucide-react';
 import { formatRelativeDate, formatNumber, CATEGORY_META } from '@/lib/utils';
 import { jobsApi } from '@/lib/api';
 import { useUIStore } from '@/lib/store';
@@ -17,6 +17,10 @@ interface Stats {
   newToday: number;
   // 30-day signup trend: one bucket per day, oldest first.
   signups30d: number[];
+  // Mobile-app users (distinct users with a registered device) + platform split.
+  mobile:  number;
+  ios:     number;
+  android: number;
 }
 
 export default function AdminPage() {
@@ -50,6 +54,9 @@ export default function AdminPage() {
           mrr:        Number(data.mrr         ?? 0),
           newToday:   Number(data.newToday    ?? 0),
           signups30d: Array.isArray(data.signups30d) ? data.signups30d : Array(30).fill(0),
+          mobile:     Number(data.mobileUsers  ?? 0),
+          ios:        Number(data.iosUsers     ?? 0),
+          android:    Number(data.androidUsers ?? 0),
         });
         setHealth({
           db:       res.ok,
@@ -57,7 +64,7 @@ export default function AdminPage() {
           paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
         });
       } catch {
-        setStats({ jobs: 0, users: 0, pro: 0, daily: 0, mrr: 0, newToday: 0, signups30d: Array(30).fill(0) });
+        setStats({ jobs: 0, users: 0, pro: 0, daily: 0, mrr: 0, newToday: 0, signups30d: Array(30).fill(0), mobile: 0, ios: 0, android: 0 });
         setHealth({ db: false, api: false, paystack: false });
       } finally {
         setLoading(false);
@@ -139,6 +146,7 @@ export default function AdminPage() {
   const cards = stats ? [
     { label: 'Total Jobs',    value: formatNumber(stats.jobs),    sub: `+${stats.newToday} today`, icon: <Briefcase className="w-5 h-5" />,  color: 'brand', href: '/admin/jobs' },
     { label: 'Total Users',   value: formatNumber(stats.users),   sub: 'registered accounts', icon: <Users className="w-5 h-5" />,      color: 'blue',  href: '/admin/users' },
+    { label: 'Mobile Users',  value: formatNumber(stats.mobile),  sub: `${stats.ios} iOS · ${stats.android} Android`, icon: <Smartphone className="w-5 h-5" />, color: 'blue', href: '/admin/users' },
     { label: 'Paid Users',    value: formatNumber(stats.pro + stats.daily), sub: `${stats.pro} pro · ${stats.daily} day`, icon: <TrendingUp className="w-5 h-5" />, color: 'amber', href: '/admin/subscriptions' },
     { label: 'Est. MRR (₦)', value: `₦${formatNumber(stats.mrr)}`, sub: 'monthly recurring', icon: <DollarSign className="w-5 h-5" />, color: 'green', href: '/admin/analytics' },
   ] : [];
