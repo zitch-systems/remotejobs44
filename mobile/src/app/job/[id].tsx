@@ -5,6 +5,7 @@ import { Alert, Animated, Linking, Pressable, ScrollView, Share, View } from 're
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Haptics from 'expo-haptics';
 import { ArrowLeft, Bookmark, Check, ExternalLink, Share2, Zap } from 'lucide-react-native';
 import { IconButton, Txt } from '@/components/ui';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
@@ -95,11 +96,13 @@ export default function JobDetail() {
       }
       applyTo(job);
       bumpApplication();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast('Tracked in your applications.', 'success');
       return;
     }
     applyTo(job);
     bumpApplication();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setBurst(true);
   }
 

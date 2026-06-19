@@ -9,6 +9,14 @@ import type { AppStatus, Job } from './types';
 // Re-export so existing importers keep working.
 export { dbToStatus } from './format';
 
+// jobs.id / applications.job_id are uuid columns. If the app ever falls back to
+// the seed set (string ids like "1") and the user saves/applies, sending a
+// non-uuid job_id makes PostgREST reject the whole write with a 400. Guard the
+// writes so a seed/demo job can never trigger that — they no-op remotely (the
+// optimistic local state still updates).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (s: string): boolean => UUID_RE.test(s);
+
 const JOB_COLUMNS =
   'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
 
@@ -27,6 +35,7 @@ export async function fetchAppliedMap(userId: string): Promise<Record<string, Ap
 }
 
 export async function setSavedRemote(userId: string, jobId: string, save: boolean): Promise<void> {
+  if (!isUuid(jobId)) return; // seed/demo job — nothing to persist remotely.
   if (save) {
     // unique(user_id, job_id) makes this idempotent.
     const { error } = await supabase.from('saved_jobs').upsert({ user_id: userId, job_id: jobId }, { onConflict: 'user_id,job_id' });
@@ -38,6 +47,7 @@ export async function setSavedRemote(userId: string, jobId: string, save: boolea
 }
 
 export async function applyRemote(userId: string, job: Job): Promise<void> {
+  if (!isUuid(job.id)) return; // seed/demo job — nothing to persist remotely.
   const { error } = await supabase.from('applications').insert({
     user_id: userId,
     job_id: job.id,
@@ -64,20 +74,27 @@ export interface ApplicationItem {
   job: Job;
   status: AppStatus;
   notes: string | null;
+  /** ISO timestamp the user applied (applications.applied_at). */
+  appliedAt: string | null;
 }
 
 /** Authoritative tracker data: applications joined to their jobs. */
 export async function fetchApplicationItems(userId: string): Promise<ApplicationItem[]> {
   const { data, error } = await supabase
     .from('applications')
-    .select(`status, notes, jobs(${JOB_COLUMNS})`)
+    .select(`status, notes, applied_at, jobs(${JOB_COLUMNS})`)
     .eq('user_id', userId)
     .order('applied_at', { ascending: false });
   if (error) throw error;
   const items: ApplicationItem[] = [];
   for (const row of (data ?? []) as any[]) {
     if (!row.jobs) continue;
-    items.push({ job: rowToJob(row.jobs), status: dbToStatus(row.status), notes: (row.notes as string | null) ?? null });
+    items.push({
+      job: rowToJob(row.jobs),
+      status: dbToStatus(row.status),
+      notes: (row.notes as string | null) ?? null,
+      appliedAt: (row.applied_at as string | null) ?? null,
+    });
   }
   return items;
 }

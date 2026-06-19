@@ -10,7 +10,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ChevronRight, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
 import { Avatar, Card, Chip, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
-import { BrandLoader } from '@/components/BrandLoader';
+import { JobListSkeleton } from '@/components/JobCardSkeleton';
 import { RecentlyViewed } from '@/components/RecentlyViewed';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
@@ -290,7 +290,7 @@ export default function Feed() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <FlatList
-        data={feed.loading ? [] : jobs}
+        data={feed.loading && jobs.length === 0 ? [] : jobs}
         keyExtractor={(j) => j.id}
         renderItem={({ item }) => <JobCard job={item} />}
         ListHeaderComponent={header}
@@ -302,9 +302,7 @@ export default function Feed() {
         onEndReached={feed.loadMore}
         ListEmptyComponent={
           feed.loading ? (
-            <View style={{ paddingVertical: spacing[12], alignItems: 'center' }}>
-              <BrandLoader label="Finding remote jobs…" />
-            </View>
+            <JobListSkeleton />
           ) : feed.error ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] }}>
               <Txt center color={colors.fg3}>

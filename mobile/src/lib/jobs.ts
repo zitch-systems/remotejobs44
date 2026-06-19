@@ -9,7 +9,39 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { SEED_JOBS } from './seed';
 import { loadFeedCache, saveFeedCache } from './feed-cache';
 import { bulletsFrom, deriveMatch, gradFor, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
+import { LEVEL_TOKENS, type ExperienceLevel } from './filters';
 import type { Job } from './types';
+
+// Server-side job query. Every field is optional; an absent field = no filter.
+// category/type are the lowercase DB values (see CATEGORY_OPTIONS/TYPE_OPTIONS).
+export interface JobQuery {
+  text?: string; // free-text match on title + company
+  categories?: string[]; // lowercase categories (OR'd), e.g. ['engineering','data']
+  type?: string; // lowercase job type, e.g. 'full-time'
+  level?: ExperienceLevel; // experience bucket (matched against the free-form level)
+  remoteOnly?: boolean; // only remote=true roles
+  location?: string; // free-text location match (ilike on the location column)
+  postedWithinDays?: number; // max posting age in days
+}
+
+/** True when no filters are set — lets the default feed reuse the disk cache. */
+export function isDefaultQuery(q: JobQuery): boolean {
+  return (
+    !q.text?.trim() &&
+    !q.categories?.length &&
+    !q.type &&
+    (!q.level || q.level === 'Any') &&
+    !q.remoteOnly &&
+    !q.location?.trim() &&
+    !q.postedWithinDays
+  );
+}
+
+// PostgREST .or() values are comma/parenthesis-delimited, so strip those (and
+// the ilike wildcard) from user text to keep the filter expression valid.
+function sanitizeText(s: string): string {
+  return s.replace(/[%,()]/g, ' ').trim();
+}
 
 // Re-export so existing importers (the feed) keep their import path.
 export { personalizeJobs } from './format';
@@ -77,13 +109,31 @@ export function rowToJob(r: JobRow): Job {
   };
 }
 
-export async function fetchJobs(opts: { limit?: number; offset?: number } = {}): Promise<Job[]> {
+export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; offset?: number } = {}): Promise<Job[]> {
   const limit = opts.limit ?? 20;
   const offset = opts.offset ?? 0;
-  const { data, error } = await supabase
-    .from('jobs')
-    .select(SAFE_COLUMNS)
-    .eq('is_active', true)
+
+  let q = supabase.from('jobs').select(SAFE_COLUMNS).eq('is_active', true);
+
+  const text = sanitizeText(query.text ?? '');
+  if (text) q = q.or(`title.ilike.%${text}%,company.ilike.%${text}%`);
+  if (query.categories?.length) q = q.in('category', query.categories);
+  if (query.type) q = q.eq('type', query.type);
+  if (query.remoteOnly) q = q.eq('remote', true);
+  const location = sanitizeText(query.location ?? '');
+  if (location) q = q.ilike('location', `%${location}%`);
+  if (query.postedWithinDays) {
+    const since = new Date(Date.now() - query.postedWithinDays * 86_400_000).toISOString();
+    q = q.gte('posted_at', since);
+  }
+  // Experience level is a free-form column; match the bucket's keywords with an
+  // OR of ILIKEs. Each .or() is ANDed with the others (and the text filter).
+  if (query.level && query.level !== 'Any') {
+    const tokens = LEVEL_TOKENS[query.level];
+    q = q.or(tokens.map((t) => `level.ilike.%${t}%`).join(','));
+  }
+
+  const { data, error } = await q
     .order('featured', { ascending: false })
     .order('posted_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -121,8 +171,16 @@ export interface JobsFeed {
   loadMore: () => void;
 }
 
-/** Paginated live job list with pull-to-refresh + seed fallback. */
-export function useJobs(pageSize = 20): JobsFeed {
+/**
+ * Paginated live job list with pull-to-refresh + seed fallback.
+ *
+ * `query` filters server-side across the whole table (not just the loaded
+ * page). Changing it refetches from offset 0. The disk cache + seed fallback
+ * only apply to the default (unfiltered) feed.
+ */
+export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
+  const queryKey = JSON.stringify(query);
+  const isDefault = isDefaultQuery(query);
   const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : SEED_JOBS);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [refreshing, setRefreshing] = useState(false);
@@ -138,17 +196,20 @@ export function useJobs(pageSize = 20): JobsFeed {
       if (mode === 'refresh') setRefreshing(true);
       else if (mode === 'initial') setLoading(true);
       try {
-        const batch = await fetchJobs({ limit: pageSize, offset });
+        const batch = await fetchJobs(query, { limit: pageSize, offset });
         setError(null);
         setHasMore(batch.length === pageSize);
         setJobs((prev) => (mode === 'more' ? [...prev, ...batch] : batch));
         if (mode !== 'more') {
           gotFresh.current = true;
-          saveFeedCache(batch);
+          if (isDefault) saveFeedCache(batch); // only cache the default feed
         }
       } catch (e: any) {
-        if (mode !== 'more' && !gotFresh.current) {
+        if (mode !== 'more' && !gotFresh.current && isDefault) {
           setJobs(SEED_JOBS);
+          setHasMore(false);
+        } else if (mode !== 'more') {
+          setJobs([]); // a filtered query that failed shows empty, not seed
           setHasMore(false);
         }
         setError(e?.message ?? 'Failed to load jobs');
@@ -158,12 +219,14 @@ export function useJobs(pageSize = 20): JobsFeed {
         setRefreshing(false);
       }
     },
-    [pageSize],
+    // queryKey stands in for `query` (a fresh object each render); changing any
+    // filter recreates `load`, which the effect below reruns from offset 0.
+    [pageSize, queryKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // Show the last cached page instantly on cold start (until fresh data lands).
+  // Show the last cached page instantly on cold start (default feed only).
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || !isDefault) return;
     let active = true;
     loadFeedCache().then((cached) => {
       if (active && cached?.length && !gotFresh.current) {
@@ -174,7 +237,7 @@ export function useJobs(pageSize = 20): JobsFeed {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isDefault]);
 
   useEffect(() => {
     load(0, 'initial');

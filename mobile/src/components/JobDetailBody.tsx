@@ -63,10 +63,13 @@ export function JobDetailBody({
             <Txt variant="h2" numberOfLines={2}>
               {job.role}
             </Txt>
-            <Txt variant="meta" color={colors.fg3}>
-              {job.company}
-              {job.verified ? ' · Verified employer' : ''}
-            </Txt>
+            {/* Company name is intentionally hidden on the detail screen; we only
+                surface the verified-employer trust signal here. */}
+            {job.verified ? (
+              <Txt variant="meta" color={colors.fg3}>
+                Verified employer
+              </Txt>
+            ) : null}
           </View>
         </View>
       ) : null}

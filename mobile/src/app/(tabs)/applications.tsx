@@ -14,6 +14,7 @@ import { BrandLoader } from '@/components/BrandLoader';
 import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_FLOW, STATUS_LABEL, type AppStatus } from '@/lib/types';
 import { applicationStats, inStatusFilter, STATUS_FILTERS, type StatusFilter } from '@/lib/stats';
+import { appliedDateLabel } from '@/lib/format';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchApplicationItems, updateApplicationNote } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
@@ -25,6 +26,7 @@ import type { Job } from '@/lib/types';
 function useApplicationJobs(appliedKey: string): {
   jobsById: Record<string, Job>;
   notesById: Record<string, string>;
+  appliedAtById: Record<string, string>;
   loading: boolean;
   refreshing: boolean;
   refresh: () => void;
@@ -32,6 +34,7 @@ function useApplicationJobs(appliedKey: string): {
   const userId = useAppStore((s) => s.userId);
   const [jobsById, setJobsById] = useState<Record<string, Job>>({});
   const [notesById, setNotesById] = useState<Record<string, string>>({});
+  const [appliedAtById, setAppliedAtById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
   const [refreshing, setRefreshing] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -42,6 +45,7 @@ function useApplicationJobs(appliedKey: string): {
       for (const j of SEED_JOBS) map[j.id] = j;
       setJobsById(map);
       setNotesById({});
+      setAppliedAtById({});
       setLoading(false);
       setRefreshing(false);
       return;
@@ -53,12 +57,15 @@ function useApplicationJobs(appliedKey: string): {
         if (!active) return;
         const map: Record<string, Job> = {};
         const notes: Record<string, string> = {};
+        const appliedAt: Record<string, string> = {};
         for (const it of items) {
           map[it.job.id] = it.job;
           if (it.notes) notes[it.job.id] = it.notes;
+          if (it.appliedAt) appliedAt[it.job.id] = it.appliedAt;
         }
         setJobsById(map);
         setNotesById(notes);
+        setAppliedAtById(appliedAt);
       })
       .catch(() => {})
       .finally(() => {
@@ -77,6 +84,7 @@ function useApplicationJobs(appliedKey: string): {
   return {
     jobsById,
     notesById,
+    appliedAtById,
     loading,
     refreshing,
     refresh: () => {
@@ -196,7 +204,7 @@ export default function Applications() {
   const updateStatus = useAppStore((s) => s.updateStatus);
   const userId = useAppStore((s) => s.userId);
   const appliedKey = Object.keys(applied).sort().join(',');
-  const { jobsById, notesById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
+  const { jobsById, notesById, appliedAtById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
   const [editing, setEditing] = useState<{ jobId: string; current: AppStatus; note: string } | null>(null);
   const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -306,6 +314,11 @@ export default function Applications() {
                       <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
                         {job.company} · {job.location}
                       </Txt>
+                      {appliedDateLabel(appliedAtById[job.id] ?? null) ? (
+                        <Txt variant="meta" color={colors.fg4} numberOfLines={1} style={{ marginTop: 1 }}>
+                          Applied {appliedDateLabel(appliedAtById[job.id] ?? null)}
+                        </Txt>
+                      ) : null}
                       {noteFor(job.id) ? (
                         <Txt variant="meta" color={colors.fg4} numberOfLines={1} style={{ marginTop: 1, fontStyle: 'italic' }}>
                           {noteFor(job.id)}
