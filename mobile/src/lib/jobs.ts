@@ -150,7 +150,7 @@ export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; of
     .order('posted_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
-  return cacheJobs((data as JobRow[]).map(rowToJob));
+  return cacheJobs(((data as JobRow[]) ?? []).map(rowToJob));
 }
 
 export async function fetchJobById(id: string): Promise<Job | null> {
@@ -341,8 +341,9 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
     if (!isSupabaseConfigured || !id) return;
     let active = true;
     // Re-seed synchronously when the id changes (cache may already have it).
+    // If it's not cached, show a loader instead of the PREVIOUS job's data.
     const seed = getCachedJob(id);
-    if (seed) setState({ job: seed, loading: false });
+    setState(seed ? { job: seed, loading: false } : { job: null, loading: true });
     fetchJobById(id)
       .then((job) => active && job && setState({ job, loading: false }))
       .catch(() => active && setState((s) => (s.job ? { ...s, loading: false } : { job: SEED_JOBS.find((j) => j.id === id) ?? null, loading: false })));

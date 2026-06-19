@@ -66,11 +66,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && userId) {
       applyRemote(userId, job).catch((e) => {
         captureError(e, { scope: 'applyTo', id: job.id });
+        // Roll back the optimistic apply AND tell the user it didn't go through
+        // (otherwise "Application sent" shows, then the entry silently vanishes).
         set((s) => {
           const next = { ...s.applied };
           delete next[job.id];
           return { applied: next };
         });
+        toast("Couldn't send your application. Please try again.", 'error');
       });
     }
   },
