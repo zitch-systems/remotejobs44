@@ -29,7 +29,15 @@ const HERO_STATS = [
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden hero-glow pt-6 pb-12 sm:pt-8 sm:pb-14">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-5 flex flex-col items-center text-center gap-6">
+      {/* Decorative depth layers — purely visual, behind the content. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 hero-grid" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="hero-orb animate-float-a" style={{ width: 340, height: 340, top: -70, left: -50, background: 'radial-gradient(circle at 30% 30%, rgba(37,99,235,0.55), transparent 70%)' }} />
+        <div className="hero-orb animate-float-b" style={{ width: 300, height: 300, top: 10, right: -60, background: 'radial-gradient(circle at 30% 30%, rgba(249,115,22,0.42), transparent 70%)' }} />
+        <div className="hero-orb animate-float-a" style={{ width: 260, height: 260, bottom: -90, left: '42%', background: 'radial-gradient(circle at 30% 30%, rgba(96,165,250,0.45), transparent 70%)' }} />
+      </div>
+
+      <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-5 flex flex-col items-center text-center gap-6">
 
         {/* Eyebrow */}
         <div className="animate-fade-in inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest"
