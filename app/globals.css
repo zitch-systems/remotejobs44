@@ -224,13 +224,42 @@
 @keyframes floatB   { 0%,100%{transform:translate(0,0) scale(1)}   50%{transform:translate(-22px,18px) scale(1.09)} }
 @keyframes logoFloat{ 0%,100%{transform:translateY(0)}             50%{transform:translateY(-6px)} }
 
+/* Continuous 3D rotation of the logo (perspective + rotateX/Y wobble). */
+@keyframes logo3d {
+  0%,100% { transform: perspective(420px) rotateY(-18deg) rotateX(8deg); }
+  50%     { transform: perspective(420px) rotateY(18deg)  rotateX(-6deg) translateZ(8px); }
+}
+/* 3D floating + tilting decorative shapes. */
+@keyframes float3d {
+  0%,100% { transform: perspective(700px) rotateX(12deg) rotateY(-20deg) translateY(0); }
+  50%     { transform: perspective(700px) rotateX(-8deg) rotateY(20deg)  translateY(-16px); }
+}
+@keyframes spin3d {
+  0%   { transform: perspective(700px) rotateX(10deg) rotateY(0deg); }
+  100% { transform: perspective(700px) rotateX(10deg) rotateY(360deg); }
+}
+
 .animate-float-a { animation: floatA 9s ease-in-out infinite; }
 .animate-float-b { animation: floatB 12s ease-in-out infinite; }
 
+/* Logo: continuous 3D animation (pauses on hover so the tilt reads). */
+.logo-3d-anim {
+  transform-style:preserve-3d;
+  animation: logo3d 4.5s ease-in-out infinite;
+  filter:drop-shadow(0 6px 11px rgba(37,99,235,0.42));
+}
+.logo-3d-anim:hover { animation-play-state:paused; }
+
+/* Floating 3D shapes in the hero. */
+.shape-3d   { position:absolute; transform-style:preserve-3d; will-change:transform; pointer-events:none; }
+.anim-float3d { animation: float3d 8s  ease-in-out infinite; }
+.anim-spin3d  { animation: spin3d 16s linear      infinite; }
+
 /* Respect users who prefer reduced motion — kill the decorative loops. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-float-a, .animate-float-b, .logo-float { animation: none !important; }
-  .logo-3d { transition: none; }
+  .animate-float-a, .animate-float-b, .logo-float,
+  .logo-3d-anim, .anim-float3d, .anim-spin3d { animation: none !important; }
+  .logo-3d, .logo-3d-anim { transition: none; }
 }
 
 @media (prefers-reduced-motion:reduce) {

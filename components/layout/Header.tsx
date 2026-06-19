@@ -97,7 +97,7 @@ export function Header() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-slate-100 hover:opacity-80 transition-opacity shrink-0">
-          <svg viewBox="0 0 40 40" className="w-9 h-9 logo-3d" fill="none">
+          <svg viewBox="0 0 40 40" className="w-9 h-9 logo-3d-anim" fill="none">
             <rect width="40" height="40" rx="10" fill="#2563eb"/>
             <path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none"/>
             <circle cx="29" cy="15" r="3.5" fill="#f97316"/>

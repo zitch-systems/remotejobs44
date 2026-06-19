@@ -36,6 +36,15 @@ export function HeroSection() {
         <div className="hero-orb animate-float-a" style={{ width: 260, height: 260, bottom: -90, left: '42%', background: 'radial-gradient(circle at 30% 30%, rgba(96,165,250,0.45), transparent 70%)' }} />
       </div>
 
+      {/* Floating 3D shapes — continuous perspective rotation/tilt (sm+ only to
+          keep small screens uncluttered). */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden hidden sm:block">
+        <div className="shape-3d anim-float3d" style={{ top: '15%', left: '6%', width: 66, height: 66, borderRadius: 18, background: 'linear-gradient(135deg,#3b82f6,#1e40af)', boxShadow: '0 20px 44px -10px rgba(37,99,235,0.55)' }} />
+        <div className="shape-3d anim-spin3d" style={{ top: '22%', right: '8%', width: 54, height: 54, borderRadius: 15, background: 'linear-gradient(135deg,#fb923c,#ea580c)', boxShadow: '0 20px 44px -10px rgba(249,115,22,0.55)' }} />
+        <div className="shape-3d anim-float3d" style={{ bottom: '14%', left: '13%', width: 46, height: 46, borderRadius: 13, background: 'linear-gradient(135deg,#60a5fa,#2563eb)', boxShadow: '0 16px 34px -8px rgba(37,99,235,0.5)', animationDelay: '1.5s' }} />
+        <div className="shape-3d anim-spin3d" style={{ bottom: '20%', right: '12%', width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#93c5fd,#3b82f6)', boxShadow: '0 16px 34px -8px rgba(37,99,235,0.5)', animationDelay: '2s' }} />
+      </div>
+
       <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-5 flex flex-col items-center text-center gap-6">
 
         {/* Eyebrow */}
