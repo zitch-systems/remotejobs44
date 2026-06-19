@@ -2,12 +2,13 @@
 // Segmented Sign in / Create account, email+password (real Supabase auth when
 // configured, demo otherwise), social placeholders, footer toggle + trust line.
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Search, ShieldCheck, User } from 'lucide-react-native';
 import { Button, Divider, Field, Txt } from '@/components/ui';
+import { Dialog, type DialogData } from '@/components/Dialog';
 import { useAuth } from '@/lib/auth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { signInWithProvider } from '@/lib/oauth';
@@ -79,6 +80,7 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<DialogData | null>(null);
 
   const isSignup = mode === 'signup';
 
@@ -89,7 +91,7 @@ export default function SignIn() {
       return;
     }
     if (!email || !password) {
-      Alert.alert('Missing details', 'Enter your email and password to continue.');
+      setDialog({ title: 'Missing details', message: 'Enter your email and password to continue.', tone: 'info' });
       return;
     }
     setBusy(true);
@@ -98,7 +100,11 @@ export default function SignIn() {
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
         if (error) throw error;
         if (!data.session) {
-          Alert.alert('Confirm your email', 'We sent you a verification link. Confirm it, then sign in.');
+          setDialog({
+            title: 'Confirm your email',
+            message: 'We sent you a verification link. Confirm it, then sign in.',
+            tone: 'success',
+          });
           setMode('signin');
         }
       } else {
@@ -107,7 +113,7 @@ export default function SignIn() {
       }
       // On success the auth listener flips `authed` and (auth)/_layout redirects.
     } catch (e: any) {
-      Alert.alert('Sign-in failed', e?.message ?? 'Please try again.');
+      setDialog({ title: 'Sign-in failed', message: e?.message ?? 'Please try again.', tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -121,7 +127,7 @@ export default function SignIn() {
       await signInWithProvider(provider === 'google' ? 'google' : 'linkedin_oidc');
       // On success the auth listener flips `authed` and (auth)/_layout redirects.
     } catch (e: any) {
-      Alert.alert('Sign-in failed', e?.message ?? 'Could not complete social sign-in.');
+      setDialog({ title: 'Sign-in failed', message: e?.message ?? 'Could not complete social sign-in.', tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -263,6 +269,8 @@ export default function SignIn() {
           </View>
         </ScrollView>
       </Wrap>
+
+      <Dialog data={dialog} onClose={() => setDialog(null)} />
     </View>
   );
 }
