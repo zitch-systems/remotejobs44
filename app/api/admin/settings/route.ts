@@ -14,6 +14,9 @@ import { logError, logWarn } from '@/lib/log';
 const ALLOWED_KEYS = new Set([
   'siteName', 'supportEmail', 'jobsPerPage',
   'notifyNewUser', 'notifyNewSub', 'notifyPayFail', 'notifyDailySync',
+  // Mobile App controls
+  'mobileMaintenance', 'allowSignups', 'mobileMinVersion', 'mobileBannerText',
+  'mobileFreeApplyLimit', 'jobArchiveDays',
 ]);
 
 function pickAllowed(input: unknown): Record<string, unknown> {
@@ -70,6 +73,8 @@ export async function POST(req: NextRequest) {
 const READABLE_COLS = [
   'siteName', 'supportEmail', 'jobsPerPage',
   'notifyNewUser', 'notifyNewSub', 'notifyPayFail', 'notifyDailySync',
+  'mobileMaintenance', 'allowSignups', 'mobileMinVersion', 'mobileBannerText',
+  'mobileFreeApplyLimit', 'jobArchiveDays',
   'updated_at',
 ].join(',');
 

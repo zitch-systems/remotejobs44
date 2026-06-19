@@ -8,6 +8,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { fetchAppliedMap, fetchSavedIds } from './user-state';
+import { registerMobileDevice } from './telemetry';
 import { captureError } from './sentry';
 import { useAppStore } from '@/store/app';
 
@@ -57,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useAppStore.getState().setUserId(userId);
     if (!isSupabaseConfigured || !userId) return;
     let active = true;
+    // Register this device for the admin's mobile-user count (best-effort).
+    registerMobileDevice(userId);
     Promise.all([fetchSavedIds(userId), fetchAppliedMap(userId)])
       .then(([saved, applied]) => {
         if (active) useAppStore.getState().hydrate({ saved, applied });

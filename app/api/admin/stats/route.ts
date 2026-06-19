@@ -37,6 +37,7 @@ export async function GET() {
       { count: sources },
       { data: subscriptions30dProfiles },
       { data: activeSubs },
+      { data: mobileDeviceRows },
     ] = await Promise.all([
       admin.from('jobs').select('id', { count: 'exact', head: true }).eq('is_active', true),
       admin.from('jobs').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
@@ -46,7 +47,23 @@ export async function GET() {
       admin.from('job_sources').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       admin.from('profiles').select('created_at').gte('created_at', since30d.toISOString()),
       admin.from('subscriptions').select('plan,billing,price').eq('status', 'active'),
+      // Mobile-app users: one row per (user, platform). Dedupe to distinct users
+      // and split by platform. Table may not exist on older DBs → tolerate null.
+      admin.from('mobile_devices').select('user_id,platform'),
     ]);
+
+    // Distinct mobile-app users + platform split.
+    const mobileUserSet = new Set<string>();
+    let iosUsers = 0;
+    let androidUsers = 0;
+    for (const d of (mobileDeviceRows ?? []) as { user_id: string; platform: string }[]) {
+      if (!mobileUserSet.has(d.user_id)) {
+        mobileUserSet.add(d.user_id);
+        if (d.platform === 'ios') iosUsers++;
+        else if (d.platform === 'android') androidUsers++;
+      }
+    }
+    const mobileUsers = mobileUserSet.size;
 
     // 30-day signup sparkline buckets, oldest → newest.
     const signups30d: number[] = Array(30).fill(0);
@@ -82,6 +99,9 @@ export async function GET() {
       mrr,
       signups30d,
       revenue:       0, // Revenue data comes from Paystack webhooks
+      mobileUsers,
+      iosUsers,
+      androidUsers,
     });
   } catch (err: any) {
     logError({ event: 'admin.stats.failed', error: err?.message ?? String(err) });
@@ -89,6 +109,7 @@ export async function GET() {
       totalJobs: 0, newToday: 0, activeUsers: 0,
       pro: 0, daily: 0, subscriptions: 0, sources: 0,
       mrr: 0, signups30d: Array(30).fill(0), revenue: 0,
+      mobileUsers: 0, iosUsers: 0, androidUsers: 0,
     });
   }
 }
