@@ -26,7 +26,9 @@ export function FeedMasterDetail() {
     const q = query.trim().toLowerCase();
     return allJobs.filter(
       (j) =>
-        (filter === 'All' || j.category === filter) &&
+        // DB categories are lowercase; the chips are capitalised → compare
+        // case-insensitively (same fix as the phone feed).
+        (filter === 'All' || j.category.toLowerCase() === filter.toLowerCase()) &&
         (q === '' || j.role.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)),
     );
   }, [filter, query, allJobs]);

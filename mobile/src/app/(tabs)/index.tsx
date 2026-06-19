@@ -151,7 +151,10 @@ export default function Feed() {
   }, [feed.jobs, userSkills, sort]);
 
   // Tablet / unfolded foldable → master–detail (hooks above run unconditionally).
-  if (width >= 840) return <FeedMasterDetail />;
+  // 672dp clears an unfolded Galaxy Z Fold (~690dp) and tablets, while phones in
+  // portrait (~360–430dp) and folded devices (~340dp) stay on the phone layout.
+  // useWindowDimensions is reactive, so folding/unfolding switches live.
+  if (width >= 672) return <FeedMasterDetail />;
 
   const firstName = (profile.name || '').trim().split(/\s+/)[0] || 'there';
   const appsCount = Object.keys(applied).length;
