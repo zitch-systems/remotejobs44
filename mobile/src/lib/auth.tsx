@@ -9,6 +9,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { fetchAppliedMap, fetchSavedIds } from './user-state';
 import { registerMobileDevice } from './telemetry';
+import { clearPushTokens } from './push';
 import { captureError } from './sentry';
 import { useAppStore } from '@/store/app';
 
@@ -80,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       enterDemo: () => setDemo(true),
       signOut: async () => {
         if (isSupabaseConfigured) {
+          // Remove this user's push tokens while still authenticated (RLS),
+          // so a shared device stops delivering their alerts after sign-out.
+          const uid = session?.user?.id;
+          if (uid) await clearPushTokens(uid);
           try {
             await supabase.auth.signOut();
           } catch {

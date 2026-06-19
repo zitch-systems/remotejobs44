@@ -29,6 +29,7 @@ Notifications.setNotificationHandler({
 });
 
 async function registerForPushToken(): Promise<string | null> {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null; // native only
   if (!Device.isDevice) return null; // simulators can't receive a push token
 
   const existing = await Notifications.getPermissionsAsync();
@@ -57,6 +58,19 @@ async function persistToken(userId: string, token: string): Promise<void> {
   await supabase
     .from('device_push_tokens')
     .upsert({ user_id: userId, token, platform: Platform.OS }, { onConflict: 'token' });
+}
+
+/**
+ * Remove the signed-out user's push tokens so a shared device doesn't keep
+ * delivering their job alerts to whoever signs in next. Best-effort.
+ */
+export async function clearPushTokens(userId: string): Promise<void> {
+  if (!isSupabaseConfigured || !userId) return;
+  try {
+    await supabase.from('device_push_tokens').delete().eq('user_id', userId);
+  } catch {
+    /* best-effort */
+  }
 }
 
 /** Registers the device for push when signed in, and routes taps to the job. */
