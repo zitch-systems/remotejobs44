@@ -255,11 +255,27 @@
 .anim-float3d { animation: float3d 8s  ease-in-out infinite; }
 .anim-spin3d  { animation: spin3d 16s linear      infinite; }
 
+/* Cards: subtle 3D lift + tilt on hover (works everywhere). */
+.card-3d { transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease; transform-style:preserve-3d; }
+.card-3d:hover { transform: perspective(900px) rotateX(4deg) rotateY(-5deg) translateY(-6px) scale(1.02); box-shadow: 0 22px 50px -18px rgba(37,99,235,0.35); }
+
+/* Cards: 3D "rotate up into place" as they scroll into view. Progressive
+   enhancement — only runs where scroll-driven animations are supported; other
+   browsers just render the card normally. */
+@keyframes reveal3d {
+  from { opacity:0; transform: perspective(900px) rotateX(16deg) translateY(26px); }
+  to   { opacity:1; transform: perspective(900px) rotateX(0deg)  translateY(0); }
+}
+@supports (animation-timeline: view()) {
+  .reveal-3d { animation: reveal3d linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+}
+
 /* Respect users who prefer reduced motion — kill the decorative loops. */
 @media (prefers-reduced-motion: reduce) {
   .animate-float-a, .animate-float-b, .logo-float,
-  .logo-3d-anim, .anim-float3d, .anim-spin3d { animation: none !important; }
-  .logo-3d, .logo-3d-anim { transition: none; }
+  .logo-3d-anim, .anim-float3d, .anim-spin3d, .reveal-3d { animation: none !important; }
+  .logo-3d, .logo-3d-anim, .card-3d { transition: none; }
+  .reveal-3d { opacity: 1 !important; transform: none !important; }
 }
 
 @media (prefers-reduced-motion:reduce) {

@@ -95,7 +95,11 @@ export async function FeaturedJobs() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {jobs.map(job => <JobCard key={job.id} job={job} />)}
+          {jobs.map(job => (
+            <div key={job.id} className="card-3d reveal-3d rounded-xl">
+              <JobCard job={job} />
+            </div>
+          ))}
         </div>
       </div>
     </section>
