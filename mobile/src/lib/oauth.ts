@@ -40,7 +40,12 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
  * that covers it, e.g. `remotejobs44://**` — MUST be in Supabase → Auth → URL
  * Configuration → Redirect URLs, or sign-in can't return to the app.
  */
-export const oauthRedirectUri = makeRedirectUri({ scheme: 'remotejobs44' });
+// Use a PATH (not a bare scheme): `remotejobs44://auth-callback`. On Android a
+// bare `remotejobs44://` is unreliably intercepted by the in-app browser, so the
+// OAuth redirect can slip past and land the user back on sign-in. A path is
+// matched reliably. The wildcard `remotejobs44://**` in the Supabase allow-list
+// covers this value.
+export const oauthRedirectUri = makeRedirectUri({ scheme: 'remotejobs44', path: 'auth-callback' });
 
 export async function signInWithProvider(provider: OAuthProvider): Promise<void> {
   // Expo Go can't use the custom scheme — opening a browser here would only

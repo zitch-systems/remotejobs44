@@ -16,8 +16,8 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
-import { personalizeJobs, useJobs } from '@/lib/jobs';
-import { activeFilterCount, jobMatchesFilters, type ExperienceLevel } from '@/lib/filters';
+import { personalizeJobs, useJobs, type JobQuery } from '@/lib/jobs';
+import { activeFilterCount, CATEGORY_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -25,7 +25,7 @@ import { useSearchHistory } from '@/store/search';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
-const FILTERS = ['All', 'Engineering', 'Design', 'Marketing'] as const;
+const FILTERS = CATEGORY_OPTIONS.map((o) => o.label);
 
 function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   const { colors } = useTheme();
@@ -76,13 +76,13 @@ export default function Feed() {
   const { colors } = useTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const feed = useJobs();
   const { profile } = useProfile();
   const applied = useAppStore((s) => s.applied);
   const userId = useAppStore((s) => s.userId);
 
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
+  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
   const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('match');
@@ -109,13 +109,33 @@ export default function Feed() {
     };
   }, [userId]);
 
+  // Debounce search so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Server-side query: search + category/type/level run across the whole table,
+  // not just the loaded page (so Home search/filter actually find everything).
+  const jobQuery: JobQuery = useMemo(() => {
+    const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
+    return {
+      text: debouncedQuery || undefined,
+      categories: cat ? [cat] : undefined,
+      type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
+      level: level === 'Any' ? undefined : level,
+    };
+  }, [debouncedQuery, filter, type, level]);
+  const feed = useJobs(20, jobQuery);
+
   const showSkillsNudge = isSupabaseConfigured && Boolean(userId) && skillsLoaded && userSkills.length === 0 && !nudgeDismissed;
 
+  // Server already filtered; here we only personalise + optionally re-rank.
   const jobs = useMemo(() => {
-    let list: Job[] = personalizeJobs(feed.jobs, userSkills).filter((j) => jobMatchesFilters(j, { category: filter, type, level, query }));
-    if (sort === 'match') list = [...list].sort((a, b) => b.match - a.match);
+    const list: Job[] = personalizeJobs(feed.jobs, userSkills);
+    if (sort === 'match') return [...list].sort((a, b) => b.match - a.match);
     return list;
-  }, [feed.jobs, userSkills, filter, type, level, query, sort]);
+  }, [feed.jobs, userSkills, sort]);
 
   // Tablet / unfolded foldable → master–detail (hooks above run unconditionally).
   if (width >= 840) return <FeedMasterDetail />;
@@ -168,6 +188,7 @@ export default function Feed() {
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onSubmitEditing={() => {
+              setDebouncedQuery(query.trim());
               addSearch(query);
               setSearchFocused(false);
             }}
