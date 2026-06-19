@@ -1,37 +1,40 @@
 // src/components/FeedMasterDetail.tsx — wide-screen (tablet / unfolded
 // foldable) master–detail for the feed (handoff §6). A 352px list pane drives
 // a live detail pane; selecting a row updates the detail in place.
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BadgeCheck, Bookmark, Check, Search, Zap } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
-import { useJobs } from '@/lib/jobs';
+import { useJobs, type JobQuery } from '@/lib/jobs';
+import { CATEGORY_OPTIONS } from '@/lib/filters';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 import { Chip, Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 import { JobDetailBody } from './JobDetailBody';
 
-const FILTERS = ['All', 'Engineering', 'Design', 'Marketing'] as const;
+const FILTERS = CATEGORY_OPTIONS.map((o) => o.label);
 
 export function FeedMasterDetail() {
   const { colors } = useTheme();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
+  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
-  const { jobs: allJobs } = useJobs();
 
-  const jobs = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return allJobs.filter(
-      (j) =>
-        // DB categories are lowercase; the chips are capitalised → compare
-        // case-insensitively (same fix as the phone feed).
-        (filter === 'All' || j.category.toLowerCase() === filter.toLowerCase()) &&
-        (q === '' || j.role.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)),
-    );
-  }, [filter, query, allJobs]);
+  // Debounce search, then run search + category server-side across all jobs
+  // (parity with the phone feed) instead of filtering only the loaded page.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const jobQuery: JobQuery = useMemo(() => {
+    const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
+    return { text: debouncedQuery || undefined, categories: cat ? [cat] : undefined };
+  }, [debouncedQuery, filter]);
+  const { jobs } = useJobs(20, jobQuery);
 
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0];
 
