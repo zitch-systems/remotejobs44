@@ -213,6 +213,19 @@ export default function Feed() {
             }}
             style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.fg1, paddingVertical: 0 }}
           />
+          {query.length > 0 ? (
+            <Pressable
+              hitSlop={8}
+              onPress={() => {
+                setQuery('');
+                setDebouncedQuery('');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <X size={16} color={colors.fg4} />
+            </Pressable>
+          ) : null}
         </Card>
         <Pressable
           onPress={() => setSheetOpen(true)}
