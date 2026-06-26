@@ -2,28 +2,29 @@
 // foldable) master–detail for the feed (handoff §6). A 352px list pane drives
 // a live detail pane; selecting a row updates the detail in place.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { BadgeCheck, Bookmark, Check, Search, Zap } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
 import { useJobs, type JobQuery } from '@/lib/jobs';
-import { CATEGORY_OPTIONS } from '@/lib/filters';
+import { useProfile } from '@/lib/profile';
+import { canApply, freeTrialBlockedMessage } from '@/lib/entitlements';
+import { evaluateFreeTrial } from '@/lib/free-trial';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
-import { Chip, Pill, Txt } from './ui';
+import { Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 import { JobDetailBody } from './JobDetailBody';
 
-const FILTERS = CATEGORY_OPTIONS.map((o) => o.label);
-
 export function FeedMasterDetail() {
   const { colors } = useTheme();
-  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 
-  // Debounce search, then run search + category server-side across all jobs
+  // Debounce search, then run search server-side across all jobs
   // (parity with the phone feed) instead of filtering only the loaded page.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -31,9 +32,8 @@ export function FeedMasterDetail() {
   }, [query]);
 
   const jobQuery: JobQuery = useMemo(() => {
-    const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
-    return { text: debouncedQuery || undefined, categories: cat ? [cat] : undefined };
-  }, [debouncedQuery, filter]);
+    return { text: debouncedQuery || undefined };
+  }, [debouncedQuery]);
   const { jobs } = useJobs(20, jobQuery);
 
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0];
@@ -72,13 +72,6 @@ export function FeedMasterDetail() {
               placeholderTextColor={colors.fg4}
               style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.fg1, paddingVertical: 0 }}
             />
-          </View>
-
-          {/* filters */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-            {FILTERS.map((f) => (
-              <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
-            ))}
           </View>
         </View>
 
@@ -147,10 +140,33 @@ function TabletJobRow({ job, selected, onPress }: { job: Job; selected: boolean;
 
 function DetailPane({ job }: { job: Job }) {
   const { colors } = useTheme();
+  const router = useRouter();
+  const { profile } = useProfile();
   const saved = useAppStore((s) => s.saved.includes(job.id));
   const applied = useAppStore((s) => job.id in s.applied);
+  const usedApplications = useAppStore((s) => Object.keys(s.applied).length);
   const toggleSaved = useAppStore((s) => s.toggleSaved);
   const applyTo = useAppStore((s) => s.applyTo);
+
+  // Same free-trial gate as the phone detail screen, so this apply path can't
+  // bypass the allowance.
+  function onApply() {
+    if (applied) return;
+    const trialCtx = { registeredAt: profile.registeredAt, used: usedApplications };
+    if (isSupabaseConfigured && !canApply(profile.plan, trialCtx)) {
+      const trial = evaluateFreeTrial(trialCtx);
+      Alert.alert(
+        trial.windowExpired ? 'Free trial ended' : 'Free limit reached',
+        freeTrialBlockedMessage(trial),
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Subscribe', onPress: () => router.push('/profile/plans') },
+        ],
+      );
+      return;
+    }
+    applyTo(job);
+  }
 
   return (
     <ScrollView
@@ -197,7 +213,7 @@ function DetailPane({ job }: { job: Job }) {
               <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: colors.fg2 }}>{saved ? 'Saved' : 'Save'}</Txt>
             </Pressable>
             <Pressable
-              onPress={() => applyTo(job)}
+              onPress={onApply}
               disabled={applied}
               style={({ pressed }) => [
                 {

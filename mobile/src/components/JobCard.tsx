@@ -1,38 +1,19 @@
 // src/components/JobCard.tsx — the feed job card (handoff §2 "Job Card").
+// Memoised (see export below): the feed FlatList re-renders on every search
+// keystroke / store change, and without memo every mounted card re-ran its
+// mount animation and rebuilt its subtree. `job` references are stable across
+// parent renders, so React.memo's shallow compare skips untouched rows.
 import React, { useEffect, useRef } from 'react';
-import { Animated, type DimensionValue, Pressable, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BadgeCheck, Bookmark } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
 import { useAppStore } from '@/store/app';
-import { radii, spacing, useTheme } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 import { Card, Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 
-/** Placeholder card shown while live jobs load. */
-export function JobCardSkeleton() {
-  const { colors } = useTheme();
-  const Block = ({ w, h, r = 6 }: { w: DimensionValue; h: number; r?: number }) => (
-    <View style={{ width: w, height: h, borderRadius: r, backgroundColor: colors.bgSection }} />
-  );
-  return (
-    <Card style={{ padding: spacing[4], gap: spacing[3] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-        <Block w={40} h={40} r={radii.logo} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <Block w="60%" h={12} />
-          <Block w="40%" h={10} />
-        </View>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <Block w={54} h={18} r={999} />
-        <Block w={54} h={18} r={999} />
-      </View>
-    </Card>
-  );
-}
-
-export function JobCard({ job }: { job: Job }) {
+function JobCardImpl({ job }: { job: Job }) {
   const { colors } = useTheme();
   const router = useRouter();
   const saved = useAppStore((s) => s.saved.includes(job.id));
@@ -134,3 +115,5 @@ export function JobCard({ job }: { job: Job }) {
     </Animated.View>
   );
 }
+
+export const JobCard = React.memo(JobCardImpl);

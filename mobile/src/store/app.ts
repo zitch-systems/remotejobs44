@@ -10,7 +10,6 @@ import { applyRemote, setSavedRemote, updateApplicationStatus } from '@/lib/user
 import { captureError } from '@/lib/sentry';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import { toast } from '@/store/toast';
-import { useUsage } from '@/store/usage';
 
 interface AppState {
   userId: string | null;
@@ -62,22 +61,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (job.id in get().applied) return; // already applied — don't double-count
     notifySuccess();
     toast('Application sent', 'success');
+    // The free-trial allowance is measured against the size of `applied`, so
+    // optimistically adding the row here both updates the tracker and consumes
+    // one trial slot; a rollback below frees it again. No separate counter.
     set((s) => ({ applied: { ...s.applied, [job.id]: 'applied' } }));
-    // Count the application here (exactly when a new one is created), so the
-    // daily limit can't be over-counted by re-taps or rolled-back failures.
-    useUsage.getState().bumpApplication();
     const { userId } = get();
     if (isSupabaseConfigured && userId) {
       applyRemote(userId, job).catch((e) => {
         captureError(e, { scope: 'applyTo', id: job.id });
-        // Roll back the optimistic apply + the count, and tell the user it
-        // didn't go through (otherwise "Application sent" shows, then vanishes).
+        // Roll back the optimistic apply, and tell the user it didn't go
+        // through (otherwise "Application sent" shows, then vanishes).
         set((s) => {
           const next = { ...s.applied };
           delete next[job.id];
           return { applied: next };
         });
-        useUsage.getState().unbumpApplication();
         toast("Couldn't send your application. Please try again.", 'error');
       });
     }

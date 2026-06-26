@@ -23,13 +23,14 @@ import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
 import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
+import { evaluateFreeTrial } from '@/lib/auth/free-trial';
 import { cn } from '@/lib/utils';
 import type { Job } from '@/lib/types';
 
 export function JobActionsCard({ job }: { job: Job }) {
   const router = useRouter();
   const { user, isPro, isAdmin, isLoggedIn, dailyAppsUsed, incrementDailyApp } = useAuthStore();
-  const { isSaved, toggleSave, hasApplied, addApplication } = useJobsStore();
+  const { isSaved, toggleSave, hasApplied, addApplication, applications } = useJobsStore();
   const { toast } = useUIStore();
 
   const [applying, setApplying] = useState(false);
@@ -39,6 +40,14 @@ export function JobActionsCard({ job }: { job: Job }) {
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
   const saved = isSaved(job.id);
   const applied = hasApplied(job.id);
+
+  // Free-trial state for registered (free-plan) users: a small allowance of
+  // applies within a week of signup. The server is the authority; this is a
+  // best-effort UI hint computed from the locally-synced application list.
+  const trial = isLoggedIn() && !isPro()
+    ? evaluateFreeTrial({ registeredAt: user?.joinedAt, used: applications.length })
+    : null;
+  const freeTrialActive = !!trial?.canApply;
 
   function copyToClipboard(text: string, field: string) {
     navigator.clipboard.writeText(text).then(() => {
@@ -64,7 +73,7 @@ export function JobActionsCard({ job }: { job: Job }) {
 
   async function handleApply() {
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
-    if (!isPro()) { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (!isPro() && !freeTrialActive) { modalService.open(<PaywallModal mode="subscribe" />); return; }
     if (isDaily && dailyLimitReached) {
       toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
@@ -122,6 +131,7 @@ export function JobActionsCard({ job }: { job: Job }) {
             : applied ? <><Zap className="w-4 h-4" /> Open Application Link</>
             : dailyLimitReached ? '10/10 applications used'
             : isPro() ? <><Zap className="w-4 h-4" /> Apply Now</>
+            : freeTrialActive ? <><Zap className="w-4 h-4" /> Apply Free ({trial!.remaining} left)</>
             : <><span>🔒</span> Subscribe to Apply</>}
         </button>
         {isDaily && dailyLimitReached && !applied && (
@@ -131,7 +141,13 @@ export function JobActionsCard({ job }: { job: Job }) {
         )}
         {!isPro() && !dailyLimitReached && (
           <p className="text-xs text-stone-400 dark:text-stone-500 text-center">
-            <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Pro</Link> unlocks apply links & auto-apply
+            {!isLoggedIn()
+              ? <><Link href="/register" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Create a free account</Link> for 3 free applications</>
+              : freeTrialActive
+                ? <>{trial!.remaining} free {trial!.remaining === 1 ? 'application' : 'applications'} left this week · <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Go Pro</Link> for unlimited</>
+                : trial?.windowExpired
+                  ? <>Your free trial has ended · <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Subscribe</Link> to keep applying</>
+                  : <>You&apos;ve used your free applications · <Link href="/pricing" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Subscribe</Link> for more</>}
           </p>
         )}
         <div className="flex gap-2 mt-3">

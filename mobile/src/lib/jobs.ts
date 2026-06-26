@@ -227,11 +227,12 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
         }
       } catch (e: any) {
         if (reqId !== reqRef.current) return; // stale failure → ignore
-        if (mode !== 'more' && !gotFresh.current && isDefault) {
-          setJobs(SEED_JOBS);
-          setHasMore(false);
-        } else if (mode !== 'more') {
-          setJobs([]); // a filtered query that failed shows empty, not seed
+        if (mode !== 'more') {
+          // Never fabricate demo jobs as if they were live on a configured
+          // build — surface the error/empty state instead. Default feed: keep
+          // any cached rows already on screen (or stay empty). Filtered query:
+          // clear stale results so the empty state is honest.
+          if (!isDefault) setJobs([]);
           setHasMore(false);
         }
         setError(e?.message ?? 'Failed to load jobs');
@@ -345,7 +346,10 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
     const seed = getCachedJob(id);
     setState(seed ? { job: seed, loading: false } : { job: null, loading: true });
     fetchJobById(id)
-      .then((job) => active && job && setState({ job, loading: false }))
+      // A null result (deleted / deactivated / bad deep-link id) must still
+      // clear loading so the "Job not found" state can render — the previous
+      // `job && …` short-circuit left the screen spinning forever.
+      .then((job) => active && setState((s) => ({ job: job ?? s.job, loading: false })))
       .catch(() => active && setState((s) => (s.job ? { ...s, loading: false } : { job: SEED_JOBS.find((j) => j.id === id) ?? null, loading: false })));
     return () => {
       active = false;

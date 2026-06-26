@@ -9,6 +9,7 @@ import { modalService } from '@/components/ui/Modal';
 import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
 import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
+import { evaluateFreeTrial } from '@/lib/auth/free-trial';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -34,14 +35,22 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   // so any save/apply re-ran every card on the page (50 of them on /jobs)
   // even though only the toggled card needed to re-render.
   const userPlan        = useAuthStore(s => s.user?.plan);
+  const joinedAt        = useAuthStore(s => s.user?.joinedAt);
   const loggedIn        = useAuthStore(s => !!s.user);
   const dailyAppsUsed   = useAuthStore(s => s.dailyAppsUsed);
   const incrementDailyApp = useAuthStore(s => s.incrementDailyApp);
+  const applicationsCount = useJobsStore(s => s.applications.length);
   // Derived booleans from primitives — re-renders only when underlying
   // primitive flips.
   const isPro    = userPlan === 'daily' || userPlan === 'pro' || userPlan === 'admin';
   const isDaily  = userPlan === 'daily';
   const isFree   = !loggedIn || userPlan === 'free';
+  // Registered free-plan users get a few free applies for a week. Server
+  // gate is authoritative; this drives the button affordance only.
+  const freeTrialActive = loggedIn && userPlan === 'free'
+    && evaluateFreeTrial({ registeredAt: joinedAt, used: applicationsCount }).canApply;
+  // Apply-able right now: a paid plan OR an active free trial.
+  const canApplyNow = isPro || freeTrialActive;
   // Per-job primitive selectors: `saved` flips only when THIS job's id is
   // added/removed from savedJobIds; other cards' subscriptions are noops.
   const saved   = useJobsStore(s => s.savedJobIds.includes(job.id));
@@ -86,7 +95,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   async function handleApply(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
     if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
-    if (!isPro)      { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (!canApplyNow) { modalService.open(<PaywallModal mode="subscribe" />); return; }
     if (isDaily && dailyLimitReached) {
       toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
@@ -159,15 +168,15 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
         <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
         <button onClick={handleApply} onAuxClick={cancelAux}
-          aria-label={applied ? 'Already applied' : isPro ? 'Apply to this job' : 'Subscribe to apply'}
-          title={applied ? 'Already applied' : isPro ? 'Apply' : 'Subscribe to apply'}
+          aria-label={applied ? 'Already applied' : canApplyNow ? 'Apply to this job' : 'Subscribe to apply'}
+          title={applied ? 'Already applied' : canApplyNow ? 'Apply' : 'Subscribe to apply'}
           className={cn(
             'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
-              : isPro ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
+              : canApplyNow ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
               : 'border border-brand-600 text-brand-700 dark:text-brand-400 hover:bg-brand-50'
           )}>
-          {applied ? '✓' : isPro ? 'Apply' : '🔒'}
+          {applied ? '✓' : canApplyNow ? 'Apply' : '🔒'}
         </button>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
@@ -257,13 +266,14 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
               ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : dailyLimitReached
               ? 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 cursor-not-allowed'
-              : isPro
+              : canApplyNow
               ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800 shadow-sm'
               : 'border border-brand-600 dark:border-brand-500 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'
           )}>
           {applied ? <><BookmarkCheck className="w-3 h-3" /> Applied</>
             : dailyLimitReached ? '10/10 Limit'
             : isPro ? <><ArrowUpRight className="w-3 h-3" /> Apply</>
+            : freeTrialActive ? <><Zap className="w-3 h-3" /> Apply Free</>
             : <><Lock className="w-3 h-3" /> Subscribe</>}
         </button>
       </div>

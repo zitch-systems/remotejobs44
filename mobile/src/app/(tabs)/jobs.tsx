@@ -18,6 +18,11 @@ import { useSavedSearches } from '@/store/saved-searches';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
+// Stable identities for the feed FlatList (see JobCard memoisation note).
+const keyExtractor = (j: Job) => j.id;
+const renderJobItem = ({ item }: { item: Job }) => <JobCard job={item} />;
+const FeedSeparator = () => <View style={{ height: spacing[3] }} />;
+
 // Category chips mirror the full DB category set (see CATEGORY_OPTIONS).
 const CATEGORY_LABELS = CATEGORY_OPTIONS.map((o) => o.label);
 
@@ -266,10 +271,10 @@ export default function Jobs() {
         // Keep the current list visible while a filter/search refetches; only
         // blank to skeletons when we have nothing yet.
         data={feed.loading && jobs.length === 0 ? [] : jobs}
-        keyExtractor={(j) => j.id}
-        renderItem={({ item }) => <JobCard job={item} />}
+        keyExtractor={keyExtractor}
+        renderItem={renderJobItem}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        ItemSeparatorComponent={FeedSeparator}
         contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[1], paddingBottom: spacing[10], gap: spacing[4] }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
