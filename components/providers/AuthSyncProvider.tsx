@@ -229,6 +229,30 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       } catch { /* network blip — next page nav will retry */ }
     })();
 
+    // Server-side applications hydrate. The free-trial "N free left" hint and
+    // the per-job "Applied" state read useJobsStore.applications, which was
+    // previously only backfilled on /dashboard and /applications — so a fresh
+    // navigation straight to /jobs showed a stale "3 left" for a user who had
+    // already used their allowance. Backfill from the server on mount (same
+    // rehydrate-await + user-switch guards as the saved-jobs hydrate above).
+    (async () => {
+      try {
+        await jobsRehydrate;
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (!s?.user) return;
+        const initialUserId = s.user.id;
+        const res = await fetch('/api/applications');
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = Array.isArray(json.applications) ? json.applications : [];
+        const { data: { session: s2 } } = await supabase.auth.getSession();
+        if (s2?.user?.id !== initialUserId) return; // logout / switch happened
+        const store = useJobsStore.getState();
+        const known = new Set(store.applications.map((a) => a.id));
+        for (const a of list) if (!known.has(a.id)) store.addApplication(a);
+      } catch { /* network blip — dashboard / next nav will retry */ }
+    })();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         ignoreNextSignedOut = true;

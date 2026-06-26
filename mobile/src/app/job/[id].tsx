@@ -35,10 +35,15 @@ export default function JobDetail() {
   const applyTo = useAppStore((s) => s.applyTo);
 
   const addRecent = useRecentJobs((s) => s.add);
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   // Real, server-hydrated count of the user's applications — the free-trial
   // allowance is measured against this (not a tamperable per-day counter).
   const usedApplications = useAppStore((s) => Object.keys(s.applied).length);
+  const appliedHydrated = useAppStore((s) => s.hydrated);
+  // Until the profile (registeredAt/plan) and applied rows have loaded, the
+  // trial state is unknown — don't let an exhausted user start a doomed apply
+  // that the server would reject with a confusing "sent → couldn't send".
+  const gateLoading = isSupabaseConfigured && (profileLoading || !appliedHydrated);
 
   const [burst, setBurst] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
@@ -74,7 +79,7 @@ export default function JobDetail() {
   const target = applyTarget(job);
 
   async function onApply() {
-    if (applied || !job) return;
+    if (applied || !job || gateLoading) return;
     // Free plan: 3 applications within the first week, then subscribe (paid
     // is unlimited). Mirrors the web free-trial gate.
     const trialCtx = { registeredAt: profile.registeredAt, used: usedApplications };
@@ -177,7 +182,7 @@ export default function JobDetail() {
 
         <Pressable
           onPress={onApply}
-          disabled={applied}
+          disabled={applied || gateLoading}
           style={({ pressed }) => [
             {
               flex: 1,
@@ -188,6 +193,7 @@ export default function JobDetail() {
               justifyContent: 'center',
               gap: spacing[2],
               backgroundColor: applied ? colors.success : colors.accent,
+              opacity: gateLoading && !applied ? 0.6 : 1,
             },
             applied ? undefined : shadows.accent,
             pressed && { transform: [{ scale: 0.98 }] },
@@ -195,7 +201,7 @@ export default function JobDetail() {
         >
           {applied ? <Check size={18} color="#fff" /> : target ? <ExternalLink size={18} color="#fff" /> : <Zap size={18} color="#fff" fill="#fff" />}
           <Txt style={{ fontFamily: fonts.displayBold, fontSize: 14, color: '#fff' }}>
-            {applied ? 'Applied' : target ? 'Apply on company site' : 'Apply in one tap'}
+            {applied ? 'Applied' : gateLoading ? 'Checking…' : target ? 'Apply on company site' : 'Apply in one tap'}
           </Txt>
         </Pressable>
       </View>
