@@ -10,12 +10,16 @@ import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectRe
 import { validateExternalUrl } from './ssrf-guard';
 import { logInfo, logError } from './log';
 
-// Fetch a user-supplied URL while re-validating EVERY redirect hop against the
-// SSRF guard. Native `fetch` follows redirects automatically, so a public host
-// that 302s to http://169.254.169.254/… (cloud metadata) would otherwise be
-// fetched even though the initial host passed validation. `redirect: 'manual'`
-// lets us check each Location before following. Career pages legitimately
-// redirect, so we follow (bounded) rather than hard-erroring like /api/rss.
+// Fetch a user-supplied URL while validating EVERY URL it touches against the
+// SSRF guard — the initial URL AND every redirect hop. Native `fetch` follows
+// redirects automatically, so a public host that 302s to
+// http://169.254.169.254/… (cloud metadata) would otherwise be fetched even
+// though the initial host passed validation. `redirect: 'manual'` lets us check
+// each Location before following. Career pages legitimately redirect, so we
+// follow (bounded) rather than hard-erroring like /api/rss. The guard runs
+// inside this helper (not just at the route) so it can't be bypassed by a new
+// caller, and we fetch the validator's normalized URL so the request target is
+// always the sanitized value.
 async function fetchFollowingValidatedRedirects(
   startUrl: string,
   init: RequestInit,
@@ -23,17 +27,16 @@ async function fetchFollowingValidatedRedirects(
 ): Promise<Response> {
   let current = startUrl;
   for (let i = 0; i <= maxRedirects; i++) {
-    const res = await fetch(current, { ...init, redirect: 'manual' });
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get('location');
-      if (!loc) return res;
-      const next = new URL(loc, current).toString();
-      const v = validateExternalUrl(next);
-      if (!v.ok) throw new Error(`blocked redirect to a disallowed host: ${v.error}`);
-      current = next;
-      continue;
-    }
-    return res;
+    const v = validateExternalUrl(current);
+    if (!v.ok) throw new Error(`blocked fetch to a disallowed host: ${v.error}`);
+    const res = await fetch(v.url.toString(), { ...init, redirect: 'manual' });
+    if (res.status < 300 || res.status >= 400) return res;
+    const loc = res.headers.get('location');
+    if (!loc) return res;
+    // Resolve the next hop relative to the sanitized current URL, then loop —
+    // the validateExternalUrl at the top of the next iteration vets it before
+    // any fetch.
+    current = new URL(loc, v.url).toString();
   }
   throw new Error('too many redirects');
 }
