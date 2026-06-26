@@ -128,13 +128,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // Two-factor gate (when enabled): a confirmed admin must reach aal2
-      // before the panel. Route them to enroll/verify otherwise. The
-      // /api/admin/* routes enforce the same gate server-side via requireAdmin.
+      // Two-factor gate (when enabled): a confirmed admin must hold a valid
+      // email-2FA session cookie before the panel. Ask the server (the cookie
+      // is httpOnly, so JS can't read it) and route to /security/2fa otherwise.
+      // The /api/admin/* routes enforce the same gate via requireAdmin.
       if (ADMIN_MFA_REQUIRED) {
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (cancelled) return;
-        if (aal?.currentLevel !== 'aal2') { router.replace('/security/2fa?next=/admin'); return; }
+        try {
+          const r = await fetch('/api/admin/2fa/status');
+          const s = await r.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!s?.verified) { router.replace('/security/2fa?next=/admin'); return; }
+        } catch { /* network blip — requireAdmin still gates every admin API */ }
       }
 
       setAdminName(profile.name ?? user.email?.split('@')[0] ?? 'Admin');
