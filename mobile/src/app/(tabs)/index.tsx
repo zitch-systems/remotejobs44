@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ChevronRight, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
-import { Avatar, Card, Chip, Txt } from '@/components/ui';
+import { Avatar, Card, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { JobListSkeleton } from '@/components/JobCardSkeleton';
 import { RecentlyViewed } from '@/components/RecentlyViewed';
@@ -17,15 +17,13 @@ import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FeedMasterDetail } from '@/components/FeedMasterDetail';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { personalizeJobs, useJobs, type JobQuery } from '@/lib/jobs';
-import { activeFilterCount, CATEGORY_OPTIONS, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
+import { activeFilterCount, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
 import { useSearchHistory } from '@/store/search';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
-
-const FILTERS = CATEGORY_OPTIONS.map((o) => o.label);
 
 function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   const { colors } = useTheme();
@@ -80,7 +78,6 @@ export default function Feed() {
   const applied = useAppStore((s) => s.applied);
   const userId = useAppStore((s) => s.userId);
 
-  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [type, setType] = useState<JobType>('Any');
@@ -128,17 +125,15 @@ export default function Feed() {
   // Server-side query: search + all filters run across the whole table, not just
   // the loaded page (so Home search/filter actually find everything).
   const jobQuery: JobQuery = useMemo(() => {
-    const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
     return {
       text: debouncedQuery || undefined,
-      categories: cat ? [cat] : undefined,
       type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
       level: level === 'Any' ? undefined : level,
       remoteOnly: remoteOnly || undefined,
       location: debouncedLocation || undefined,
       postedWithinDays,
     };
-  }, [debouncedQuery, filter, type, level, remoteOnly, debouncedLocation, postedWithinDays]);
+  }, [debouncedQuery, type, level, remoteOnly, debouncedLocation, postedWithinDays]);
   const feed = useJobs(20, jobQuery);
 
   const showSkillsNudge = isSupabaseConfigured && Boolean(userId) && skillsLoaded && userSkills.length === 0 && !nudgeDismissed;
@@ -322,21 +317,6 @@ export default function Feed() {
       ) : null}
 
       {query.trim() === '' ? <RecentlyViewed /> : null}
-
-      {/* section + chips */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Txt variant="h2">Top matches</Txt>
-        {(type !== 'Any' || level !== 'Any' || sort !== 'match') && (
-          <Pressable onPress={resetFilters}>
-            <Txt style={{ fontFamily: fonts.displaySemibold, fontSize: 13, color: colors.brand }}>Reset</Txt>
-          </Pressable>
-        )}
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-        {FILTERS.map((f) => (
-          <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
-        ))}
-      </View>
     </View>
   );
 
@@ -372,7 +352,6 @@ export default function Feed() {
               </Txt>
               <Pressable
                 onPress={() => {
-                  setFilter('All');
                   setQuery('');
                   resetFilters();
                 }}

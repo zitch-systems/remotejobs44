@@ -7,23 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BadgeCheck, Bookmark, Check, Search, Zap } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
 import { useJobs, type JobQuery } from '@/lib/jobs';
-import { CATEGORY_OPTIONS } from '@/lib/filters';
 import { useAppStore } from '@/store/app';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
-import { Chip, Pill, Txt } from './ui';
+import { Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 import { JobDetailBody } from './JobDetailBody';
 
-const FILTERS = CATEGORY_OPTIONS.map((o) => o.label);
-
 export function FeedMasterDetail() {
   const { colors } = useTheme();
-  const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 
-  // Debounce search, then run search + category server-side across all jobs
+  // Debounce search, then run search server-side across all jobs
   // (parity with the phone feed) instead of filtering only the loaded page.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -31,9 +27,8 @@ export function FeedMasterDetail() {
   }, [query]);
 
   const jobQuery: JobQuery = useMemo(() => {
-    const cat = CATEGORY_OPTIONS.find((o) => o.label === filter)?.value;
-    return { text: debouncedQuery || undefined, categories: cat ? [cat] : undefined };
-  }, [debouncedQuery, filter]);
+    return { text: debouncedQuery || undefined };
+  }, [debouncedQuery]);
   const { jobs } = useJobs(20, jobQuery);
 
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0];
@@ -72,13 +67,6 @@ export function FeedMasterDetail() {
               placeholderTextColor={colors.fg4}
               style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.fg1, paddingVertical: 0 }}
             />
-          </View>
-
-          {/* filters */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-            {FILTERS.map((f) => (
-              <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
-            ))}
           </View>
         </View>
 
