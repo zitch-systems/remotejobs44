@@ -56,4 +56,26 @@ describe('dedupeByApplyUrl', () => {
   it('returns an empty array unchanged', () => {
     expect(dedupeByApplyUrl([])).toEqual([]);
   });
+
+  it('keeps a scam-flagged duplicate over a clean one regardless of order', () => {
+    const cleanFirst = dedupeByApplyUrl([
+      { apply_url: 'https://x.com/a', title: 'clean', flagged: false },
+      { apply_url: 'https://x.com/a', title: 'scam',  flagged: true },
+    ]);
+    expect(cleanFirst[0].flagged).toBe(true);
+    // ...and when the flagged one comes first, it still wins (not last-write).
+    const flaggedFirst = dedupeByApplyUrl([
+      { apply_url: 'https://x.com/a', title: 'scam',  flagged: true },
+      { apply_url: 'https://x.com/a', title: 'clean', flagged: false },
+    ]);
+    expect(flaggedFirst[0].flagged).toBe(true);
+  });
+
+  it('prefers the richer copy (longer description) when neither is flagged', () => {
+    const out = dedupeByApplyUrl([
+      { apply_url: 'https://x.com/a', title: 'rich', description: 'A long, detailed description.' },
+      { apply_url: 'https://x.com/a', title: 'sparse', description: 'short' },
+    ]);
+    expect(out[0].title).toBe('rich');
+  });
 });

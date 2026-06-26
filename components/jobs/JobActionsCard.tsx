@@ -93,6 +93,17 @@ export function JobActionsCard({ job }: { job: Job }) {
       return;
     }
 
+    // Defensive symmetry with JobCard: only persist real (UUID) job ids. The
+    // detail page server-side notFound()s non-DB ids so this normally can't
+    // fire, but if a mock/seed job ever reaches here, just open the link
+    // rather than 400-ing on a non-uuid job_id insert.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(job.id)) {
+      if (applyTarget) safeWindowOpen(applyTarget);
+      else toast('No application link available for this job', 'error');
+      return;
+    }
+
     setApplying(true);
     try {
       const app = await applicationsApi.apply(job.id);

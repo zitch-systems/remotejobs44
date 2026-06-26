@@ -75,7 +75,6 @@ export async function GET(req: NextRequest) {
 
     const supabase  = createAdminSupabaseClient();
     const planTier  = getPlanTier(plan);
-    const expiresAt = getPlanExpiry(plan);
 
     // Idempotency: if this paystack_reference is already recorded, the
     // user has already been credited for this charge — short-circuit so a
@@ -93,9 +92,16 @@ export async function GET(req: NextRequest) {
     // Update user plan — but never overwrite an admin's special 'admin' plan tag.
     const { data: existing } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, plan_expires_at')
       .eq('id', user_id)
       .maybeSingle();
+    // Preserve unused paid time on an upgrade/renewal: extend from the LATER of
+    // now or the user's current (future) expiry, so e.g. monthly→annual or a
+    // mid-period renewal doesn't discard days the user already paid for. A
+    // fresh purchase (no future expiry) extends from now as before.
+    const existingExpiryMs = existing?.plan_expires_at ? new Date(existing.plan_expires_at).getTime() : 0;
+    const expiryBase = existingExpiryMs > Date.now() ? new Date(existingExpiryMs) : new Date();
+    const expiresAt = getPlanExpiry(plan, expiryBase);
     if (existing?.role !== 'admin') {
       const { error: planErr } = await supabase
         .from('profiles')
