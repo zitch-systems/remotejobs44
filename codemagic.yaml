@@ -28,17 +28,22 @@ definitions:
       name: Install JS dependencies
       script: npm ci
     set_version: &set_version
-      name: Stamp Android versionCode from the build number
+      name: Stamp native build number from the CI build number
       script: |
-        # Google Play REJECTS a duplicate versionCode, so every Play upload must
-        # use a higher one. CNG regenerates android/ from app.json on each
-        # prebuild, so stamp app.json's android.versionCode with Codemagic's
-        # monotonic build number BEFORE prebuild runs. versionName ("1.0.0")
-        # is unchanged — only versionCode needs to be unique.
-        node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const n=parseInt(process.env.PROJECT_BUILD_NUMBER||process.env.BUILD_NUMBER||'1',10);j.expo.android.versionCode=n;fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('android.versionCode =',n);"
+        # Google Play AND the App Store both REJECT a duplicate build number, so
+        # every upload must use a higher one. CNG regenerates android/ + ios/
+        # from app.json on each prebuild, so stamp both app.json's
+        # android.versionCode (int) and ios.buildNumber (string) with
+        # Codemagic's monotonic build number BEFORE prebuild runs. versionName
+        # / CFBundleShortVersionString ("1.0.0") is unchanged — only the build
+        # number needs to be unique.
+        node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const n=parseInt(process.env.PROJECT_BUILD_NUMBER||process.env.BUILD_NUMBER||'1',10);j.expo.android=j.expo.android||{};j.expo.ios=j.expo.ios||{};j.expo.android.versionCode=n;j.expo.ios.buildNumber=String(n);fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('versionCode/buildNumber =',n);"
     prebuild: &prebuild
       name: Expo prebuild (Android)
       script: npx expo prebuild --platform android --clean
+    prebuild_ios: &prebuild_ios
+      name: Expo prebuild (iOS)
+      script: npx expo prebuild --platform ios --clean
 
 workflows:
   android-apk:
@@ -146,3 +151,75 @@ workflows:
       #   track: internal          # internal → closed (alpha/beta) → production
       #   submit_as_draft: true    # review in the console before going live
       #   in_app_update_priority: 0
+
+  # ── iOS (App Store / TestFlight) ───────────────────────────────────────────────
+  # Manual-trigger (no `triggering:` block) — iOS build minutes on macOS are
+  # pricier, so kick this from the Codemagic UI for a release.
+  #
+  # PREREQUISITES (one-time — only you can do these, all Apple-side):
+  #   1. Apple Developer Program membership ($99/yr).
+  #   2. App Store Connect API key: Codemagic → Teams → Integrations →
+  #      App Store Connect → connect a key (Issuer ID + Key ID + .p8). Name the
+  #      integration `codemagic_asc_api_key` (or edit the name below).
+  #   3. Register the bundle id `com.remotejobs44.app` in your Apple Developer
+  #      account (or let the ASC integration auto-create it on first run).
+  #   4. Create the app in App Store Connect (reuse the same bundle id).
+  #   5. Same `expo_public` env group as Android (Supabase URL / anon key).
+  #
+  # Signing is automatic: `xcode-project use-profiles` fetches the cert +
+  # provisioning profile from the App Store Connect integration at build time —
+  # no certificates committed to the repo.
+  ios-ipa:
+    name: RemoteJobs44 · iOS IPA (App Store / TestFlight)
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    working_directory: mobile
+    integrations:
+      app_store_connect: codemagic_asc_api_key
+    environment:
+      <<: *env_versions
+      groups:
+        - expo_public        # EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY (Codemagic UI)
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.remotejobs44.app
+      vars:
+        BUNDLE_ID: com.remotejobs44.app
+      xcode: latest
+      cocoapods: default
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/Library/Caches/CocoaPods
+    scripts:
+      - *install
+      - *set_version
+      - *prebuild_ios
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Set up provisioning profiles (App Store Connect)
+        script: xcode-project use-profiles
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa \
+            --project "ios/RemoteJobs44.xcodeproj" \
+            --scheme "RemoteJobs44"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - mobile/build/ios/ipa/*.ipa
+      - '**/*.ipa'
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - teyokensax1@gmail.com
+        notify:
+          success: true
+          failure: true
+      # ── Auto-publish to TestFlight (optional — leave commented until ready) ──
+      # After the app exists in App Store Connect, uncomment to push every
+      # build straight to TestFlight (uses the same ASC integration above):
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
