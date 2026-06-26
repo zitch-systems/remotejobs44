@@ -141,17 +141,21 @@ function TabletJobRow({ job, selected, onPress }: { job: Job; selected: boolean;
 function DetailPane({ job }: { job: Job }) {
   const { colors } = useTheme();
   const router = useRouter();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const saved = useAppStore((s) => s.saved.includes(job.id));
   const applied = useAppStore((s) => job.id in s.applied);
   const usedApplications = useAppStore((s) => Object.keys(s.applied).length);
+  const appliedHydrated = useAppStore((s) => s.hydrated);
   const toggleSaved = useAppStore((s) => s.toggleSaved);
   const applyTo = useAppStore((s) => s.applyTo);
+
+  // Don't gate until the trial inputs (profile + applied rows) have loaded.
+  const gateLoading = isSupabaseConfigured && (profileLoading || !appliedHydrated);
 
   // Same free-trial gate as the phone detail screen, so this apply path can't
   // bypass the allowance.
   function onApply() {
-    if (applied) return;
+    if (applied || gateLoading) return;
     const trialCtx = { registeredAt: profile.registeredAt, used: usedApplications };
     if (isSupabaseConfigured && !canApply(profile.plan, trialCtx)) {
       const trial = evaluateFreeTrial(trialCtx);
@@ -214,7 +218,7 @@ function DetailPane({ job }: { job: Job }) {
             </Pressable>
             <Pressable
               onPress={onApply}
-              disabled={applied}
+              disabled={applied || gateLoading}
               style={({ pressed }) => [
                 {
                   flex: 1,
@@ -225,6 +229,7 @@ function DetailPane({ job }: { job: Job }) {
                   height: 46,
                   borderRadius: radii.row,
                   backgroundColor: applied ? colors.success : colors.accent,
+                  opacity: gateLoading && !applied ? 0.6 : 1,
                 },
                 applied ? undefined : shadows.accent,
                 pressed && { transform: [{ scale: 0.98 }] },
@@ -232,7 +237,7 @@ function DetailPane({ job }: { job: Job }) {
             >
               {applied ? <Check size={17} color="#fff" /> : <Zap size={17} color="#fff" fill="#fff" />}
               <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: '#fff' }}>
-                {applied ? 'Applied' : 'Apply now'}
+                {applied ? 'Applied' : gateLoading ? 'Checking…' : 'Apply now'}
               </Txt>
             </Pressable>
           </View>

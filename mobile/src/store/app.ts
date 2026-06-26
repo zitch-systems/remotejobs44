@@ -15,6 +15,10 @@ interface AppState {
   userId: string | null;
   saved: string[];
   applied: Record<string, AppStatus>;
+  /** True once the signed-in user's saved/applied rows have loaded from the
+   *  server. The free-trial gate waits on this so it can't read `applied` as
+   *  empty (and wrongly offer a free apply) during the post-sign-in window. */
+  hydrated: boolean;
 
   isSaved: (id: string) => boolean;
   isApplied: (id: string) => boolean;
@@ -34,12 +38,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Seed only in demo mode; a real signed-in user starts from their own rows.
   saved: isSupabaseConfigured ? [] : [...SEED_SAVED],
   applied: isSupabaseConfigured ? {} : { ...SEED_APPLIED },
+  // Demo mode has its data up front; a configured build hydrates on sign-in.
+  hydrated: !isSupabaseConfigured,
 
   isSaved: (id) => get().saved.includes(id),
   isApplied: (id) => id in get().applied,
 
   setUserId: (id) => set({ userId: id }),
-  hydrate: ({ saved, applied }) => set({ saved, applied }),
+  hydrate: ({ saved, applied }) => set({ saved, applied, hydrated: true }),
 
   toggleSaved: (id) => {
     const willSave = !get().saved.includes(id);
@@ -97,5 +103,5 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  reset: () => set({ saved: [], applied: {}, userId: null }),
+  reset: () => set({ saved: [], applied: {}, userId: null, hydrated: !isSupabaseConfigured }),
 }));

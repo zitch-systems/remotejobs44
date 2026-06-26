@@ -52,6 +52,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Parse + validate the target job id up front, and short-circuit an
+    // already-applied request with a clean 409 BEFORE any plan / free-trial
+    // gating. Re-applying to a job you already applied to must never surface
+    // as a "subscribe" paywall — that count gate is for NEW applications.
+    const body = await req.json();
+    const { jobId } = body;
+    if (!jobId) return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
+    // applications.job_id is uuid — short-circuit a bad shape locally
+    // rather than letting PostgREST 22P02 cascade into the 500 branch.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof jobId !== 'string' || !UUID_RE.test(jobId)) {
+      return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+    }
+    // auto_applied is a boolean column. Coerce defensively so a client
+    // sending `autoApplied: "hello"` doesn't 22023 the whole insert.
+    const autoApplied = body.autoApplied === true;
+
+    const { data: existing } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('job_id', jobId)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({ error: 'You have already applied to this job' }, { status: 409 });
+    }
+
     // Check user has an active plan (pro, daily, or admin)
     const { data: profile } = await supabase
       .from('profiles')
@@ -176,19 +203,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const body = await req.json();
-    const { jobId } = body;
-    if (!jobId) return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
-    // applications.job_id is uuid — short-circuit a bad shape locally
-    // rather than letting PostgREST 22P02 cascade into the 500 branch.
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (typeof jobId !== 'string' || !UUID_RE.test(jobId)) {
-      return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
-    }
-    // auto_applied is a boolean column. Coerce defensively so a client
-    // sending `autoApplied: "hello"` doesn't 22023 the whole insert.
-    const autoApplied = body.autoApplied === true;
-
     // Fetch job details using admin client (bypasses RLS)
     const adminSupabase = createAdminSupabaseClient();
     const { data: job, error: jobError } = await adminSupabase
@@ -199,18 +213,6 @@ export async function POST(req: NextRequest) {
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    }
-
-    // Check for duplicate application (return 409 — already applied is not a 500)
-    const { data: existing } = await supabase
-      .from('applications')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('job_id', jobId)
-      .maybeSingle();
-
-    if (existing) {
-      return NextResponse.json({ error: 'You have already applied to this job' }, { status: 409 });
     }
 
     const steps = [
@@ -244,6 +246,18 @@ export async function POST(req: NextRequest) {
       // returns — so both paths look identical to the client.
       if ((insertError as any).code === '23505') {
         return NextResponse.json({ error: 'You have already applied to this job' }, { status: 409 });
+      }
+      // 23514 = check_violation. The free-trial enforcement trigger
+      // (migration_v56) raises this with a `free_trial_*` message when a free
+      // user is past their allowance/window. The route's pre-gate normally
+      // catches that first, but a count→insert race can let it reach the
+      // trigger — surface the same friendly 403 instead of an opaque 500.
+      const insertMsg = (insertError as any).message ?? '';
+      if ((insertError as any).code === '23514' && insertMsg.includes('free_trial')) {
+        return NextResponse.json(
+          { error: freeTrialBlockedMessage({ windowExpired: insertMsg.includes('window_expired') }) },
+          { status: 403 },
+        );
       }
       // Surface a clear error — don't expose raw DB messages
       logError({ event: 'applications.insert_failed', user_id: user.id, error: insertError.message });

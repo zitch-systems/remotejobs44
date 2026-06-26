@@ -65,7 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(([saved, applied]) => {
         if (active) useAppStore.getState().hydrate({ saved, applied });
       })
-      .catch((e) => captureError(e, { scope: 'hydrate-user-state' }));
+      .catch((e) => {
+        captureError(e, { scope: 'hydrate-user-state' });
+        // Don't leave the apply gate stuck on "Checking…" if the row fetch
+        // failed — mark hydrated so the UI proceeds. The server trigger is the
+        // authoritative limit; the client count is only a hint.
+        if (active) useAppStore.setState({ hydrated: true });
+      });
     return () => {
       active = false;
     };
