@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { resolveRole } from '@/lib/auth/redirect';
 import { useAuthStore } from '@/lib/store';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { ADMIN_MFA_REQUIRED } from '@/lib/auth/mfa';
 
 // Admin access is determined solely by the 'role' column in the profiles table.
 // To grant admin access, set role = 'admin' directly in the Supabase dashboard.
@@ -32,6 +33,7 @@ const NAV = [
   { href: '/admin/broadcasts',    icon: Mail,            label: 'Broadcasts'                  },
   { href: '/admin/audit',         icon: ShieldCheck,     label: 'Audit Log'                   },
   { href: '/admin/settings',      icon: Settings,        label: 'Settings'                    },
+  { href: '/security/2fa',        icon: Shield,          label: 'Two-Factor Auth'             },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -124,6 +126,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (role !== 'admin') {
         router.replace('/dashboard');
         return;
+      }
+
+      // Two-factor gate (when enabled): a confirmed admin must reach aal2
+      // before the panel. Route them to enroll/verify otherwise. The
+      // /api/admin/* routes enforce the same gate server-side via requireAdmin.
+      if (ADMIN_MFA_REQUIRED) {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (cancelled) return;
+        if (aal?.currentLevel !== 'aal2') { router.replace('/security/2fa?next=/admin'); return; }
       }
 
       setAdminName(profile.name ?? user.email?.split('@')[0] ?? 'Admin');

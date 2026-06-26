@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { ADMIN_MFA_REQUIRED, getCurrentAAL } from '@/lib/auth/mfa';
 
 export type RequireAdminResult =
   | { ok: true;  adminId: string; adminEmail: string | null }
@@ -37,6 +38,23 @@ export async function requireAdmin(): Promise<RequireAdminResult> {
   // of a redeploy. migration_v4 introduced the `suspended` column for this.
   if (profile?.suspended === true) {
     return { ok: false, res: NextResponse.json({ error: 'Account suspended' }, { status: 403 }) };
+  }
+  // Two-factor gate (when enabled): an admin must have completed a TOTP
+  // challenge this session (aal2). Returns a distinct `code: 'mfa_required'`
+  // so the admin UI can route them to /security/2fa to enroll/verify. The 2FA
+  // flow itself talks to Supabase Auth directly (not /api/admin), so it isn't
+  // blocked by this gate.
+  if (ADMIN_MFA_REQUIRED) {
+    const aal = await getCurrentAAL(supabase);
+    if (aal !== 'aal2') {
+      return {
+        ok: false,
+        res: NextResponse.json(
+          { error: 'Two-factor authentication required', code: 'mfa_required' },
+          { status: 403 },
+        ),
+      };
+    }
   }
   return { ok: true, adminId: user.id, adminEmail: user.email ?? null };
 }
