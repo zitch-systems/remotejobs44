@@ -1,5 +1,7 @@
 // lib/store.ts
-// Using zustand 4.4.7 — pinned in package.json to avoid createWithEqualityFn deprecation
+// zustand v5: this store only uses `create` + `persist`/`createJSONStorage`
+// (no createWithEqualityFn / default import), so the v4→v5 upgrade is a no-op
+// here. Matches the mobile app, which already runs zustand 5.
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, Toast, Application, SearchFilters } from './types';
