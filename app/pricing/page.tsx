@@ -20,15 +20,15 @@ const PLANS = [
     originalPrice: null,
     save: null,
     icon: null,
-    desc: 'Browse jobs and explore opportunities.',
+    desc: 'Browse jobs and apply free for your first week.',
     cta: 'Start Free',
     popular: false,
     features: [
       { text: 'Browse all 50,000+ remote jobs', ok: true },
+      { text: '3 free applications in your first week', ok: true },
       { text: 'Basic search & filters', ok: true },
       { text: 'Save up to 5 jobs', ok: true },
       { text: 'Company profiles', ok: true },
-      { text: 'Apply links & contact emails', ok: false },
       { text: 'CV upload & auto-apply', ok: false },
       { text: 'Application tracker', ok: false },
       { text: 'Job alerts & notifications', ok: false },
@@ -245,7 +245,7 @@ function PricingContent() {
           Plans for every job seeker
         </h1>
         <p className="text-stone-400 dark:text-stone-500 text-lg max-w-xl mx-auto">
-          Browse free forever. Upgrade to unlock apply links, auto-apply, and tracking. Start from just ₦500.
+          Browse free forever and get 3 free applications your first week. Upgrade for unlimited applies, auto-apply, and tracking. Start from just ₦500.
         </p>
       </div>
 
@@ -356,7 +356,7 @@ function PricingContent() {
             { q: 'How does auto-apply work?', a: 'Upload your CV once in your profile. For jobs that support it, we pre-fill the application form and submit it with one tap.' },
             { q: 'Can I cancel my monthly subscription?', a: 'Yes — cancel anytime from your dashboard. You keep access until the end of your current billing period.' },
             { q: 'What payment methods does Paystack support?', a: 'All major debit/credit cards, bank transfers, USSD, and mobile money. Fully encrypted and PCI-compliant.' },
-            { q: 'Is there a free trial?', a: 'The Free plan lets you browse everything with no time limit. Upgrade to a paid plan when you\'re ready to start applying.' },
+            { q: 'Is there a free trial?', a: 'Yes — every new account gets 3 free job applications during its first week. After that (or once you\'ve used all 3), upgrade to a paid plan to keep applying. Browsing stays free forever.' },
           ].map(faq => (
             <div key={faq.q} className="card p-5">
               <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-2">{faq.q}</h3>

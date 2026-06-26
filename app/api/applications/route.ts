@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
+import { evaluateFreeTrial, freeTrialBlockedMessage } from '@/lib/auth/free-trial';
 import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     // Check user has an active plan (pro, daily, or admin)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, role, plan_expires_at')
+      .select('plan, role, plan_expires_at, created_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -62,8 +63,36 @@ export async function POST(req: NextRequest) {
     const role = profile?.role ?? 'user';
     const allowedPlans = ['daily', 'pro', 'admin'];
 
+    // Free-trial gate for registered (free-plan) users. Every account gets
+    // a small number of free applications within a fixed window after
+    // signup; past the allowance OR the window, they're told to subscribe.
+    // Enforced server-side so it can't be bypassed by editing client state.
     if (!allowedPlans.includes(plan) && role !== 'admin') {
-      return NextResponse.json({ error: 'Active subscription required to apply for jobs' }, { status: 403 });
+      const { count: usedCount } = await supabase
+        .from('applications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      const trial = evaluateFreeTrial({
+        // profiles.created_at is the canonical registration time; fall back
+        // to the auth user's created_at if the profile row predates the
+        // column default for any reason.
+        registeredAt: profile?.created_at ?? user.created_at,
+        used: usedCount ?? 0,
+      });
+
+      logInfo({
+        event:    'applications.free_trial_apply',
+        user_id:  user.id,
+        used:     usedCount ?? 0,
+        remaining: trial.remaining,
+        window_expired: trial.windowExpired,
+      });
+
+      if (!trial.canApply) {
+        return NextResponse.json({ error: freeTrialBlockedMessage(trial) }, { status: 403 });
+      }
+      // Within the trial — fall through and let the apply proceed.
     }
 
     // Pro Monthly / Pro Annual revenue leak: `/api/cron/expire-daily` and
