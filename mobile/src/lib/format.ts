@@ -41,6 +41,15 @@ export function salaryLabel(min: number | null, max: number | null, currency: st
   return 'Competitive';
 }
 
+// Product rule: pay is only surfaced on cards when it's quoted in US dollars.
+// money() prefixes USD amounts with '$' (other currencies use ₦/£/€/… and the
+// no-salary fallback is the word 'Competitive'), so a '$'-leading label is our
+// USD signal. Gating on the formatted string keeps one rule for BOTH live rows
+// and the hardcoded demo seed set, without touching the pure helpers above.
+export function isUsdSalary(label: string | null | undefined): boolean {
+  return !!label && label.startsWith('$');
+}
+
 export function timeAgo(iso: string | null, now: number = Date.now()): string {
   if (!iso) return 'recently';
   const diff = now - new Date(iso).getTime();

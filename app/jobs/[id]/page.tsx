@@ -243,7 +243,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     skills: job.skills?.join(', ') ?? undefined,
     url: `${baseUrl}/jobs/${job.id}`,
   };
-  if (job.salaryMin) {
+  // Structured data mirrors the on-page rule: only emit baseSalary for
+  // US-dollar postings, so crawlers (Google Jobs) don't surface a pay figure
+  // we deliberately hide for non-USD currencies.
+  if ((job.currency ?? 'USD') === 'USD' && job.salaryMin) {
     jsonLd.baseSalary = {
       '@type': 'MonetaryAmount',
       currency: job.currency ?? 'USD',

@@ -26,6 +26,13 @@ export function formatDate(dateStr: string, fmt = 'MMM d, yyyy'): string {
 }
 
 export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
+  // Product decision: only surface pay when it's quoted in US dollars. Non-USD
+  // ranges (NGN/GBP/EUR/…) are hidden — every consumer already guards on the
+  // empty string, so returning '' here removes them at the single chokepoint.
+  // null / undefined / '' currency is treated as USD (the platform default and
+  // what the vast majority of rows carry), so we don't drop legit dollar jobs
+  // that simply never set the column.
+  if ((currency || 'USD') !== 'USD') return '';
   // Null/undefined checks rather than truthiness so a legitimate $0 floor
   // isn't treated as "absent" — previously {min:0,max:50000} rendered as
   // "Up to $50k", silently dropping the explicit 0 lower bound.

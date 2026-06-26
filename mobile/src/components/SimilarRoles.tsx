@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Job } from '@/lib/types';
 import { fetchSimilarJobs } from '@/lib/jobs';
+import { isUsdSalary } from '@/lib/format';
 import { SEED_JOBS } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { radii, spacing, useTheme } from '@/theme';
@@ -62,8 +63,8 @@ export function SimilarRoles({ job }: { job: Job }) {
                 {j.role}
               </Txt>
               <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
-                {j.company} · {j.salary}
-                {j.per}
+                {j.company}
+                {isUsdSalary(j.salary) ? ` · ${j.salary}${j.per}` : ''}
               </Txt>
             </View>
             <Pill label={`${j.match}%`} bg={colors.successBg} fg={colors.successText} border={colors.successBorder} small />
