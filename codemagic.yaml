@@ -27,6 +27,15 @@ definitions:
     install: &install
       name: Install JS dependencies
       script: npm ci
+    set_version: &set_version
+      name: Stamp Android versionCode from the build number
+      script: |
+        # Google Play REJECTS a duplicate versionCode, so every Play upload must
+        # use a higher one. CNG regenerates android/ from app.json on each
+        # prebuild, so stamp app.json's android.versionCode with Codemagic's
+        # monotonic build number BEFORE prebuild runs. versionName ("1.0.0")
+        # is unchanged — only versionCode needs to be unique.
+        node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const n=parseInt(process.env.PROJECT_BUILD_NUMBER||process.env.BUILD_NUMBER||'1',10);j.expo.android.versionCode=n;fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('android.versionCode =',n);"
     prebuild: &prebuild
       name: Expo prebuild (Android)
       script: npx expo prebuild --platform android --clean
@@ -57,6 +66,7 @@ workflows:
         - $HOME/.gradle/caches
     scripts:
       - *install
+      - *set_version
       - *prebuild
       - name: Build signed release APK
         script: |
@@ -99,6 +109,7 @@ workflows:
         - $HOME/.gradle/caches
     scripts:
       - *install
+      - *set_version
       - *prebuild
       - name: Build signed release AAB
         script: |
@@ -119,3 +130,19 @@ workflows:
         notify:
           success: true
           failure: true
+      # ── Auto-publish to Google Play (optional — leave commented until ready) ──
+      # Prerequisites (one-time):
+      #   1. Create the app in Play Console and upload the FIRST .aab MANUALLY
+      #      (Google requires the first upload via the console so you can opt
+      #      into Play App Signing). Only automate from the 2nd release on.
+      #   2. Create a Google Cloud service account, grant it access in Play
+      #      Console → Users & permissions (Release apps to testing tracks),
+      #      and download its JSON key.
+      #   3. Add that JSON as a SECURE Codemagic env var named
+      #      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS.
+      # Then uncomment:
+      # google_play:
+      #   credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      #   track: internal          # internal → closed (alpha/beta) → production
+      #   submit_as_draft: true    # review in the console before going live
+      #   in_app_update_priority: 0
