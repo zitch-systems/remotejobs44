@@ -1,4 +1,7 @@
-import { applicationLimit, applicationsLeft, canApply, canUseAI, FREE_DAILY_APPLICATIONS, isPaid } from './entitlements';
+import { applicationsLeft, canApply, canUseAI, isPaid, FREE_TRIAL_APPLICATIONS } from './entitlements';
+
+const REGISTERED = '2026-06-01T00:00:00Z';
+const DAY1 = new Date(REGISTERED).getTime() + 24 * 60 * 60 * 1000;
 
 describe('entitlements', () => {
   it('isPaid / canUseAI gate paid plans', () => {
@@ -9,19 +12,21 @@ describe('entitlements', () => {
     expect(canUseAI('free')).toBe(false);
     expect(canUseAI('pro')).toBe(true);
   });
-  it('application limit is finite for free, infinite for paid', () => {
-    expect(applicationLimit('free')).toBe(FREE_DAILY_APPLICATIONS);
-    expect(applicationLimit('pro')).toBe(Infinity);
+
+  it('paid plans apply without limit', () => {
+    const trial = { registeredAt: REGISTERED, used: 9999, now: DAY1 };
+    expect(canApply('pro', trial)).toBe(true);
+    expect(applicationsLeft('pro', trial)).toBe(Infinity);
   });
-  it('canApply respects the free daily cap', () => {
-    expect(canApply('free', 0)).toBe(true);
-    expect(canApply('free', FREE_DAILY_APPLICATIONS - 1)).toBe(true);
-    expect(canApply('free', FREE_DAILY_APPLICATIONS)).toBe(false);
-    expect(canApply('pro', 9999)).toBe(true);
+
+  it('free users get FREE_TRIAL_APPLICATIONS within the window', () => {
+    expect(canApply('free', { registeredAt: REGISTERED, used: 0, now: DAY1 })).toBe(true);
+    expect(canApply('free', { registeredAt: REGISTERED, used: FREE_TRIAL_APPLICATIONS - 1, now: DAY1 })).toBe(true);
+    expect(canApply('free', { registeredAt: REGISTERED, used: FREE_TRIAL_APPLICATIONS, now: DAY1 })).toBe(false);
   });
-  it('applicationsLeft counts down for free, stays infinite for paid', () => {
-    expect(applicationsLeft('free', 3)).toBe(FREE_DAILY_APPLICATIONS - 3);
-    expect(applicationsLeft('free', 999)).toBe(0);
-    expect(applicationsLeft('pro', 9999)).toBe(Infinity);
+
+  it('applicationsLeft counts down for free', () => {
+    expect(applicationsLeft('free', { registeredAt: REGISTERED, used: 1, now: DAY1 })).toBe(FREE_TRIAL_APPLICATIONS - 1);
+    expect(applicationsLeft('free', { registeredAt: REGISTERED, used: 999, now: DAY1 })).toBe(0);
   });
 });

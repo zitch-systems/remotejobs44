@@ -14,10 +14,10 @@ import { SimilarRoles } from '@/components/SimilarRoles';
 import { useJob } from '@/lib/jobs';
 import { applyTarget } from '@/lib/apply';
 import { useProfile } from '@/lib/profile';
-import { canApply, FREE_DAILY_APPLICATIONS } from '@/lib/entitlements';
+import { canApply, freeTrialBlockedMessage } from '@/lib/entitlements';
+import { evaluateFreeTrial } from '@/lib/free-trial';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
-import { useUsage } from '@/store/usage';
 import { useRecentJobs } from '@/store/recent-jobs';
 import { toast } from '@/store/toast';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
@@ -36,7 +36,9 @@ export default function JobDetail() {
 
   const addRecent = useRecentJobs((s) => s.add);
   const { profile } = useProfile();
-  const usedToday = useUsage((s) => s.todayApplications());
+  // Real, server-hydrated count of the user's applications — the free-trial
+  // allowance is measured against this (not a tamperable per-day counter).
+  const usedApplications = useAppStore((s) => Object.keys(s.applied).length);
 
   const [burst, setBurst] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
@@ -73,14 +75,17 @@ export default function JobDetail() {
 
   async function onApply() {
     if (applied || !job) return;
-    // Free plan: cap applications per day (paid is unlimited).
-    if (isSupabaseConfigured && !canApply(profile.plan, usedToday)) {
+    // Free plan: 3 applications within the first week, then subscribe (paid
+    // is unlimited). Mirrors the web free-trial gate.
+    const trialCtx = { registeredAt: profile.registeredAt, used: usedApplications };
+    if (isSupabaseConfigured && !canApply(profile.plan, trialCtx)) {
+      const trial = evaluateFreeTrial(trialCtx);
       Alert.alert(
-        'Daily limit reached',
-        `Free accounts can apply to ${FREE_DAILY_APPLICATIONS} roles a day. Upgrade to Pro for unlimited applications.`,
+        trial.windowExpired ? 'Free trial ended' : 'Free limit reached',
+        freeTrialBlockedMessage(trial),
         [
           { text: 'Not now', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => router.push('/profile/plans') },
+          { text: 'Subscribe', onPress: () => router.push('/profile/plans') },
         ],
       );
       return;

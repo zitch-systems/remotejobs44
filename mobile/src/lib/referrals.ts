@@ -67,11 +67,18 @@ export function useReferral(): { state: ReferralState; goal: number; loading: bo
     let active = true;
     setLoading(true);
     (async () => {
-      const code = await fetchReferralCode(userId);
-      const count = await fetchReferralCount(userId).catch(() => 0);
-      if (active) {
-        setState({ code, count });
-        setLoading(false);
+      try {
+        // Run both reads in parallel; either degrades to its own fallback.
+        const [code, count] = await Promise.all([
+          fetchReferralCode(userId),
+          fetchReferralCount(userId).catch(() => 0),
+        ]);
+        if (active) setState({ code, count });
+      } catch {
+        // fetchReferralCode already swallows to a derived code, but guard the
+        // IIFE so an unexpected rejection can't leave the spinner up forever.
+      } finally {
+        if (active) setLoading(false);
       }
     })();
     return () => {

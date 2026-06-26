@@ -53,13 +53,31 @@ export async function uploadAvatar(userId: string, asset: { uri: string; name?: 
 
 export type Plan = 'free' | 'daily' | 'pro' | 'admin';
 
+/**
+ * Effective plan, honouring plan_expires_at. The daily expire-cron runs only
+ * once a day, so profiles.plan can read 'daily'/'pro' for hours after the real
+ * expiry; an expiry in the past is the authoritative downgrade signal (mirrors
+ * the web app's resolvePlan). Admins never expire.
+ */
+export function resolveEffectivePlan(plan: Plan, planExpiresAt: string | null | undefined): Plan {
+  if (plan === 'admin') return 'admin';
+  if (planExpiresAt) {
+    const expiryMs = new Date(planExpiresAt).getTime();
+    if (Number.isFinite(expiryMs) && expiryMs < Date.now()) return 'free';
+  }
+  return plan;
+}
+
 export interface UserProfile {
   name: string;
   email: string | null;
   avatarUrl: string | null;
   completion: number; // profile_completion 0–100 (server-computed)
   cvUrl: string | null;
+  /** Effective plan (already downgraded to 'free' if plan_expires_at lapsed). */
   plan: Plan;
+  /** profiles.created_at — start of the free-trial window (null in demo mode). */
+  registeredAt: string | null;
 }
 
 export interface UserPreferences {
@@ -75,12 +93,13 @@ const SEED_PROFILE: UserProfile = {
   completion: SEED_USER.profileStrength,
   cvUrl: SEED_USER.cvName,
   plan: 'free',
+  registeredAt: null,
 };
 
 export async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('name,email,avatar_url,profile_completion,cv_url,plan')
+    .select('name,email,avatar_url,profile_completion,cv_url,plan,plan_expires_at,created_at')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
@@ -91,7 +110,9 @@ export async function fetchProfile(userId: string): Promise<UserProfile | null> 
     avatarUrl: data.avatar_url ?? null,
     completion: data.profile_completion ?? 20,
     cvUrl: data.cv_url ?? null,
-    plan: (data.plan as Plan) ?? 'free',
+    // Honour plan_expires_at so a lapsed Pro/daily user can't keep paid perks.
+    plan: resolveEffectivePlan((data.plan as Plan) ?? 'free', data.plan_expires_at as string | null),
+    registeredAt: (data.created_at as string | null) ?? null,
   };
 }
 
@@ -163,7 +184,13 @@ export function useProfile(): { profile: UserProfile; loading: boolean; reload: 
     let active = true;
     setLoading(true);
     fetchProfile(userId)
-      .then((p) => active && p && (setProfile(p), setLoading(false)))
+      .then((p) => {
+        if (!active) return;
+        // A null result (no profile row yet) must still clear loading — the
+        // previous `p && …` short-circuit left the spinner up forever.
+        if (p) setProfile(p);
+        setLoading(false);
+      })
       .catch(() => active && setLoading(false));
     return () => {
       active = false;

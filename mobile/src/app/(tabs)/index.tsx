@@ -25,6 +25,12 @@ import { useSearchHistory } from '@/store/search';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 import type { Job } from '@/lib/types';
 
+// Module-level stable identities for the feed FlatList — recreating these
+// inline on every render defeats JobCard's memoisation and re-renders all rows.
+const keyExtractor = (j: Job) => j.id;
+const renderJobItem = ({ item }: { item: Job }) => <JobCard job={item} />;
+const FeedSeparator = () => <View style={{ height: spacing[3] }} />;
+
 function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   const { colors } = useTheme();
   return (
@@ -324,10 +330,10 @@ export default function Feed() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <FlatList
         data={feed.loading && jobs.length === 0 ? [] : jobs}
-        keyExtractor={(j) => j.id}
-        renderItem={({ item }) => <JobCard job={item} />}
+        keyExtractor={keyExtractor}
+        renderItem={renderJobItem}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        ItemSeparatorComponent={FeedSeparator}
         contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[1], paddingBottom: spacing[10], gap: spacing[4] }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={feed.refresh} tintColor={colors.brand} />}

@@ -1,8 +1,14 @@
 // src/lib/entitlements.ts — pure plan → feature gating. Single source of truth
-// for what each plan can do (AI tools, daily application cap). Unit-tested.
+// for what each plan can do (AI tools, application allowance). Unit-tested.
+//
+// Application gating follows the same free-trial model as the web app
+// (lib/auth/free-trial.ts): registered free users get a small allowance of
+// applications within a window from signup; paid plans are unlimited. The
+// trial math lives in ./free-trial so phone and web stay in lock-step.
 import type { Plan } from './profile';
+import { evaluateFreeTrial } from './free-trial';
 
-export const FREE_DAILY_APPLICATIONS = 10;
+export { FREE_TRIAL_APPLICATIONS, FREE_TRIAL_DAYS, freeTrialBlockedMessage } from './free-trial';
 
 export function isPaid(plan: Plan): boolean {
   return plan === 'pro' || plan === 'daily' || plan === 'admin';
@@ -13,16 +19,24 @@ export function canUseAI(plan: Plan): boolean {
   return isPaid(plan);
 }
 
-/** Daily application cap — Free is limited, paid is unlimited. */
-export function applicationLimit(plan: Plan): number {
-  return isPaid(plan) ? Infinity : FREE_DAILY_APPLICATIONS;
+/** Inputs for the free-trial application gate (ignored for paid plans). */
+export interface TrialContext {
+  /** profiles.created_at — when the free trial window started. */
+  registeredAt: string | Date | null | undefined;
+  /** Applications the user has already submitted (server-authoritative count). */
+  used: number;
+  /** Injectable clock for tests. */
+  now?: number;
 }
 
-export function applicationsLeft(plan: Plan, usedToday: number): number {
-  const limit = applicationLimit(plan);
-  return limit === Infinity ? Infinity : Math.max(0, limit - Math.max(0, usedToday));
+/** Applications still available to this user. Infinity for paid plans. */
+export function applicationsLeft(plan: Plan, trial: TrialContext): number {
+  if (isPaid(plan)) return Infinity;
+  return evaluateFreeTrial(trial).remaining;
 }
 
-export function canApply(plan: Plan, usedToday: number): boolean {
-  return applicationsLeft(plan, usedToday) > 0;
+/** Whether this user may submit another application right now. */
+export function canApply(plan: Plan, trial: TrialContext): boolean {
+  if (isPaid(plan)) return true;
+  return evaluateFreeTrial(trial).canApply;
 }
