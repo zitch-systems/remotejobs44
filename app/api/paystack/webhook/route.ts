@@ -175,12 +175,18 @@ export async function POST(req: NextRequest) {
 
       const tier      = planTierShared(plan);
       const billing   = billingShared(plan);
-      const expiresAt = planExpiryShared(plan);
 
       // Skip plan write if user is an admin — admins get a permanent 'admin' plan tag.
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', userId).maybeSingle();
+        .from('profiles').select('role, plan_expires_at').eq('id', userId).maybeSingle();
       const isAdmin = profile?.role === 'admin';
+
+      // Preserve unused paid time on an upgrade/renewal: extend from the LATER
+      // of now or the current (future) expiry so a mid-period upgrade doesn't
+      // discard days already paid for (mirrors the verify route).
+      const existingExpiryMs = profile?.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : 0;
+      const expiryBase = existingExpiryMs > Date.now() ? new Date(existingExpiryMs) : new Date();
+      const expiresAt  = planExpiryShared(plan, expiryBase);
 
       if (!isAdmin) {
         const { error: updateError } = await supabase

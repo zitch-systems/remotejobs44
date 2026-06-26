@@ -35,6 +35,14 @@ export interface ScamCheckInput {
 
 const FREE_WEBMAIL = /@(gmail|googlemail|yahoo|hotmail|outlook|live|aol|protonmail|proton\.me|icloud|mail\.ru|yandex)\.[a-z.]{2,8}$/i;
 
+// Hosts a scam uses to route applicants off-platform. If apply_url points at
+// one of these it's a near-certain fraud channel — checked directly against the
+// URL host (the free-text regex pass only catches them when mentioned in prose).
+const OFF_PLATFORM_APPLY_HOSTS = [
+  't.me', 'telegram.me', 'telegram.org', 'wa.me', 'whatsapp.com',
+  'chat.whatsapp.com', 'signal.me', 'discord.gg',
+];
+
 const APPLY_VIA_OFF_PLATFORM = [
   /\btelegram\s*(?:me|@|chat|channel|group)?/i,
   /\bt\.me\/[a-z0-9_]+/i,
@@ -71,7 +79,21 @@ const SALARY_CEILING_USD_HOUR  = 2_000;     // anything beyond is almost certain
 
 export function detectScam(job: ScamCheckInput): { flagged: true; flagged_reason: string } | null {
   const reasons: string[] = [];
-  const haystack = `${job.title ?? ''}\n${job.description ?? ''}`.toLowerCase();
+  // Scan the structured apply channel too — the apply_url / apply_email ARE the
+  // off-platform routing a scam uses, and were previously never inspected (so a
+  // clean description with `apply_url: t.me/...` sailed through).
+  const haystack = `${job.title ?? ''}\n${job.description ?? ''}\n${job.apply_url ?? ''}\n${job.apply_email ?? ''}`.toLowerCase();
+
+  // 0. apply_url pointing at an off-platform messaging host — near-certain
+  //    fraud. Check the parsed host directly (the regex pass can miss URL forms).
+  if (job.apply_url) {
+    try {
+      const host = new URL(job.apply_url).hostname.replace(/^www\./, '').toLowerCase();
+      if (OFF_PLATFORM_APPLY_HOSTS.some((h) => host === h || host.endsWith('.' + h))) {
+        return { flagged: true, flagged_reason: `apply_off_platform_host:${host.slice(0, 30)}` };
+      }
+    } catch { /* unparseable apply_url — the free-text regex pass below still scans it */ }
+  }
 
   // 1. Off-platform apply instructions — strong signal. Single hit flags.
   for (const re of APPLY_VIA_OFF_PLATFORM) {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { evaluateFreeTrial, freeTrialBlockedMessage } from '@/lib/auth/free-trial';
+import { resolvePlan } from '@/lib/auth/plan';
 import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
@@ -86,9 +87,33 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    const plan = profile?.plan ?? 'free';
+    const rawPlan = profile?.plan ?? 'free';
     const role = profile?.role ?? 'user';
+    const planExpiresAt = profile?.plan_expires_at ?? null;
     const allowedPlans = ['daily', 'pro', 'admin'];
+
+    // Gate on the EFFECTIVE plan — the same resolution /api/profile and the
+    // client use — so the server agrees with what the user sees. resolvePlan
+    // downgrades a lapsed pro/daily (expiry in the past) to 'free' and keeps
+    // admins unlimited. This replaces a hand-rolled lapsed-pro check that used
+    // to live below and could drift out of agreement with the rest of the app.
+    let plan = resolvePlan({ role, dbPlan: rawPlan, planExpiresAt });
+    // Webhook race: right after a successful charge the verify route has
+    // already stamped a FUTURE plan_expires_at, but the subscription webhook
+    // that flips profiles.plan can lag a few seconds. A future expiry proves the
+    // payment cleared, so honor it as paid access rather than bouncing a
+    // just-paid user into the free-trial gate. (We can't tell daily vs pro from
+    // the lagging column, so grant the unlimited tier for the brief race.)
+    const hasFutureExpiry = !!planExpiresAt && new Date(planExpiresAt) > new Date();
+    if (plan === 'free' && hasFutureExpiry) plan = 'pro';
+
+    // A previously-paid plan whose expiry lapsed resolves to 'free'. Give those
+    // users a renew-focused message instead of the new-user free-trial copy.
+    if (plan === 'free' && role !== 'admin' && (rawPlan === 'pro' || rawPlan === 'daily')) {
+      return NextResponse.json({
+        error: 'Your subscription has expired. Please renew to continue applying.',
+      }, { status: 403 });
+    }
 
     // Free-trial gate for registered (free-plan) users. Every account gets
     // a small number of free applications within a fixed window after
@@ -122,24 +147,9 @@ export async function POST(req: NextRequest) {
       // Within the trial — fall through and let the apply proceed.
     }
 
-    // Pro Monthly / Pro Annual revenue leak: `/api/cron/expire-daily` and
-    // `/api/cron/daily` only downgrade subscriptions where billing='daily'.
-    // If a Pro user's Paystack subscription stops renewing (card decline,
-    // cancellation), `profile.plan` stays 'pro' indefinitely even though
-    // `plan_expires_at` is in the past. Block applies in that window —
-    // the client UI already shows 'free' via the effective-plan logic in
-    // Header.buildUser / /api/profile, so this just makes the server agree.
-    // Admins are exempt (their plan_expires_at may be null).
-    if (
-      plan === 'pro' &&
-      role !== 'admin' &&
-      profile?.plan_expires_at &&
-      new Date(profile.plan_expires_at) < new Date()
-    ) {
-      return NextResponse.json({
-        error: 'Your subscription has expired. Please renew to continue applying.',
-      }, { status: 403 });
-    }
+    // (The lapsed-Pro revenue-leak block that used to live here is now handled
+    // above by resolvePlan downgrading an expired pro/daily to 'free' + the
+    // "subscription expired" branch — one source of truth, no drift.)
 
     // For daily plan users: enforce the 10-application limit per day-pass period.
     //

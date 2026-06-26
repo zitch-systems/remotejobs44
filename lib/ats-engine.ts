@@ -7,7 +7,36 @@
 import type { Job, JobCategory, JobLevel } from './types';
 import { uid } from './utils';
 import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
+import { validateExternalUrl } from './ssrf-guard';
 import { logInfo, logError } from './log';
+
+// Fetch a user-supplied URL while re-validating EVERY redirect hop against the
+// SSRF guard. Native `fetch` follows redirects automatically, so a public host
+// that 302s to http://169.254.169.254/… (cloud metadata) would otherwise be
+// fetched even though the initial host passed validation. `redirect: 'manual'`
+// lets us check each Location before following. Career pages legitimately
+// redirect, so we follow (bounded) rather than hard-erroring like /api/rss.
+async function fetchFollowingValidatedRedirects(
+  startUrl: string,
+  init: RequestInit,
+  maxRedirects = 4,
+): Promise<Response> {
+  let current = startUrl;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const res = await fetch(current, { ...init, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) return res;
+      const next = new URL(loc, current).toString();
+      const v = validateExternalUrl(next);
+      if (!v.ok) throw new Error(`blocked redirect to a disallowed host: ${v.error}`);
+      current = next;
+      continue;
+    }
+    return res;
+  }
+  throw new Error('too many redirects');
+}
 
 // Re-export so existing imports of `from '@/lib/ats-engine'` still work.
 export { detectATSFromUrl, detectATSFromHtml };
@@ -426,7 +455,7 @@ export async function autoFetchFromCareerUrl(url: string): Promise<ATSFetchResul
   //    Cheap path — works for sites where the careers page links out to a
   //    boards.greenhouse.io / jobs.lever.co URL in the markup itself.
   try {
-    const pageRes = await fetch(url, {
+    const pageRes = await fetchFollowingValidatedRedirects(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RemoteJobs44/1.0)' },
       signal: AbortSignal.timeout(10000),
     });

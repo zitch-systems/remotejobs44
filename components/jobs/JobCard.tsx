@@ -128,9 +128,14 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
-      toast('Application tracked! 🎉', 'success');
-      if (applyTarget) safeWindowOpen(applyTarget);
-      else toast('No application link available for this job', 'error');
+      // One toast, not two: confirm tracking, and only mention a missing link
+      // when there genuinely isn't one (the old code stacked both).
+      if (applyTarget) {
+        toast('Application tracked! 🎉', 'success');
+        safeWindowOpen(applyTarget);
+      } else {
+        toast('Application tracked! No apply link on file for this job.', 'success');
+      }
     } catch (err: any) {
       // If DB tracking fails but we have a URL, still let them apply
       if (applyTarget && err.message?.includes('not found')) {

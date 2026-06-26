@@ -211,10 +211,12 @@ async function callOpenAICompat(
 
 // ─── Google Gemini ────────────────────────────────────────────────────────────
 async function callGemini(apiKey: string, model: string, userMessage: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // Pass the key via header, not the query string — query strings are the most
+  // leak-prone place for a secret (proxy logs, error traces, Referer).
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: userMessage }] }],

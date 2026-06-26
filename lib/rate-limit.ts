@@ -69,9 +69,19 @@ export function releaseRateLimit(key: string): void {
 /** Extract the best available IP from a Next.js request */
 export function getIP(req: Request): string {
   const headers = new Headers((req as Request).headers);
-  return (
-    headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    headers.get('x-real-ip') ??
-    'unknown'
-  );
+  // Prefer x-real-ip: on Vercel the platform sets this to the verified client
+  // IP and overwrites any client-supplied value, so it can't be spoofed. The
+  // FIRST hop of x-forwarded-for IS client-controllable (a request can send its
+  // own `X-Forwarded-For: <anything>`, and that value lands at the front), so
+  // keying limits on it lets an attacker rotate it to defeat the cap. Only fall
+  // back to x-forwarded-for when x-real-ip is absent (local/dev), and take the
+  // last hop (added by the nearest proxy) rather than the spoofable first one.
+  const realIp = headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  const xff = headers.get('x-forwarded-for');
+  if (xff) {
+    const hops = xff.split(',').map((h) => h.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
+  return 'unknown';
 }

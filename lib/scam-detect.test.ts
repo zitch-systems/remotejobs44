@@ -112,4 +112,46 @@ describe('detectScam', () => {
     });
     expect(r?.flagged).toBe(true);
   });
+
+  describe('apply channel (apply_url / apply_email) is scanned', () => {
+    it('flags a clean description whose apply_url points at t.me', () => {
+      // The classic miss: spotless prose, fraud routing lives only in apply_url.
+      const r = detectScam({
+        title: 'Customer Support Rep',
+        description: 'Friendly support role for a growing SaaS. Great team, flexible hours.',
+        apply_url: 'https://t.me/recruiter_fast',
+      });
+      expect(r?.flagged).toBe(true);
+      expect(r?.flagged_reason).toMatch(/^apply_off_platform_host:/);
+    });
+
+    it('flags a whatsapp wa.me apply_url', () => {
+      const r = detectScam({
+        title: 'Sales Associate',
+        description: 'Sell our products, set your own schedule.',
+        apply_url: 'https://wa.me/15551234567',
+      });
+      expect(r?.flagged).toBe(true);
+      expect(r?.flagged_reason).toMatch(/^apply_off_platform_host:/);
+    });
+
+    it('flags off-platform routing in apply_email free text', () => {
+      const r = detectScam({
+        title: 'Assistant',
+        description: 'Remote assistant wanted.',
+        apply_email: 'apply.via.telegram@example.com',
+      });
+      expect(r?.flagged).toBe(true);
+    });
+
+    it('does NOT flag a normal ATS apply_url', () => {
+      const r = detectScam({
+        title: 'Backend Engineer',
+        description: 'Go + Postgres, fully remote.',
+        apply_url: 'https://boards.greenhouse.io/acme/jobs/456',
+        apply_email: 'careers@acme.com',
+      });
+      expect(r).toBeNull();
+    });
+  });
 });

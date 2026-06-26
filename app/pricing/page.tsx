@@ -27,7 +27,7 @@ const PLANS = [
       { text: 'Browse all 50,000+ remote jobs', ok: true },
       { text: '3 free applications in your first week', ok: true },
       { text: 'Basic search & filters', ok: true },
-      { text: 'Save up to 5 jobs', ok: true },
+      { text: 'Save jobs you like', ok: true },
       { text: 'Company profiles', ok: true },
       { text: 'CV upload & auto-apply', ok: false },
       { text: 'Application tracker', ok: false },
