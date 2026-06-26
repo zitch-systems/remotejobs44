@@ -19,7 +19,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const title   = clamp(searchParams.get('title'),    'Find Remote Jobs');
   const company = clamp(searchParams.get('company'),  '');
-  const salary  = clamp(searchParams.get('salary'),   '');
+  // Only render US-dollar pay on the card. money labels are '$'-prefixed for
+  // USD; non-USD glyphs (₦/€/£) both violate the product's USD-only rule AND
+  // lack coverage in the default ImageResponse font (the ₦ badge used to crash
+  // the edge renderer), so anything not starting with '$' is dropped.
+  const salaryRaw = clamp(searchParams.get('salary'), '');
+  const salary  = salaryRaw.startsWith('$') ? salaryRaw : '';
   const sub     = clamp(searchParams.get('subtitle'), '70,000+ remote jobs • remotejobs44.com');
 
   return new ImageResponse(

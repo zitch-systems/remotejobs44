@@ -7,6 +7,7 @@ import { Card, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 import { useRecentJobs } from '@/store/recent-jobs';
 import type { RecentJob } from '@/lib/recent';
+import { isUsdSalary } from '@/lib/format';
 import { fonts, spacing, useTheme } from '@/theme';
 
 function RecentCard({ job, onPress }: { job: RecentJob; onPress: () => void }) {
@@ -28,12 +29,14 @@ function RecentCard({ job, onPress }: { job: RecentJob; onPress: () => void }) {
             {job.company}
           </Txt>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-          <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: colors.fg1 }}>{job.salary}</Txt>
-          <Txt variant="meta" color={colors.fg4}>
-            {job.per}
-          </Txt>
-        </View>
+        {isUsdSalary(job.salary) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+            <Txt style={{ fontFamily: fonts.displayBold, fontSize: 13, color: colors.fg1 }}>{job.salary}</Txt>
+            <Txt variant="meta" color={colors.fg4}>
+              {job.per}
+            </Txt>
+          </View>
+        ) : null}
       </Card>
     </Pressable>
   );

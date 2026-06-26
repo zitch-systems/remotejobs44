@@ -19,8 +19,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       ? normalizeJobDescription(job.description).slice(0, 160).replace(/\s+/g, ' ').trim()
       : `Apply for ${job.title} at ${job.company}. Remote job — ${job.location}. Find remote jobs at RemoteJobs44.`;
 
-    const salary = job.salary_min
-      ? `${job.currency ?? 'USD'} ${job.salary_min.toLocaleString()}${job.salary_max ? `–${job.salary_max.toLocaleString()}` : '+'}`
+    // Only US-dollar pay goes on the share card (product rule). Build a
+    // '$'-prefixed label so the /api/og route — which renders salary only when
+    // it starts with '$' — accepts it; non-USD rows resolve to '' and are dropped.
+    const salary = ((job.currency ?? 'USD') === 'USD' && job.salary_min)
+      ? `$${job.salary_min.toLocaleString()}${job.salary_max ? `–${job.salary_max.toLocaleString()}` : '+'}`
       : '';
 
     return {
@@ -36,8 +39,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         // PNG is a single public asset cached for a year and fetched by social
         // crawlers with no auth context, so it can't honour the free/day-pass
         // company blur the way the on-page UI does — baking the real employer
-        // in would leak it to everyone and undercut the paywall. Title + salary
-        // still make a compelling card.
+        // in would leak it to everyone and undercut the paywall. Title + (USD)
+        // salary still make a compelling card.
         images: [{ url: `/api/og?title=${encodeURIComponent(job.title)}&salary=${encodeURIComponent(salary)}`, width: 1200, height: 630 }],
       },
       twitter: { card: 'summary_large_image', title, description },
