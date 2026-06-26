@@ -8,7 +8,7 @@
 //
 // Talks to Supabase Auth directly (auth.mfa.*), so it works even while the
 // /api/admin routes are gated on aal2 (this page never calls them).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, Loader2 } from 'lucide-react';
@@ -20,7 +20,8 @@ export default function TwoFactorPage() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get('next') || '/admin';
-  const supabase = useRef(createClient()).current;
+  // Lazy init → one stable client for the component's life, created render-safe.
+  const [supabase] = useState(() => createClient());
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [qr, setQr] = useState<string | null>(null);
