@@ -503,7 +503,7 @@ function ProfileContent() {
             sub="Track your applied jobs and statuses."
           />
           <SettingsLink
-            href="/profile/billing"
+            href="/profile/billing#danger"
             icon={<Trash2 className="w-4 h-4" />}
             title="Delete account"
             sub="Permanently remove your account and data."

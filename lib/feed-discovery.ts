@@ -115,6 +115,9 @@ export async function tryDiscoveredFeeds(html: string, pageUrl: string): Promise
         redirect: 'error',
       });
       if (!res.ok) continue;
+      // Reject giants by declared Content-Length before buffering (header is
+      // lie-able, so the post-buffer check stays as the real cap).
+      if (parseInt(res.headers.get('content-length') ?? '0', 10) > MAX_FEED_BYTES) continue;
       const body = await res.text();
       if (body.length > MAX_FEED_BYTES) continue;
       // sourceUrl stays the page the admin registered, so ingested jobs

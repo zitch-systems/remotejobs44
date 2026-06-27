@@ -12,7 +12,7 @@
 // serverComponentsExternalPackages list (next.config.js).
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrl, validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 
 // 5-minute in-memory cache so a second click on the same URL doesn't pay the
 // full render cost again. Process-scoped — fine for one Vercel function
@@ -24,7 +24,11 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 export async function renderHtml(rawUrl: string, opts?: { waitForSelector?: string; timeoutMs?: number }): Promise<string> {
   // Reuse the SSRF guard from /api/rss — chromium fetching internal URLs
   // would be just as bad as fetch() doing it.
-  const v = validateExternalUrl(rawUrl);
+  // DNS-aware for the top-level navigation target (the externally-supplied
+  // URL). Sub-resource requests below stay on the synchronous guard — the
+  // puppeteer request-interception callback can't await a DNS lookup without
+  // racing the navigation, but it still blocks literal internal IPs.
+  const v = await validateExternalUrlAndResolve(rawUrl);
   if (!v.ok) throw new Error(`URL rejected by SSRF guard: ${v.error}`);
   const url = v.url.toString();
 

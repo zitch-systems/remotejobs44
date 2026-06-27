@@ -233,7 +233,7 @@ export default function BillingPage() {
 
       {/* Email preferences */}
       {emailPrefs && (
-        <div className="card p-6 mb-5">
+        <div id="emails" className="card p-6 mb-5 scroll-mt-24">
           <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-2 flex items-center gap-2">
             <Bell className="w-4 h-4 text-brand-600" /> Email notifications
           </h2>
@@ -273,7 +273,7 @@ export default function BillingPage() {
       )}
 
       {/* Delete account */}
-      <div className="card p-6 border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-900/5">
+      <div id="danger" className="card p-6 border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-900/5 scroll-mt-24">
         <h2 className="font-bold text-sm text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
           <Trash2 className="w-4 h-4" /> Delete account
         </h2>

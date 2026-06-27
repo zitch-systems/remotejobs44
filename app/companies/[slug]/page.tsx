@@ -6,6 +6,7 @@
 // (and was client-rendered), so the entire branded-search surface was
 // dead. Per-company pages with Organization JSON-LD let Google show
 // site-links + Knowledge Panel entries for each employer we list.
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -32,7 +33,10 @@ interface JobRow {
   apply_url:    string | null;
 }
 
-async function findCompany(slug: string): Promise<{ name: string; jobs: JobRow[]; total: number } | null> {
+// Wrapped in React cache() so generateMetadata and the page body share ONE
+// query per request instead of each running the wide ILIKE-limit-200 + JS
+// slug filter independently (two Supabase round-trips per company-page hit).
+const findCompany = cache(async (slug: string): Promise<{ name: string; jobs: JobRow[]; total: number } | null> => {
   // Length cap + character whitelist. URL slugs come from companySlug()
   // which only emits [a-z0-9-]; anything beyond that shape can't match
   // a real company entry, and an unbounded ILIKE pattern from a crafted
@@ -80,7 +84,7 @@ async function findCompany(slug: string): Promise<{ name: string; jobs: JobRow[]
   for (const [n, c] of counts) if (c > best) { best = c; name = n; }
 
   return { name, jobs: matches.slice(0, 30), total: matches.length };
-}
+});
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const found = await findCompany((await params).slug);

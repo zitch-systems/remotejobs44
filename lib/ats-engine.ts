@@ -7,7 +7,7 @@
 import type { Job, JobCategory, JobLevel } from './types';
 import { uid } from './utils';
 import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
-import { validateExternalUrl } from './ssrf-guard';
+import { validateExternalUrlAndResolve } from './ssrf-guard';
 import { logInfo, logError } from './log';
 
 // Fetch a user-supplied URL while validating EVERY URL it touches against the
@@ -27,7 +27,10 @@ async function fetchFollowingValidatedRedirects(
 ): Promise<Response> {
   let current = startUrl;
   for (let i = 0; i <= maxRedirects; i++) {
-    const v = validateExternalUrl(current);
+    // DNS-aware: each hop (initial URL + every Location) is resolved and
+    // rejected if it points at an internal/metadata IP, defeating a public
+    // host that 302s to a name resolving to 169.254.169.254 et al.
+    const v = await validateExternalUrlAndResolve(current);
     if (!v.ok) throw new Error(`blocked fetch to a disallowed host: ${v.error}`);
     const res = await fetch(v.url.toString(), { ...init, redirect: 'manual' });
     if (res.status < 300 || res.status >= 400) return res;

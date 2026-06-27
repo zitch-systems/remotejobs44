@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { autoFetchFromCareerUrl, fetchATSJobs } from '@/lib/ats-engine';
 import { isValidATSPlatform } from '@/lib/ats-detect';
 import { requireAdmin } from '@/lib/admin/auth';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { logError } from '@/lib/log';
 
 export const runtime = 'nodejs';
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   // fetch in lib/ats-engine.ts could pivot into 169.254.169.254 et al.
   // (render-js already has its own guard, but step-2 hits fetch directly.)
   if (url) {
-    const validation = validateExternalUrl(url);
+    const validation = await validateExternalUrlAndResolve(url);
     if (!validation.ok) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }

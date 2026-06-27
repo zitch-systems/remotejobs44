@@ -39,6 +39,30 @@ function isPrivateIPv4(host: string): boolean {
   return false;
 }
 
+// True for any IPv6 address we must never connect to: loopback (::1),
+// unspecified (::), unique-local (fc00::/7), link-local (fe80::/10), and
+// IPv4-mapped/compat forms (::ffff:a.b.c.d, ::a.b.c.d) whose embedded v4 is
+// itself private. Resolved AAAA records flow through here.
+function isPrivateIPv6(addr: string): boolean {
+  let ip = addr.toLowerCase().trim();
+  if (ip.startsWith('[') && ip.endsWith(']')) ip = ip.slice(1, -1);
+  // Strip a zone id (fe80::1%eth0) before classifying.
+  const pct = ip.indexOf('%');
+  if (pct !== -1) ip = ip.slice(0, pct);
+  if (ip === '::1' || ip === '::') return true;
+  // IPv4-mapped / -compatible: defer to the v4 classifier for the embedded addr.
+  const mapped = ip.match(/^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (mapped) return isPrivateIPv4(mapped[1]);
+  if (ip.startsWith('fe8') || ip.startsWith('fe9') || ip.startsWith('fea') || ip.startsWith('feb')) return true; // fe80::/10 link-local
+  if (ip.startsWith('fc') || ip.startsWith('fd')) return true; // fc00::/7 unique-local
+  return false;
+}
+
+// Classify any resolved literal IP (v4 or v6) as private/unsafe.
+function isPrivateIP(addr: string): boolean {
+  return isPrivateIPv4(addr) || (addr.includes(':') && isPrivateIPv6(addr));
+}
+
 // Accept only http(s), reject private hosts, reject ipv6 (anything with ':' that
 // isn't a port), reject obvious internal services. This is intentionally strict
 // rather than smart — we'd rather block a few legit feeds than have an SSRF.
@@ -81,4 +105,45 @@ export function validateExternalUrl(raw: string): UrlValidation | UrlError {
   }
 
   return { ok: true, url };
+}
+
+// Async, DNS-aware variant. Runs the synchronous string checks above, then
+// RESOLVES the hostname and rejects if ANY resolved A/AAAA address is private,
+// link-local, or a cloud-metadata IP. The string-only `validateExternalUrl`
+// can be defeated by a public hostname that resolves to an internal IP
+// (e.g. `169.254.169.254.nip.io`, or an attacker's own domain whose DNS
+// returns 10.x / 127.0.0.1) — DNS-rebinding / public-name-to-internal-IP SSRF.
+// Use this for every server-side fetch of a non-allowlisted, externally
+// influenced URL.
+//
+// Residual: native fetch/puppeteer do their own DNS lookup, so a record that
+// flips between our resolve and the socket connect (true rebinding) is not
+// fully closed without connect-time IP pinning (needs a custom dispatcher,
+// which the runtime doesn't expose here). This check defeats the realistic
+// static-record case; pin at connect time if undici becomes importable.
+export async function validateExternalUrlAndResolve(raw: string): Promise<UrlValidation | UrlError> {
+  const v = validateExternalUrl(raw);
+  if (!v.ok) return v;
+
+  let addrs: { address: string }[];
+  try {
+    // node:dns is only available on the Node runtime. Import lazily so this
+    // module stays importable from Edge/client bundles that only use the
+    // synchronous validator.
+    const dns = await import('node:dns/promises');
+    addrs = await dns.lookup(v.url.hostname, { all: true });
+  } catch (err: any) {
+    // NXDOMAIN / no address → nothing to fetch anyway; treat as blocked.
+    return { ok: false, error: `DNS resolution failed: ${err?.code ?? err?.message ?? 'unknown'}` };
+  }
+
+  if (addrs.length === 0) {
+    return { ok: false, error: 'Host did not resolve to any address' };
+  }
+  for (const { address } of addrs) {
+    if (isPrivateIP(address)) {
+      return { ok: false, error: `Host resolves to a disallowed address (${address})` };
+    }
+  }
+  return { ok: true, url: v.url };
 }
