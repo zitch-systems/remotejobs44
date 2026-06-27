@@ -29,7 +29,7 @@ export function Hero({ jobs }: { jobs: LandingJob[] }) {
       <div className="wrap hb-body">
         <div className="hb-copy">
           <span className="eyebrow-pill"><span className="dot" />70,000+ live remote roles · 150+ countries hiring</span>
-          <h1>The world&apos;s <em>remote</em> jobs.<br />One search.<br />Apply from anywhere.</h1>
+          <h1>The world&apos;s <em className="flip-word">remote</em> jobs.<br />One search.<br />Apply from anywhere.</h1>
           <p className="lede">
             Every remote opening worth applying to — engineering, design, marketing, finance, data —{' '}
             <b>verified remote-friendly</b> and searchable in <b>one place</b>.
@@ -39,15 +39,15 @@ export function Hero({ jobs }: { jobs: LandingJob[] }) {
 
           <div className="hb-stats">
             <div className="hb-stat">
-              <CountUp className="n" target={70} suffix="k+" />
+              <CountUp className="n" target={70} suffix="k+" loop holdMs={2600} />
               <div className="l">Jobs indexed</div>
             </div>
             <div className="hb-stat">
-              <CountUp className="n" target={150} suffix="+" />
+              <CountUp className="n" target={150} suffix="+" loop holdMs={3000} />
               <div className="l">Countries hiring</div>
             </div>
             <div className="hb-stat">
-              <CountUp className="n" target={10} suffix="+" />
+              <CountUp className="n" target={10} suffix="+" loop holdMs={3400} />
               <div className="l">Job categories</div>
             </div>
           </div>
