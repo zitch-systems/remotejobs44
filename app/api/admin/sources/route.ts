@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { logError } from '@/lib/log';
 
 type SourceMethod = 'rss' | 'json-api' | 'scrape' | 'auto' | 'unknown';
@@ -69,7 +69,10 @@ export async function POST(req: NextRequest) {
 
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
 
-  const v = validateExternalUrl(url);
+  // DNS-aware SSRF check at insert time: reject public hostnames that resolve
+  // to internal/metadata IPs, not just literal private-IP URLs. The daily
+  // cron re-validates the same way on every run (see lib/ingest-pipeline).
+  const v = await validateExternalUrlAndResolve(url);
   if (!v.ok) {
     return NextResponse.json({ error: v.error }, { status: 400 });
   }

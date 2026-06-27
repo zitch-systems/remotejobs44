@@ -224,11 +224,16 @@ export function JobsFiltersBar() {
   const activeFilterCount = [type, level, salary, timezone, posted, region, country].filter(Boolean).length;
   const hasActiveChips = category !== 'all' || type || level || country || posted;
 
-  // "Most relevant" only ranks when there's a search term — relevance lives
-  // in the search_jobs FTS path, so with no `q` it silently fell back to
-  // newest-first. Only offer it while searching, and never let the <select>
-  // display an option the backend will ignore.
-  const sortOptions = q ? SORTS : SORTS.filter(s => s.value !== 'relevant');
+  // Only offer sort options the backend actually honours for the current
+  // mode — never let the <select> display an option that silently no-ops:
+  //   • With a query: results come from the search_jobs FTS RPC, which always
+  //     orders by ts_rank and has NO sort parameter, so "Highest salary" is
+  //     ignored. Offer newest + relevant only (drop salary).
+  //   • Without a query: relevance has nothing to rank (no FTS), so it silently
+  //     fell back to newest. Offer newest + salary only (drop relevant).
+  const sortOptions = q
+    ? SORTS.filter(s => s.value !== 'salary')
+    : SORTS.filter(s => s.value !== 'relevant');
   const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
 
   useEffect(() => { setSearchInput(q); }, [q]);

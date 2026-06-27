@@ -173,16 +173,30 @@ export async function middleware(request: NextRequest) {
     return redirectWithAuthCookies(url, response);
   }
 
-  // Belt-and-braces server-side check for /admin/*: even with the client
-  // gate in app/admin/layout.tsx, a non-admin's browser was previously
-  // able to render the admin page shell before the client redirected.
-  // Hardcoded-admin emails go through (DB-only admins still rely on the
-  // client gate, because reading profiles.role here adds latency to every
-  // page load). All admin API routes already require admin via lib/admin/auth.
+  // Server-side role gate for /admin/*. Without this, a logged-in non-admin
+  // could render the admin shell (nav, layout chrome) until the client gate in
+  // app/admin/layout.tsx finished its async profile fetch and redirected — the
+  // admin UI structure leaked, even though every /api/admin/* route enforces
+  // requireAdmin so no admin DATA was ever served. The per-page-load latency
+  // concern that keeps getUser() off the rest of the site does NOT apply here:
+  // /admin/* is low-traffic, and getUser() already ran above, so this adds at
+  // most one profiles read on admin navigations only.
   if (user && !isAdminEmail(user.email)) {
-    // Don't outright redirect — DB-admin users would loop. Let the client
-    // /admin/layout.tsx check decide based on profiles.role.
-    // (Intentional no-op; see comment above.)
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    // Only bounce on a CONFIRMED non-admin. On a transient read error (or a
+    // not-yet-provisioned profile row) keep the prior behaviour — let the
+    // client gate decide — so a DB blip can never lock a real DB-role admin
+    // out of /admin.
+    if (!profErr && profile && profile.role !== 'admin') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      url.search = '';
+      return redirectWithAuthCookies(url, response);
+    }
   }
 
   return response;

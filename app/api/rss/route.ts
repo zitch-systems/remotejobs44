@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseFeed } from '@/lib/feed-parser';
 import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { requireAdmin } from '@/lib/admin/auth';
 import { logError } from '@/lib/log';
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get('url');
   if (!raw) return NextResponse.json({ error: 'url required' }, { status: 400 });
 
-  const v = validateExternalUrl(raw);
+  const v = await validateExternalUrlAndResolve(raw);
   if (!v.ok) {
     return NextResponse.json({ error: v.error, jobs: [] }, { status: 400 });
   }

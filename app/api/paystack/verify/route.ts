@@ -76,10 +76,43 @@ export async function GET(req: NextRequest) {
     const supabase  = createAdminSupabaseClient();
     const planTier  = getPlanTier(plan);
 
-    // Idempotency: if this paystack_reference is already recorded, the
-    // user has already been credited for this charge — short-circuit so a
-    // refresh of the callback URL doesn't extend their period again.
-    // Same check is in the webhook; whichever ran first wins.
+    // Durable idempotency: claim the reference in the immutable per-charge
+    // ledger (paystack_transactions.reference is the PRIMARY KEY) BEFORE
+    // crediting. subscriptions.paystack_reference can't be relied on here:
+    // the table is one-row-per-user (onConflict: 'user_id'), so a later
+    // renewal OVERWRITES the prior reference. An attacker who kept an old
+    // success-callback URL could then replay GET ?reference=<old> after
+    // renewing — the subscriptions lookup below would miss (overwritten),
+    // Paystack still reports the past charge as 'success' forever, and the
+    // period would be extended again for free. The reference-PK ledger can't
+    // be overwritten, so a replay hits the 23505 short-circuit. This mirrors
+    // the mobile edge function (supabase/functions/paystack-verify).
+    const { error: claimErr } = await supabase
+      .from('paystack_transactions')
+      .insert({
+        reference,
+        user_id:   user_id,
+        plan:      planTier,
+        selection: plan,
+        amount:    amount ?? null,
+        currency:  currency ?? 'NGN',
+      });
+    if (claimErr) {
+      // 23505 = unique_violation → this reference was already redeemed.
+      // Return the success redirect WITHOUT re-extending the plan.
+      if ((claimErr as { code?: string }).code === '23505') {
+        return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${planTier}&upgraded=1`);
+      }
+      // Any other error (FK violation for an unknown user, transient DB
+      // hiccup, or the ledger table not yet migrated) — log and fall through
+      // to the legacy subscriptions-based path below, which is a safe no-op
+      // for unknown users. No regression versus the previous behaviour.
+      logWarn({ event: 'paystack.verify.ledger_claim_failed', code: (claimErr as { code?: string }).code, error: claimErr.message });
+    }
+
+    // Legacy idempotency fast-path (kept as belt-and-braces alongside the
+    // ledger claim above): if this reference is still on the user's current
+    // subscription row, it was already credited — short-circuit.
     const { data: existingRef } = await supabase
       .from('subscriptions')
       .select('user_id')

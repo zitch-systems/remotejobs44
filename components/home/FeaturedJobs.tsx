@@ -31,8 +31,14 @@ function transform(j: any): Job {
     requirements: j.requirements ?? undefined,
     skills:       j.skills ?? [],
     benefits:     j.benefits ?? undefined,
-    applyUrl:     j.apply_url ?? undefined,
-    applyEmail:   j.apply_email ?? undefined,
+    // PAYWALL INVARIANT: never expose apply_url / apply_email here. This is a
+    // server component whose <JobCard> child is a client island, so EVERY field
+    // on `job` is serialized into the public RSC/Flight payload — readable by
+    // anonymous visitors. The homepage has no paid-plan gate, and the cards only
+    // link to /jobs/[id] (where the gated detail page re-adds these for paid
+    // users), so the off-site apply links must not ship to the wire here.
+    applyUrl:     undefined,
+    applyEmail:   undefined,
     posted:       j.posted_at ?? j.created_at ?? new Date().toISOString(),
     expires:      j.expires_at ?? undefined,
     featured:     j.featured ?? false,

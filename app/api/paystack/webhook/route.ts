@@ -159,22 +159,46 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      // Idempotency: if this paystack_reference is already on a sub row,
-      // verify endpoint already credited this charge. No-op.
-      if (reference) {
-        const { data: refRow } = await supabase
-          .from('subscriptions')
-          .select('user_id')
-          .eq('paystack_reference', reference)
-          .maybeSingle();
-        if (refRow) {
-          logInfo({ event: 'webhook.charge_success.duplicate', reference, user_id: userId });
-          break;
-        }
-      }
-
       const tier      = planTierShared(plan);
       const billing   = billingShared(plan);
+
+      // Durable idempotency: claim the reference in the immutable per-charge
+      // ledger (paystack_transactions.reference is the PRIMARY KEY) BEFORE
+      // crediting — same anchor the verify route uses. subscriptions.
+      // paystack_reference is overwritten on renewal (onConflict: 'user_id'),
+      // so it is not a reliable dedup key; the reference-PK ledger is. If
+      // verify already claimed this reference, the insert hits 23505 and we
+      // no-op (whichever of verify/webhook landed first wins).
+      if (reference) {
+        const { error: claimErr } = await supabase
+          .from('paystack_transactions')
+          .insert({
+            reference,
+            user_id:   userId,
+            plan:      tier,
+            selection: plan,
+            amount:    amount ?? null,
+            currency:  currency ?? 'NGN',
+          });
+        if (claimErr) {
+          if (claimErr.code === '23505') {
+            logInfo({ event: 'webhook.charge_success.duplicate', reference, user_id: userId });
+            break;
+          }
+          // Non-conflict error (FK/transient/un-migrated table) — fall through
+          // to the legacy subscriptions check below, no regression.
+          logError({ event: 'webhook.charge_success.ledger_claim_failed', code: claimErr.code, error: claimErr.message, reference });
+          const { data: refRow } = await supabase
+            .from('subscriptions')
+            .select('user_id')
+            .eq('paystack_reference', reference)
+            .maybeSingle();
+          if (refRow) {
+            logInfo({ event: 'webhook.charge_success.duplicate_legacy', reference, user_id: userId });
+            break;
+          }
+        }
+      }
 
       // Skip plan write if user is an admin — admins get a permanent 'admin' plan tag.
       const { data: profile } = await supabase

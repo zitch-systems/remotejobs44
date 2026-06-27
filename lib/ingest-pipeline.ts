@@ -18,7 +18,7 @@ import { detectScam } from '@/lib/scam-detect';
 import { parseFeed, feedJobToDbRow } from '@/lib/feed-parser';
 import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { enrichDirectApplyLinks } from '@/lib/apply-link';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { logInfo, logWarn, logError } from '@/lib/log';
 
@@ -472,7 +472,9 @@ export async function runIngest(): Promise<IngestResult> {
       }
       // Re-validate URL on every run. A row may have been inserted via
       // SQL (bypassing the API's SSRF guard) so we can't assume it's safe.
-      const v = validateExternalUrl(row.url);
+      // DNS-aware: also rejects public hostnames that resolve to internal
+      // IPs (e.g. 169.254.169.254.nip.io), not just literal private IPs.
+      const v = await validateExternalUrlAndResolve(row.url);
       if (!v.ok) {
         results[label] = `error: blocked URL (${v.error})`;
         await markSourceStatus(supabase, row.id, 'error', 0, `blocked URL (${v.error})`);
@@ -488,6 +490,14 @@ export async function runIngest(): Promise<IngestResult> {
           redirect: 'error',
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+        // Cheap pre-check: reject giants by the declared Content-Length BEFORE
+        // buffering the whole body into memory. The header is optional and
+        // lie-able, so the post-buffer length check below is still the
+        // authoritative cap — this just avoids OOMing the cron function on an
+        // honest multi-hundred-MB response. (Same pattern as /api/rss.)
+        const declaredLen = parseInt(res.headers.get('content-length') ?? '0', 10);
+        if (declaredLen > MAX_FEED_BYTES) throw new Error('response body too large (>5MB) — not a feed');
 
         const body = await res.text();
         if (body.length > MAX_FEED_BYTES) throw new Error('response body too large (>5MB) — not a feed');

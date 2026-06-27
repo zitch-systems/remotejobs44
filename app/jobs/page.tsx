@@ -13,6 +13,7 @@ import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -42,24 +43,6 @@ export const metadata: Metadata = {
 };
 
 const JOBS_PER_PAGE = 50;
-
-// Region/country term map mirrors REGION_TERMS in /api/jobs/route.ts.
-// Duplicated rather than imported because that file is a route handler
-// and importing it pulls in the entire Next handler graph.
-const REGION_TERMS: Record<string, string[]> = {
-  africa:        ['africa','nigeria','ghana','kenya','south africa','egypt','ethiopia','cameroon','senegal'],
-  nigeria:       ['nigeria','lagos','abuja','port harcourt'],
-  ghana:         ['ghana','accra'],
-  kenya:         ['kenya','nairobi'],
-  'south-africa':['south africa','johannesburg','cape town','durban'],
-  europe:        ['europe','uk','germany','france','netherlands','spain','italy','sweden','poland'],
-  uk:            ['uk','united kingdom','london','england','scotland','wales'],
-  us:            ['us','usa','united states','new york','san francisco','los angeles','chicago'],
-  canada:        ['canada','toronto','vancouver','montreal'],
-  latam:         ['latin america','brazil','mexico','colombia','argentina','chile'],
-  asia:          ['asia','india','singapore','japan','china','korea','indonesia','vietnam'],
-  worldwide:     ['worldwide','global','remote','anywhere'],
-};
 
 interface SearchParams {
   q?:           string;

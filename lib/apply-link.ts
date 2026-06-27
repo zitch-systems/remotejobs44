@@ -163,6 +163,9 @@ export async function enrichDirectApplyLinks(
         });
         res.fetched++;
         if (!r.ok) { res.failed++; return; }
+        // Reject giants by declared Content-Length before buffering (header is
+        // lie-able, so the post-buffer length check stays as the real cap).
+        if (parseInt(r.headers.get('content-length') ?? '0', 10) > maxBytes) { res.failed++; return; }
         const html = await r.text();
         if (html.length > maxBytes) { res.failed++; return; }
 

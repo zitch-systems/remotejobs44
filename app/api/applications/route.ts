@@ -269,6 +269,16 @@ export async function POST(req: NextRequest) {
           { status: 403 },
         );
       }
+      // 23514 from the day-pass cap (migration_v59): the count→insert race
+      // slipped a concurrent apply past the pre-gate above and the trigger's
+      // atomic cap caught it. Surface the same friendly 403 the pre-gate uses
+      // instead of an opaque 500.
+      if ((insertError as any).code === '23514' && insertMsg.includes('day_pass')) {
+        return NextResponse.json(
+          { error: 'You have reached the 10-application limit for your day pass. Upgrade to Pro for unlimited access.' },
+          { status: 403 },
+        );
+      }
       // Surface a clear error — don't expose raw DB messages
       logError({ event: 'applications.insert_failed', user_id: user.id, error: insertError.message });
       return NextResponse.json(

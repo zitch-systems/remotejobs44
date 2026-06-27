@@ -6,6 +6,7 @@ import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visi
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { rateLimit, getIP } from '@/lib/rate-limit';
 import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
@@ -105,21 +106,6 @@ export async function GET(req: NextRequest) {
   const rawPerPage = parseInt(searchParams.get('perPage') ?? '12', 10);
   const page    = Number.isFinite(rawPage)    && rawPage    > 0 ? Math.min(rawPage,    1000) : 1;
   const perPage = Number.isFinite(rawPerPage) && rawPerPage > 0 ? Math.min(rawPerPage, 50)   : 12;
-
-  const REGION_TERMS: Record<string, string[]> = {
-    africa:        ['africa','nigeria','ghana','kenya','south africa','egypt','ethiopia','cameroon','senegal'],
-    nigeria:       ['nigeria','lagos','abuja','port harcourt'],
-    ghana:         ['ghana','accra'],
-    kenya:         ['kenya','nairobi'],
-    'south-africa':['south africa','johannesburg','cape town','durban'],
-    europe:        ['europe','uk','germany','france','netherlands','spain','italy','sweden','poland'],
-    uk:            ['uk','united kingdom','london','england','scotland','wales'],
-    us:            ['us','usa','united states','new york','san francisco','los angeles','chicago'],
-    canada:        ['canada','toronto','vancouver','montreal'],
-    latam:         ['latin america','brazil','mexico','colombia','argentina','chile'],
-    asia:          ['asia','india','singapore','japan','china','korea','indonesia','vietnam'],
-    worldwide:     ['worldwide','global','remote','anywhere'],
-  };
 
   try {
     // Resolve plan via the session-bound client — getRequesterPlan
