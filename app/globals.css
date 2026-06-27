@@ -250,6 +250,18 @@
 }
 .logo-3d-anim:hover { animation-play-state:paused; }
 
+/* Logo: animate ONLY the inner icon (the chart line + dot) in 3D, leaving
+   the rounded-square background static. Applied to the overlaid icon-only
+   SVG in the header so the transform spins the mark in place, not the whole
+   logo. Pauses on hover so the tilt reads. */
+.logo-icon-3d {
+  transform-style:preserve-3d;
+  transform-origin:center;
+  animation: logo3d 4.5s ease-in-out infinite;
+  will-change:transform;
+}
+.logo-icon-3d:hover { animation-play-state:paused; }
+
 /* Floating 3D shapes in the hero. */
 .shape-3d   { position:absolute; transform-style:preserve-3d; will-change:transform; pointer-events:none; }
 .anim-float3d { animation: float3d 8s  ease-in-out infinite; }
@@ -273,7 +285,7 @@
 /* Respect users who prefer reduced motion — kill the decorative loops. */
 @media (prefers-reduced-motion: reduce) {
   .animate-float-a, .animate-float-b, .logo-float,
-  .logo-3d-anim, .anim-float3d, .anim-spin3d, .reveal-3d { animation: none !important; }
+  .logo-3d-anim, .logo-icon-3d, .anim-float3d, .anim-spin3d, .reveal-3d { animation: none !important; }
   .logo-3d, .logo-3d-anim, .card-3d { transition: none; }
   .reveal-3d { opacity: 1 !important; transform: none !important; }
 }

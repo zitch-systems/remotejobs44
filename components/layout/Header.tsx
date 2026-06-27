@@ -97,11 +97,18 @@ export function Header() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-slate-100 hover:opacity-80 transition-opacity shrink-0">
-          <svg viewBox="0 0 40 40" className="w-9 h-9 logo-3d-anim" fill="none">
-            <rect width="40" height="40" rx="10" fill="#2563eb"/>
-            <path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none"/>
-            <circle cx="29" cy="15" r="3.5" fill="#f97316"/>
-          </svg>
+          {/* Logo: the rounded-square background stays put; only the icon
+              (the chart line + dot) does the 3D animation, on its own
+              overlaid SVG so the transform doesn't move the whole mark. */}
+          <span className="relative inline-block w-9 h-9 shrink-0">
+            <svg viewBox="0 0 40 40" className="absolute inset-0 w-9 h-9" fill="none" aria-hidden="true">
+              <rect width="40" height="40" rx="10" fill="#2563eb"/>
+            </svg>
+            <svg viewBox="0 0 40 40" className="absolute inset-0 w-9 h-9 logo-icon-3d" fill="none" aria-hidden="true">
+              <path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none"/>
+              <circle cx="29" cy="15" r="3.5" fill="#f97316"/>
+            </svg>
+          </span>
           RemoteJobs44
         </Link>
 
