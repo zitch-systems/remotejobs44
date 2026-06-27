@@ -1,11 +1,11 @@
 // app/page.tsx — Deep Ocean landing (Direction B), wired to real jobs.
 import type { Metadata } from 'next';
-import { fetchLandingJobs } from '@/components/home/deep-ocean/data';
+import { fetchLandingJobs, fetchCategoryCounts } from '@/components/home/deep-ocean/data';
 import { Hero }            from '@/components/home/deep-ocean/Hero';
 import { CompanyMarquee }  from '@/components/home/deep-ocean/CompanyMarquee';
 import { Differentiator }  from '@/components/home/deep-ocean/Differentiator';
 import { Listings }        from '@/components/home/deep-ocean/Listings';
-import { Categories }      from '@/components/home/deep-ocean/Categories';
+import { Categories, CATEGORY_SLUGS } from '@/components/home/deep-ocean/Categories';
 import { Featured }        from '@/components/home/deep-ocean/Featured';
 import { LiveWall }        from '@/components/home/deep-ocean/LiveWall';
 import { Mission }         from '@/components/home/deep-ocean/Mission';
@@ -26,15 +26,18 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const jobs = await fetchLandingJobs(40);
+  const [jobs, categoryCounts] = await Promise.all([
+    fetchLandingJobs(40),
+    fetchCategoryCounts(CATEGORY_SLUGS),
+  ]);
 
   return (
     <div className="deep-ocean">
       <Hero jobs={jobs} />
       <CompanyMarquee />
       <Differentiator />
-      <Listings jobs={jobs} />
-      <Categories />
+      <Listings jobs={jobs} categoryCounts={categoryCounts} />
+      <Categories counts={categoryCounts} />
       <Featured jobs={jobs} />
       <LiveWall jobs={jobs} />
       <Mission />

@@ -106,9 +106,13 @@
 .deep-ocean .marquee-track { display:flex; gap:14px; width:max-content; animation:doMarquee 60s linear infinite; }
 .deep-ocean .marquee-track--rev { animation-direction:reverse; animation-duration:72s; }
 .deep-ocean .marquee-row:hover .marquee-track { animation-play-state:paused; }
-.deep-ocean .logo-chip { display:inline-flex; align-items:center; gap:11px; flex-shrink:0; padding:11px 20px 11px 12px; border-radius:14px; border:1.5px solid var(--border-1); background:var(--bg-card); filter:grayscale(1); opacity:0.72; transition:filter var(--dur-normal), opacity var(--dur-normal), border-color var(--dur-normal); }
-.deep-ocean .logo-chip:hover { filter:grayscale(0); opacity:1; border-color:var(--brand-300); }
+/* Real brand logos, shown in full colour (Simple Icons / DuckDuckGo). */
+.deep-ocean .logo-chip { display:inline-flex; align-items:center; gap:11px; flex-shrink:0; padding:11px 20px 11px 12px; border-radius:14px; border:1.5px solid var(--border-1); background:var(--bg-card); opacity:1; transition:opacity var(--dur-normal), border-color var(--dur-normal), box-shadow var(--dur-normal), transform var(--dur-normal); }
+.deep-ocean .logo-chip:hover { border-color:var(--brand-300); box-shadow:var(--shadow-sm-brand); transform:translateY(-1px); }
 .deep-ocean .logo-mark { width:34px; height:34px; border-radius:9px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; font-size:13px; background:var(--lm-bg); color:var(--lm-fg); }
+.deep-ocean .logo-img { width:30px; height:30px; object-fit:contain; flex-shrink:0; display:block; }
+/* In dark mode any-colour marks sit on a small white rounded tile so they stay legible. */
+.dark .deep-ocean .logo-img { box-sizing:border-box; background:#fff; padding:4px; border-radius:8px; width:34px; height:34px; }
 .deep-ocean .logo-name { font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--fg-2); white-space:nowrap; }
 
 /* ---------- Job feed rows ---------- */

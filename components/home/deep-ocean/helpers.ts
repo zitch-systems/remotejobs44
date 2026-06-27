@@ -45,6 +45,15 @@ export function ageLabel(job: LandingJob): string {
   return formatRelativeDate(job.posted);
 }
 
+// "2.1k" / "920" — compact count for the category tiles + filter rail.
+export function compactCount(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000;
+    return (k >= 10 ? Math.round(k) : Math.round(k * 10) / 10) + 'k';
+  }
+  return String(n);
+}
+
 // Deterministic tint per company so monograms look intentional (no CDN logos).
 const LOGO_TINTS: Array<[string, string]> = [
   ['#eff6ff', '#2563eb'],
