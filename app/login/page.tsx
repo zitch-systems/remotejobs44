@@ -2,12 +2,31 @@
 import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Eye, EyeOff, Mail, Lock, Check, Moon, Sun, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
 import { ResendVerificationLink } from '@/components/auth/ResendVerificationLink';
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const isDark = theme === 'dark';
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label="Toggle dark mode"
+      aria-pressed={mounted ? isDark : undefined}
+      className="absolute top-5 right-6 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
+    >
+      {mounted && isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+    </button>
+  );
+}
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -16,6 +35,7 @@ function LoginForm() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [loading,  setLoading]  = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success,  setSuccess]  = useState(false);
@@ -78,6 +98,26 @@ function LoginForm() {
       clearTimeout(fallback);
       setLoading(false);
       setErrorMsg(err?.message ?? 'Google sign-in failed. Please try again.');
+    }
+  }
+
+  async function handleGithubLogin() {
+    setLoading(true);
+    setErrorMsg('');
+    // Safety: reset loading if OAuth redirect doesn't happen within 10s
+    const fallback = setTimeout(() => setLoading(false), 10000);
+    try {
+      const supabase = createClient();
+      const next = searchParams.get('next') ?? '/dashboard';
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      clearTimeout(fallback);
+      setLoading(false);
+      setErrorMsg(err?.message ?? 'GitHub sign-in failed. Please try again.');
     }
   }
 
@@ -215,13 +255,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="card p-6 shadow-md">
+    <div className="w-full max-w-[416px]">
+      <h1 className="font-display text-[30px] font-extrabold tracking-[-0.02em] text-[var(--fg-1)]">Welcome back</h1>
+      <p className="mb-7 mt-[7px] text-[15px] text-[var(--fg-3)]">
+        New to RemoteJobs44?{' '}
+        <Link href="/register" className="font-semibold text-[var(--brand-700)] no-underline hover:underline dark:text-[var(--brand-400)]">
+          Create a free account
+        </Link>
+      </p>
+
       {success && (
-        <div className="flex items-start gap-3 p-3 mb-4 rounded-lg bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800">
-          <CheckCircle className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" />
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50 p-3 dark:border-brand-800 dark:bg-brand-900/20">
+          <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
           <div>
             <p className="text-sm font-semibold text-brand-700 dark:text-brand-400">Account created!</p>
-            <p className="text-xs text-brand-600 dark:text-brand-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-brand-600 dark:text-brand-500">
               Check your email for a confirmation link, then sign in below.
             </p>
           </div>
@@ -229,35 +277,46 @@ function LoginForm() {
       )}
 
       {errorMsg && (
-        <div className="flex items-start gap-3 p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
           <p className="text-sm text-red-700 dark:text-red-400">{errorMsg}</p>
         </div>
       )}
 
-      {/* Google OAuth */}
-      <button
-        type="button"
-        onClick={handleGoogleLogin}
-        disabled={loading}
-        className="w-full flex items-center justify-center gap-3 py-3 mb-4 border border-slate-200 dark:border-[#1e3a5f] rounded-lg bg-white dark:bg-[#0d1a2e] hover:bg-slate-50 dark:hover:bg-[#162033] text-slate-800 dark:text-slate-100 text-sm font-semibold transition-all disabled:opacity-50"
-      >
-        <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
-          <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
-          <path d="M24 48c6.5 0 12-2.1 16-5.8l-7.9-6c-2.2 1.5-5 2.3-8.1 2.3-6.2 0-11.5-4.2-13.4-9.9H2.5v6.2C6.5 42.6 14.7 48 24 48z" fill="#34A853"/>
-          <path d="M10.6 28.6A14.8 14.8 0 0 1 9.8 24c0-1.6.3-3.2.8-4.6v-6.2H2.5A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.8l8.1-6.2z" fill="#FBBC05"/>
-          <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
-        </svg>
-        Continue with Google
-      </button>
-
-      <div className="flex items-center gap-3 mb-4">
-        <hr className="flex-1 border-slate-200 dark:border-[#1e3a5f]" />
-        <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">or</span>
-        <hr className="flex-1 border-slate-200 dark:border-[#1e3a5f]" />
+      {/* Social sign-in */}
+      <div className="flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="flex items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] p-3 font-display text-[14.5px] font-semibold text-[var(--fg-1)] transition-colors hover:border-[var(--brand-400)] hover:bg-[var(--brand-50)] disabled:opacity-50 dark:hover:bg-brand-900/20"
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
+            <path d="M24 48c6.5 0 12-2.1 16-5.8l-7.9-6c-2.2 1.5-5 2.3-8.1 2.3-6.2 0-11.5-4.2-13.4-9.9H2.5v6.2C6.5 42.6 14.7 48 24 48z" fill="#34A853"/>
+            <path d="M10.6 28.6A14.8 14.8 0 0 1 9.8 24c0-1.6.3-3.2.8-4.6v-6.2H2.5A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.8l8.1-6.2z" fill="#FBBC05"/>
+            <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+        <button
+          type="button"
+          onClick={handleGithubLogin}
+          disabled={loading}
+          className="flex items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] p-3 font-display text-[14.5px] font-semibold text-[var(--fg-1)] transition-colors hover:border-[var(--brand-400)] hover:bg-[var(--brand-50)] disabled:opacity-50 dark:hover:bg-brand-900/20"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.9-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/>
+          </svg>
+          Continue with GitHub
+        </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="my-[22px] flex items-center gap-3.5 text-[12.5px] font-semibold tracking-[0.04em] text-[var(--fg-4)] before:h-px before:flex-1 before:bg-[var(--border-3)] after:h-px after:flex-1 after:bg-[var(--border-3)]">
+        OR
+      </div>
+
+      <form onSubmit={handleSubmit}>
         {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
             never see or focus this; auto-fillers populate it. */}
         <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
@@ -272,100 +331,167 @@ function LoginForm() {
             />
           </label>
         </div>
-        <div>
-          <label htmlFor="login-email" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-            Email address
-          </label>
-          <input
-            id="login-email"
-            type="email" required autoComplete="email"
-            value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            disabled={loading}
-            className="input"
-          />
+
+        <div className="mb-4">
+          <label htmlFor="login-email" className="mb-[7px] block text-[13px] font-semibold text-[var(--fg-2)]">Email</label>
+          <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] px-3.5 transition-all focus-within:border-[var(--brand-500)] focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]">
+            <Mail className="h-[18px] w-[18px] shrink-0 text-[var(--fg-4)]" />
+            <input
+              id="login-email"
+              type="email" required autoComplete="email"
+              value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              disabled={loading}
+              className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
+            />
+          </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="login-password" className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Password
-            </label>
-            <Link href="/forgot-password"
-              className="text-xs text-brand-600 dark:text-brand-400 hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <div className="relative">
+        <div className="mb-4">
+          <label htmlFor="login-password" className="mb-[7px] block text-[13px] font-semibold text-[var(--fg-2)]">Password</label>
+          <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] px-3.5 transition-all focus-within:border-[var(--brand-500)] focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]">
+            <Lock className="h-[18px] w-[18px] shrink-0 text-[var(--fg-4)]" />
             <input
               id="login-password"
               type={showPass ? 'text' : 'password'} required autoComplete="current-password"
               value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={loading}
-              className="input pr-10"
+              className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="inline-flex p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
               aria-label={showPass ? 'Hide password' : 'Show password'}>
-              {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPass ? <EyeOff className="h-[17px] w-[17px]" /> : <Eye className="h-[17px] w-[17px]" />}
             </button>
           </div>
+        </div>
+
+        <div className="mb-[22px] mt-0.5 flex items-center justify-between text-[13.5px]">
+          <label className="inline-flex cursor-pointer select-none items-center gap-2.5 text-[var(--fg-2)]">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              className="h-[18px] w-[18px] rounded-md border-[1.5px] border-[var(--border-2)] text-[var(--brand-600)] focus:ring-[var(--brand-600)]"
+            />
+            Remember me
+          </label>
+          <Link href="/forgot-password" className="font-semibold text-[var(--brand-700)] no-underline hover:underline dark:text-[var(--brand-400)]">
+            Forgot password?
+          </Link>
         </div>
 
         <button
           type="submit"
           disabled={loading || !email.trim() || !password}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-brand-600 text-white font-bold rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-all shadow-sm"
+          className="btn btn-primary btn-lg w-full justify-center disabled:opacity-50"
         >
           {loading ? (
             <>
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               Signing in…
             </>
           ) : (
             <>
-              <LogIn className="w-5 h-5" />
-              Sign In
+              Log in
+              <ArrowRight className="h-[17px] w-[17px]" />
             </>
           )}
         </button>
       </form>
+
+      <p className="mt-[18px] text-center text-[12.5px] leading-relaxed text-[var(--fg-4)]">
+        By continuing you agree to our{' '}
+        <Link href="/terms" className="text-[var(--fg-3)] underline">Terms</Link>
+        {' '}&amp;{' '}
+        <Link href="/privacy" className="text-[var(--fg-3)] underline">Privacy Policy</Link>.
+      </p>
+
+      <div className="mt-4 text-center">
+        <ResendVerificationLink />
+      </div>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-[80dvh] flex items-center justify-center px-5 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 font-display font-bold text-xl text-slate-900 dark:text-slate-100">
-            <svg viewBox="0 0 32 32" className="w-8 h-8 text-brand-600" fill="none">
-              <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.12"/>
-              <path d="M8 20 Q12 10 16 16 Q20 22 24 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              <circle cx="24" cy="12" r="3" fill="currentColor"/>
-            </svg>
-            RemoteJobs44
-          </Link>
-          <h1 className="font-display font-extrabold text-2xl text-slate-900 dark:text-slate-100 mt-6 mb-1">
-            Welcome back
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Sign in to continue your job search.</p>
-        </div>
+    <div className="deep-ocean">
+      <div className="grid min-h-[80dvh] grid-cols-1 md:grid-cols-[1.04fr_0.96fr]">
 
-        <Suspense fallback={<div className="card p-6 shadow-md animate-pulse"><div className="skeleton h-10 w-full rounded mb-4" /><div className="skeleton h-10 w-full rounded mb-4" /><div className="skeleton h-10 w-full rounded" /></div>}>
-          <LoginForm />
-        </Suspense>
+        {/* Brand panel — dark ocean over photo */}
+        <aside
+          className="relative hidden flex-col overflow-hidden px-[52px] pb-[46px] pt-10 text-white md:flex"
+          style={{
+            background:
+              'radial-gradient(ellipse 74% 50% at 18% 0%, rgba(37,99,235,0.34), transparent 60%),' +
+              'radial-gradient(ellipse 60% 60% at 96% 100%, rgba(249,115,22,0.16), transparent 60%),' +
+              'linear-gradient(155deg, rgba(8,18,36,0.82) 0%, rgba(8,17,34,0.88) 50%, rgba(6,14,31,0.93) 100%),' +
+              'url(/redesign/hero-videocall-sm.jpg) center 24%/cover no-repeat, #060e1f',
+          }}
+        >
+          <div className="relative z-[2]">
+            <Link href="/" className="inline-flex items-center gap-2.5 font-display font-bold text-white no-underline">
+              <svg viewBox="0 0 32 32" fill="none" className="h-[30px] w-[30px]">
+                <defs><linearGradient id="lg-login" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#1e3a5f"/></linearGradient></defs>
+                <rect width="32" height="32" rx="8" fill="url(#lg-login)"/>
+                <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                <circle cx="23" cy="12" r="2.5" fill="#f97316"/>
+              </svg>
+              <span className="text-lg">RemoteJobs<span className="text-[var(--accent-light)]">44</span></span>
+            </Link>
+          </div>
 
-        <div className="text-center mt-4">
-          <ResendVerificationLink />
-        </div>
+          <div className="relative z-[2] my-auto max-w-[440px]">
+            <span className="eyebrow-pill" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.18)', color: '#dbeafe' }}>
+              <span className="dot" />70,000+ live remote roles
+            </span>
+            <h2 className="mb-3.5 mt-[18px] font-display text-[clamp(2rem,3vw,2.85rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-white">
+              Your next remote role is already posted.
+            </h2>
+            <p className="mb-[26px] text-[17px] leading-[1.55] text-[#aebfd6]">
+              Pick up where you left off — saved searches, tracked applications, and one-click apply, all in one place.
+            </p>
+            <ul className="flex list-none flex-col gap-[13px] p-0">
+              {[
+                'Every listing verified genuinely remote',
+                'Salary shown upfront, in USD',
+                'Track every application to offer',
+              ].map(point => (
+                <li key={point} className="flex items-center gap-3 text-[14.5px] text-[#d7e2f1]">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[rgba(34,197,94,0.18)] text-[#5fd99a]">
+                    <Check className="h-[13px] w-[13px]" strokeWidth={3} />
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-5">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Create one</Link>
-        </p>
+          <div className="relative z-[2] mt-[34px] flex items-center gap-3.5 rounded-2xl border border-white/[0.12] bg-white/[0.06] p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/redesign/people-4-portrait.jpg" alt="Adaeze O." className="h-[46px] w-[46px] shrink-0 rounded-full object-cover" />
+            <div>
+              <div className="text-[13.5px] leading-[1.5] text-[#eaf0f9]">&ldquo;Two interviews in my first week — I&apos;d never seen so many genuinely remote roles in one place.&rdquo;</div>
+              <div className="mt-[3px] text-[12.5px] text-[#9fb2cf]">Adaeze O. · Frontend Engineer → Vercel</div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Form panel */}
+        <main className="relative flex items-center justify-center px-8 py-12">
+          <ThemeToggle />
+          <Suspense fallback={
+            <div className="w-full max-w-[416px] animate-pulse">
+              <div className="skeleton mb-4 h-10 w-full rounded" />
+              <div className="skeleton mb-4 h-10 w-full rounded" />
+              <div className="skeleton h-10 w-full rounded" />
+            </div>
+          }>
+            <LoginForm />
+          </Suspense>
+        </main>
       </div>
     </div>
   );

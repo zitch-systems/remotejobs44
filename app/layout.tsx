@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
+import './deep-ocean.css';
 import { Analytics }      from '@vercel/analytics/next';
 import { SpeedInsights }  from '@vercel/speed-insights/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';

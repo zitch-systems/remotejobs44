@@ -11,7 +11,7 @@
 // client islands.
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Clock, ArrowLeft, Flag } from 'lucide-react';
+import { MapPin, Clock, ArrowLeft, Flag, ChevronRight, Check } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
 import { getJobDetailRow } from '@/lib/jobs/job-detail';
@@ -260,7 +260,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="max-w-[900px] mx-auto px-5 py-8">
+    <div className="deep-ocean">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
@@ -275,142 +275,151 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           { name: job.title,  href: `/jobs/${job.id}`                   },
         ]}
       />
-      <Link href="/jobs" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 mb-6 transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back to Jobs
-      </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content (server-rendered) */}
-        <div className="lg:col-span-2 space-y-5">
-          <div className="card p-6">
-            {/* Long titles wrap to 2+ lines; items-center pushed the icon
-                halfway down and stranded the company name below it. Anchor
-                the icon to the top so title flows naturally beside it. */}
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-16 h-16 shrink-0 rounded-xl bg-stone-100 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-2xl font-black text-brand-700 dark:text-brand-400">
-                {job.logo}
-              </div>
-              <div className="flex-1 min-w-0 pt-0.5">
-                <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight leading-tight mb-1">{job.title}</h1>
-                {/* Real company name is always in the HTML (good for SEO + AI
-                    indexers); CompanyMask client island applies a CSS blur
-                    on hydration when the auth state is free / unrevealed-daily. */}
-                <p className="text-sm text-stone-500 dark:text-stone-400 font-semibold truncate">
-                  <CompanyMask company={job.company} />
-                </p>
+      {/* Dark photo hero band — Deep Ocean. Breadcrumb + logo tile + title +
+          meta chips. The apply/save/share CTAs stay in the JobActionsCard
+          client island (aside) so the paywall gating is preserved exactly. */}
+      <section className="photoband" style={{ '--pb-img': 'url(/redesign/ig-focused-desk.jpg)' } as React.CSSProperties}>
+        <div className="wrap">
+          <div className="crumb">
+            <Link href="/">Home</Link>
+            <ChevronRight aria-hidden />
+            <Link href="/jobs">Jobs</Link>
+            <ChevronRight aria-hidden />
+            <span>{job.title}</span>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-16 h-16 shrink-0 rounded-xl bg-white flex items-center justify-center text-2xl font-black text-brand-700">
+              {job.logo}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1>{job.title}</h1>
+              {/* Real company name is always in the HTML (good for SEO + AI
+                  indexers); CompanyMask client island applies a CSS blur
+                  on hydration when the auth state is free / unrevealed-daily. */}
+              <p className="text-sm font-semibold mt-1 text-white/80">
+                <CompanyMask company={job.company} />
+                <span className="mx-2 opacity-50">·</span>
+                <span>{job.location}{job.remote ? ' · Remote' : ''}</span>
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className="metachip"><MapPin className="w-3.5 h-3.5" />{job.location}</span>
+                {job.timezone && <span className="metachip"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
+                <span className="metachip capitalize">{job.type}</span>
+                {job.level && <span className="metachip capitalize">{job.level}</span>}
+                <span className="metachip">{catMeta.label}</span>
+                {job.featured && <span className="metachip job-flag">Featured</span>}
+                <span className="metachip">{formatRelativeDate(job.posted)}</span>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-stone-500 dark:text-stone-400 mb-4">
-              <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{job.location}</span>
-              {job.timezone && <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
-              <span className="text-stone-400">{formatRelativeDate(job.posted)}</span>
-            </div>
+      <div className="wrap">
+        <div className="detail-grid">
+          {/* Main content (server-rendered) */}
+          <main className="do-prose">
+            <Link href="/jobs" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 mb-6 transition-colors no-underline">
+              <ArrowLeft className="w-4 h-4" /> Back to Jobs
+            </Link>
 
-            <div className="flex flex-wrap gap-2 mb-4">
+            {salary && (
+              <div className="mb-6 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-0.5">Salary</p>
+                <p className="font-display font-extrabold text-xl text-brand-700 dark:text-brand-400">{salary}</p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 mb-6">
               {job.isNew && <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">New</span>}
-              {job.featured && <span className="badge bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">Featured</span>}
               <span className={cn('badge', catMeta.color)}>{catMeta.label}</span>
               <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.type}</span>
               {job.level && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 capitalize">{job.level}</span>}
               <SourceTrustBadge source={job.source} />
             </div>
 
-            {salary && (
-              <div className="mb-5 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-0.5">Salary</p>
-                <p className="font-display font-extrabold text-xl text-brand-700 dark:text-brand-400">{salary}</p>
+            <h2>About the role</h2>
+            {job.description && job.description.trim().length > 40 ? (
+              renderJobDescription(job.description)
+            ) : (
+              <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-4 text-sm text-stone-500 dark:text-stone-400">
+                <p>
+                  Full description is on the company&rsquo;s site. Click <strong>Apply Now</strong> on the right to view and apply.
+                </p>
               </div>
             )}
 
-            <div className="job-prose">
-              {job.description && job.description.trim().length > 40 ? (
-                renderJobDescription(job.description)
-              ) : (
-                <div className="rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#162033] p-4 text-sm text-stone-500 dark:text-stone-400">
-                  <p>
-                    Full description is on the company&rsquo;s site. Click <strong>Apply Now</strong> on the right to view and apply.
-                  </p>
+            {job.requirements && job.requirements.length > 0 && (
+              <>
+                <h2>Requirements</h2>
+                <ul>
+                  {job.requirements.map((r, i) => (
+                    <li key={i}>
+                      <Check className="w-[19px] h-[19px]" />
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {job.skills && job.skills.length > 0 && (
+              <>
+                <h2>Skills</h2>
+                {/* Plain anchors that feed PageRank into the /jobs/skill/[slug]
+                    landing pages when the skill is in our SEO catalogue; unknown
+                    skills fall back to /jobs?q=. */}
+                <div className="tagrow">
+                  {job.skills.map(s => {
+                    const slug = skillSlug(s);
+                    const href = slug ? `/jobs/skill/${slug}` : `/jobs?q=${encodeURIComponent(s)}`;
+                    return (
+                      <Link key={s} href={href} className="skill no-underline">{s}</Link>
+                    );
+                  })}
                 </div>
-              )}
+              </>
+            )}
+
+            {job.benefits && job.benefits.length > 0 && (
+              <>
+                <h2>Benefits</h2>
+                <div className="flex flex-wrap gap-2">
+                  {job.benefits.map((b, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-semibold">
+                      ✓ {b}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </main>
+
+          {/* Sidebar */}
+          <aside>
+            {/* Apply / save / share / admin / CV helper — all interactive, one
+                client island. Paywall gating + apply behaviour preserved. */}
+            <JobActionsCard job={job} />
+
+            {/* "Report this job" — user-driven trust signal. Pre-filling the
+                subject + body with the job id keeps the friction near zero. */}
+            <div className="aside-card">
+              <h4 className="flex items-center gap-1.5">
+                <Flag className="w-3.5 h-3.5" /> See something off?
+              </h4>
+              <p className="co-blurb">
+                Spam, scam, fake employer, broken apply link — let us know and we&rsquo;ll review within 24h.
+              </p>
+              <a
+                href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title} at ${job.company}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
+                className="btn btn-ghost btn-sm mt-3 no-underline"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <Flag className="w-3 h-3" /> Report this listing
+              </a>
             </div>
-          </div>
-
-          {job.requirements && job.requirements.length > 0 && (
-            <div className="card p-6">
-              <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-4">Requirements</h2>
-              <ul className="space-y-2">
-                {job.requirements.map((r, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-stone-600 dark:text-stone-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-600 dark:bg-brand-400 mt-2 shrink-0" />
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {job.benefits && job.benefits.length > 0 && (
-            <div className="card p-6">
-              <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-4">Benefits</h2>
-              <div className="flex flex-wrap gap-2">
-                {job.benefits.map((b, i) => (
-                  <span key={i} className="px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-semibold">
-                    ✓ {b}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Apply / save / share / admin / CV helper — all interactive, one client island */}
-          <JobActionsCard job={job} />
-
-          {/* Skills (server-rendered — plain anchors that feed PageRank into
-              the /jobs/skill/[slug] landing pages when the skill is in our
-              SEO catalogue; unknown skills fall back to /jobs?q=). */}
-          {job.skills && job.skills.length > 0 && (
-            <div className="card p-5">
-              <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-3">Skills</h3>
-              <div className="flex flex-wrap gap-2">
-                {job.skills.map(s => {
-                  const slug = skillSlug(s);
-                  const href = slug ? `/jobs/skill/${slug}` : `/jobs?q=${encodeURIComponent(s)}`;
-                  return (
-                    <Link key={s} href={href}
-                      className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-[#162033] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
-                      {s}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* "Report this job" — user-driven trust signal. Scam-detect +
-              source-trust badge catch the obvious cases at ingest, but the
-              long tail (off-topic listings, broken apply URLs, employer-
-              misrepresentation, expired postings) only reveal themselves
-              when a real user hits them. Pre-filling the subject + body
-              with the job id keeps the friction near zero — most users
-              won't write a follow-up if they have to compose from scratch. */}
-          <div className="card p-5">
-            <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-1.5">
-              <Flag className="w-3.5 h-3.5" /> See something off?
-            </h3>
-            <p className="text-xs text-stone-400 dark:text-stone-500 mb-3 leading-relaxed">
-              Spam, scam, fake employer, broken apply link — let us know and we&rsquo;ll review within 24h.
-            </p>
-            <a
-              href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title} at ${job.company}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors"
-            >
-              <Flag className="w-3 h-3" /> Report this listing
-            </a>
-          </div>
+          </aside>
         </div>
       </div>
     </div>
