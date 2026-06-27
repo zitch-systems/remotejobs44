@@ -3,10 +3,29 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, UserPlus, Check } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Eye, EyeOff, Mail, Lock, User, Check, Moon, Sun, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUIStore, useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const isDark = theme === 'dark';
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label="Toggle dark mode"
+      aria-pressed={mounted ? isDark : undefined}
+      className="absolute top-5 right-6 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
+    >
+      {mounted && isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+    </button>
+  );
+}
 
 function StrengthBar({ password }: { password: string }) {
   const checks = [
@@ -18,15 +37,15 @@ function StrengthBar({ password }: { password: string }) {
   const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-brand-500'];
   return (
     <div className="mt-2">
-      <div className="flex gap-1 mb-1.5">
+      <div className="mb-1.5 flex gap-1">
         {[0, 1, 2].map(i => (
           <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < score ? colors[score] : 'bg-stone-200 dark:bg-stone-700'}`} />
         ))}
       </div>
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-wrap gap-3">
         {checks.map(c => (
           <span key={c.label} className={`flex items-center gap-1 text-xs ${c.pass ? 'text-brand-600 dark:text-brand-400' : 'text-stone-400'}`}>
-            <Check className="w-3 h-3" />{c.label}
+            <Check className="h-3 w-3" />{c.label}
           </span>
         ))}
       </div>
@@ -164,139 +183,238 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleGithubSignup() {
+    setLoading(true);
+    const fallback = setTimeout(() => setLoading(false), 10000);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/dashboard` },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      clearTimeout(fallback);
+      setLoading(false);
+      toast(err?.message ?? 'GitHub sign-up failed. Please try again.', 'error');
+    }
+  }
+
   return (
-    <div className="min-h-[80dvh] flex items-center justify-center px-5 py-12">
-      <div className="w-full max-w-md">
+    <div className="deep-ocean">
+      <div className="grid min-h-[80dvh] grid-cols-1 md:grid-cols-[1.04fr_0.96fr]">
 
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 font-display font-bold text-xl text-stone-900 dark:text-stone-100">
-            <svg viewBox="0 0 32 32" className="w-8 h-8 text-brand-700 dark:text-brand-400" fill="none">
-              <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.12"/>
-              <path d="M8 20 Q12 10 16 16 Q20 22 24 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              <circle cx="24" cy="12" r="3" fill="currentColor"/>
-            </svg>
-            RemoteJobs44
-          </Link>
-          <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mt-6 mb-1">
-            Create your account
-          </h1>
-          <p className="text-sm text-stone-400 dark:text-stone-500">Free to join. Upgrade to apply to any job.</p>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex flex-wrap gap-2 mb-5">
-            {['Browse 50k+ jobs', 'Save favourites', 'Track applications'].map(f => (
-              <span key={f} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 text-xs font-semibold">
-                <Check className="w-3 h-3" /> {f}
-              </span>
-            ))}
+        {/* Brand panel — darker scrim because ig-high-five.jpg is brighter */}
+        <aside
+          className="relative hidden flex-col overflow-hidden px-[52px] pb-[46px] pt-10 text-white md:flex"
+          style={{
+            background:
+              'radial-gradient(ellipse 74% 50% at 18% 0%, rgba(37,99,235,0.34), transparent 60%),' +
+              'radial-gradient(ellipse 60% 60% at 96% 100%, rgba(249,115,22,0.16), transparent 60%),' +
+              'linear-gradient(155deg, rgba(8,18,36,0.90) 0%, rgba(8,17,34,0.93) 50%, rgba(6,14,31,0.96) 100%),' +
+              'url(/redesign/ig-high-five.jpg) center 22%/cover no-repeat, #060e1f',
+          }}
+        >
+          <div className="relative z-[2]">
+            <Link href="/" className="inline-flex items-center gap-2.5 font-display font-bold text-white no-underline">
+              <svg viewBox="0 0 32 32" fill="none" className="h-[30px] w-[30px]">
+                <defs><linearGradient id="lg-register" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#1e3a5f"/></linearGradient></defs>
+                <rect width="32" height="32" rx="8" fill="url(#lg-register)"/>
+                <path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                <circle cx="23" cy="12" r="2.5" fill="#f97316"/>
+              </svg>
+              <span className="text-lg">RemoteJobs<span className="text-[var(--accent-light)]">44</span></span>
+            </Link>
           </div>
 
-          {/* Google OAuth */}
-          <button
-            type="button"
-            onClick={handleGoogleSignup}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 mb-4 border border-stone-200 dark:border-[#1e3a5f] rounded-lg bg-white dark:bg-[#0d1a2e] hover:bg-stone-50 dark:hover:bg-[#162033] text-stone-800 dark:text-stone-100 text-sm font-semibold transition-all disabled:opacity-50"
-          >
-            <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
-              <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
-              <path d="M24 48c6.5 0 12-2.1 16-5.8l-7.9-6c-2.2 1.5-5 2.3-8.1 2.3-6.2 0-11.5-4.2-13.4-9.9H2.5v6.2C6.5 42.6 14.7 48 24 48z" fill="#34A853"/>
-              <path d="M10.6 28.6A14.8 14.8 0 0 1 9.8 24c0-1.6.3-3.2.8-4.6v-6.2H2.5A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.8l8.1-6.2z" fill="#FBBC05"/>
-              <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
-            </svg>
-            Sign up with Google
-          </button>
-
-          <div className="flex items-center gap-3 mb-4">
-            <hr className="flex-1 border-stone-200 dark:border-[#1e3a5f]" />
-            <span className="text-xs text-stone-400 dark:text-stone-500 font-medium">or with email</span>
-            <hr className="flex-1 border-stone-200 dark:border-[#1e3a5f]" />
+          <div className="relative z-[2] my-auto max-w-[440px]">
+            <span className="eyebrow-pill" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.18)', color: '#dbeafe' }}>
+              <span className="dot" />Free to browse — no card needed
+            </span>
+            <h2 className="mb-3.5 mt-[18px] font-display text-[clamp(2rem,3vw,2.85rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-white">
+              Start applying to remote roles today.
+            </h2>
+            <p className="mb-[26px] text-[17px] leading-[1.55] text-[#aebfd6]">
+              Create your free account and unlock saved searches, job alerts, and one-click apply across 70,000+ verified remote jobs.
+            </p>
+            <ul className="flex list-none flex-col gap-[13px] p-0">
+              {[
+                'Browse every role free, forever',
+                'Daily alerts for roles that fit you',
+                "Pay only when you're ready to apply",
+              ].map(point => (
+                <li key={point} className="flex items-center gap-3 text-[14.5px] text-[#d7e2f1]">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[rgba(34,197,94,0.18)] text-[#5fd99a]">
+                    <Check className="h-[13px] w-[13px]" strokeWidth={3} />
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 flex gap-[30px]">
+              {[
+                { n: '70k+', l: 'Live roles' },
+                { n: '150+', l: 'Countries' },
+                { n: '5,000+', l: 'Hired' },
+              ].map(s => (
+                <div key={s.l}>
+                  <div className="font-display text-[26px] font-extrabold tracking-[-0.02em] text-white">{s.n}</div>
+                  <div className="mt-0.5 text-[12.5px] text-[#9fb2cf]">{s.l}</div>
+                </div>
+              ))}
+            </div>
           </div>
+        </aside>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
-                never see or focus this; auto-fillers and naive crawlers
-                will populate any <input name="website"> they see. */}
-            <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
-              <label>Website (leave blank)
-                <input
-                  type="text"
-                  name="website"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={website}
-                  onChange={e => setWebsite(e.target.value)}
-                />
-              </label>
-            </div>
-            <div>
-              <label htmlFor="reg-name" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Full name</label>
-              <input
-                id="reg-name"
-                type="text" required value={name} onChange={e => setName(e.target.value)}
-                placeholder="Jane Smith" className="input" autoComplete="name"
-              />
+        {/* Form panel */}
+        <main className="relative flex items-center justify-center px-8 py-12">
+          <ThemeToggle />
+
+          <div className="w-full max-w-[416px]">
+            <h1 className="font-display text-[30px] font-extrabold tracking-[-0.02em] text-[var(--fg-1)]">Create your free account</h1>
+            <p className="mb-7 mt-[7px] text-[15px] text-[var(--fg-3)]">
+              Already have an account?{' '}
+              <Link href="/login" className="font-semibold text-[var(--brand-700)] no-underline hover:underline dark:text-[var(--brand-400)]">
+                Log in
+              </Link>
+            </p>
+
+            {/* Social sign-up */}
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleGoogleSignup}
+                disabled={loading}
+                className="flex items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] p-3 font-display text-[14.5px] font-semibold text-[var(--fg-1)] transition-colors hover:border-[var(--brand-400)] hover:bg-[var(--brand-50)] disabled:opacity-50 dark:hover:bg-brand-900/20"
+              >
+                <svg width="18" height="18" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                  <path d="M47.5 24.6c0-1.6-.1-3.2-.4-4.7H24v8.9h13.2c-.6 3-2.3 5.5-4.9 7.2v6h7.9c4.6-4.2 7.3-10.5 7.3-17.4z" fill="#4285F4"/>
+                  <path d="M24 48c6.5 0 12-2.1 16-5.8l-7.9-6c-2.2 1.5-5 2.3-8.1 2.3-6.2 0-11.5-4.2-13.4-9.9H2.5v6.2C6.5 42.6 14.7 48 24 48z" fill="#34A853"/>
+                  <path d="M10.6 28.6A14.8 14.8 0 0 1 9.8 24c0-1.6.3-3.2.8-4.6v-6.2H2.5A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.8l8.1-6.2z" fill="#FBBC05"/>
+                  <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
+                </svg>
+                Sign up with Google
+              </button>
+              <button
+                type="button"
+                onClick={handleGithubSignup}
+                disabled={loading}
+                className="flex items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] p-3 font-display text-[14.5px] font-semibold text-[var(--fg-1)] transition-colors hover:border-[var(--brand-400)] hover:bg-[var(--brand-50)] disabled:opacity-50 dark:hover:bg-brand-900/20"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.9-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/>
+                </svg>
+                Sign up with GitHub
+              </button>
             </div>
 
-            <div>
-              <label htmlFor="reg-email" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Email address</label>
-              <input
-                id="reg-email"
-                type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" className="input" autoComplete="email"
-              />
+            <div className="my-[22px] flex items-center gap-3.5 text-[12.5px] font-semibold tracking-[0.04em] text-[var(--fg-4)] before:h-px before:flex-1 before:bg-[var(--border-3)] after:h-px after:flex-1 after:bg-[var(--border-3)]">
+              OR
             </div>
 
-            <div>
-              <label htmlFor="reg-password" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  id="reg-password"
-                  type={showPass ? 'text' : 'password'} required value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Create a strong password" className="input pr-10"
-                  autoComplete="new-password"
-                />
-                <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                  aria-label={showPass ? 'Hide password' : 'Show password'}>
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            <form onSubmit={handleSubmit}>
+              {/* Honeypot — off-screen, aria-hidden, tabIndex=-1. Real users
+                  never see or focus this; auto-fillers and naive crawlers
+                  will populate any <input name="website"> they see. */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                <label>Website (leave blank)
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={website}
+                    onChange={e => setWebsite(e.target.value)}
+                  />
+                </label>
               </div>
-              {password && <StrengthBar password={password} />}
-            </div>
 
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-stone-300 dark:border-[#1e3a5f] text-brand-700 focus:ring-brand-600"
-              />
-              <span className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-                I agree to the{' '}
-                <Link href="/terms" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Terms</Link>
-                {' '}and{' '}
-                <Link href="/privacy" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Privacy Policy</Link>
-              </span>
-            </label>
+              <div className="mb-4">
+                <label htmlFor="reg-name" className="mb-[7px] block text-[13px] font-semibold text-[var(--fg-2)]">Full name</label>
+                <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] px-3.5 transition-all focus-within:border-[var(--brand-500)] focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]">
+                  <User className="h-[18px] w-[18px] shrink-0 text-[var(--fg-4)]" />
+                  <input
+                    id="reg-name"
+                    type="text" required value={name} onChange={e => setName(e.target.value)}
+                    placeholder="Ada Okeke" autoComplete="name"
+                    className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
+                  />
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading || !name || !email || !password || !agree}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-60 transition-colors"
-            >
-              {loading
-                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <UserPlus className="w-4 h-4" />}
-              {loading ? 'Creating account…' : 'Create Free Account'}
-            </button>
-          </form>
-        </div>
+              <div className="mb-4">
+                <label htmlFor="reg-email" className="mb-[7px] block text-[13px] font-semibold text-[var(--fg-2)]">Email</label>
+                <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] px-3.5 transition-all focus-within:border-[var(--brand-500)] focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]">
+                  <Mail className="h-[18px] w-[18px] shrink-0 text-[var(--fg-4)]" />
+                  <input
+                    id="reg-email"
+                    type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@email.com" autoComplete="email"
+                    className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
+                  />
+                </div>
+              </div>
 
-        <p className="text-center text-sm text-stone-400 dark:text-stone-500 mt-5">
-          Already have an account?{' '}
-          <Link href="/login" className="text-brand-700 dark:text-brand-400 font-semibold hover:underline">Sign in</Link>
-        </p>
+              <div className="mb-4">
+                <label htmlFor="reg-password" className="mb-[7px] block text-[13px] font-semibold text-[var(--fg-2)]">Password</label>
+                <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] px-3.5 transition-all focus-within:border-[var(--brand-500)] focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]">
+                  <Lock className="h-[18px] w-[18px] shrink-0 text-[var(--fg-4)]" />
+                  <input
+                    id="reg-password"
+                    type={showPass ? 'text' : 'password'} required value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="At least 8 characters" autoComplete="new-password" minLength={8}
+                    className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
+                  />
+                  <button type="button" onClick={() => setShowPass(!showPass)}
+                    className="inline-flex p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+                    aria-label={showPass ? 'Hide password' : 'Show password'}>
+                    {showPass ? <EyeOff className="h-[17px] w-[17px]" /> : <Eye className="h-[17px] w-[17px]" />}
+                  </button>
+                </div>
+                {password
+                  ? <StrengthBar password={password} />
+                  : <p className="mt-[7px] text-xs text-[var(--fg-4)]">Use 8+ characters with a mix of letters and numbers.</p>}
+              </div>
+
+              <div className="my-1 mb-[22px] flex items-start gap-2.5 text-[13px]">
+                <label className="inline-flex cursor-pointer items-start gap-2.5 leading-[1.45] text-[var(--fg-2)]">
+                  <input
+                    type="checkbox" required checked={agree} onChange={e => setAgree(e.target.checked)}
+                    className="mt-[1px] h-[18px] w-[18px] shrink-0 rounded-md border-[1.5px] border-[var(--border-2)] text-[var(--brand-600)] focus:ring-[var(--brand-600)]"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <Link href="/terms" className="font-semibold text-[var(--brand-700)] no-underline hover:underline dark:text-[var(--brand-400)]">Terms</Link>
+                    {' '}and{' '}
+                    <Link href="/privacy" className="font-semibold text-[var(--brand-700)] no-underline hover:underline dark:text-[var(--brand-400)]">Privacy Policy</Link>.
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !name || !email || !password || !agree}
+                className="btn btn-primary btn-lg w-full justify-center disabled:opacity-60"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Creating account…
+                  </>
+                ) : (
+                  <>
+                    Create account
+                    <ArrowRight className="h-[17px] w-[17px]" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-[18px] text-center text-[12.5px] leading-relaxed text-[var(--fg-4)]">
+              Browse free. Upgrade only when you&apos;re ready to apply.
+            </p>
+          </div>
+        </main>
       </div>
     </div>
   );

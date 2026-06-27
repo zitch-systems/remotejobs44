@@ -417,46 +417,66 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-5 py-6">
+    <div className="deep-ocean">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList).replace(/</g, '\\u003c') }}
       />
 
-      {/* Filter UI — client island. URL changes re-run the server fetch above. */}
-      <JobsFiltersBar />
-
-      {/* Results header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h1 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">
-            {q ? `Results for "${q}"` : category === 'all' ? 'All Remote Jobs' : `${catMeta.label} Jobs`}
-          </h1>
-          {fuzzy && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-              No exact matches — showing similar results
-            </p>
-          )}
-          <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {total.toLocaleString()} jobs found
-            {total > 0 && (
-              <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400">
-                <Zap className="w-3 h-3" />
-                {remoteOnly ? 'Remote only' : 'All locations'}
-              </span>
-            )}
-            <RemoteToggleLink />
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasActive && <ClearAllButton />}
-          <div className="flex items-center gap-0.5 p-1 rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628]">
-            <span aria-label="Grid view" className="p-1.5 rounded-md bg-brand-700 text-white">
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </span>
+      {/* Dark photo hero band — Deep Ocean look. Copy preserved from the
+          prototype; the live search/filter UI lives in JobsFiltersBar below. */}
+      <section className="photoband" style={{ '--pb-img': 'url(/redesign/ig-duo-laptops.jpg)' } as React.CSSProperties}>
+        <div className="wrap wrap--wide">
+          <div className="crumb">
+            <Link href="/">Home</Link>
+            <ChevronRight aria-hidden />
+            <span>Browse jobs</span>
+          </div>
+          <h1>Search 70,000+ remote roles</h1>
+          <p className="sub">Every role verified remote — filter by category, region and type.</p>
+          <div className="bandstats">
+            <span><span className="pulse" />{total.toLocaleString()} live roles</span>
+            <span>150+ countries hiring</span>
+            <span>Updated daily</span>
           </div>
         </div>
-      </div>
+      </section>
+
+      <div className="wrap wrap--wide" style={{ padding: '32px 28px 72px' }}>
+        {/* Filter UI — client island. URL changes re-run the server fetch above. */}
+        <JobsFiltersBar />
+
+        {/* Results header / toolbar */}
+        <div className="toolbar">
+          <div>
+            <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">
+              {q ? `Results for "${q}"` : category === 'all' ? 'All Remote Jobs' : `${catMeta.label} Jobs`}
+            </h2>
+            {fuzzy && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                No exact matches — showing similar results
+              </p>
+            )}
+            <div className="count mt-0.5">
+              <span className="pulse" />Showing <b>{total.toLocaleString()}</b> of 70,000+ jobs
+              {total > 0 && (
+                <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400">
+                  <Zap className="w-3 h-3" />
+                  {remoteOnly ? 'Remote only' : 'All locations'}
+                </span>
+              )}
+              <RemoteToggleLink />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasActive && <ClearAllButton />}
+            <div className="flex items-center gap-0.5 p-1 rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628]">
+              <span aria-label="Grid view" className="p-1.5 rounded-md bg-brand-700 text-white">
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+        </div>
 
       {/* Grid */}
       {jobs.length === 0 ? (
@@ -498,40 +518,37 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             {jobs.map(job => <JobCard key={job.id} job={job} />)}
           </div>
 
-          {/* Pagination — plain <Link>s so it works without JS. */}
+          {/* Pagination — plain <Link>s so it works without JS. Deep Ocean .pager skin. */}
           {pages > 1 && (
-            <div className="flex items-center justify-center gap-1.5">
+            <div className="pager">
               {page > 1 ? (
-                <Link href={paginationHref(sp, page - 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
-                  <ChevronLeft className="w-4 h-4" />Previous
+                <Link href={paginationHref(sp, page - 1)} aria-label="Previous page">
+                  <ChevronLeft className="w-4 h-4" />
                 </Link>
               ) : (
-                <span className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-400 opacity-40">
-                  <ChevronLeft className="w-4 h-4" />Previous
+                <span className="disabled" aria-hidden>
+                  <ChevronLeft className="w-4 h-4" />
                 </span>
               )}
               {pageWindow(page, pages).map(p => (
-                <Link key={p} href={paginationHref(sp, p)}
-                  className={cn('w-10 h-10 rounded-xl text-sm font-bold transition-all flex items-center justify-center',
-                    p === page ? 'bg-brand-700 dark:bg-brand-600 text-white shadow-md-brand' : 'border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628]')}>
+                <Link key={p} href={paginationHref(sp, p)} className={cn(p === page && 'on')}>
                   {p}
                 </Link>
               ))}
               {page < pages ? (
-                <Link href={paginationHref(sp, page + 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
-                  Next<ChevronRight className="w-4 h-4" />
+                <Link href={paginationHref(sp, page + 1)} aria-label="Next page">
+                  <ChevronRight className="w-4 h-4" />
                 </Link>
               ) : (
-                <span className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-[#1e3a5f] text-sm font-semibold text-stone-400 opacity-40">
-                  Next<ChevronRight className="w-4 h-4" />
+                <span className="disabled" aria-hidden>
+                  <ChevronRight className="w-4 h-4" />
                 </span>
               )}
             </div>
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
