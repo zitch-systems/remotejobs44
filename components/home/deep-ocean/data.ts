@@ -57,3 +57,30 @@ export async function fetchLandingJobs(limit = 40): Promise<LandingJob[]> {
     return [];
   }
 }
+
+// Live open-role count per category slug (same visibility filters as the
+// rest of the landing). Used by the categories grid + the listings filter
+// rail. Runs hourly behind the page's revalidate, so the per-slug count
+// queries are cheap in aggregate. The DB `category` column value equals the
+// URL slug (see VALID_CATEGORIES in app/api/jobs/route.ts). Returns {} on
+// failure so callers fall back to a generic label.
+export async function fetchCategoryCounts(slugs: string[]): Promise<Record<string, number>> {
+  try {
+    const supabase = createAdminSupabaseClient();
+    const entries = await Promise.all(
+      slugs.map(async (slug) => {
+        const { count } = await supabase
+          .from('jobs')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', true)
+          .eq('category', slug)
+          .or(notExpired())
+          .or(NOT_FLAGGED);
+        return [slug, count ?? 0] as const;
+      }),
+    );
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+}

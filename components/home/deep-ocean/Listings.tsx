@@ -1,7 +1,17 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { LandingJob, payLabel, ageLabel, tintFor } from './helpers';
+import { LandingJob, payLabel, ageLabel, tintFor, compactCount } from './helpers';
+
+// The four categories surfaced in the filter rail; counts come live from
+// the page (keyed by slug = DB category value), and each row links into the
+// real filtered /jobs listing.
+const RAIL_CATS = [
+  { slug: 'engineering', name: 'Engineering' },
+  { slug: 'design',      name: 'Design' },
+  { slug: 'marketing',   name: 'Marketing' },
+  { slug: 'data',        name: 'Data & AI' },
+];
 
 // Live-filter listings: filter-rail (static affordance) + client-filtered
 // job rows. Filtering happens over the rows already rendered (progressive
@@ -35,7 +45,7 @@ function JobRow({ job }: { job: LandingJob }) {
   );
 }
 
-export function Listings({ jobs }: { jobs: LandingJob[] }) {
+export function Listings({ jobs, categoryCounts = {} }: { jobs: LandingJob[]; categoryCounts?: Record<string, number> }) {
   const [q, setQ] = useState('');
 
   const filtered = useMemo(() => {
@@ -62,10 +72,15 @@ export function Listings({ jobs }: { jobs: LandingJob[] }) {
             <h4>Filters</h4>
             <div className="fgroup">
               <div className="ft">Category</div>
-              <label className="fopt on"><span className="box"><FilterTick /></span>Engineering<span className="ct">2.1k</span></label>
-              <label className="fopt"><span className="box"><FilterTick /></span>Design<span className="ct">840</span></label>
-              <label className="fopt"><span className="box"><FilterTick /></span>Marketing<span className="ct">1.3k</span></label>
-              <label className="fopt"><span className="box"><FilterTick /></span>Data &amp; AI<span className="ct">920</span></label>
+              {RAIL_CATS.map(c => {
+                const n = categoryCounts[c.slug];
+                return (
+                  <Link key={c.slug} className="fopt" href={`/jobs?category=${c.slug}`}>
+                    <span className="box"><FilterTick /></span>{c.name}
+                    {n && n > 0 ? <span className="ct">{compactCount(n)}</span> : null}
+                  </Link>
+                );
+              })}
             </div>
             <div className="fgroup">
               <div className="ft">Region</div>

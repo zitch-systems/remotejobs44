@@ -101,26 +101,6 @@ function LoginForm() {
     }
   }
 
-  async function handleGithubLogin() {
-    setLoading(true);
-    setErrorMsg('');
-    // Safety: reset loading if OAuth redirect doesn't happen within 10s
-    const fallback = setTimeout(() => setLoading(false), 10000);
-    try {
-      const supabase = createClient();
-      const next = searchParams.get('next') ?? '/dashboard';
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      clearTimeout(fallback);
-      setLoading(false);
-      setErrorMsg(err?.message ?? 'GitHub sign-in failed. Please try again.');
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     // Honeypot trip — pretend the sign-in is in flight then settle on
@@ -298,17 +278,6 @@ function LoginForm() {
             <path d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.8-6.8C35.9 2.3 30.4 0 24 0 14.7 0 6.5 5.4 2.5 13.2l8.1 6.2C12.5 13.7 17.8 9.5 24 9.5z" fill="#EA4335"/>
           </svg>
           Continue with Google
-        </button>
-        <button
-          type="button"
-          onClick={handleGithubLogin}
-          disabled={loading}
-          className="flex items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-[var(--border-2)] bg-[var(--bg-card)] p-3 font-display text-[14.5px] font-semibold text-[var(--fg-1)] transition-colors hover:border-[var(--brand-400)] hover:bg-[var(--brand-50)] disabled:opacity-50 dark:hover:bg-brand-900/20"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.9-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/>
-          </svg>
-          Continue with GitHub
         </button>
       </div>
 
