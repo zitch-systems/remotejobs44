@@ -16,7 +16,7 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/sup
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
 import { getJobDetailRow } from '@/lib/jobs/job-detail';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
-import { normalizeJobDescription } from '@/lib/job-description';
+import { normalizeJobDescription, jobDescriptionToHtml } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
 import { JobActionsCard } from '@/components/jobs/JobActionsCard';
 import { CompanyMask } from '@/components/jobs/CompanyMask';
@@ -100,10 +100,16 @@ async function fetchJob(id: string): Promise<Job | null> {
   }
 }
 
-// applicantLocationRequirements — Google penalises generic "Worldwide" when
-// the role is actually region-locked. Express the eligible applicant
-// countries honestly from `job.location` when we can recognise them.
-const KNOWN_REGIONS: Array<readonly [string, string]> = [
+// applicantLocationRequirements — Google's JobPosting spec REQUIRES that
+// each entry be a `Country` with a real country name; multi-country regions
+// like "Europe", "Africa" or the catch-all "Worldwide" are NOT valid Country
+// values and make Google drop the structured data ("Invalid value in field
+// applicantLocationRequirements"). So we only emit genuine countries here,
+// and when a role is open globally (or we can't resolve a specific country)
+// we OMIT the property entirely — with jobLocationType: TELECOMMUTE that
+// already signals "remote, no location restriction", which is the correct,
+// penalty-free way to express a worldwide-remote role.
+const KNOWN_COUNTRIES: Array<readonly [string, string]> = [
   ['united states', 'United States'], ['us only', 'United States'], ['usa', 'United States'],
   ['canada', 'Canada'], ['uk', 'United Kingdom'], ['united kingdom', 'United Kingdom'],
   ['germany', 'Germany'], ['france', 'France'], ['spain', 'Spain'],
@@ -111,18 +117,22 @@ const KNOWN_REGIONS: Array<readonly [string, string]> = [
   ['nigeria', 'Nigeria'], ['kenya', 'Kenya'], ['south africa', 'South Africa'],
   ['ghana', 'Ghana'], ['egypt', 'Egypt'], ['india', 'India'],
   ['australia', 'Australia'], ['brazil', 'Brazil'], ['mexico', 'Mexico'],
-  ['europe', 'Europe'], ['emea', 'Europe'], ['latam', 'Latin America'],
-  ['apac', 'Asia-Pacific'], ['africa', 'Africa'],
 ];
-function inferApplicantLocations(location: string | undefined) {
-  if (!location) return [{ '@type': 'Country', name: 'Worldwide' }];
+/**
+ * Returns an array of valid `Country` entries, or `null` when the role is
+ * effectively global / unresolved (caller omits applicantLocationRequirements).
+ */
+function inferApplicantLocations(location: string | undefined): Array<{ '@type': string; name: string }> | null {
+  if (!location) return null;
   const l = location.toLowerCase();
+  const seen = new Set<string>();
   const hits: Array<{ '@type': string; name: string }> = [];
-  for (const [needle, name] of KNOWN_REGIONS) if (l.includes(needle)) hits.push({ '@type': 'Country', name });
-  if (hits.length === 0 && (l.includes('remote') || l.includes('worldwide') || l.includes('anywhere'))) {
-    hits.push({ '@type': 'Country', name: 'Worldwide' });
+  for (const [needle, name] of KNOWN_COUNTRIES) {
+    if (l.includes(needle) && !seen.has(name)) { seen.add(name); hits.push({ '@type': 'Country', name }); }
   }
-  return hits.length > 0 ? hits : [{ '@type': 'Country', name: 'Worldwide' }];
+  // No specific country recognised (incl. "remote"/"worldwide"/"anywhere"
+  // and multi-country regions like EMEA/LATAM/APAC) → omit the field.
+  return hits.length > 0 ? hits : null;
 }
 
 // Render a scraped job description as structured blocks. ATS feeds give us
@@ -209,18 +219,40 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // jobs older than 60 days from listing pages, so a 30-day fallback
   // here is conservative and matches Google Jobs' expectation that
   // postings expire within a reasonable window.
-  const POSTING_TTL_DAYS = 30;
-  const postedMs = job.posted ? new Date(job.posted).getTime() : Date.now();
-  const validThrough = job.expires
-    ? new Date(job.expires).toISOString()
-    : new Date(postedMs + POSTING_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // validThrough MUST be in the future. Google Jobs silently DROPS any
+  // posting whose validThrough has already passed ("expired"), so a naive
+  // posted+30d fallback would de-list every job older than 30 days even
+  // though our own staleness gate keeps them visible for 60. We therefore
+  // take the LATEST of {upstream expires_at, posted+TTL} and, if that's
+  // still in the past (or for any reason absent), clamp it forward to
+  // now + a short window so the listing stays eligible while it's live on
+  // the site. When the staleness pass finally hides the job, the detail
+  // page 404s and the posting drops out cleanly.
+  const POSTING_TTL_DAYS = 45;
+  const MIN_FUTURE_DAYS  = 14;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const postedMs = job.posted ? new Date(job.posted).getTime() : nowMs;
+  const expiresMs = job.expires ? new Date(job.expires).getTime() : 0;
+  const validThroughMs = Math.max(
+    expiresMs,
+    postedMs + POSTING_TTL_DAYS * DAY_MS,
+    nowMs + MIN_FUTURE_DAYS * DAY_MS,
+  );
+  const validThrough = new Date(validThroughMs).toISOString();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com';
+
+  // Google recommends an HTML-formatted description; fall back to plaintext
+  // if the scraped body had no recoverable structure.
+  const descriptionHtml = jobDescriptionToHtml(job.description ?? '')
+    || normalizeJobDescription(job.description ?? '');
+  const applicantLocations = inferApplicantLocations(job.location);
 
   const jsonLd: Record<string, any> = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
-    description: normalizeJobDescription(job.description ?? ''),
+    description: descriptionHtml,
     datePosted: job.posted,
     validThrough,
     identifier: {
@@ -234,11 +266,19 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   : job.type === 'freelance' ? 'TEMPORARY'
                   : 'OTHER',
     jobLocationType: 'TELECOMMUTE',
-    applicantLocationRequirements: inferApplicantLocations(job.location),
+    // Only emit when we resolved real Country values; omitting it for a
+    // global-remote role is the correct, penalty-free signal (see
+    // inferApplicantLocations).
+    ...(applicantLocations ? { applicantLocationRequirements: applicantLocations } : {}),
     directApply: false,
     hiringOrganization: {
       '@type': 'Organization',
       name: job.company,
+      // Point at our own canonical company hub so Google can tie the
+      // posting to the employer entity (we don't have the employer's real
+      // homepage in the feed, but the hub is a stable same-as target).
+      sameAs: `${baseUrl}/companies/${companySlug(job.company)}`,
+      url: `${baseUrl}/companies/${companySlug(job.company)}`,
     },
     skills: job.skills?.join(', ') ?? undefined,
     url: `${baseUrl}/jobs/${job.id}`,

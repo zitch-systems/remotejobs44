@@ -122,7 +122,7 @@ export default async function SalaryRolePage({ params }: { params: Promise<{ slu
       <div className="card p-6 mt-5 bg-brand-50/40 dark:bg-brand-900/10 border-brand-200 dark:border-brand-800">
         <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">See live {r.role} listings</h2>
         <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
-          50,000+ remote jobs on RemoteJobs44 — filter by role, level, and country. Day Pass from ₦500.
+          70,000+ remote jobs on RemoteJobs44 — filter by role, level, and country. Day Pass from ₦500.
         </p>
         <Link href={`/jobs?q=${encodeURIComponent(r.role)}`}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">

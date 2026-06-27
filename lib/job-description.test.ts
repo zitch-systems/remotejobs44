@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeJobDescription } from './job-description';
+import { normalizeJobDescription, jobDescriptionToHtml } from './job-description';
 
 describe('normalizeJobDescription', () => {
   it('passes plaintext through unchanged', () => {
@@ -77,5 +77,35 @@ describe('normalizeJobDescription', () => {
     expect(out).not.toContain('&quot;');
     expect(out).not.toContain('<');
     expect(out).toContain("We're transforming the grocery industry");
+  });
+});
+
+describe('jobDescriptionToHtml', () => {
+  it('wraps paragraphs in <p> tags', () => {
+    const out = jobDescriptionToHtml('First para.\n\nSecond para.');
+    expect(out).toBe('<p>First para.</p><p>Second para.</p>');
+  });
+
+  it('groups bullet lines into a single <ul>', () => {
+    const out = jobDescriptionToHtml('Responsibilities:\n- Build things\n- Ship features');
+    expect(out).toContain('<ul><li>Build things</li><li>Ship features</li></ul>');
+  });
+
+  it('escapes ampersands in text so the emitted HTML stays well-formed', () => {
+    // Plaintext (no markup) passes through normalize untouched, then the
+    // raw & must be escaped so it can't form a stray entity in the JSON-LD.
+    const out = jobDescriptionToHtml('Research & Development team');
+    expect(out).toBe('<p>Research &amp; Development team</p>');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(jobDescriptionToHtml('')).toBe('');
+  });
+
+  it('converts scraped HTML to a clean whitelisted subset', () => {
+    const input = '&lt;p&gt;Intro&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Alpha&lt;/li&gt;&lt;li&gt;Beta&lt;/li&gt;&lt;/ul&gt;';
+    const out   = jobDescriptionToHtml(input);
+    expect(out).toContain('<p>Intro</p>');
+    expect(out).toContain('<ul><li>Alpha</li><li>Beta</li></ul>');
   });
 });

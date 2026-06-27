@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 // page inherited only the generic root title despite being in sitemap.ts.
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: 'Affordable access to 50,000+ remote jobs — grab a Day Pass from ₦500 or go Pro for unlimited one-click applications, AI tools, and job alerts.',
+  description: 'Affordable access to 70,000+ remote jobs — grab a Day Pass from ₦500 or go Pro for unlimited one-click applications, AI tools, and job alerts.',
   alternates: { canonical: 'https://remotejobs44.com/pricing' },
 };
 

@@ -103,7 +103,10 @@
 /* ---------- Company logo marquee ---------- */
 .deep-ocean .marquee { display:flex; flex-direction:column; gap:18px; }
 .deep-ocean .marquee-row { overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
-.deep-ocean .marquee-track { display:flex; gap:14px; width:max-content; animation:doMarquee 60s linear infinite; }
+/* will-change:transform promotes the track to its own compositor layer so
+   the infinite translateX runs on the GPU instead of repainting on the main
+   thread — smoother scroll and lower INP on the homepage. */
+.deep-ocean .marquee-track { display:flex; gap:14px; width:max-content; animation:doMarquee 60s linear infinite; will-change:transform; }
 .deep-ocean .marquee-track--rev { animation-direction:reverse; animation-duration:72s; }
 .deep-ocean .marquee-row:hover .marquee-track { animation-play-state:paused; }
 /* Real brand logos, shown in full colour (Simple Icons / DuckDuckGo). */
@@ -280,7 +283,11 @@
 .dark .deep-ocean .hb-chip { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.14); color:#cdd9ec; }
 .dark .deep-ocean .hb-chip:hover { background:rgba(255,255,255,0.14); color:#fff; }
 .deep-ocean .hb-stats { display:flex; gap:40px; margin-top:36px; }
-.deep-ocean .hb-stat .n { font-family:var(--font-display); font-weight:800; font-size:30px; letter-spacing:-0.02em; color:var(--fg-1); }
+/* tabular-nums + min-width keep the stat from reflowing while the
+   count-up animation cycles through digits of different widths (the "8" in
+   70,000 is wider than the "1" in 10,000). Without this the label under it
+   jitters horizontally every frame — a measurable CLS contributor. */
+.deep-ocean .hb-stat .n { font-family:var(--font-display); font-weight:800; font-size:30px; letter-spacing:-0.02em; color:var(--fg-1); font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; display:inline-block; min-width:2.6ch; }
 .deep-ocean .hb-stat .l { font-size:13px; color:var(--fg-3); margin-top:2px; }
 .dark .deep-ocean .hb-stat .n { color:#fff; }
 .dark .deep-ocean .hb-stat .l { color:#8ea2c2; }

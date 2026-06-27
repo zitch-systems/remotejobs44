@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { n: 1, icon: Search,     title: 'Browse for free', body: 'Search 50,000+ remote jobs from 8+ aggregators and direct ATS feeds, refreshed every 6 hours. No signup required to browse.' },
+  { n: 1, icon: Search,     title: 'Browse for free', body: 'Search 70,000+ remote jobs from 8+ aggregators and direct ATS feeds, refreshed every 6 hours. No signup required to browse.' },
   { n: 2, icon: Filter,     title: 'Filter aggressively', body: 'Filter by category, role, country, timezone, salary, and posting date. Save searches and bookmark roles to revisit.' },
   { n: 3, icon: CreditCard, title: 'Unlock apply links', body: 'A ₦500 Day Pass gives 24 hours of full access with 10 applications. Or go Pro for unlimited applications + AI tools.' },
   { n: 4, icon: Brain,      title: 'AI CV review', body: 'Paste your CV, get a 0–100 score with strengths, gaps, missing ATS keywords, and rewrite tips. Tailor your CV before applying.' },

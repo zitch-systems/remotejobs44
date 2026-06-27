@@ -49,7 +49,7 @@ export function welcomeEmail(name: string) {
     <div style="background:#eff6ff;border-radius:8px;padding:20px;margin:0 0 24px">
       <p style="margin:0 0 12px;color:#2563eb;font-weight:600;font-size:14px">What you can do for free:</p>
       <ul style="margin:0;padding:0 0 0 20px;color:#1d4ed8;font-size:14px;line-height:2">
-        <li>Browse 50,000+ remote jobs</li>
+        <li>Browse 70,000+ remote jobs</li>
         <li>Save your favourite listings</li>
         <li>Explore company profiles</li>
       </ul>

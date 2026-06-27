@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // re-running them on every visit.
 export const revalidate = 3600;
 
-// Real DB-backed counts. The previous static "50,000+ jobs / 8,000+
+// Real DB-backed counts. The previous static "70,000+ jobs / 8,000+
 // companies / 190+ countries" was unverifiable and inflated — a savvy
 // user counting jobs in /jobs would catch the lie and lose trust. We
 // now read live numbers and round down conservatively.

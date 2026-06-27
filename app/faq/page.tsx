@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is RemoteJobs44 free to use?',
-    a: 'Yes — browsing all 50,000+ remote jobs and saving favourites is completely free. You only pay if you want to apply to roles via the platform or use the AI tools. The Day Pass (₦500) gives you 24 hours of full access with 10 applications. Pro Monthly (₦2,999) or Pro Annual (₦29,999) unlock unlimited applications and AI tools.',
+    a: 'Yes — browsing all 70,000+ remote jobs and saving favourites is completely free. You only pay if you want to apply to roles via the platform or use the AI tools. The Day Pass (₦500) gives you 24 hours of full access with 10 applications. Pro Monthly (₦2,999) or Pro Annual (₦29,999) unlock unlimited applications and AI tools.',
   },
   {
     q: 'How do I get paid by remote employers?',

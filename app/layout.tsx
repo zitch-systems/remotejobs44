@@ -36,7 +36,12 @@ const fontDmSans = DM_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://remotejobs44.com'),
-  alternates: { canonical: 'https://remotejobs44.com' },
+  // NOTE: do NOT set a site-wide `alternates.canonical` here. In the Next
+  // Metadata API a root-layout canonical is inherited by every page that
+  // doesn't set its own — which previously stamped the HOMEPAGE URL onto
+  // /blog, /about, the legal pages, etc., telling Google they're duplicates
+  // of the homepage. With no default, those pages self-canonicalize (correct);
+  // content pages set their own `alternates.canonical` explicitly.
   title: { default: 'RemoteJobs44 – Remote Jobs in Nigeria & Worldwide', template: '%s | RemoteJobs44' },
   description: 'Find 70,000+ verified remote jobs from top global companies. Search engineering, design, marketing, finance, and more. Browse free.',
   keywords: [

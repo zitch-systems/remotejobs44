@@ -16,11 +16,15 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
+// Surfacing the high-value SEO hub pages (Salary Guide, Resources) in the
+// primary nav gives them a sitewide internal link from a prominent,
+// crawler-visible position — and helps users discover them.
 const NAV_LINKS = [
-  { href: '/jobs',      label: 'Jobs'      },
-  { href: '/companies', label: 'Companies' },
-  { href: '/pricing',   label: 'Pricing'   },
-  { href: '/about',     label: 'About'     },
+  { href: '/jobs',         label: 'Jobs'         },
+  { href: '/companies',    label: 'Companies'    },
+  { href: '/salary-guide', label: 'Salary Guide' },
+  { href: '/resources',    label: 'Resources'    },
+  { href: '/pricing',      label: 'Pricing'      },
 ];
 
 function getInitials(name: string) {

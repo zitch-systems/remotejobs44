@@ -1,5 +1,6 @@
 // app/page.tsx — Deep Ocean landing (Direction B), wired to real jobs.
 import type { Metadata } from 'next';
+import ReactDOM from 'react-dom';
 import { fetchLandingJobs, fetchCategoryCounts } from '@/components/home/deep-ocean/data';
 import { Hero }            from '@/components/home/deep-ocean/Hero';
 import { CompanyMarquee }  from '@/components/home/deep-ocean/CompanyMarquee';
@@ -26,6 +27,14 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function HomePage() {
+  // The hero's LCP element is the .hero-b CSS background photo. Because it's
+  // referenced from a stylesheet the browser can't discover it until the CSS
+  // has downloaded + parsed, which pushes LCP out. Preloading it here (homepage
+  // only, so other routes don't pay for an image they never show) hoists a
+  // <link rel="preload" as="image" fetchpriority="high"> into <head> so the
+  // fetch starts in parallel with the CSS.
+  ReactDOM.preload('/redesign/hero-videocall-sm.jpg', { as: 'image', fetchPriority: 'high' });
+
   const [jobs, categoryCounts] = await Promise.all([
     fetchLandingJobs(40),
     fetchCategoryCounts(CATEGORY_SLUGS),
