@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -439,8 +440,7 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-[2] mt-[34px] flex items-center gap-3.5 rounded-2xl border border-white/[0.12] bg-white/[0.06] p-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/redesign/people-4-portrait.jpg" alt="Adaeze O." className="h-[46px] w-[46px] shrink-0 rounded-full object-cover" />
+            <Image src="/redesign/people-4-portrait.jpg" alt="Adaeze O." width={46} height={46} sizes="46px" className="h-[46px] w-[46px] shrink-0 rounded-full object-cover" />
             <div>
               <div className="text-[13.5px] leading-[1.5] text-[#eaf0f9]">&ldquo;Two interviews in my first week — I&apos;d never seen so many genuinely remote roles in one place.&rdquo;</div>
               <div className="mt-[3px] text-[12.5px] text-[#9fb2cf]">Adaeze O. · Frontend Engineer → Vercel</div>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { HeroSearch } from './HeroSearch';
 import { CountUp } from './CountUp';
 import { LandingJob, payCompact, tintFor } from './data';
@@ -80,8 +81,13 @@ export function Hero({ jobs }: { jobs: LandingJob[] }) {
             </div>
           </div>
           <figure className="hero-photo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/redesign/ig-high-five.jpg" alt="Two remote teammates celebrating an offer" />
+            <Image
+              src="/redesign/ig-high-five.jpg"
+              alt="Two remote teammates celebrating an offer"
+              width={172}
+              height={204}
+              sizes="172px"
+            />
             <figcaption><span className="hp-pulse" />Hired remotely this week</figcaption>
           </figure>
         </div>

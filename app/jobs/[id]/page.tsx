@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { MapPin, Clock, ArrowLeft, Flag, ChevronRight, Check } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
-import { getJobDetailRow } from '@/lib/jobs/job-detail';
+import { getJobDetailRow, getExpiredJobMeta } from '@/lib/jobs/job-detail';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription, jobDescriptionToHtml } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -201,9 +201,50 @@ function renderJobDescription(raw: string): React.ReactNode {
   return <>{blocks}</>;
 }
 
+// Noindex "position closed" view for a job that existed but is no longer
+// visible. Deliberately renders NO JobPosting structured data (the role is
+// gone) and points the visitor at live inventory.
+function ExpiredJobView({ title, company }: { title: string; company: string }) {
+  return (
+    <div className="deep-ocean">
+      <div className="max-w-[680px] mx-auto px-5 py-20 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-stone-100 dark:bg-[#162033] text-stone-500 dark:text-stone-400 text-xs font-bold uppercase tracking-wider mb-5">
+          Position Closed
+        </div>
+        <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">
+          {title}{company ? ` at ${company}` : ''} is no longer accepting applications
+        </h1>
+        <p className="text-stone-500 dark:text-stone-400 leading-relaxed mb-8">
+          This role has been filled or has expired. Thousands of fresh remote jobs are live right now — keep your search moving.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link href="/jobs" className="px-6 py-3 bg-brand-700 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors text-sm">
+            Browse live remote jobs
+          </Link>
+          {company && (
+            <Link href={`/companies/${companySlug(company)}`} className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-700 dark:text-stone-200 font-bold rounded-xl hover:border-brand-600 dark:hover:border-brand-500 transition-colors text-sm">
+              More roles at {company}
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const job = await fetchJob((await params).id);
-  if (!job) notFound();
+  const id = (await params).id;
+  const job = await fetchJob(id);
+  if (!job) {
+    // Existed once but is now hidden (expired/flagged/inactive) → serve a
+    // helpful, noindex "position closed" page with links back to live roles,
+    // which is Google's recommended treatment for expired job postings
+    // (better than a hard 404 for both users and crawl signals). The noindex
+    // is set in generateMetadata; a genuinely unknown id still 404s.
+    const expired = await getExpiredJobMeta(id);
+    if (expired) return <ExpiredJobView title={expired.title} company={expired.company} />;
+    notFound();
+  }
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
   const salary = formatSalary(job.salaryMin, job.salaryMax, job.currency);

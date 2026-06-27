@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import Image from 'next/image';
 
 interface T { quote: ReactNode; img: string; name: string; role: string; }
 
@@ -38,8 +39,7 @@ export function Testimonials() {
               <div className="quote-mark">&ldquo;</div>
               <blockquote>{t.quote}</blockquote>
               <figcaption className="tcard-person">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t.img} alt={t.name} />
+                <Image src={t.img} alt={t.name} width={46} height={46} sizes="46px" />
                 <div>
                   <div className="pn">{t.name}</div>
                   <div className="pr">{t.role}</div>

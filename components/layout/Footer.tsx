@@ -97,8 +97,8 @@ const FOOTER_LINKS = {
     { label: 'Design',           href: '/jobs/category/design' },
     { label: 'Marketing',        href: '/jobs/category/marketing' },
     { label: 'Finance',          href: '/jobs/category/finance' },
-    { label: 'Data & Analytics', href: '/jobs/category/data' },
-    { label: 'Product',          href: '/jobs/category/product' },
+    { label: 'By Industry',      href: '/jobs/industry' },
+    { label: 'By City',          href: '/jobs/city' },
   ],
   // Surface the programmatic-SEO hub pages here so they get a sitewide
   // internal link (PageRank) on every page — previously they were reachable

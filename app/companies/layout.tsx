@@ -1,14 +1,6 @@
-import type { Metadata } from 'next';
-
-// /companies (the index) is a client component, so metadata lives here.
-// The per-company /companies/[slug] pages set their own via
-// generateMetadata, which overrides these defaults for that segment.
-export const metadata: Metadata = {
-  title: 'Remote Companies Hiring',
-  description: 'Browse remote-first companies hiring worldwide on RemoteJobs44 and explore their open roles.',
-  alternates: { canonical: 'https://remotejobs44.com/companies' },
-};
-
+// /companies metadata now lives in app/companies/page.tsx (a Server
+// Component). This layout intentionally exports none — two metadata exports
+// on the same route segment silently override each other field-by-field.
 export default function CompaniesLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

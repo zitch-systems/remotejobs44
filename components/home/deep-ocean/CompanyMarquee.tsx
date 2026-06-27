@@ -3,74 +3,75 @@ import { useState } from 'react';
 import { tintFor } from './helpers';
 
 // Curated, well-known remote-friendly companies (global + African fintech).
-// Each carries a Simple Icons slug where one exists and a domain for the
-// DuckDuckGo favicon fallback. Logos render in full brand colour; a tinted
-// monogram is the last-resort fallback. Slugs/domains mirror the design
-// handoff's BRAND_SLUG / BRAND_DOMAIN maps.
+// Brands with a `slug` have a self-hosted, brand-coloured SVG committed at
+// public/logos/<slug>.svg (extracted from the simple-icons package — see
+// scripts/extract-logos.mjs). Everything else renders a tinted monogram.
 //
-// NOTE (production): these are hot-linked from public icon CDNs (Simple Icons
-// / DuckDuckGo). Before a full public launch, prefer self-hosting approved
-// partner marks / a licensed logo API and confirm usage rights per brand.
-interface Brand { name: string; slug?: string; domain: string }
+// Why self-hosted: the marquee previously hot-linked ~60 logos per page load
+// from cdn.simpleicons.org + icons.duckduckgo.com — third-party requests that
+// added latency, leaked visitor IPs to those CDNs, and broke whenever a CDN
+// rate-limited or a brand was pulled. All requests are now same-origin static
+// assets, so there are ZERO external logo requests on the homepage.
+//
+// (Twilio + Canva have no committed mark — both asked simple-icons to drop
+// their logos — so they intentionally fall through to the monogram.)
+interface Brand { name: string; slug?: string }
 
 const COMPANIES: Brand[] = [
-  { name: 'GitLab',       slug: 'gitlab',       domain: 'gitlab.com' },
-  { name: 'Stripe',       slug: 'stripe',       domain: 'stripe.com' },
-  { name: 'Shopify',      slug: 'shopify',      domain: 'shopify.com' },
-  { name: 'Vercel',       slug: 'vercel',       domain: 'vercel.com' },
-  { name: 'Netlify',      slug: 'netlify',      domain: 'netlify.com' },
-  { name: 'Notion',       slug: 'notion',       domain: 'notion.so' },
-  { name: 'Figma',        slug: 'figma',        domain: 'figma.com' },
-  { name: 'Cloudflare',   slug: 'cloudflare',   domain: 'cloudflare.com' },
-  { name: 'GitHub',       slug: 'github',       domain: 'github.com' },
-  { name: 'Atlassian',    slug: 'atlassian',    domain: 'atlassian.com' },
-  { name: 'Coinbase',     slug: 'coinbase',     domain: 'coinbase.com' },
-  { name: 'Datadog',      slug: 'datadog',      domain: 'datadoghq.com' },
-  { name: 'MongoDB',      slug: 'mongodb',      domain: 'mongodb.com' },
-  { name: 'DigitalOcean', slug: 'digitalocean', domain: 'digitalocean.com' },
-  { name: 'Zapier',       slug: 'zapier',       domain: 'zapier.com' },
-  { name: 'Automattic',   slug: 'automattic',   domain: 'automattic.com' },
-  { name: 'HashiCorp',    slug: 'hashicorp',    domain: 'hashicorp.com' },
-  { name: 'Twilio',       slug: 'twilio',       domain: 'twilio.com' },
-  { name: 'Dropbox',      slug: 'dropbox',      domain: 'dropbox.com' },
-  { name: 'Linear',       slug: 'linear',       domain: 'linear.app' },
-  { name: 'Webflow',      slug: 'webflow',      domain: 'webflow.com' },
-  { name: 'Spotify',      slug: 'spotify',      domain: 'spotify.com' },
-  { name: 'Asana',        slug: 'asana',        domain: 'asana.com' },
-  { name: 'Grammarly',    slug: 'grammarly',    domain: 'grammarly.com' },
-  { name: 'Elastic',      slug: 'elastic',      domain: 'elastic.co' },
-  { name: 'Canva',        slug: 'canva',        domain: 'canva.com' },
-  { name: 'Paystack',                           domain: 'paystack.com' },
-  { name: 'Flutterwave',                        domain: 'flutterwave.com' },
-  { name: 'Deel',                               domain: 'deel.com' },
-  { name: 'Remote',                             domain: 'remote.com' },
-  { name: 'Andela',                             domain: 'andela.com' },
-  { name: 'Moniepoint',                         domain: 'moniepoint.com' },
+  { name: 'GitLab',       slug: 'gitlab'       },
+  { name: 'Stripe',       slug: 'stripe'       },
+  { name: 'Shopify',      slug: 'shopify'      },
+  { name: 'Vercel',       slug: 'vercel'       },
+  { name: 'Netlify',      slug: 'netlify'      },
+  { name: 'Notion',       slug: 'notion'       },
+  { name: 'Figma',        slug: 'figma'        },
+  { name: 'Cloudflare',   slug: 'cloudflare'   },
+  { name: 'GitHub',       slug: 'github'       },
+  { name: 'Atlassian',    slug: 'atlassian'    },
+  { name: 'Coinbase',     slug: 'coinbase'     },
+  { name: 'Datadog',      slug: 'datadog'      },
+  { name: 'MongoDB',      slug: 'mongodb'      },
+  { name: 'DigitalOcean', slug: 'digitalocean' },
+  { name: 'Zapier',       slug: 'zapier'       },
+  { name: 'Automattic',   slug: 'automattic'   },
+  { name: 'HashiCorp',    slug: 'hashicorp'    },
+  { name: 'Dropbox',      slug: 'dropbox'      },
+  { name: 'Linear',       slug: 'linear'       },
+  { name: 'Webflow',      slug: 'webflow'      },
+  { name: 'Spotify',      slug: 'spotify'      },
+  { name: 'Asana',        slug: 'asana'        },
+  { name: 'Grammarly',    slug: 'grammarly'    },
+  { name: 'Elastic',      slug: 'elastic'      },
+  { name: 'Twilio'        },
+  { name: 'Canva'         },
+  { name: 'Paystack'      },
+  { name: 'Flutterwave'   },
+  { name: 'Deel'          },
+  { name: 'Remote'        },
+  { name: 'Andela'        },
+  { name: 'Moniepoint'    },
 ];
 
 function LogoChip({ brand }: { brand: Brand }) {
-  // Source chain: Simple Icons (crisp brand-coloured vector) → DuckDuckGo
-  // favicon (covers brands not on Simple Icons) → tinted monogram.
-  const sources: string[] = [];
-  if (brand.slug) sources.push(`https://cdn.simpleicons.org/${brand.slug}`);
-  sources.push(`https://icons.duckduckgo.com/ip3/${brand.domain}.ico`);
-
-  const [idx, setIdx] = useState(0);
   const tint = tintFor(brand.name);
+  // Render the self-hosted SVG when we have one; a failed load (missing file)
+  // falls back to the monogram so the marquee never shows a broken image.
+  const [broken, setBroken] = useState(false);
+  const showLogo = brand.slug && !broken;
 
   return (
     <span className="logo-chip logo-chip--logo">
-      {idx < sources.length ? (
+      {showLogo ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           className="logo-img"
-          src={sources[idx]}
+          src={`/logos/${brand.slug}.svg`}
           alt={`${brand.name} logo`}
           loading="lazy"
           decoding="async"
           width={30}
           height={30}
-          onError={() => setIdx(i => i + 1)}
+          onError={() => setBroken(true)}
         />
       ) : (
         <span className="logo-mark" style={{ ['--lm-bg' as string]: tint.bg, ['--lm-fg' as string]: tint.fg }}>
