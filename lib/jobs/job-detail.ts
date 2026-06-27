@@ -64,3 +64,33 @@ export const getJobDetailRow = cache(async (id: string): Promise<JobDetailRow | 
     return null;
   }
 });
+
+/** Minimal record for a job that exists but is no longer publicly visible. */
+export interface ExpiredJobMeta { title: string; company: string }
+
+/**
+ * Existence probe used ONLY on the not-visible path: when getJobDetailRow
+ * returns null, this distinguishes "row exists but is expired/flagged/inactive"
+ * (→ render a noindex "position closed" page, per Google's job-expiry guidance)
+ * from "row never existed" (→ a genuine 404). It deliberately skips the
+ * visibility gate and selects just enough to label the closed posting.
+ *
+ * React cache() dedupes it across generateMetadata + the page body in one
+ * request, and it only fires when the cheap, cached visible-row lookup already
+ * came back empty — so the happy path pays nothing.
+ */
+export const getExpiredJobMeta = cache(async (id: string): Promise<ExpiredJobMeta | null> => {
+  if (!id) return null;
+  try {
+    const supabase = createAdminSupabaseClient();
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('title, company')
+      .eq('id', id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return { title: (data as any).title ?? 'This role', company: (data as any).company ?? '' };
+  } catch {
+    return null;
+  }
+});

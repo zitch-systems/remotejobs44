@@ -1,18 +1,31 @@
 import type { Metadata } from 'next';
 import { normalizeJobDescription } from '@/lib/job-description';
-import { getJobDetailRow } from '@/lib/jobs/job-detail';
+import { getJobDetailRow, getExpiredJobMeta } from '@/lib/jobs/job-detail';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
     // Shared cached fetch (lib/jobs/job-detail) — the page body reuses the
     // same row via React cache(), so metadata no longer costs a second
-    // Supabase round-trip per request. Side effect of sharing the page's
-    // visibility filters: expired/flagged jobs now get "Job Not Found"
-    // metadata to match their 404 body, instead of leaking live-looking
-    // tags for a page that doesn't render.
-    const job = await getJobDetailRow((await params).id);
+    // Supabase round-trip per request.
+    const id = (await params).id;
+    const job = await getJobDetailRow(id);
 
-    if (!job) return { title: 'Job Not Found | RemoteJobs44' };
+    if (!job) {
+      // Distinguish a closed posting from a genuine 404 so the <head> matches
+      // the body the page renders. Either way the page must NOT be indexed:
+      // an expired role gets a noindex "position closed" page (Google's
+      // recommended treatment for expired JobPostings), and a missing id 404s.
+      const expired = await getExpiredJobMeta(id);
+      if (expired) {
+        return {
+          title: `${expired.title}${expired.company ? ` at ${expired.company}` : ''} — Position Closed | RemoteJobs44`,
+          description: 'This role is no longer accepting applications. Browse thousands of live remote jobs on RemoteJobs44.',
+          robots: { index: false, follow: true },
+          alternates: { canonical: `https://remotejobs44.com/jobs/${id}` },
+        };
+      }
+      return { title: 'Job Not Found | RemoteJobs44', robots: { index: false, follow: true } };
+    }
 
     const title = `${job.title} at ${job.company} | RemoteJobs44`;
     const description = job.description

@@ -30,7 +30,11 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
       },
     ],
-    sitemap: `${BASE}/sitemap.xml`,
+    // The sitemap is sharded (generateSitemaps → /sitemap/<id>.xml). Point
+    // crawlers at the index that lists every shard. Next reserves /sitemap.xml
+    // for the root-metadata route (which 404s under sharding), so the index
+    // lives at /sitemap-index.xml — see app/sitemap-index.xml/route.ts.
+    sitemap: `${BASE}/sitemap-index.xml`,
     host: BASE,
   };
 }

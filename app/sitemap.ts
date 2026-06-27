@@ -5,30 +5,47 @@ import { CATEGORIES, COUNTRIES, SKILLS, TIMEZONES, REGIONS } from '@/lib/seo-sli
 import { INDUSTRIES, CITIES, SALARY_ROLES, COMPETITORS } from '@/lib/seo-extra';
 import { ARTICLES } from '@/lib/resources';
 import { companySlug } from '@/lib/company-slug';
+import { BASE, JOB_SHARD_SIZE, jobShardCount } from '@/lib/sitemap-shards';
 
-// Prefer NEXT_PUBLIC_APP_URL so preview deploys emit sitemap entries
-// pointing at themselves (otherwise staging links push canonical signals
-// to prod). Strip trailing slash so we always join with `${BASE}/path`.
-const BASE = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://remotejobs44.com').replace(/\/$/, '');
+// ── Sharding ────────────────────────────────────────────────────────────
+// There are ~58k publicly-visible job postings — past Google's 50k-URL /
+// 50MB-per-file limit, so a single sitemap would be truncated and silently
+// drop tens of thousands of URLs (the old code hard-capped at 40k for
+// exactly this reason). generateSitemaps() splits the output into shards:
+//
+//   shard 0           → static shell + blog + resources + programmatic
+//                       slices + the top company landing pages
+//   shard 1 .. N      → job-detail URLs, JOB_SHARD_SIZE per shard
+//
+// Next.js serves each shard at /sitemap/<id>.xml; the <sitemapindex> that
+// links them is emitted by app/sitemap.xml/route.ts (Next does NOT generate
+// that index for a root sitemap), and that index is what robots.ts points
+// crawlers at. Shard sizing lives in lib/sitemap-shards.ts so the index and
+// the shards can't disagree on the shard count.
 
-// Daily granularity for lastModified. Previously every URL shared the
-// exact `new Date()` instant, which Google treats as "no real freshness
-// signal" and ignores entirely. Rounding to today's date gives a stable
-// per-day value that Google can use to detect when a section actually
-// changed — particularly useful for the static-shell pages.
+// Daily granularity for lastModified. A per-day value (vs a fresh `new
+// Date()` instant on every build) is a stable freshness signal Google can
+// actually diff, rather than noise it ignores.
 function today() {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = today();
+export async function generateSitemaps(): Promise<{ id: number }[]> {
+  const jobShards = await jobShardCount();
+  // id 0 is always present (the static/slice/company shard); job shards are
+  // ids 1..jobShards.
+  return Array.from({ length: jobShards + 1 }, (_, i) => ({ id: i }));
+}
 
-  // Static "shell" routes — includes new SEO landing pages
+// ── Shard 0: static shell + slices + companies ──────────────────────────
+function staticAndSliceRoutes(now: Date): MetadataRoute.Sitemap {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${BASE}/`,                lastModified: now, changeFrequency: 'daily',   priority: 1.0  },
     { url: `${BASE}/jobs`,            lastModified: now, changeFrequency: 'hourly',  priority: 0.95 },
+    { url: `${BASE}/jobs/industry`,   lastModified: now, changeFrequency: 'weekly',  priority: 0.85 },
+    { url: `${BASE}/jobs/city`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.85 },
     { url: `${BASE}/resources`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.9  },
     { url: `${BASE}/salary-guide`,    lastModified: now, changeFrequency: 'monthly', priority: 0.9  },
     { url: `${BASE}/interview-prep`,  lastModified: now, changeFrequency: 'weekly',  priority: 0.85 },
@@ -49,14 +66,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // the sitemap triggers Search Console "Submitted URL marked noindex".
   ];
 
-  // Existing curated blog posts
   const blogRoutes: MetadataRoute.Sitemap = [
     { url: `${BASE}/blog/remote-job-interview-tips`,          lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/blog/how-to-find-remote-jobs-in-nigeria`, lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
     { url: `${BASE}/blog/best-remote-jobs-for-beginners`,     lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
   ];
 
-  // Resource articles (30)
   const resourceRoutes: MetadataRoute.Sitemap = ARTICLES.map(a => ({
     url: `${BASE}/resources/${a.slug}`,
     lastModified: new Date(a.updated),
@@ -64,8 +79,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.75,
   }));
 
-  // Programmatic SEO landing pages — existing + new (industries, cities,
-  // salary guides, comparisons).
   const sliceRoutes: MetadataRoute.Sitemap = [
     ...CATEGORIES.map(c => ({ url: `${BASE}/jobs/category/${c.slug}`,  lastModified: now, changeFrequency: 'daily'   as const, priority: 0.8  })),
     ...COUNTRIES .map(c => ({ url: `${BASE}/jobs/country/${c.slug}`,   lastModified: now, changeFrequency: 'daily'   as const, priority: 0.8  })),
@@ -78,78 +91,89 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...COMPETITORS .map(c => ({ url: `${BASE}/compare/${c.slug}`,      lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7  })),
   ];
 
-  // Real active job postings. Mirrors the read-time visibility gate
-  // (notExpired + NOT_FLAGGED) so we never list a URL whose detail page
-  // 404s — that mismatch is a soft-404 generator that erodes crawl trust.
-  // Capped to 40k so the single sitemap stays well under Google's
-  // 50k-URL / 50MB limit alongside the slice + company URLs. (A sharded
-  // sitemap index via generateSitemaps() is the next step past ~45k.)
-  // lastModified prefers updated_at (re-seen / deduped activity) over
-  // posted_at so re-activity surfaces as a freshness delta.
-  const JOB_URL_CAP = 40000;
-  let jobRoutes: MetadataRoute.Sitemap = [];
-  // Per-company landing pages (derived from jobs.company). One sitemap
-  // entry per unique slug; capped to 1000 employers by total job count.
-  let companyRoutes: MetadataRoute.Sitemap = [];
+  return [...staticRoutes, ...blogRoutes, ...resourceRoutes, ...sliceRoutes];
+}
+
+// Top company landing pages, aggregated from recent hiring activity. Scans
+// the most-recent slice of jobs (one query) and emits one URL per employer,
+// capped to the 1000 most-active so crawl budget stays on real hiring.
+async function companyRoutes(now: Date): Promise<MetadataRoute.Sitemap> {
   try {
     const admin = createAdminSupabaseClient();
     const { data: jobs } = await admin
       .from('jobs')
-      .select('id, company, posted_at, updated_at')
+      .select('company, posted_at')
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)
       .order('posted_at', { ascending: false })
-      .limit(JOB_URL_CAP);
+      .limit(40000);
+    if (!jobs) return [];
 
-    if (jobs) {
-      jobRoutes = jobs.map((job: { id: string; posted_at: string | null; updated_at?: string | null }) => ({
-        url: `${BASE}/jobs/${job.id}`,
-        lastModified: new Date(job.updated_at ?? job.posted_at ?? now),
-        changeFrequency: 'weekly' as const,
-        priority: 0.65,
-      }));
-
-      // Aggregate companies — pick the most recent posted_at per slug as
-      // the company page's lastModified so the sitemap reflects the
-      // freshest hiring activity at that employer.
-      const companyMap = new Map<string, { name: string; latest: Date; count: number }>();
-      for (const j of jobs as Array<{ company: string | null; posted_at: string | null }>) {
-        const name = (j.company ?? '').trim();
-        if (!name) continue;
-        const slug = companySlug(name);
-        if (!slug) continue;
-        const posted = j.posted_at ? new Date(j.posted_at) : now;
-        const existing = companyMap.get(slug);
-        if (!existing) {
-          companyMap.set(slug, { name, latest: posted, count: 1 });
-        } else {
-          existing.count++;
-          if (posted > existing.latest) existing.latest = posted;
-        }
-      }
-      // Cap to 1000 most-active employers — keeps the sitemap small and
-      // focuses crawler attention on companies with real ongoing hiring.
-      companyRoutes = Array.from(companyMap.entries())
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 1000)
-        .map(([slug, info]) => ({
-          url:             `${BASE}/companies/${slug}`,
-          lastModified:    info.latest,
-          changeFrequency: 'weekly' as const,
-          priority:        0.7,
-        }));
+    const companyMap = new Map<string, { latest: Date; count: number }>();
+    for (const j of jobs as Array<{ company: string | null; posted_at: string | null }>) {
+      const name = (j.company ?? '').trim();
+      if (!name) continue;
+      const slug = companySlug(name);
+      if (!slug) continue;
+      const posted = j.posted_at ? new Date(j.posted_at) : now;
+      const existing = companyMap.get(slug);
+      if (!existing) companyMap.set(slug, { latest: posted, count: 1 });
+      else { existing.count++; if (posted > existing.latest) existing.latest = posted; }
     }
+    return Array.from(companyMap.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 1000)
+      .map(([slug, info]) => ({
+        url:             `${BASE}/companies/${slug}`,
+        lastModified:    info.latest,
+        changeFrequency: 'weekly' as const,
+        priority:        0.7,
+      }));
   } catch {
-    // Non-fatal — DB down at build time
+    return [];
+  }
+}
+
+// ── Job shards ──────────────────────────────────────────────────────────
+// One stable ordering (posted_at desc, id asc) sliced by range() so a given
+// job lands in exactly one shard. Mirrors the read-time visibility gate so
+// we never list a URL whose detail page is hidden (soft-404 generator).
+async function jobShard(shardIndex: number, now: Date): Promise<MetadataRoute.Sitemap> {
+  const from = shardIndex * JOB_SHARD_SIZE;
+  const to = from + JOB_SHARD_SIZE - 1;
+  try {
+    const admin = createAdminSupabaseClient();
+    const { data: jobs } = await admin
+      .from('jobs')
+      .select('id, posted_at, updated_at')
+      .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
+      .order('posted_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to);
+    if (!jobs) return [];
+    return jobs.map((job: { id: string; posted_at: string | null; updated_at?: string | null }) => ({
+      url: `${BASE}/jobs/${job.id}`,
+      lastModified: new Date(job.updated_at ?? job.posted_at ?? now),
+      changeFrequency: 'weekly' as const,
+      priority: 0.65,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
+  const now = today();
+
+  // id 0 → the static/slice/company shard.
+  if (id === 0) {
+    const [companies] = await Promise.all([companyRoutes(now)]);
+    return [...staticAndSliceRoutes(now), ...companies];
   }
 
-  return [
-    ...staticRoutes,
-    ...blogRoutes,
-    ...resourceRoutes,
-    ...sliceRoutes,
-    ...companyRoutes,
-    ...jobRoutes,
-  ];
+  // id ≥ 1 → job-URL shard (zero-based slice index = id - 1).
+  return jobShard(id - 1, now);
 }
