@@ -33,7 +33,10 @@ module.exports = {
           DEFAULT: '#2563eb',
         },
         accent: {
-          DEFAULT: '#F5A623',
+          // "Sunrise orange" — Deep Ocean accent (logo dot, featured stripe,
+          // saved icon). Was #F5A623 (yellower amber); the design token is the
+          // warmer #f97316, matching the inline --accent var in app/layout.tsx.
+          DEFAULT: '#f97316',
           light:   '#fbbf46',
           dark:    '#d48a0a',
         },
