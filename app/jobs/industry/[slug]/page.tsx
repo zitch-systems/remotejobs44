@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const i = find((await params).slug);
   if (!i) return {};
   const title = `Remote ${i.label} Jobs | RemoteJobs44`;
-  const description = `${i.blurb} Apply from Nigeria, Kenya, South Africa, and anywhere globally — 50,000+ remote jobs on RemoteJobs44.`;
+  const description = `${i.blurb} Apply from Nigeria, Kenya, South Africa, and anywhere globally — 70,000+ remote jobs on RemoteJobs44.`;
   const url = `${BASE}/jobs/industry/${i.slug}`;
   const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote ${i.label} Jobs`)}&subtitle=${encodeURIComponent('Industry-specific roles on RemoteJobs44')}`;
   return {
@@ -38,17 +38,27 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 // Heuristic industry filter: match on job title / company / description keywords.
+//
+// These tokens feed `ilike '%token%'`, which is a SUBSTRING match, not a
+// word match — so a two-letter token like 'ai' or 'ml' silently matches
+// "av(ai)lable", "e(ma)il", "ht(ml)", "ret(ai)l", "m(ai)ntain" and floods
+// the /jobs/industry/ai page with irrelevant roles (thin, off-topic content
+// that hurts the page's relevance signal). Every token below is therefore
+// ≥4 chars or a distinctive multi-word phrase that can't collide with a
+// common English substring. Bare 'ai'/'ml' were replaced with explicit
+// phrases ('artificial intelligence', 'ai engineer', 'ai/ml', 'ml engineer'),
+// and 'game' with 'gaming'/'video game' to avoid 'engagement'/'management'.
 const KEYWORDS: Record<string, string[]> = {
-  fintech:    ['fintech','bank','payment','lending','neobank','wealth','trading'],
-  crypto:     ['crypto','blockchain','web3','defi','nft','exchange','token','chain'],
-  ai:         ['ai','machine learning','ml','llm','genai','model','inference'],
-  saas:       ['saas','b2b','platform','enterprise','workflow','automation'],
-  ecommerce:  ['ecommerce','e-commerce','marketplace','retail','shopify','dtc','commerce'],
-  healthtech: ['health','telemedicine','clinical','pharma','medical','wellness','therapy'],
-  edtech:     ['edtech','education','tutoring','learning','lms','school','course'],
-  climate:    ['climate','carbon','renewable','energy','sustain','green','solar'],
-  gaming:     ['game','gaming','esports','unity','unreal','console'],
-  agency:     ['agency','consulting','consultancy','dev shop','studio'],
+  fintech:    ['fintech','banking','payment','lending','neobank','wealthtech','trading'],
+  crypto:     ['crypto','blockchain','web3','defi','nft','token','digital asset'],
+  ai:         ['artificial intelligence','ai engineer','ai/ml','machine learning','ml engineer','llm','genai','deep learning'],
+  saas:       ['saas','b2b software','platform engineer','enterprise software','workflow automation'],
+  ecommerce:  ['ecommerce','e-commerce','marketplace','retail','shopify','commerce'],
+  healthtech: ['healthtech','telemedicine','clinical','pharma','medical','wellness','therapy'],
+  edtech:     ['edtech','education','tutoring','learning','school','course'],
+  climate:    ['climate','carbon','renewable','sustainability','cleantech','solar'],
+  gaming:     ['gaming','video game','esports','game studio','unity','unreal'],
+  agency:     ['agency','consulting','consultancy','dev shop','creative studio'],
 };
 
 export default async function IndustryPage({ params }: { params: Promise<{ slug: string }> }) {

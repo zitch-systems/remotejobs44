@@ -34,8 +34,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 const RJ44_ROWS = [
-  { feature: 'Total listings', us: '50,000+ aggregated', them: (c: string) => c },
-  { feature: 'Free tier', us: 'Browse all 50,000+', them: () => 'Limited / paid' },
+  { feature: 'Total listings', us: '70,000+ aggregated', them: (c: string) => c },
+  { feature: 'Free tier', us: 'Browse all 70,000+', them: () => 'Limited / paid' },
   { feature: 'Day Pass pricing', us: '₦500 / 24h, 10 applies', them: () => 'No day pass' },
   { feature: 'Pro Monthly', us: '₦2,999 (~$2 USD)', them: () => '$15–$30 USD' },
   { feature: 'AI CV Review', us: 'Included on Pro', them: () => 'Not offered' },
@@ -116,7 +116,7 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
       <div className="card p-6 mt-6 bg-brand-50/40 dark:bg-brand-900/10 border-brand-200 dark:border-brand-800 text-center">
         <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">Try RemoteJobs44 free</h2>
         <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
-          Browse 50,000+ remote jobs free. Day Pass from ₦500 unlocks apply links and AI tools.
+          Browse 70,000+ remote jobs free. Day Pass from ₦500 unlocks apply links and AI tools.
         </p>
         <Link href="/jobs"
           className="inline-flex items-center gap-2 px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">

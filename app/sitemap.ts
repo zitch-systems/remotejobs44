@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { CATEGORIES, COUNTRIES, SKILLS, TIMEZONES, REGIONS } from '@/lib/seo-slices';
 import { INDUSTRIES, CITIES, SALARY_ROLES, COMPETITORS } from '@/lib/seo-extra';
 import { ARTICLES } from '@/lib/resources';
@@ -43,9 +44,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/privacy`,         lastModified: now, changeFrequency: 'yearly',  priority: 0.3  },
     { url: `${BASE}/terms`,           lastModified: now, changeFrequency: 'yearly',  priority: 0.3  },
     { url: `${BASE}/cookies`,         lastModified: now, changeFrequency: 'yearly',  priority: 0.3  },
-    { url: `${BASE}/login`,           lastModified: now, changeFrequency: 'yearly',  priority: 0.4  },
-    { url: `${BASE}/register`,        lastModified: now, changeFrequency: 'yearly',  priority: 0.5  },
-    { url: `${BASE}/forgot-password`, lastModified: now, changeFrequency: 'yearly',  priority: 0.2  },
+    // NOTE: /login, /register, /forgot-password are intentionally NOT listed —
+    // they're auth/utility pages (noindex), and submitting noindexed URLs in
+    // the sitemap triggers Search Console "Submitted URL marked noindex".
   ];
 
   // Existing curated blog posts
@@ -77,9 +78,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...COMPETITORS .map(c => ({ url: `${BASE}/compare/${c.slug}`,      lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7  })),
   ];
 
-  // Real active job postings (capped to 5000 to keep the sitemap under
-  // Google's 50k-URL / 50MB limit even at scale). lastModified is derived
-  // from posted_at so freshness signals don't all collapse into "today".
+  // Real active job postings. Mirrors the read-time visibility gate
+  // (notExpired + NOT_FLAGGED) so we never list a URL whose detail page
+  // 404s — that mismatch is a soft-404 generator that erodes crawl trust.
+  // Capped to 40k so the single sitemap stays well under Google's
+  // 50k-URL / 50MB limit alongside the slice + company URLs. (A sharded
+  // sitemap index via generateSitemaps() is the next step past ~45k.)
+  // lastModified prefers updated_at (re-seen / deduped activity) over
+  // posted_at so re-activity surfaces as a freshness delta.
+  const JOB_URL_CAP = 40000;
   let jobRoutes: MetadataRoute.Sitemap = [];
   // Per-company landing pages (derived from jobs.company). One sitemap
   // entry per unique slug; capped to 1000 employers by total job count.
@@ -88,15 +95,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const admin = createAdminSupabaseClient();
     const { data: jobs } = await admin
       .from('jobs')
-      .select('id, company, posted_at')
+      .select('id, company, posted_at, updated_at')
       .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .order('posted_at', { ascending: false })
-      .limit(5000);
+      .limit(JOB_URL_CAP);
 
     if (jobs) {
-      jobRoutes = jobs.map((job: { id: string; posted_at: string | null }) => ({
+      jobRoutes = jobs.map((job: { id: string; posted_at: string | null; updated_at?: string | null }) => ({
         url: `${BASE}/jobs/${job.id}`,
-        lastModified: job.posted_at ? new Date(job.posted_at) : now,
+        lastModified: new Date(job.updated_at ?? job.posted_at ?? now),
         changeFrequency: 'weekly' as const,
         priority: 0.65,
       }));

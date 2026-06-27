@@ -94,7 +94,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
       <div className="mt-10 card p-6 bg-brand-50 dark:bg-brand-900/10 border-brand-200 dark:border-brand-800">
         <h3 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">Ready to apply?</h3>
-        <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">Browse 50,000+ verified remote jobs. Apply from ₦500 with a Day Pass.</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">Browse 70,000+ verified remote jobs. Apply from ₦500 with a Day Pass.</p>
         <div className="flex flex-wrap gap-2">
           <Link href="/jobs" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
             Browse jobs <ArrowRight className="w-4 h-4" />

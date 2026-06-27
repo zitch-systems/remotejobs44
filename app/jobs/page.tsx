@@ -36,10 +36,20 @@ export const maxDuration = 30;
 // Listing is heavily filterable; the noindex on faceted permutations is
 // enforced via robots.ts (Disallow /jobs?*). The canonical surface for
 // indexing is /jobs/category|skill|country|...|[slug].
+// Single source of metadata for /jobs. (app/jobs/layout.tsx intentionally
+// exports none — two metadata exports on the same segment silently
+// override each other field-by-field and had drifted out of sync.)
 export const metadata: Metadata = {
   title: 'Browse Remote Jobs',
-  description: 'Search 50,000+ verified remote jobs from global companies. Filter by category, skill, country, timezone, salary, and more.',
+  description: 'Search 70,000+ verified remote jobs from global companies. Filter by category, skill, country, timezone, salary, and more — apply from Nigeria, Africa & worldwide.',
+  keywords: ['remote jobs', 'work from home jobs', 'remote jobs Nigeria', 'remote jobs Africa', 'online jobs', 'telecommute jobs', 'remote engineering jobs', 'remote design jobs'],
   alternates: { canonical: 'https://remotejobs44.com/jobs' },
+  openGraph: {
+    title: 'Browse 70,000+ Remote Jobs | RemoteJobs44',
+    description: 'Find remote jobs from top global companies. Filter by category, salary, region. Subscribe from ₦500.',
+    url: 'https://remotejobs44.com/jobs',
+    images: [{ url: '/api/og', width: 1200, height: 630 }],
+  },
 };
 
 const JOBS_PER_PAGE = 50;
@@ -407,7 +417,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: 'Remote Jobs on RemoteJobs44',
-    numberOfItems: jobs.length,
+    // The full size of the live result set for this view, not just the
+    // current page slice — previously this reported `jobs.length` (≤ one
+    // page), understating the feed and undercutting the "fresh, large job
+    // board" signal. The itemListElement below is a 25-item sample.
+    numberOfItems: total,
     itemListElement: jobs.slice(0, 25).map((j, i) => ({
       '@type': 'ListItem',
       position: i + 1,

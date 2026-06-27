@@ -92,6 +92,7 @@ const SOCIAL = [
 // arriving on the canonical pages had nowhere to flow back to.
 const FOOTER_LINKS = {
   Jobs: [
+    { label: 'All Remote Jobs',  href: '/jobs' },
     { label: 'Engineering',      href: '/jobs/category/engineering' },
     { label: 'Design',           href: '/jobs/category/design' },
     { label: 'Marketing',        href: '/jobs/category/marketing' },
@@ -99,11 +100,22 @@ const FOOTER_LINKS = {
     { label: 'Data & Analytics', href: '/jobs/category/data' },
     { label: 'Product',          href: '/jobs/category/product' },
   ],
+  // Surface the programmatic-SEO hub pages here so they get a sitewide
+  // internal link (PageRank) on every page — previously they were reachable
+  // only from the sitemap, which passes no internal anchor signal.
+  Explore: [
+    { label: 'Salary Guide',     href: '/salary-guide' },
+    { label: 'Resources',        href: '/resources' },
+    { label: 'Compare Boards',   href: '/compare' },
+    { label: 'Companies Hiring', href: '/companies' },
+    { label: 'How It Works',     href: '/how-it-works' },
+    { label: 'For Employers',    href: '/for-employers' },
+  ],
   Company: [
     { label: 'About',      href: '/about' },
-    { label: 'Companies',  href: '/companies' },
     { label: 'Blog',       href: '/blog' },
     { label: 'Pricing',    href: '/pricing' },
+    { label: 'FAQ',        href: '/faq' },
     { label: 'Contact',    href: '/contact' },
   ],
   Legal: [
@@ -114,13 +126,17 @@ const FOOTER_LINKS = {
 };
 
 export function Footer() {
+  // Rendered on every breakpoint (was `hidden md:block`). Under mobile-first
+  // indexing Googlebot crawls the mobile viewport, so a footer hidden on
+  // mobile starved the programmatic landing pages of their sitewide internal
+  // links. Extra bottom padding on mobile clears the fixed BottomNav.
   return (
-    <footer className="bg-white dark:bg-[#0f1e38] border-t border-stone-200 dark:border-[#1e3a5f] pt-16 pb-8 hidden md:block">
+    <footer className="bg-white dark:bg-[#0f1e38] border-t border-stone-200 dark:border-[#1e3a5f] pt-16 pb-24 md:pb-8 block">
       <div className="max-w-[1440px] mx-auto px-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
 
           {/* Brand */}
-          <div className="lg:col-span-2">
+          <div className="col-span-2 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2.5 font-display font-bold text-[18px] text-stone-900 dark:text-stone-100 tracking-tight mb-3 hover:opacity-80 transition-opacity">
               <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
                 <rect width="32" height="32" rx="8" fill="#2563eb"/>
