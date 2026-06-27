@@ -1,0 +1,301 @@
+/* ============================================================
+   RemoteJobs44 — Landing redesign · shared data + helpers
+   Used by both Direction A and Direction B.
+   ============================================================ */
+
+/* ---- Top 50 companies hiring remotely (monogram logo wall) ----
+   Mark colours rotate through the homepage category pastel set so the
+   wall reads as a real partner row, not flat type. */
+const LOGO_TINTS = [
+  ['#eff6ff', '#2563eb'], ['#faf5ff', '#9333ea'], ['#fdf2f8', '#db2777'],
+  ['#fffbeb', '#d97706'], ['#fff7ed', '#ea580c'], ['#ecfeff', '#0891b2'],
+  ['#fff1f2', '#e11d48'], ['#eef2ff', '#4f46e5'], ['#f0fdf4', '#16a34a'],
+  ['#f8fafc', '#475569'],
+];
+
+const COMPANIES = [
+  'GitLab','Automattic','Zapier','Shopify','Stripe','Vercel','Netlify','HashiCorp',
+  'Toptal','Buffer','Doist','Hotjar','Coinbase','Dropbox','Atlassian','Twilio',
+  'Cloudflare','GitHub','Notion','Figma','Canva','Airtable','Calendly','Loom',
+  'Linear','Webflow','Mozilla','Reddit','Spotify','Square','Asana','Grammarly',
+  'Intercom','Zendesk','Datadog','MongoDB','DigitalOcean','Elastic','Auth0','Segment',
+  'Algolia','Plaid','Andela','Flutterwave','Paystack','Remote','Deel','Chipper',
+  'Kuda','Moniepoint',
+];
+
+function monogram(name) {
+  const parts = name.replace(/[^A-Za-z0-9 ]/g, '').split(' ').filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+/* ---- Real brand logo lookups ----
+   Logos load from public sources at render time: Simple Icons (vector, by
+   slug) first, then the DuckDuckGo icon service (by domain), and a tinted
+   monogram as the final fallback. BRAND_DOMAIN powers the DuckDuckGo step. */
+const BRAND_DOMAIN = {
+  'GitLab':'gitlab.com', 'Automattic':'automattic.com', 'Zapier':'zapier.com', 'Shopify':'shopify.com',
+  'Stripe':'stripe.com', 'Vercel':'vercel.com', 'Netlify':'netlify.com', 'HashiCorp':'hashicorp.com',
+  'Toptal':'toptal.com', 'Buffer':'buffer.com', 'Doist':'doist.com', 'Hotjar':'hotjar.com',
+  'Coinbase':'coinbase.com', 'Dropbox':'dropbox.com', 'Atlassian':'atlassian.com', 'Twilio':'twilio.com',
+  'Cloudflare':'cloudflare.com', 'GitHub':'github.com', 'Notion':'notion.so', 'Figma':'figma.com',
+  'Canva':'canva.com', 'Airtable':'airtable.com', 'Calendly':'calendly.com', 'Loom':'loom.com',
+  'Linear':'linear.app', 'Webflow':'webflow.com', 'Mozilla':'mozilla.org', 'Reddit':'reddit.com',
+  'Spotify':'spotify.com', 'Square':'squareup.com', 'Asana':'asana.com', 'Grammarly':'grammarly.com',
+  'Intercom':'intercom.com', 'Zendesk':'zendesk.com', 'Datadog':'datadoghq.com', 'MongoDB':'mongodb.com',
+  'DigitalOcean':'digitalocean.com', 'Elastic':'elastic.co', 'Auth0':'auth0.com', 'Segment':'segment.com',
+  'Algolia':'algolia.com', 'Plaid':'plaid.com', 'Andela':'andela.com', 'Flutterwave':'flutterwave.com',
+  'Paystack':'paystack.com', 'Remote':'remote.com', 'Deel':'deel.com', 'Chipper':'chippercash.com',
+  'Kuda':'kuda.com', 'Moniepoint':'moniepoint.com',
+};
+const BRAND_SLUG = {
+  'GitLab':'gitlab', 'Automattic':'automattic', 'Zapier':'zapier', 'Shopify':'shopify',
+  'Stripe':'stripe', 'Vercel':'vercel', 'Netlify':'netlify', 'HashiCorp':'hashicorp',
+  'Buffer':'buffer', 'Hotjar':'hotjar', 'Coinbase':'coinbase',
+  'Dropbox':'dropbox', 'Atlassian':'atlassian', 'Cloudflare':'cloudflare',
+  'GitHub':'github', 'Notion':'notion', 'Figma':'figma',
+  'Airtable':'airtable', 'Calendly':'calendly', 'Loom':'loom', 'Linear':'linear',
+  'Webflow':'webflow', 'Mozilla':'mozilla', 'Reddit':'reddit', 'Spotify':'spotify',
+  'Square':'square', 'Asana':'asana', 'Grammarly':'grammarly', 'Intercom':'intercom',
+  'Zendesk':'zendesk', 'Datadog':'datadog', 'MongoDB':'mongodb', 'DigitalOcean':'digitalocean',
+  'Elastic':'elastic', 'Auth0':'auth0', 'Algolia':'algolia',
+  'Toptal':'toptal',
+};
+
+/* Step a failed brand <img> down the fallback chain: data-fallback → monogram. */
+function brandImgFail(img) {
+  const next = img.getAttribute('data-fallback');
+  if (next) { img.removeAttribute('data-fallback'); img.src = next; return; }
+  const s = document.createElement('span');
+  s.className = 'logo-mark';
+  s.style.setProperty('--lm-bg', img.dataset.bg);
+  s.style.setProperty('--lm-fg', img.dataset.fg);
+  s.textContent = img.dataset.mono;
+  img.replaceWith(s);
+}
+
+/* Build a single marquee track (returns HTML string for one set of chips). */
+function logoChipsHTML(list) {
+  return list.map((name, i) => {
+    const [bg, fg] = LOGO_TINTS[i % LOGO_TINTS.length];
+    const domain = BRAND_DOMAIN[name];
+    const slug = BRAND_SLUG[name];
+    const ddg = domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : '';
+    const si  = slug ? `https://cdn.simpleicons.org/${slug}` : '';
+    const primary = si || ddg || null;
+    const fallback = si ? ddg : '';
+    const mark = primary
+      ? `<img class="logo-img" src="${primary}" alt="${name} logo" decoding="async"
+           data-fallback="${fallback}" data-mono="${monogram(name)}" data-bg="${bg}" data-fg="${fg}" onerror="brandImgFail(this)">`
+      : `<span class="logo-mark" style="--lm-bg:${bg};--lm-fg:${fg}">${monogram(name)}</span>`;
+    return `<div class="logo-chip">${mark}<span class="logo-name">${name}</span></div>`;
+  }).join('');
+}
+
+/* Mount two opposite-scrolling marquee rows into a container.
+   Splits the 50 companies across two rows; duplicates each row for a
+   seamless loop. */
+function mountMarquee(rootSel) {
+  const root = document.querySelector(rootSel);
+  if (!root) return;
+  const half = Math.ceil(COMPANIES.length / 2);
+  const rowA = COMPANIES.slice(0, half);
+  const rowB = COMPANIES.slice(half);
+  root.innerHTML = `
+    <div class="marquee-row">
+      <div class="marquee-track">${logoChipsHTML(rowA)}${logoChipsHTML(rowA)}</div>
+    </div>
+    <div class="marquee-row">
+      <div class="marquee-track marquee-track--rev">${logoChipsHTML(rowB)}${logoChipsHTML(rowB)}</div>
+    </div>`;
+}
+
+/* ---- Live job feed --------------------------------------------------
+   Global remote roles with their advertised salary range. */
+const JOBS = [
+  { title:'Senior Frontend Engineer', company:'Vercel',      cat:'Engineering', region:'Worldwide',        pay:'$120k–$160k', type:'Full-time', age:'just now', featured:true  },
+  { title:'Product Designer',         company:'Figma',        cat:'Design',      region:'EMEA · Remote',    pay:'$90k–$130k',  type:'Full-time', age:'12m ago',  featured:true  },
+  { title:'Growth Marketer',          company:'Buffer',       cat:'Marketing',   region:'Remote · Global',   pay:'$55k–$80k',   type:'Full-time', age:'34m ago',  featured:false },
+  { title:'Backend Engineer (Go)',    company:'HashiCorp',    cat:'Engineering', region:'Worldwide',        pay:'$110k–$150k', type:'Full-time', age:'1h ago',   featured:false },
+  { title:'Data Analyst',             company:'Andela',       cat:'Data & AI',   region:'Remote · Worldwide',pay:'$45k–$70k',   type:'Full-time', age:'2h ago',   featured:false },
+  { title:'Customer Success Lead',    company:'Intercom',     cat:'Support',     region:'Worldwide',        pay:'$70k–$95k',   type:'Full-time', age:'3h ago',   featured:false },
+  { title:'Finance Operations',       company:'Flutterwave',  cat:'Finance',     region:'Remote · EMEA',     pay:'$60k–$85k',   type:'Full-time', age:'4h ago',   featured:false },
+  { title:'Fullstack Developer',      company:'GitLab',       cat:'Engineering', region:'Worldwide',        pay:'$100k–$140k', type:'Full-time', age:'5h ago',   featured:false },
+  { title:'UX Researcher',            company:'Notion',       cat:'Design',      region:'Americas · Remote',pay:'$95k–$125k',  type:'Full-time', age:'6h ago',   featured:false },
+  { title:'Sales Development Rep',    company:'Twilio',       cat:'Sales',       region:'EMEA · Remote',    pay:'$48k–$72k',   type:'Full-time', age:'7h ago',   featured:false },
+  { title:'DevOps Engineer',          company:'Cloudflare',   cat:'Engineering', region:'Worldwide',        pay:'$115k–$155k', type:'Full-time', age:'8h ago',   featured:false },
+  { title:'Content Strategist',       company:'Canva',        cat:'Marketing',   region:'APAC · Remote',    pay:'$58k–$82k',   type:'Full-time', age:'9h ago',   featured:false },
+  { title:'ML Engineer',              company:'Coinbase',     cat:'Data & AI',   region:'Worldwide',        pay:'$140k–$190k', type:'Full-time', age:'11h ago',  featured:false },
+  { title:'People Operations Mgr',    company:'Deel',         cat:'HR',          region:'Worldwide',        pay:'$65k–$90k',   type:'Full-time', age:'13h ago',  featured:false },
+];
+
+const CAT_TINT = {
+  'Engineering':['#eff6ff','#2563eb'], 'Design':['#faf5ff','#9333ea'],
+  'Marketing':['#fdf2f8','#db2777'], 'Finance':['#fffbeb','#d97706'],
+  'Sales':['#fff7ed','#ea580c'], 'Data & AI':['#ecfeff','#0891b2'],
+  'HR':['#fff1f2','#e11d48'], 'Support':['#eef2ff','#4f46e5'],
+};
+
+function jobRowHTML(j) {
+  const [bg, fg] = LOGO_TINTS[COMPANIES.indexOf(j.company) % LOGO_TINTS.length] || ['#eff6ff','#2563eb'];
+  const [cbg, cfg] = CAT_TINT[j.cat] || ['#eff6ff','#2563eb'];
+  return `<a class="job-row${j.featured ? ' job-row--featured' : ''}" href="${window.RJ_JOB_URL || '#'}"
+      data-text="${(j.title+' '+j.company+' '+j.cat).toLowerCase()}">
+    <span class="job-logo" style="--lm-bg:${bg};--lm-fg:${fg}">${monogram(j.company)}</span>
+    <span class="job-main">
+      <span class="job-title">${j.title}${j.featured ? '<span class="job-flag">Featured</span>' : ''}</span>
+      <span class="job-meta">${j.company} · ${j.region}</span>
+    </span>
+    <span class="job-tag" style="--ct-bg:${cbg};--ct-fg:${cfg}">${j.cat}</span>
+    <span class="job-pay">${j.pay}</span>
+    <span class="job-age">${j.age}</span>
+    <svg class="job-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </a>`;
+}
+
+function mountJobs(listSel, n) {
+  const list = document.querySelector(listSel);
+  if (!list) return;
+  const items = (n ? JOBS.slice(0, n) : JOBS);
+  list.innerHTML = items.map(jobRowHTML).join('');
+}
+
+/* Featured job cards (richer than rows) for the "Featured" grid. */
+function featuredCardHTML(j) {
+  const [bg, fg] = LOGO_TINTS[COMPANIES.indexOf(j.company) % LOGO_TINTS.length] || ['#eff6ff','#2563eb'];
+  const [cbg, cfg] = CAT_TINT[j.cat] || ['#eff6ff','#2563eb'];
+  return `<a class="fcard${j.featured ? ' fcard--featured' : ''}" href="${window.RJ_JOB_URL || '#'}">
+    <div class="fcard-top">
+      <span class="job-logo" style="--lm-bg:${bg};--lm-fg:${fg}">${monogram(j.company)}</span>
+      <button class="fcard-save" aria-label="Save job" onclick="event.preventDefault();this.classList.toggle('on')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+    <h3 class="fcard-title">${j.title}</h3>
+    <p class="fcard-co">${j.company} · ${j.region}</p>
+    <div class="fcard-tags">
+      <span class="job-tag" style="--ct-bg:${cbg};--ct-fg:${cfg}">${j.cat}</span>
+      <span class="fcard-type">${j.type}</span>
+    </div>
+    <div class="fcard-foot">
+      <span class="fcard-pay">${j.pay}</span>
+      <span class="fcard-age">${j.age}</span>
+    </div>
+  </a>`;
+}
+
+function mountFeatured(sel, indices) {
+  const root = document.querySelector(sel);
+  if (!root) return;
+  const picks = (indices || [0,1,4,8,12,6]).map(i => JOBS[i]).filter(Boolean);
+  root.innerHTML = picks.map(featuredCardHTML).join('');
+}
+
+/* ---- Auxia-inspired "live market" wall ----
+   Several columns of role cards streaming vertically at different speeds and
+   directions; each column's content is duplicated for a seamless loop. */
+function mountLiveWall(sel, colCount) {
+  const root = document.querySelector(sel);
+  if (!root) return;
+  colCount = colCount || 4;
+  const tints = LOGO_TINTS;
+  const card = (j) => {
+    const [bg, fg] = tints[COMPANIES.indexOf(j.company) % tints.length] || ['#eff6ff','#2563eb'];
+    return `<div class="lw-card">
+      <div class="lw-top">
+        <span class="job-logo" style="--lm-bg:${bg};--lm-fg:${fg}">${monogram(j.company)}</span>
+        <span class="lw-pay">${j.pay.split('–')[0]}+</span>
+      </div>
+      <div class="lw-title">${j.title}</div>
+      <div class="lw-co">${j.company} · ${j.region}</div>
+      <div class="lw-foot"><span class="lw-live"><i></i>Live</span><span class="lw-age">${j.age}</span></div>
+    </div>`;
+  };
+  let html = '';
+  for (let c = 0; c < colCount; c++) {
+    const items = [];
+    for (let k = 0; k < 6; k++) items.push(JOBS[(c * 4 + k * 3 + 1) % JOBS.length]);
+    const inner = items.map(card).join('');
+    html += `<div class="lw-col"><div class="lw-track">${inner}${inner}</div></div>`;
+  }
+  root.innerHTML = html;
+}
+
+/* Animate a number from 0 to its data-count when it scrolls into view. */
+function countUp(sel) {
+  const els = document.querySelectorAll(sel);
+  if (!els.length) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const run = (el) => {
+    const target = parseFloat(el.dataset.count);
+    if (isNaN(target)) return;
+    const suffix = el.dataset.suffix || '';
+    if (reduce) { el.textContent = target + suffix; return; }
+    const dur = 1200, t0 = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      const v = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      el.textContent = v + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  if (!('IntersectionObserver' in window)) { els.forEach(run); return; }
+  const io = new IntersectionObserver((ents) => {
+    ents.forEach(e => { if (e.isIntersecting) { io.unobserve(e.target); run(e.target); } });
+  }, { threshold: 0.5 });
+  els.forEach(el => io.observe(el));
+}
+
+/* Wire a search input to filter rendered job rows live (by title/company/cat). */
+function wireSearch(inputSel, listSel, countSel) {
+  const input = document.querySelector(inputSel);
+  const list = document.querySelector(listSel);
+  if (!input || !list) return;
+  const update = () => {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    list.querySelectorAll('.job-row').forEach(row => {
+      const hit = !q || row.dataset.text.includes(q);
+      row.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    const c = countSel && document.querySelector(countSel);
+    if (c) c.textContent = shown;
+  };
+  input.addEventListener('input', update);
+  update();
+  return update;
+}
+
+/* Popular-term chips set the search box value and refilter. */
+function wireChips(chipSel, inputSel, onChange) {
+  document.querySelectorAll(chipSel).forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      const input = document.querySelector(inputSel);
+      if (input) { input.value = chip.dataset.q || chip.textContent.trim(); input.focus(); }
+      if (onChange) onChange();
+    });
+  });
+}
+
+/* ---- Theme toggle (per-document, persisted) ---- */
+function initTheme(toggleSel, storageKey) {
+  const root = document.documentElement;
+  const saved = localStorage.getItem(storageKey);
+  if (saved === 'dark') root.setAttribute('data-theme', 'dark');
+  const apply = () => {
+    const dark = root.getAttribute('data-theme') === 'dark';
+    document.querySelectorAll(toggleSel).forEach(b => b.setAttribute('aria-pressed', String(dark)));
+  };
+  apply();
+  document.querySelectorAll(toggleSel).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) { root.removeAttribute('data-theme'); localStorage.setItem(storageKey, 'light'); }
+      else { root.setAttribute('data-theme', 'dark'); localStorage.setItem(storageKey, 'dark'); }
+      apply();
+    });
+  });
+}

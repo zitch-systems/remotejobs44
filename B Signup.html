@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Direction B — Sign up" subtitle="Deep Ocean — split-screen auth" viewport="1280x860" -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create your free account — RemoteJobs44 (Deep Ocean)</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg-app); }
+  .auth { display: grid; grid-template-columns: 1.04fr 0.96fr; min-height: 100vh; }
+
+  .auth-aside {
+    position: relative; overflow: hidden; color: #fff; padding: 40px 52px 46px;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(ellipse 74% 50% at 18% 0%, rgba(37,99,235,0.34), transparent 60%),
+      radial-gradient(ellipse 60% 60% at 96% 100%, rgba(249,115,22,0.16), transparent 60%),
+      linear-gradient(155deg, rgba(8,18,36,0.90) 0%, rgba(8,17,34,0.93) 50%, rgba(6,14,31,0.96) 100%),
+      url(assets/ig-high-five.jpg) center 22%/cover no-repeat,
+      #060e1f;
+  }
+  .auth-aside::after { content:''; position:absolute; inset:0; opacity:0.5; pointer-events:none; background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 26px 26px; mask-image: linear-gradient(180deg,#000,transparent 80%); }
+  .aa-top, .aa-mid, .aa-bottom { position: relative; z-index: 2; }
+  .aa-top .brand b { color: #fff; }
+  .aa-top .brand b span { color: var(--accent-light); }
+  .aa-mid { margin: auto 0; max-width: 440px; }
+  .aa-mid .eyebrow-pill { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); color: #dbeafe; }
+  .aa-mid h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; font-size: clamp(2rem, 3vw, 2.85rem); line-height: 1.05; margin: 18px 0 14px; color: #fff; text-wrap: balance; }
+  .aa-mid p { color: #aebfd6; font-size: var(--fs-md); line-height: 1.55; margin: 0 0 26px; }
+  .aa-points { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 13px; }
+  .aa-points li { display: flex; align-items: center; gap: 12px; font-size: 14.5px; color: #d7e2f1; }
+  .aa-points .tick { width: 24px; height: 24px; border-radius: 8px; background: rgba(34,197,94,0.18); color: #5fd99a; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .aa-points .tick svg { width: 13px; height: 13px; }
+  .aa-stats { margin-top: 32px; display: flex; gap: 30px; }
+  .aa-stats .n { font-family: var(--font-display); font-weight: 800; font-size: 26px; color: #fff; letter-spacing: -0.02em; }
+  .aa-stats .l { font-size: 12.5px; color: #9fb2cf; margin-top: 2px; }
+
+  .auth-main { position: relative; display: flex; align-items: center; justify-content: center; padding: 48px 32px; }
+  .auth-toggle { position: absolute; top: 22px; right: 26px; }
+  .auth-card { width: 100%; max-width: 416px; }
+  .auth-card h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; font-size: 30px; color: var(--fg-1); margin: 0 0 7px; }
+  .auth-card .lead { font-size: 15px; color: var(--fg-3); margin: 0 0 28px; }
+  .auth-card .lead a { color: var(--brand-700); font-weight: 600; text-decoration: none; }
+  [data-theme="dark"] .auth-card .lead a { color: var(--brand-400); }
+
+  .social { display: flex; flex-direction: column; gap: 10px; }
+  .sbtn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 1.5px solid var(--border-2); border-radius: 12px; background: var(--bg-card); font-family: var(--font-display); font-weight: 600; font-size: 14.5px; color: var(--fg-1); cursor: pointer; text-decoration: none; transition: border-color var(--dur-fast), background var(--dur-fast); }
+  .sbtn:hover { border-color: var(--brand-400); background: var(--brand-50); }
+  [data-theme="dark"] .sbtn:hover { background: rgba(59,130,246,0.1); }
+  .sbtn img { width: 18px; height: 18px; }
+  [data-theme="dark"] .sbtn .gh { filter: invert(1); }
+
+  .divider { display: flex; align-items: center; gap: 14px; margin: 22px 0; color: var(--fg-4); font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-3); }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--fg-2); margin-bottom: 7px; }
+  .inp { display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1.5px solid var(--border-2); border-radius: 12px; padding: 0 14px; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+  .inp:focus-within { border-color: var(--brand-500); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); }
+  .inp svg { width: 18px; height: 18px; color: var(--fg-4); flex-shrink: 0; }
+  .inp input { flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 15px; color: var(--fg-1); padding: 13px 0; min-width: 0; }
+  .inp input::placeholder { color: var(--fg-4); }
+  .inp .pw { background: none; border: none; cursor: pointer; color: var(--fg-4); padding: 4px; display: inline-flex; }
+  .inp .pw svg { width: 17px; height: 17px; }
+  .pw-hint { font-size: 12px; color: var(--fg-4); margin: 7px 0 0; }
+
+  .auth-row { display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 22px; font-size: 13px; }
+  .auth-row label { display: inline-flex; align-items: flex-start; gap: 9px; color: var(--fg-2); cursor: pointer; line-height: 1.45; }
+  .auth-row input { position: absolute; opacity: 0; pointer-events: none; }
+  .auth-row .box { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--border-2); display: inline-flex; align-items: center; justify-content: center; transition: all var(--dur-fast); flex-shrink: 0; margin-top: 1px; }
+  .auth-row .box svg { width: 12px; height: 12px; color: #fff; opacity: 0; }
+  .auth-row input:checked + .box { background: var(--brand-600); border-color: var(--brand-600); }
+  .auth-row input:checked + .box svg { opacity: 1; }
+  .auth-row a { color: var(--brand-700); font-weight: 600; text-decoration: none; }
+  [data-theme="dark"] .auth-row a { color: var(--brand-400); }
+  .btn-full { width: 100%; justify-content: center; }
+  .auth-fine { font-size: 12.5px; color: var(--fg-4); text-align: center; margin: 18px 0 0; line-height: 1.5; }
+
+  @media (max-width: 880px) {
+    .auth { grid-template-columns: 1fr; }
+    .auth-aside { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="auth">
+
+  <aside class="auth-aside" data-screen-label="B · Signup · Brand">
+    <div class="aa-top">
+      <a class="brand" href="Landing B.html">
+        <svg viewBox="0 0 32 32" fill="none" style="width:30px;height:30px"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg>
+        <b>RemoteJobs<span>44</span></b>
+      </a>
+    </div>
+
+    <div class="aa-mid">
+      <span class="eyebrow-pill"><span class="dot"></span>Free to browse — no card needed</span>
+      <h2>Start applying to remote roles today.</h2>
+      <p>Create your free account and unlock saved searches, job alerts, and one-click apply across 70,000+ verified remote jobs.</p>
+      <ul class="aa-points">
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Browse every role free, forever</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Daily alerts for roles that fit you</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Pay only when you're ready to apply</li>
+      </ul>
+      <div class="aa-stats">
+        <div><div class="n">70k+</div><div class="l">Live roles</div></div>
+        <div><div class="n">150+</div><div class="l">Countries</div></div>
+        <div><div class="n">5,000+</div><div class="l">Hired</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="auth-main" data-screen-label="B · Signup · Form">
+    <button class="theme-toggle auth-toggle" aria-label="Toggle dark mode" aria-pressed="false">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+
+    <div class="auth-card">
+      <h1>Create your free account</h1>
+      <p class="lead">Already have an account? <a href="B Login.html">Log in</a></p>
+
+      <div class="social">
+        <a href="#" class="sbtn"><img src="https://cdn.simpleicons.org/google" alt="" onerror="this.style.display='none'">Sign up with Google</a>
+        <a href="#" class="sbtn"><img class="gh" src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display='none'">Sign up with GitHub</a>
+      </div>
+
+      <div class="divider">OR</div>
+
+      <form onsubmit="event.preventDefault(); window.location.href='B Jobs.html';">
+        <div class="field">
+          <label for="name">Full name</label>
+          <div class="inp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="name" type="text" placeholder="Ada Okeke" autocomplete="name" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <div class="inp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+            <input id="email" type="email" placeholder="you@email.com" autocomplete="email" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pw">Password</label>
+          <div class="inp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="pw" type="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required>
+            <button type="button" class="pw" aria-label="Show password" onclick="const i=this.previousElementSibling; i.type=i.type==='password'?'text':'password';">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="pw-hint">Use 8+ characters with a mix of letters and numbers.</p>
+        </div>
+
+        <div class="auth-row">
+          <label><input type="checkbox" required><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span>I agree to the <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</span></label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-full">Create account →</button>
+      </form>
+
+      <p class="auth-fine">Browse free. Upgrade only when you're ready to apply.</p>
+    </div>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  initTheme('.theme-toggle', 'rj44-theme-b');
+</script>
+</body>
+</html>
