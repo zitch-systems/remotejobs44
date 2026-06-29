@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { House, BriefcaseBusiness, BookmarkCheck, ClipboardCheck, CircleUserRound, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, useJobsStore } from '@/lib/store';
+import { isMemberRoute } from '@/lib/member-routes';
 
 const NAV = [
   { href: '/',             icon: House,              label: 'Home'     },
@@ -18,6 +19,9 @@ export function BottomNav() {
   const pathname = usePathname();
   const { isLoggedIn, hydrated } = useAuthStore();
   const { savedJobIds } = useJobsStore();
+
+  // Member routes use the MemberShell's own navigation (sidebar / rail).
+  if (isMemberRoute(pathname)) return null;
 
   return (
     <nav
