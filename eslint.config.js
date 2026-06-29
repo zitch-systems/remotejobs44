@@ -34,15 +34,6 @@ module.exports = [
       // Generated files
       'next-env.d.ts',
       'public/**',
-      // Stray design-handoff bundle artifacts dumped at the repo root by the
-      // "critical updates" commit. They are NOT part of the Next.js app (the
-      // real source lives in app/ components/ lib/ hooks/) — several are
-      // actually images/JSON saved with .ts/.tsx/.js extensions — so they
-      // can't be parsed and must be kept out of the web lint/type-check.
-      // (tsconfig.json scopes `include` to the app dirs for the same reason.)
-      'App.tsx', 'app.js', 'data.ts', 'detail.js', 'pro.tsx',
-      'screens.js', 'screens.tsx', 'shared.js', 'store.js', 'store.tsx',
-      'sw.js', 'theme.ts', 'ui.js', 'ui.tsx',
     ],
   },
   // Next.js + core-web-vitals presets (already include react, react-hooks,
