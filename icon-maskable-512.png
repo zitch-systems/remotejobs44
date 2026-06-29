@@ -1,0 +1,108 @@
+/* RemoteJobs44 — data layer
+ * Mock data today, API-ready shape for tomorrow. Swap the bodies of `API.*`
+ * for real fetch() calls and the rest of the app keeps working unchanged. */
+
+const COMPANIES = {
+  Paystack:   { domain: 'paystack.com',   icon: 'paystack' },
+  Flutterwave:{ domain: 'flutterwave.com',icon: 'flutterwave' },
+  Vercel:     { domain: 'vercel.com',     icon: 'vercel' },
+  Andela:     { domain: 'andela.com',     icon: '' },
+  Kuda:       { domain: 'kuda.com',       icon: '' },
+  Zapier:     { domain: 'zapier.com',     icon: 'zapier' },
+  Shopify:    { domain: 'shopify.com',    icon: 'shopify' },
+  Notion:     { domain: 'notion.so',      icon: 'notion' },
+  Canva:      { domain: 'canva.com',      icon: 'canva' },
+  Intercom:   { domain: 'intercom.com',   icon: 'intercom' },
+  Buffer:     { domain: 'buffer.com',     icon: 'buffer' },
+  Remote:     { domain: 'remote.com',     icon: '' }
+};
+
+function logoFor(co) {
+  const c = COMPANIES[co] || {};
+  const ddg = c.domain ? 'https://icons.duckduckgo.com/ip3/' + c.domain + '.ico' : '';
+  const si  = c.icon ? 'https://cdn.simpleicons.org/' + c.icon : '';
+  return { primary: si || ddg, fallback: ddg, monogram: co.slice(0,1) };
+}
+
+const GRADS = {
+  Engineering:'linear-gradient(150deg,#2563eb,#1e3a8a)', Design:'linear-gradient(150deg,#9333ea,#6b21a8)',
+  Marketing:'linear-gradient(150deg,#db2777,#9d174d)',    Data:'linear-gradient(150deg,#0891b2,#155e75)',
+  Support:'linear-gradient(150deg,#ea580c,#9a3412)',      Sales:'linear-gradient(150deg,#e11d48,#9f1239)',
+  Product:'linear-gradient(150deg,#4f46e5,#3730a3)',      VA:'linear-gradient(150deg,#0d9488,#115e59)'
+};
+
+const JOBS = [
+  { id:'j1',  role:'Virtual Assistant',        co:'Andela',     cat:'VA',          type:'Full-time', region:'Worldwide',    pay:'$1.2k–2k/mo',  posted:'2h',  level:'Entry',     match:96, verified:true,
+    about:'Support a distributed founder team with scheduling, inbox triage, travel and light research. You keep the trains running on time across timezones.',
+    duties:['Own calendars, inbox and meeting prep','Coordinate travel and expenses','Prepare docs, decks and notes','Light CRM and data entry'] },
+  { id:'j2',  role:'Customer Service Rep',      co:'Intercom',   cat:'Support',     type:'Full-time', region:'EMEA',         pay:'$2.5k–3.4k/mo',posted:'4h',  level:'Entry',     match:92, verified:true,
+    about:'Be the first human our customers meet. Resolve tickets with empathy and speed, and turn confused users into fans.',
+    duties:['Resolve chat and email tickets','Hit CSAT and response-time goals','Document recurring issues','Partner with product on fixes'] },
+  { id:'j3',  role:'Social Media Manager',      co:'Buffer',     cat:'Marketing',   type:'Full-time', region:'Worldwide',    pay:'$3.5k–4.8k/mo',posted:'6h',  level:'Mid',       match:90, verified:true,
+    about:'Own our voice across channels. Plan, write, publish and analyse content that builds a remote-first community.',
+    duties:['Run the content calendar','Write and schedule posts','Grow and engage the community','Report on reach and conversion'] },
+  { id:'j4',  role:'Digital Marketer',          co:'Canva',      cat:'Marketing',   type:'Full-time', region:'Worldwide',    pay:'$4k–6k/mo',    posted:'8h',  level:'Mid',       match:88, verified:true,
+    about:'Drive top-of-funnel growth across global markets. Own SEO, lifecycle and paid experiments that compound.',
+    duties:['Plan and run acquisition campaigns','Own SEO and content strategy','Build lifecycle and email flows','Turn data into experiments'] },
+  { id:'j5',  role:'Data Analyst',              co:'Flutterwave',cat:'Data',        type:'Full-time', region:'Worldwide',    pay:'$4.5k–6.5k/mo',posted:'12h', level:'Mid',       match:91, verified:true,
+    about:'Turn raw product and payments data into decisions. Build dashboards and answer the questions leadership keeps asking.',
+    duties:['Model data in SQL and dbt','Build and maintain dashboards','Run experiment analysis','Tell stories with data'] },
+  { id:'j6',  role:'Product Manager',           co:'Paystack',   cat:'Product',     type:'Full-time', region:'Worldwide',    pay:'$6k–9k/mo',    posted:'1d',  level:'Senior',    match:87, verified:true,
+    about:'Own a payments surface end-to-end. Talk to users, shape the roadmap, and ship things merchants love.',
+    duties:['Own discovery and roadmap','Write crisp specs','Partner with design and eng','Measure outcomes, not output'] },
+  { id:'j7',  role:'Senior Software Engineer',  co:'Vercel',     cat:'Engineering', type:'Full-time', region:'Worldwide',    pay:'$120k–160k',   posted:'1d',  level:'Senior',    match:94, verified:true,
+    about:'Ship React + TypeScript features end-to-end and help steward our design system and performance budget.',
+    duties:['Build features end-to-end','Lead the design system','Own performance and a11y','Mentor and review'] },
+  { id:'j8',  role:'Sales Manager',             co:'Shopify',    cat:'Sales',       type:'Full-time', region:'Worldwide',    pay:'$70k–95k + OTE',posted:'2d', level:'Senior',    match:84, verified:true,
+    about:'Lead a remote SMB sales pod. Coach reps, forecast accurately, and own the number.',
+    duties:['Coach and grow the team','Own pipeline and forecast','Refine the sales motion','Partner with marketing'] },
+  { id:'j9',  role:'Customer Success Manager',  co:'Zapier',     cat:'Support',     type:'Full-time', region:'Americas',     pay:'$5k–7k/mo',    posted:'2d',  level:'Mid',       match:83, verified:true,
+    about:'Own a book of business and make customers wildly successful. Drive retention and expansion.',
+    duties:['Onboard and grow accounts','Drive renewals and expansion','Be the voice of the customer','Hit NRR targets'] },
+  { id:'j10', role:'Frontend Engineer',         co:'Notion',     cat:'Engineering', type:'Contract',  region:'Worldwide',    pay:'$80k–110k',    posted:'3d',  level:'Mid',       match:89, verified:true,
+    about:'Craft delightful, fast interfaces. Care about the last 10% of polish and the first paint.',
+    duties:['Build polished UI','Own component quality','Profile and optimise','Collaborate with design'] },
+  { id:'j11', role:'Growth Marketer',           co:'Kuda',       cat:'Marketing',   type:'Full-time', region:'Worldwide',    pay:'$3.5k–5k/mo',  posted:'3d',  level:'Mid',       match:81, verified:true,
+    about:'Find scalable loops that grow a consumer fintech. Test relentlessly and double down on what works.',
+    duties:['Run growth experiments','Own a north-star metric','Build referral and lifecycle loops','Analyse and iterate'] },
+  { id:'j12', role:'Executive Assistant',       co:'Remote',     cat:'VA',          type:'Full-time', region:'Worldwide',    pay:'$2k–3k/mo',    posted:'4d',  level:'Mid',       match:80, verified:true,
+    about:'Be the right hand to a VP. Protect their time, run projects, and make everything around them smoother.',
+    duties:['Manage complex calendars','Run cross-team projects','Prep briefs and decks','Handle confidential work'] }
+];
+
+const CATEGORIES = [
+  { key:'VA',          label:'Virtual Assistant', count:'2.1k' },
+  { key:'Support',     label:'Customer Service',  count:'1.8k' },
+  { key:'Marketing',   label:'Marketing',         count:'1.3k' },
+  { key:'Data',        label:'Data & Analytics',  count:'920'  },
+  { key:'Product',     label:'Product',           count:'610'  },
+  { key:'Engineering', label:'Engineering',       count:'2.1k' },
+  { key:'Sales',       label:'Sales',             count:'780'  },
+  { key:'Design',      label:'Design',            count:'840'  }
+];
+
+function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* The single seam a real backend drops into. Today: in-memory + delay. */
+const API = {
+  async listJobs({ q = '', cat = null, type = null, region = null } = {}) {
+    await delay(140);
+    const needle = q.trim().toLowerCase();
+    return JOBS.filter(j =>
+      (!cat || j.cat === cat) &&
+      (!type || j.type === type) &&
+      (!region || j.region === region) &&
+      (!needle || (j.role + ' ' + j.co + ' ' + j.cat).toLowerCase().includes(needle))
+    );
+  },
+  async getJob(id){ await delay(90); return JOBS.find(j => j.id === id) || null; },
+  async categories(){ await delay(60); return CATEGORIES; },
+  async signIn({ email }){ await delay(420); return { id:'me', name: nameFromEmail(email), email }; }
+};
+
+function nameFromEmail(email){
+  const h = (email || '').split('@')[0].replace(/[._-]+/g,' ').trim();
+  return h ? h.replace(/\b\w/g, c => c.toUpperCase()) : 'Ada Obi';
+}
+
+window.RJ = Object.assign(window.RJ || {}, { JOBS, CATEGORIES, COMPANIES, GRADS, API, logoFor, nameFromEmail });

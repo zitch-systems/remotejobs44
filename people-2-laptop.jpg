@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Deep Ocean — Saved Jobs" subtitle="Bookmarked roles grid with filters + unsave" viewport="1280x900" -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Jobs — RemoteJobs44</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  /* Top bar */
+  .topbar { position: relative; flex-shrink: 0; display: flex; align-items: center; gap: 18px; height: 60px; padding: 0 24px; background: var(--bg-card); border-bottom: 1px solid var(--border-1); z-index: 100; }
+  .topbar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .topbar .brand b { font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--fg-1); letter-spacing: -0.02em; }
+  .topbar .brand b span { color: var(--brand-600); }
+  .topbar-search { /* centered */ position: absolute; left: 50%; transform: translateX(-50%); top: 18px; width: clamp(240px, 30vw, 360px); flex: none; max-width: none; }
+  .topbar-search .search-box { height: 36px; background: var(--bg-section); border-color: var(--border-2); }
+  .topbar-search .search-box input { font-size: 13.5px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .tb-ico { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border-2); background: var(--bg-section); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg-3); position: relative; }
+  .tb-ico:hover { color: var(--fg-1); border-color: var(--brand-400); }
+  .tb-badge { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--brand-600); color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center; }
+  .tb-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--brand-300); cursor: pointer; }
+  .tb-name { font-size: 13.5px; font-weight: 600; color: var(--fg-1); }
+
+  /* Shell */
+  .shell { flex: 1; display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
+  .sidebar { overflow-y: auto; background: var(--bg-card); border-right: 1px solid var(--border-1); padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .sidebar::-webkit-scrollbar { width: 4px; } .sidebar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  .nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-4); padding: 14px 10px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--fg-2); text-decoration: none; cursor: pointer; transition: all var(--dur-fast); }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--bg-section); color: var(--fg-1); }
+  .nav-item.active { background: var(--brand-50); color: var(--brand-700); font-weight: 700; }
+  [data-theme="dark"] .nav-item.active { background: rgba(59,130,246,0.14); color: var(--brand-400); }
+  .nav-item .nbadge { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--brand-600); padding: 1px 7px; border-radius: 999px; }
+  .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-3); }
+
+  /* Main */
+  .main { overflow-y: auto; background: var(--bg-app); }
+  .main::-webkit-scrollbar { width: 6px; } .main::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  .sj-wrap { max-width: 1040px; margin: 0 auto; padding: 26px 28px 48px; }
+
+  .sj-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .sj-head h1 { font-family: var(--font-display); font-weight: 800; font-size: 24px; color: var(--fg-1); margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sj-head p { font-size: 14px; color: var(--fg-3); margin: 0; }
+
+  .sj-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .sj-filter { font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; background: var(--bg-card); border: 1.5px solid var(--border-2); color: var(--fg-2); cursor: pointer; transition: all var(--dur-fast); }
+  .sj-filter:hover { border-color: var(--brand-400); color: var(--brand-700); }
+  .sj-filter.on { background: var(--brand-600); border-color: var(--brand-600); color: #fff; }
+
+  .sj-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+
+  .scard { background: var(--bg-card); border: 1.5px solid var(--border-1); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+  .scard:hover { border-color: var(--brand-400); box-shadow: var(--shadow-md-brand); }
+  .scard-top { display: flex; align-items: flex-start; gap: 12px; }
+  .scard-logo { width: 44px; height: 44px; border-radius: 11px; font-size: 14px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+  .scard-tt { flex: 1; min-width: 0; }
+  .scard-tt h3 { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--fg-1); margin: 0 0 2px; line-height: 1.25; }
+  .scard-co { font-size: 13px; color: var(--fg-3); }
+  .scard-save { width: 34px; height: 34px; border-radius: 9px; border: 1.5px solid var(--border-2); background: var(--bg-section); display: grid; place-items: center; cursor: pointer; flex-shrink: 0; color: var(--brand-600); transition: all var(--dur-fast); }
+  .scard-save:hover { border-color: var(--brand-400); background: var(--brand-50); }
+  .scard-save svg { width: 17px; height: 17px; }
+  .scard-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+  .schip { font-size: 11.5px; font-weight: 600; color: var(--fg-3); background: var(--bg-section); border: 1px solid var(--border-2); padding: 4px 10px; border-radius: 999px; }
+  .scard-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-3); }
+  .scard-pay { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--success); }
+  .scard-age { font-size: 12px; color: var(--fg-4); }
+  .scard-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .scard-actions .btn { flex: 1; justify-content: center; }
+
+  @media (max-width: 760px) { .sj-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="Member Dashboard Desktop.html">
+    <svg viewBox="0 0 32 32" fill="none" style="width:30px;height:30px"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg>
+    <b>RemoteJobs<span>44</span></b>
+  </a>
+  <div class="topbar-search">
+    <div class="search-box">
+      <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Search saved jobs…">
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-toggle tb-ico" aria-label="Toggle dark mode" aria-pressed="false" style="border:none">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+    <div class="tb-ico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="tb-badge">3</span>
+    </div>
+    <span class="tb-name">Ada Obi</span>
+    <img class="tb-avatar" src="assets/people-4-portrait.jpg" alt="Ada Obi">
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="nav-label">Menu</div>
+    <a class="nav-item" href="Member Dashboard Desktop.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item" href="Browse Jobs.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+      Browse Jobs
+      <span class="nbadge">12</span>
+    </a>
+    <a class="nav-item active" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      Saved Jobs
+    </a>
+    <a class="nav-item" href="Applications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Applications
+      <span class="nbadge">4</span>
+    </a>
+    <div class="nav-label">Tools</div>
+    <a class="nav-item" href="CV Builder.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+      CV Builder
+    </a>
+    <a class="nav-item" href="Cover Letter.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Cover Letters
+    </a>
+    <a class="nav-item" href="AI Interview.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      AI Interview
+    </a>
+    <a class="nav-item" href="Job Match.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      Job Match
+    </a>
+    <div class="nav-label">Account</div>
+    <a class="nav-item" href="Profile.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </a>
+    <a class="nav-item" href="Alerts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      Alerts<span class="nbadge">3</span>
+    </a>
+    <div class="sidebar-footer">
+      <a class="nav-item" href="B Login.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="sj-wrap">
+      <div class="sj-head" data-screen-label="Saved · Header">
+        <div>
+          <h1>Saved Jobs</h1>
+          <p>18 roles bookmarked — 5 still open, 13 closed or filled.</p>
+        </div>
+        <a href="Browse Jobs.html" class="btn btn-primary btn-sm">Browse more jobs</a>
+      </div>
+
+      <div class="sj-filters">
+        <button class="sj-filter on">All saved · 18</button>
+        <button class="sj-filter">Still open · 5</button>
+        <button class="sj-filter">Engineering · 9</button>
+        <button class="sj-filter">Design · 4</button>
+        <button class="sj-filter">Marketing · 3</button>
+      </div>
+
+      <div class="sj-grid" data-screen-label="Saved · Grid">
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#eff6ff;color:#2563eb">Gi</span>
+            <div class="scard-tt"><h3>Staff Engineer</h3><div class="scard-co">GitHub · Remote Worldwide</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Senior</span><span class="schip">Full-time</span><span class="schip">Engineering</span></div>
+          <div class="scard-foot"><span class="scard-pay">$180–220k</span><span class="scard-age">Saved 2d ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#faf5ff;color:#9333ea">Li</span>
+            <div class="scard-tt"><h3>Frontend Lead</h3><div class="scard-co">Linear · Remote EU</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Lead</span><span class="schip">Full-time</span><span class="schip">Engineering</span></div>
+          <div class="scard-foot"><span class="scard-pay">€110–140k</span><span class="scard-age">Saved 3d ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#fdf2f8;color:#db2777">Fg</span>
+            <div class="scard-tt"><h3>Staff UX Designer</h3><div class="scard-co">Figma · Remote Worldwide</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Senior</span><span class="schip">Full-time</span><span class="schip">Design</span></div>
+          <div class="scard-foot"><span class="scard-pay">$170–200k</span><span class="scard-age">Saved 4d ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#f0fdf4;color:#16a34a">No</span>
+            <div class="scard-tt"><h3>Senior Product Engineer</h3><div class="scard-co">Notion · Remote</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Senior</span><span class="schip">Full-time</span><span class="schip">Engineering</span></div>
+          <div class="scard-foot"><span class="scard-pay">$160–190k</span><span class="scard-age">Saved 5d ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#fff7ed;color:#ea580c">Za</span>
+            <div class="scard-tt"><h3>Growth Marketing Manager</h3><div class="scard-co">Zapier · Remote Worldwide</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Mid</span><span class="schip">Full-time</span><span class="schip">Marketing</span></div>
+          <div class="scard-foot"><span class="scard-pay">$110–140k</span><span class="scard-age">Saved 1w ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+
+        <article class="scard">
+          <div class="scard-top">
+            <span class="scard-logo" style="background:#fef2f2;color:#dc2626">Ai</span>
+            <div class="scard-tt"><h3>Design Engineer</h3><div class="scard-co">Airbnb · Remote US</div></div>
+            <button class="scard-save" aria-label="Remove from saved"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="scard-meta"><span class="schip">Mid</span><span class="schip">Full-time</span><span class="schip">Design</span></div>
+          <div class="scard-foot"><span class="scard-pay">$150–175k</span><span class="scard-age">Saved 1w ago</span></div>
+          <div class="scard-actions"><a href="Job Detail.html" class="btn btn-ghost btn-sm">View role</a><a href="Job Detail.html" class="btn btn-primary btn-sm">Apply</a></div>
+        </article>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  initTheme('.theme-toggle', 'rj44-theme-dash');
+  // Unsave: remove the card with a quick fade
+  document.querySelectorAll('.scard-save').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var card = btn.closest('.scard');
+      card.style.transition = 'opacity .2s, transform .2s';
+      card.style.opacity = '0'; card.style.transform = 'scale(0.96)';
+      setTimeout(function(){ card.remove(); }, 200);
+    });
+  });
+  // Filter pills (visual toggle only)
+  document.querySelectorAll('.sj-filter').forEach(function(f){
+    f.addEventListener('click', function(){
+      document.querySelectorAll('.sj-filter').forEach(function(x){ x.classList.remove('on'); });
+      f.classList.add('on');
+    });
+  });
+</script>
+</body>
+</html>

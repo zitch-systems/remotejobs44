@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Deep Ocean — Profile & Settings" subtitle="Member profile editor + notification, privacy & subscription settings" viewport="1280x900" -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile & Settings — RemoteJobs44</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  html,body{height:100%;overflow:hidden;}body{display:flex;flex-direction:column;}
+  .topbar{ position: relative;flex-shrink:0;display:flex;align-items:center;gap:18px;height:60px;padding:0 24px;background:var(--bg-card);border-bottom:1px solid var(--border-1);z-index:100;}
+  .topbar .brand{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0;}
+  .topbar .brand b{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--fg-1);letter-spacing:-0.02em;}
+  .topbar .brand b span{color:var(--brand-600);}
+  .topbar-search { /* centered */ position: absolute; left: 50%; transform: translateX(-50%); top: 18px; width: clamp(240px, 30vw, 360px); flex: none; max-width: none; }
+  .topbar-search .search-box{height:36px;background:var(--bg-section);border-color:var(--border-2);}
+  .topbar-search .search-box input{font-size:13.5px;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+  .tb-ico{width:34px;height:34px;border-radius:9px;border:1px solid var(--border-2);background:var(--bg-section);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--fg-3);position:relative;}
+  .tb-badge{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--brand-600);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;}
+  .tb-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--brand-300);}
+  .tb-name{font-size:13.5px;font-weight:600;color:var(--fg-1);}
+  .shell{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden;}
+  .sidebar{overflow-y:auto;background:var(--bg-card);border-right:1px solid var(--border-1);padding:20px 12px;display:flex;flex-direction:column;gap:4px;}
+  .nav-label{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--fg-4);padding:14px 10px 6px;}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;font-size:14px;font-weight:500;color:var(--fg-2);text-decoration:none;transition:all var(--dur-fast);}
+  .nav-item svg{width:18px;height:18px;flex-shrink:0;}
+  .nav-item:hover{background:var(--bg-section);color:var(--fg-1);}
+  .nav-item.active{background:var(--brand-50);color:var(--brand-700);font-weight:700;}
+  [data-theme="dark"] .nav-item.active{background:rgba(59,130,246,0.14);color:var(--brand-400);}
+  .nav-item .nbadge{margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:var(--brand-600);padding:1px 7px;border-radius:999px;}
+  .sidebar-footer{margin-top:auto;padding-top:20px;border-top:1px solid var(--border-3);}
+  .main{overflow:hidden;background:var(--bg-app);display:flex;flex-direction:column;}
+  .pr-topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:1px solid var(--border-1);background:var(--bg-card);}
+  .pr-topbar h1{font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--fg-1);margin:0;letter-spacing:-0.02em;}
+  .pr-tabs{display:flex;gap:0;border-bottom:1px solid var(--border-1);background:var(--bg-card);padding:0 24px;flex-shrink:0;}
+  .pr-tab{padding:12px 18px;font-size:14px;font-weight:600;color:var(--fg-3);border-bottom:2px solid transparent;cursor:pointer;transition:all var(--dur-fast);white-space:nowrap;}
+  .pr-tab:hover{color:var(--fg-1);}
+  .pr-tab.on{color:var(--brand-700);border-bottom-color:var(--brand-600);}
+  [data-theme="dark"] .pr-tab.on{color:var(--brand-400);border-bottom-color:var(--brand-400);}
+  .pr-body{flex:1;overflow-y:auto;padding:28px 28px 48px;max-width:780px;}
+  .pr-body::-webkit-scrollbar{width:6px;}.pr-body::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px;}
+  .tab-panel{display:none;}
+  .tab-panel.on{display:block;}
+  .avatar-row{display:flex;align-items:center;gap:20px;padding:20px;background:var(--bg-card);border:1.5px solid var(--border-1);border-radius:16px;margin-bottom:20px;}
+  .avatar-big{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--brand-300);}
+  .avatar-info h3{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--fg-1);margin:0 0 3px;}
+  .avatar-info p{font-size:13px;color:var(--fg-3);margin:0 0 10px;}
+  .form-sec{background:var(--bg-card);border:1.5px solid var(--border-1);border-radius:16px;padding:20px;margin-bottom:16px;}
+  .form-sec h3{font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--fg-1);margin:0 0 16px;}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{font-size:12px;font-weight:600;color:var(--fg-3);}
+  .field input,.field select,.field textarea{background:var(--bg-section);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 12px;font-family:var(--font-body);font-size:13.5px;color:var(--fg-1);outline:none;transition:border-color var(--dur-fast);width:100%;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand-500);}
+  .field textarea{resize:vertical;min-height:80px;}
+  .field.full{grid-column:1/-1;}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-3);}
+  .toggle-row:last-child{border-bottom:none;}
+  .tr-copy h4{font-size:14px;font-weight:600;color:var(--fg-1);margin:0 0 2px;}
+  .tr-copy p{font-size:12.5px;color:var(--fg-3);margin:0;}
+  .toggle{position:relative;width:42px;height:24px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;position:absolute;}
+  .toggle-slider{position:absolute;inset:0;background:var(--border-2);border-radius:999px;transition:all var(--dur-fast);cursor:pointer;}
+  .toggle-slider::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:all var(--dur-fast);}
+  .toggle input:checked + .toggle-slider{background:var(--brand-600);}
+  .toggle input:checked + .toggle-slider::after{transform:translateX(18px);}
+  .plan-card{background:var(--bg-card);border:1.5px solid var(--border-1);border-radius:16px;padding:22px;margin-bottom:14px;}
+  .plan-card.current{border-color:var(--brand-600);}
+  .plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .plan-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--fg-1);}
+  .plan-badge{font-size:11px;font-weight:700;color:#fff;background:var(--brand-600);padding:3px 10px;border-radius:999px;}
+  .plan-price{font-family:var(--font-display);font-weight:800;font-size:26px;color:var(--fg-1);letter-spacing:-0.03em;}
+  .plan-price span{font-size:14px;font-weight:500;color:var(--fg-3);}
+  .plan-feats{display:flex;flex-direction:column;gap:8px;margin:12px 0 16px;}
+  .plan-feat{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--fg-2);}
+  .plan-feat::before{content:'✓';color:var(--success);font-weight:700;}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="Member Dashboard Desktop.html"><svg viewBox="0 0 32 32" fill="none" style="width:30px;height:30px"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg><b>RemoteJobs<span>44</span></b></a>
+  <div class="topbar-search"><div class="search-box"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Search remote jobs…"></div></div>
+  <div class="topbar-right">
+    <button class="theme-toggle tb-ico" aria-label="Toggle dark mode" aria-pressed="false" style="border:none"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+    <div class="tb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="tb-badge">3</span></div>
+    <span class="tb-name">Ada Obi</span><img class="tb-avatar" src="assets/people-4-portrait.jpg" alt="Ada Obi">
+  </div>
+</header>
+<div class="shell">
+  <nav class="sidebar">
+    <div class="nav-label">Menu</div>
+    <a class="nav-item" href="Member Dashboard Desktop.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+    <a class="nav-item" href="Browse Jobs.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>Browse Jobs<span class="nbadge">12</span></a>
+    <a class="nav-item" href="Saved Jobs.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Saved Jobs</a>
+    <a class="nav-item" href="Applications.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Applications<span class="nbadge">4</span></a>
+    <div class="nav-label">Tools</div>
+    <a class="nav-item" href="CV Builder.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>CV Builder</a>
+    <a class="nav-item" href="Cover Letter.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Cover Letters</a>
+    <a class="nav-item" href="AI Interview.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>AI Interview</a>
+    <a class="nav-item" href="Job Match.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Job Match</a>
+    <div class="nav-label">Account</div>
+    <a class="nav-item active" href="Profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
+    <a class="nav-item" href="Alerts.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="nbadge">3</span></a>
+    <div class="sidebar-footer"><a class="nav-item" href="B Login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</a></div>
+  </nav>
+  <main class="main" style="overflow:hidden;display:flex;flex-direction:column;">
+    <div class="pr-topbar" data-screen-label="Profile · Topbar">
+      <h1>Profile &amp; Settings</h1>
+      <a href="#" class="btn btn-primary btn-sm" id="saveBtn">Save changes</a>
+    </div>
+    <div class="pr-tabs">
+      <div class="pr-tab on" data-tab="profile">Profile</div>
+      <div class="pr-tab" data-tab="settings">Notifications</div>
+      <div class="pr-tab" data-tab="privacy">Privacy</div>
+      <div class="pr-tab" data-tab="subscription">Subscription</div>
+    </div>
+    <div class="pr-body">
+      <!-- Profile tab -->
+      <div class="tab-panel on" id="tab-profile" data-screen-label="Profile · Form">
+        <div class="avatar-row">
+          <img class="avatar-big" src="assets/people-4-portrait.jpg" alt="Ada Obi">
+          <div class="avatar-info"><h3>Ada Obi</h3><p>Senior Frontend Engineer · Lagos, Nigeria</p><div style="display:flex;gap:8px"><a href="#" class="btn btn-ghost btn-sm">Change photo</a><a href="#" class="btn btn-ghost btn-sm">Remove</a></div></div>
+        </div>
+        <div class="form-sec"><h3>Basic info</h3>
+          <div class="frow">
+            <div class="field"><label>Full name</label><input value="Ada Obi"></div>
+            <div class="field"><label>Headline</label><input value="Senior Frontend Engineer"></div>
+            <div class="field"><label>Email</label><input value="ada.obi@gmail.com" type="email"></div>
+            <div class="field"><label>Location</label><input value="Lagos, Nigeria"></div>
+            <div class="field full"><label>Bio</label><textarea>Frontend engineer with 6+ years building high-performance web apps. Passionate about great UX, accessible design, and remote-first collaboration. Open to senior and lead roles worldwide.</textarea></div>
+          </div>
+        </div>
+        <div class="form-sec"><h3>Job preferences</h3>
+          <div class="frow">
+            <div class="field"><label>Desired role</label><input value="Senior / Lead Frontend Engineer"></div>
+            <div class="field"><label>Availability</label><select><option>Open to work</option><option>Actively searching</option><option>Not looking</option></select></div>
+            <div class="field"><label>Preferred salary (USD)</label><input value="$160,000+"></div>
+            <div class="field"><label>Work type</label><select><option>Remote only</option><option>Hybrid</option><option>Any</option></select></div>
+          </div>
+        </div>
+        <div class="form-sec"><h3>Links</h3>
+          <div class="frow">
+            <div class="field"><label>LinkedIn</label><input value="linkedin.com/in/adaobi"></div>
+            <div class="field"><label>GitHub</label><input value="github.com/adaobi"></div>
+            <div class="field"><label>Portfolio</label><input value="adaobi.dev"></div>
+            <div class="field"><label>Twitter / X</label><input placeholder="@handle"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Notifications tab -->
+      <div class="tab-panel" id="tab-settings" data-screen-label="Profile · Notifications">
+        <div class="form-sec"><h3>Job alerts</h3>
+          <div class="toggle-row"><div class="tr-copy"><h4>Daily job digest</h4><p>New roles matching your saved searches, delivered every morning.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Instant alerts for top matches</h4><p>Get notified immediately when a 90%+ match role goes live.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Featured role alerts</h4><p>Early access to curated roles our team is excited about.</p></div><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="form-sec"><h3>Activity</h3>
+          <div class="toggle-row"><div class="tr-copy"><h4>Application status updates</h4><p>When a company views or responds to your application.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Interview reminders</h4><p>24h and 1h reminders before scheduled AI interview sessions.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>CV score tips</h4><p>Suggestions when we spot ways to improve your ATS score.</p></div><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="form-sec"><h3>Communications</h3>
+          <div class="toggle-row"><div class="tr-copy"><h4>Product updates &amp; news</h4><p>New features, improvements and RemoteJobs44 community news.</p></div><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Tips &amp; career resources</h4><p>Weekly remote-work tips, salary guides and interview prep resources.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        </div>
+      </div>
+      <!-- Privacy tab -->
+      <div class="tab-panel" id="tab-privacy" data-screen-label="Profile · Privacy">
+        <div class="form-sec"><h3>Profile visibility</h3>
+          <div class="toggle-row"><div class="tr-copy"><h4>Show profile to employers</h4><p>Let verified companies and recruiters discover your profile in search.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Show salary expectations</h4><p>Display your preferred salary range on your public profile.</p></div><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Show portfolio / links</h4><p>Include your GitHub, LinkedIn and portfolio URLs on your profile.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="form-sec"><h3>Data &amp; security</h3>
+          <div class="toggle-row"><div class="tr-copy"><h4>Two-factor authentication</h4><p>Require a one-time code when signing in from a new device.</p></div><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><div class="tr-copy"><h4>Share anonymised usage data</h4><p>Help us improve RemoteJobs44 with anonymous product analytics.</p></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        </div>
+        <div class="form-sec"><h3>Account actions</h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap"><a href="#" class="btn btn-ghost btn-sm">Download my data</a><a href="#" class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)">Delete account</a></div>
+        </div>
+      </div>
+      <!-- Subscription tab -->
+      <div class="tab-panel" id="tab-subscription" data-screen-label="Profile · Subscription">
+        <div class="plan-card current">
+          <div class="plan-head"><span class="plan-name">Pro Plan</span><span class="plan-badge">Current</span></div>
+          <div class="plan-price">$19<span> / month</span></div>
+          <div class="plan-feats"><div class="plan-feat">Unlimited apply-link unlocks</div><div class="plan-feat">Save CV to apply faster</div><div class="plan-feat">Application tracker</div><div class="plan-feat">Early access to featured roles</div></div>
+          <div style="display:flex;gap:10px"><a href="#" class="btn btn-ghost btn-sm">Cancel plan</a><a href="#" class="btn btn-ghost btn-sm">View invoice history</a></div>
+        </div>
+        <div class="plan-card">
+          <div class="plan-head"><span class="plan-name">Free</span></div>
+          <div class="plan-price">$0<span> / forever</span></div>
+          <div class="plan-feats"><div class="plan-feat">Browse 70,000+ verified remote roles</div><div class="plan-feat">Daily job alerts &amp; saved searches</div></div>
+          <a href="#" class="btn btn-ghost btn-sm">Downgrade to Free</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="shared.js"></script>
+<script>
+  initTheme('.theme-toggle','rj44-theme-dash');
+  document.querySelectorAll('.pr-tab').forEach(function(t){
+    t.addEventListener('click',function(){
+      document.querySelectorAll('.pr-tab').forEach(function(x){x.classList.remove('on');});
+      document.querySelectorAll('.tab-panel').forEach(function(x){x.classList.remove('on');});
+      t.classList.add('on');
+      var panel=document.getElementById('tab-'+t.dataset.tab);
+      if(panel)panel.classList.add('on');
+    });
+  });
+</script>
+</body>
+</html>

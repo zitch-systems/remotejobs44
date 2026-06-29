@@ -1,0 +1,82 @@
+/* RemoteJobs44 — Job detail + apply flow. */
+window.RJ = window.RJ || {};
+(function(){
+  function detail(params){
+    return {
+      full:true,
+      async build(){
+        const j = await window.RJ.API.getJob(params.id);
+        if(!j) return { html:'<div class="topbar"><button class="iconbtn" data-back>'+window.RJ.svg('back')+'</button></div><div class="empty"><h3>Job not found</h3></div>' };
+        const { Store } = window.RJ;
+        const saved = Store.isSaved(j.id);
+        const applied = Store.hasApplied(j.id);
+        return {
+          full:true,
+          html:
+            '<header class="dt-hero">'
+            + '<div class="dt-bar"><button class="iconbtn" data-back>'+window.RJ.svg('back')+'</button><div class="spacer"></div>'
+              + '<button class="iconbtn" data-share>'+window.RJ.svg('share')+'</button>'
+              + '<button class="iconbtn dt-save'+(saved?' on':'')+'" data-save="'+j.id+'">'+window.RJ.svgFill('bookmark')+'</button></div>'
+            + '<div class="dt-head">'+window.RJ.logoHTML(j.co,j.cat).replace('jlogo','jlogo dt-logo')
+              + '<h1>'+window.RJ.esc(j.role)+'</h1>'
+              + '<div class="dt-co">'+window.RJ.esc(j.co)+(j.verified?' <span class="vchip">'+window.RJ.svg('check')+'Verified</span>':'')+'</div></div>'
+            + '<div class="dt-chips"><span>'+window.RJ.svg('pin')+window.RJ.esc(j.region)+'</span><span>'+window.RJ.svg('clock')+window.RJ.esc(j.type)+'</span><span>'+window.RJ.esc(j.level)+'</span></div>'
+            + '</header>'
+            + '<div class="pad dt-body">'
+              + '<div class="dt-keyrow"><div><b>'+window.RJ.esc(j.pay)+'</b><span>Pay range</span></div><div><b class="mt">'+j.match+'%</b><span>Match</span></div><div><b>'+window.RJ.esc(j.posted)+'</b><span>Posted ago</span></div></div>'
+              + '<div class="match-bar"><i style="width:'+j.match+'%"></i></div>'
+              + '<h2 class="dt-h">About the role</h2><p class="dt-p">'+window.RJ.esc(j.about)+'</p>'
+              + '<h2 class="dt-h">What you\'ll do</h2><ul class="dt-list">'+j.duties.map(d=>'<li>'+window.RJ.svg('check')+window.RJ.esc(d)+'</li>').join('')+'</ul>'
+              + '<div class="comp-card">'+window.RJ.logoHTML(j.co,j.cat)+'<div><b>'+window.RJ.esc(j.co)+'</b><span>Hiring remotely · '+window.RJ.esc(j.region)+'</span></div><button class="mini" data-co>View</button></div>'
+              + '<div style="height:96px"></div>'
+            + '</div>'
+            + '<div class="applybar"><button class="iconbtn big dt-save'+(saved?' on':'')+'" data-save="'+j.id+'">'+window.RJ.svgFill('bookmark')+'</button>'
+              + '<button class="btn btn-primary btn-lg apply-btn'+(applied?' done':'')+'" data-apply="'+j.id+'">'+(applied?window.RJ.svg('check')+'Applied':window.RJ.svg('bolt')+'Apply now')+'</button></div>',
+          mount(el){
+            el.querySelector('[data-share]')?.addEventListener('click', ()=>window.RJ.toast('Share link copied'));
+            el.querySelector('[data-co]')?.addEventListener('click', ()=>window.RJ.toast('Company page — demo'));
+            el.querySelectorAll('[data-apply]').forEach(b=>b.addEventListener('click', ()=>openApply(j)));
+          }
+        };
+      }
+    };
+  }
+
+  function openApply(j){
+    const { Store } = window.RJ;
+    if(Store.hasApplied(j.id)){ window.RJ.toast('Already applied'); return; }
+    const ov = document.createElement('div');
+    ov.className = 'sheet-ov';
+    const p = Store.state.profile;
+    ov.innerHTML =
+      '<div class="sheet">'
+      + '<div class="sheet-grab"></div>'
+      + '<h3>Apply to '+window.RJ.esc(j.role)+'</h3><p class="muted">'+window.RJ.esc(j.co)+' · '+window.RJ.esc(j.pay)+'</p>'
+      + '<div class="apply-rows">'
+        + '<div class="ar"><span class="ar-ic">'+window.RJ.svg('doc')+'</span><div><b>'+window.RJ.esc(p.cv)+'</b><span>Attached résumé</span></div>'+window.RJ.svg('check')+'</div>'
+        + '<div class="ar"><span class="ar-ic">'+window.RJ.svg('user')+'</span><div><b>'+window.RJ.esc(p.name)+'</b><span>'+window.RJ.esc(p.title)+'</span></div>'+window.RJ.svg('check')+'</div>'
+      + '</div>'
+      + '<div class="field"><label>Add a note (optional)</label><div class="input"><input placeholder="Why you\'re a great fit…"></div></div>'
+      + '<button class="btn btn-primary btn-block btn-lg" data-confirm>'+window.RJ.svg('bolt')+'Submit application</button>'
+      + '<button class="btn btn-ghost btn-block" data-cancel>Cancel</button>'
+      + '</div>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(()=>ov.classList.add('show'));
+    const close = ()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(), 240); };
+    ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
+    ov.querySelector('[data-cancel]').addEventListener('click', close);
+    ov.querySelector('[data-confirm]').addEventListener('click', ()=>{
+      Store.apply(j.id);
+      ov.querySelector('.sheet').innerHTML =
+        '<div class="apply-done"><div class="burst">'+window.RJ.svg('check')+'</div><h3>Application sent!</h3>'
+        + '<p class="muted">We\'ll notify you when '+window.RJ.esc(j.co)+' responds. Track it under Applications.</p>'
+        + '<button class="btn btn-primary btn-block btn-lg" data-view-apps>View applications</button>'
+        + '<button class="btn btn-ghost btn-block" data-keep>Keep browsing</button></div>';
+      ov.querySelector('[data-view-apps]').addEventListener('click', ()=>{ close(); window.RJ.go('applications'); });
+      ov.querySelector('[data-keep]').addEventListener('click', ()=>{ close(); window.RJ.go('detail',{id:j.id}); });
+    });
+  }
+
+  window.RJ.Screens = window.RJ.Screens || {};
+  window.RJ.Screens.detail = detail;
+})();

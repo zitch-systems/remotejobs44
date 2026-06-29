@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Deep Ocean — Job Detail (member)" subtitle="Full job page in member shell: role info, match score, apply flow" viewport="1280x900" -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Senior Frontend Engineer — Vercel · RemoteJobs44</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  html,body{height:100%;overflow:hidden;}body{display:flex;flex-direction:column;}
+  .topbar{ position: relative;flex-shrink:0;display:flex;align-items:center;gap:18px;height:60px;padding:0 24px;background:var(--bg-card);border-bottom:1px solid var(--border-1);z-index:100;}
+  .topbar .brand{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0;}
+  .topbar .brand b{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--fg-1);letter-spacing:-0.02em;}
+  .topbar .brand b span{color:var(--brand-600);}
+  .topbar-search { /* centered */ position: absolute; left: 50%; transform: translateX(-50%); top: 18px; width: clamp(240px, 30vw, 360px); flex: none; max-width: none; }
+  .topbar-search .search-box{height:36px;background:var(--bg-section);border-color:var(--border-2);}
+  .topbar-search .search-box input{font-size:13.5px;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+  .tb-ico{width:34px;height:34px;border-radius:9px;border:1px solid var(--border-2);background:var(--bg-section);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--fg-3);position:relative;}
+  .tb-badge{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--brand-600);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;}
+  .tb-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--brand-300);}
+  .tb-name{font-size:13.5px;font-weight:600;color:var(--fg-1);}
+  .shell{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden;}
+  .sidebar{overflow-y:auto;background:var(--bg-card);border-right:1px solid var(--border-1);padding:20px 12px;display:flex;flex-direction:column;gap:4px;}
+  .nav-label{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--fg-4);padding:14px 10px 6px;}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;font-size:14px;font-weight:500;color:var(--fg-2);text-decoration:none;transition:all var(--dur-fast);}
+  .nav-item svg{width:18px;height:18px;flex-shrink:0;}
+  .nav-item:hover{background:var(--bg-section);color:var(--fg-1);}
+  .nav-item.active{background:var(--brand-50);color:var(--brand-700);font-weight:700;}
+  [data-theme="dark"] .nav-item.active{background:rgba(59,130,246,0.14);color:var(--brand-400);}
+  .nav-item .nbadge{margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:var(--brand-600);padding:1px 7px;border-radius:999px;}
+  .sidebar-footer{margin-top:auto;padding-top:20px;border-top:1px solid var(--border-3);}
+  .main{overflow:hidden;background:var(--bg-app);display:flex;flex-direction:column;}
+  .jd-topbar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border-1);background:var(--bg-card);}
+  .crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-4);}
+  .crumb a{color:var(--fg-3);text-decoration:none;font-weight:500;}
+  .crumb a:hover{color:var(--brand-600);}
+  .crumb svg{width:14px;height:14px;}
+  .jd-body{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 320px;gap:0;}
+  .jd-body::-webkit-scrollbar{width:6px;}.jd-body::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px;}
+  .jd-main{overflow-y:auto;padding:24px 28px 48px;border-right:1px solid var(--border-1);}
+  .jd-main::-webkit-scrollbar{width:5px;}.jd-main::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px;}
+  .jd-aside{overflow-y:auto;padding:20px;background:var(--bg-section);display:flex;flex-direction:column;gap:16px;}
+  .jd-aside::-webkit-scrollbar{width:5px;}.jd-aside::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px;}
+  .jd-hero{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;}
+  .jd-logo{width:56px;height:56px;border-radius:14px;background:#eff6ff;color:#2563eb;font-size:18px;font-weight:700;display:grid;place-items:center;flex-shrink:0;border:1.5px solid var(--border-1);}
+  .jd-hero-copy h1{font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--fg-1);margin:0 0 4px;letter-spacing:-0.02em;}
+  .jd-co{font-size:15px;color:var(--brand-700);font-weight:600;}
+  [data-theme="dark"] .jd-co{color:var(--brand-400);}
+  .jd-chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;}
+  .jd-chip{font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:999px;background:var(--bg-section);border:1.5px solid var(--border-2);color:var(--fg-2);}
+  .jd-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid var(--border-3);}
+  .prose h2{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--fg-1);margin:24px 0 10px;}
+  .prose h2:first-child{margin-top:0;}
+  .prose p{font-size:14.5px;line-height:1.7;color:var(--fg-2);margin:0 0 14px;}
+  .prose ul{padding-left:20px;margin:0 0 14px;}
+  .prose li{font-size:14.5px;line-height:1.7;color:var(--fg-2);margin-bottom:5px;}
+  .prose li::marker{color:var(--brand-500);}
+  .aside-card{background:var(--bg-card);border:1.5px solid var(--border-1);border-radius:14px;padding:16px;}
+  .aside-card h3{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--fg-1);margin:0 0 12px;}
+  .match-big{text-align:center;padding:6px 0 12px;}
+  .match-big .mn{font-family:var(--font-display);font-weight:800;font-size:36px;color:var(--brand-700);letter-spacing:-0.03em;}
+  [data-theme="dark"] .match-big .mn{color:var(--brand-400);}
+  .match-big .ml{font-size:13px;color:var(--fg-3);}
+  .match-bar{height:8px;border-radius:999px;background:var(--border-2);overflow:hidden;margin-bottom:10px;}
+  .match-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand-500),var(--success));}
+  .match-tips{display:flex;flex-direction:column;gap:6px;}
+  .mtip{font-size:12.5px;color:var(--fg-2);display:flex;align-items:flex-start;gap:7px;}
+  .mtip::before{content:'•';color:var(--brand-500);font-weight:700;flex-shrink:0;}
+  .detail-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border-3);font-size:13.5px;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-row .dk{color:var(--fg-3);}
+  .detail-row .dv{color:var(--fg-1);font-weight:600;text-align:right;}
+  .similar-job{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-3);cursor:pointer;}
+  .similar-job:last-child{border-bottom:none;}
+  .sj-logo{width:32px;height:32px;border-radius:8px;font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0;}
+  .sj-t{font-size:13.5px;font-weight:600;color:var(--fg-1);}
+  .sj-c{font-size:12px;color:var(--fg-3);}
+  .sj-pay{font-size:12.5px;font-weight:700;color:var(--success);white-space:nowrap;margin-left:auto;}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="Member Dashboard Desktop.html"><svg viewBox="0 0 32 32" fill="none" style="width:30px;height:30px"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg><b>RemoteJobs<span>44</span></b></a>
+  <div class="topbar-search"><div class="search-box"><svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Search remote jobs…"></div></div>
+  <div class="topbar-right">
+    <button class="theme-toggle tb-ico" aria-label="Toggle dark mode" aria-pressed="false" style="border:none"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+    <div class="tb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="tb-badge">3</span></div>
+    <span class="tb-name">Ada Obi</span><img class="tb-avatar" src="assets/people-4-portrait.jpg" alt="Ada Obi">
+  </div>
+</header>
+<div class="shell">
+  <nav class="sidebar">
+    <div class="nav-label">Menu</div>
+    <a class="nav-item" href="Member Dashboard Desktop.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+    <a class="nav-item active" href="Browse Jobs.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>Browse Jobs<span class="nbadge">12</span></a>
+    <a class="nav-item" href="Saved Jobs.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Saved Jobs</a>
+    <a class="nav-item" href="Applications.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Applications<span class="nbadge">4</span></a>
+    <div class="nav-label">Tools</div>
+    <a class="nav-item" href="CV Builder.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>CV Builder</a>
+    <a class="nav-item" href="Cover Letter.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Cover Letters</a>
+    <a class="nav-item" href="AI Interview.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>AI Interview</a>
+    <a class="nav-item" href="Job Match.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Job Match</a>
+    <div class="nav-label">Account</div>
+    <a class="nav-item" href="Profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
+    <a class="nav-item" href="Alerts.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="nbadge">3</span></a>
+    <div class="sidebar-footer"><a class="nav-item" href="B Login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</a></div>
+  </nav>
+  <main class="main">
+    <div class="jd-topbar" data-screen-label="Job Detail · Breadcrumb">
+      <div class="crumb"><a href="Browse Jobs.html">Browse Jobs</a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg><span>Senior Frontend Engineer</span></div>
+    </div>
+    <div class="jd-body">
+      <div class="jd-main" data-screen-label="Job Detail · Main">
+        <div class="jd-hero">
+          <div class="jd-logo">V</div>
+          <div class="jd-hero-copy">
+            <h1>Senior Frontend Engineer</h1>
+            <div class="jd-co">Vercel · Remote Worldwide</div>
+          </div>
+        </div>
+        <div class="jd-chips">
+          <span class="jd-chip">$180–230k / yr</span>
+          <span class="jd-chip">Full-time</span>
+          <span class="jd-chip">Senior</span>
+          <span class="jd-chip">Engineering</span>
+          <span class="jd-chip">Remote · Worldwide</span>
+          <span class="jd-chip">Posted 2h ago</span>
+        </div>
+        <div class="jd-actions">
+          <a href="Applications.html" class="btn btn-primary">Apply now →</a>
+          <button class="btn btn-ghost" id="saveBtn">Bookmark</button>
+          <a href="Cover Letter.html" class="btn btn-ghost">Write cover letter</a>
+          <a href="Job Match.html" class="btn btn-ghost">Check my fit</a>
+        </div>
+        <div class="prose">
+          <h2>About the role</h2>
+          <p>Vercel is looking for a Senior Frontend Engineer to help build the products that power the modern web. You'll work on highly-visible, performance-critical interfaces used by millions of developers worldwide — from our dashboard and deployment UX to onboarding flows and billing experiences.</p>
+          <p>This is a fully remote role open to candidates worldwide. We optimise for written communication, autonomy, and shipping thoughtfully.</p>
+          <h2>What you'll do</h2>
+          <ul>
+            <li>Build and maintain high-performance interfaces in React, Next.js and TypeScript</li>
+            <li>Lead frontend architecture decisions and mentor mid-level engineers</li>
+            <li>Own our design system component library and accessibility standards</li>
+            <li>Collaborate with design and product in Figma, from wireframe to production</li>
+            <li>Write thorough tests (Jest, Playwright) and own CI/CD quality gates</li>
+            <li>Participate in async code review with a globally distributed team</li>
+          </ul>
+          <h2>What we're looking for</h2>
+          <ul>
+            <li>5+ years of frontend engineering experience</li>
+            <li>Deep knowledge of React and TypeScript — you're opinionated and can defend tradeoffs</li>
+            <li>Strong CS fundamentals and a systems-level intuition for the web</li>
+            <li>Experience designing and shipping component libraries at scale</li>
+            <li>Excellent written communication — we're async-first across time zones</li>
+            <li>Experience with GraphQL or REST API design is a plus</li>
+          </ul>
+          <h2>Compensation &amp; benefits</h2>
+          <ul>
+            <li>$180,000 – $230,000 base salary (location-adjusted)</li>
+            <li>Equity package + 401(k) match</li>
+            <li>Fully remote — work from anywhere with reliable internet</li>
+            <li>$3,000 home office budget + $500/yr peripherals stipend</li>
+            <li>Paid via Deel — any country supported</li>
+          </ul>
+        </div>
+      </div>
+      <div class="jd-aside" data-screen-label="Job Detail · Aside">
+        <div class="aside-card">
+          <h3>Your match score</h3>
+          <div class="match-big"><div class="mn">85%</div><div class="ml">Strong match</div></div>
+          <div class="match-bar"><i style="width:85%"></i></div>
+          <div class="match-tips">
+            <div class="mtip">Covers 17 of 20 signals in your CV</div>
+            <div class="mtip">Add Playwright to reach 90%+</div>
+            <div class="mtip">Your remote track record is a strong fit</div>
+          </div>
+          <a href="Job Match.html" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:14px">Full analysis →</a>
+        </div>
+        <div class="aside-card">
+          <h3>Job details</h3>
+          <div class="detail-row"><span class="dk">Company</span><span class="dv">Vercel</span></div>
+          <div class="detail-row"><span class="dk">Level</span><span class="dv">Senior</span></div>
+          <div class="detail-row"><span class="dk">Type</span><span class="dv">Full-time</span></div>
+          <div class="detail-row"><span class="dk">Location</span><span class="dv">Remote · Worldwide</span></div>
+          <div class="detail-row"><span class="dk">Salary</span><span class="dv">$180–230k</span></div>
+          <div class="detail-row"><span class="dk">Posted</span><span class="dv">2 hours ago</span></div>
+          <div class="detail-row"><span class="dk">Payment</span><span class="dv">Deel · Any country</span></div>
+        </div>
+        <div class="aside-card">
+          <h3>Similar roles</h3>
+          <div class="similar-job">
+            <div class="sj-logo" style="background:#ecfeff;color:#0891b2">Cl</div>
+            <div><div class="sj-t">Frontend Engineer</div><div class="sj-c">Cloudflare</div></div>
+            <span class="sj-pay">$140–170k</span>
+          </div>
+          <div class="similar-job">
+            <div class="sj-logo" style="background:#f0fdf4;color:#16a34a">No</div>
+            <div><div class="sj-t">Senior Product Engineer</div><div class="sj-c">Notion</div></div>
+            <span class="sj-pay">$160–190k</span>
+          </div>
+          <div class="similar-job">
+            <div class="sj-logo" style="background:#faf5ff;color:#9333ea">Li</div>
+            <div><div class="sj-t">Frontend Lead</div><div class="sj-c">Linear</div></div>
+            <span class="sj-pay">€110–140k</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="shared.js"></script>
+<script>
+  initTheme('.theme-toggle','rj44-theme-dash');
+  document.getElementById('saveBtn').addEventListener('click',function(){this.textContent=this.textContent==='Bookmark'?'Bookmarked ✓':'Bookmark';});
+</script>
+</body>
+</html>

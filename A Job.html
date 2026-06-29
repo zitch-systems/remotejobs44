@@ -1,179 +1,114 @@
-<!DOCTYPE html>
-<!-- @dsCard group="Brand" name="Direction A — Job detail" subtitle="Spotlight — single job detail" -->
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Senior Frontend Engineer — Vercel · RemoteJobs44 (Spotlight)</title>
-<link rel="stylesheet" href="colors_and_type.css">
-<link rel="stylesheet" href="components.css">
-<style>
-  .detail-hero { position: relative; overflow: hidden; }
-  .detail-hero::before { content:''; position:absolute; inset:-60% 0 auto 0; height:160%; z-index:0; pointer-events:none; background: radial-gradient(ellipse 55% 70% at 22% 0%, rgba(37,99,235,0.10), transparent 62%); }
-  [data-theme="dark"] .detail-hero::before { background: radial-gradient(ellipse 55% 70% at 22% 0%, rgba(59,130,246,0.14), transparent 62%); }
-  .detail-hero .wrap { position: relative; z-index: 1; }
-</style>
-</head>
-<body>
+// RemoteJobs44 — data layer. Mock today; swap the API.* bodies for real fetch() later.
+export type Job = {
+  id: string; role: string; co: string; cat: string; type: string; region: string;
+  pay: string; posted: string; level: string; match: number; verified: boolean;
+  about: string; duties: string[];
+};
 
-<header class="site-header" data-screen-label="A · Job · Header">
-  <div class="wrap header-inner">
-    <a class="brand" href="Landing A.html">
-      <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/><circle cx="8" cy="20" r="1.5" fill="rgba(255,255,255,0.5)"/></svg>
-      <b>RemoteJobs<span>44</span></b>
-    </a>
-    <nav class="nav">
-      <a href="A Jobs.html">Browse Jobs</a>
-      <a href="Landing A.html">Categories</a>
-      <a href="Landing A.html">Companies</a>
-      <a href="Landing A.html">How It Works</a>
-    </nav>
-    <div class="header-actions">
-      <button class="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false">
-        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      </button>
-      <a href="#" class="btn btn-ghost btn-sm">Log In</a>
-      <a href="#" class="btn btn-primary btn-sm">Get Started Free</a>
-    </div>
-  </div>
-</header>
+const D = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-<section class="detail-hero" data-screen-label="A · Job · Hero">
-  <div class="wrap">
-    <div class="crumb" style="padding-top:26px">
-      <a href="Landing A.html">Home</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      <a href="A Jobs.html">Jobs</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      <span>Senior Frontend Engineer</span>
-    </div>
-    <div class="detail-top">
-      <span class="detail-logo" style="background:#ecfeff;color:#0891b2">VE</span>
-      <div class="detail-headmain">
-        <h1>Senior Frontend Engineer</h1>
-        <div class="detail-co">
-          <strong style="color:var(--fg-1);font-family:var(--font-display)">Vercel</strong>
-          <span class="dot"></span><span>Worldwide · Remote</span>
-          <span class="dot"></span><span class="job-flag" style="background:var(--warning-bg)">Featured</span>
-        </div>
-        <div class="detail-meta">
-          <span class="metachip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Full-time</span>
-          <span class="metachip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Remote · Worldwide</span>
-          <span class="metachip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Posted just now</span>
-          <span class="metachip" style="color:var(--success)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>$120k–$160k</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+export const JOBS: Job[] = [
+  { id:'j1', role:'Virtual Assistant', co:'Andela', cat:'VA', type:'Full-time', region:'Worldwide', pay:'$1.2k–2k/mo', posted:'2h', level:'Entry', match:96, verified:true,
+    about:'Support a distributed founder team with scheduling, inbox triage, travel and light research across timezones.',
+    duties:['Own calendars, inbox and meeting prep','Coordinate travel and expenses','Prepare docs, decks and notes','Light CRM and data entry'] },
+  { id:'j2', role:'Customer Service Rep', co:'Intercom', cat:'Support', type:'Full-time', region:'EMEA', pay:'$2.5k–3.4k/mo', posted:'4h', level:'Entry', match:92, verified:true,
+    about:'Be the first human our customers meet. Resolve tickets with empathy and speed.',
+    duties:['Resolve chat and email tickets','Hit CSAT and response-time goals','Document recurring issues','Partner with product on fixes'] },
+  { id:'j3', role:'Social Media Manager', co:'Buffer', cat:'Marketing', type:'Full-time', region:'Worldwide', pay:'$3.5k–4.8k/mo', posted:'6h', level:'Mid', match:90, verified:true,
+    about:'Own our voice across channels. Plan, write, publish and analyse content for a remote-first community.',
+    duties:['Run the content calendar','Write and schedule posts','Grow the community','Report on reach and conversion'] },
+  { id:'j4', role:'Digital Marketer', co:'Canva', cat:'Marketing', type:'Full-time', region:'Worldwide', pay:'$4k–6k/mo', posted:'8h', level:'Mid', match:88, verified:true,
+    about:'Drive top-of-funnel growth across global markets. Own SEO, lifecycle and paid experiments.',
+    duties:['Plan acquisition campaigns','Own SEO and content','Build lifecycle flows','Turn data into experiments'] },
+  { id:'j5', role:'Data Analyst', co:'Flutterwave', cat:'Data', type:'Full-time', region:'Worldwide', pay:'$4.5k–6.5k/mo', posted:'12h', level:'Mid', match:91, verified:true,
+    about:'Turn raw product and payments data into decisions. Build dashboards and answer leadership questions.',
+    duties:['Model data in SQL and dbt','Build dashboards','Run experiment analysis','Tell stories with data'] },
+  { id:'j6', role:'Product Manager', co:'Paystack', cat:'Product', type:'Full-time', region:'Worldwide', pay:'$6k–9k/mo', posted:'1d', level:'Senior', match:87, verified:true,
+    about:'Own a payments surface end-to-end. Talk to users, shape the roadmap, ship things merchants love.',
+    duties:['Own discovery and roadmap','Write crisp specs','Partner with design and eng','Measure outcomes'] },
+  { id:'j7', role:'Senior Software Engineer', co:'Vercel', cat:'Engineering', type:'Full-time', region:'Worldwide', pay:'$120k–160k', posted:'1d', level:'Senior', match:94, verified:true,
+    about:'Ship React + TypeScript features end-to-end and steward our design system and performance budget.',
+    duties:['Build features end-to-end','Lead the design system','Own performance and a11y','Mentor and review'] },
+  { id:'j8', role:'Sales Manager', co:'Shopify', cat:'Sales', type:'Full-time', region:'Worldwide', pay:'$70k–95k + OTE', posted:'2d', level:'Senior', match:84, verified:true,
+    about:'Lead a remote SMB sales pod. Coach reps, forecast accurately, and own the number.',
+    duties:['Coach and grow the team','Own pipeline and forecast','Refine the sales motion','Partner with marketing'] },
+];
 
-<div class="wrap">
-  <div class="detail-grid">
-    <main class="prose" data-screen-label="A · Job · Body">
-      <h2>About the role</h2>
-      <p>Vercel is looking for a Senior Frontend Engineer to help build the products that power the modern web. You'll work on highly-visible, performance-critical interfaces used by millions of developers — from the dashboard to the deployment experience — collaborating closely with design and platform teams across time zones.</p>
-      <p>This is a fully remote role open to candidates worldwide &mdash; we hire across time zones, not borders. We optimise for written communication, autonomy, and shipping thoughtfully.</p>
+export const CATEGORIES = [
+  { key:'VA', label:'Virtual Assistant', count:'2.1k' }, { key:'Support', label:'Customer Service', count:'1.8k' },
+  { key:'Marketing', label:'Marketing', count:'1.3k' }, { key:'Data', label:'Data & Analytics', count:'920' },
+  { key:'Product', label:'Product', count:'610' }, { key:'Engineering', label:'Engineering', count:'2.1k' },
+  { key:'Sales', label:'Sales', count:'780' }, { key:'Design', label:'Design', count:'840' },
+];
 
-      <h2>What you'll do</h2>
-      <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Build and own complex, accessible interfaces in React and TypeScript.</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Partner with design to turn ambitious concepts into polished, fast experiences.</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Set the bar for performance, raising Core Web Vitals across the product.</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Mentor engineers and contribute to a thoughtful, kind code-review culture.</li>
-      </ul>
+export type Filter = { q?: string; cat?: string | null; type?: string | null; region?: string | null };
 
-      <h2>What we're looking for</h2>
-      <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>5+ years building production web applications with React.</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Deep understanding of browser performance and rendering.</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Strong written communication for an async, distributed team.</li>
-      </ul>
+// The single seam a real backend drops into.
+export const API = {
+  async listJobs(f: Filter = {}): Promise<Job[]> {
+    await D(120);
+    const q = (f.q || '').trim().toLowerCase();
+    return JOBS.filter(j =>
+      (!f.cat || j.cat === f.cat) && (!f.type || j.type === f.type) && (!f.region || j.region === f.region) &&
+      (!q || `${j.role} ${j.co} ${j.cat}`.toLowerCase().includes(q)));
+  },
+  async getJob(id: string) { await D(80); return JOBS.find(j => j.id === id) || null; },
+  async categories() { await D(50); return CATEGORIES; },
+  async signIn(email: string) {
+    await D(380);
+    const h = (email || '').split('@')[0].replace(/[._-]+/g, ' ').trim();
+    const name = h ? h.replace(/\b\w/g, c => c.toUpperCase()) : 'Ada Obi';
+    return { id: 'me', name, email };
+  },
+};
 
-      <h2>Skills</h2>
-      <div class="tagrow">
-        <span class="skill">React</span><span class="skill">TypeScript</span><span class="skill">Next.js</span>
-        <span class="skill">Performance</span><span class="skill">Accessibility</span><span class="skill">CSS</span><span class="skill">Testing</span>
-      </div>
+// ---- Notifications / inbox ----
+export type Notif = { id: string; kind: 'match' | 'status' | 'interview' | 'alert' | 'tip'; title: string; body: string; at: string; jobId?: string };
+export const NOTIFICATIONS: Notif[] = [
+  { id: 'n1', kind: 'match', title: 'New 96% match', body: 'Virtual Assistant at Andela fits your profile.', at: '2h', jobId: 'j1' },
+  { id: 'n2', kind: 'status', title: 'Application viewed', body: 'Intercom opened your application.', at: '5h', jobId: 'j2' },
+  { id: 'n3', kind: 'interview', title: 'Interview request', body: 'Buffer invited you to a first call.', at: '1d', jobId: 'j3' },
+  { id: 'n4', kind: 'alert', title: '9 new remote roles', body: 'Fresh Marketing roles match your alerts.', at: '1d' },
+  { id: 'n5', kind: 'tip', title: 'Boost your profile', body: 'Add 2 more skills to reach 100% strength.', at: '2d' },
+];
 
-      <h2>About Vercel</h2>
-      <p>Vercel is the platform for frontend developers, providing the speed and reliability innovators need to create at the moment of inspiration. Fully distributed, with teammates in 190+ countries.</p>
-    </main>
+// ---- Application status model (6 states) ----
+export type Tone = 'brand' | 'amber' | 'green' | 'rose' | 'slate';
+export const STATUSES: { key: string; label: string; tone: Tone }[] = [
+  { key: 'Applied', label: 'Applied', tone: 'brand' },
+  { key: 'In review', label: 'In review', tone: 'amber' },
+  { key: 'Interview', label: 'Interview', tone: 'amber' },
+  { key: 'Offer', label: 'Offer', tone: 'green' },
+  { key: 'Not selected', label: 'Not selected', tone: 'rose' },
+  { key: 'Withdrawn', label: 'Withdrawn', tone: 'slate' },
+];
+export const statusMeta = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
 
-    <aside data-screen-label="A · Job · Apply">
-      <div class="aside-card">
-        <div class="aside-pay">$120k–$160k <span>/ year</span></div>
-        <div class="aside-list">
-          <div class="row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Type</span><span class="v">Full-time</span></div>
-          <div class="row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Location</span><span class="v">Worldwide</span></div>
-          <div class="row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Level</span><span class="v">Senior</span></div>
-          <div class="row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Posted</span><span class="v">Just now</span></div>
-        </div>
-        <a href="#" class="btn btn-primary btn-lg">Apply Now →</a>
-        <div class="detail-actions" style="margin-top:12px">
-          <button class="icon-btn" aria-label="Save job" onclick="this.classList.toggle('on')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          </button>
-          <button class="icon-btn" aria-label="Share" onclick="this.classList.add('on')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-          </button>
-        </div>
-        <p class="aside-note">Apply directly on the company site — verified link.</p>
-      </div>
+// ---- Similar roles ----
+export const similarJobs = (job: Job, n = 3) =>
+  JOBS.filter(j => j.id !== job.id && (j.cat === job.cat || j.level === job.level)).slice(0, n);
 
-      <div class="aside-card">
-        <div style="display:flex;align-items:center;gap:12px">
-          <span class="job-logo" style="--lm-bg:#ecfeff;--lm-fg:#0891b2">VE</span>
-          <div><h4>Vercel</h4><span class="sm" style="font-size:13px;color:var(--fg-3)">190+ countries · Remote-first</span></div>
-        </div>
-        <p class="co-blurb">The platform for frontend developers — speed and reliability to create at the moment of inspiration.</p>
-        <a href="#" class="btn btn-ghost btn-sm" style="margin-top:14px;width:100%;justify-content:center">View company →</a>
-      </div>
+// ---- Plans / Pro ----
+export const PRO_PRICE = { monthly: '$19', yearly: '$150', daily: '$3' };
+export const FREE_FEATURES = [
+  'Browse 70,000+ verified roles',
+  'Up to 3 applications per day',
+  'Save jobs & daily alerts',
+];
+export const PRO_FEATURES = [
+  'Unlimited applications, every day',
+  'One-tap apply with your saved CV',
+  'AI CV review, cover letters & interview prep',
+  'See who viewed your application',
+  'Priority access to brand-new roles',
+];
 
-      <div class="aside-card similar" id="similar">
-        <h4 style="margin-bottom:8px">Similar roles</h4>
-      </div>
-    </aside>
-  </div>
-</div>
-
-<footer class="site-footer" data-screen-label="A · Job · Footer">
-  <div class="wrap">
-    <div class="footer-grid">
-      <div>
-        <a class="brand" href="Landing A.html">
-          <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg>
-          <b>RemoteJobs<span>44</span></b>
-        </a>
-        <p class="footer-blurb">The remote-first job board for talent everywhere. Over 70,000+ jobs verified and listed.</p>
-      </div>
-      <div><h5>For job seekers</h5><a href="A Jobs.html">Browse jobs</a><a href="Landing A.html">Categories</a><a href="#">Saved jobs</a><a href="Landing A.html">How it works</a></div>
-      <div><h5>Company</h5><a href="#">About</a><a href="#">Blog</a><a href="#">Contact</a><a href="#">Careers</a></div>
-      <div><h5>Support</h5><a href="#">Help center</a><a href="#">hello@remotejobs44.com</a><a href="#">WhatsApp</a><a href="#">Privacy</a></div>
-    </div>
-    <div class="footer-bottom">
-      <span>© 2026 RemoteJobs44. Built for remote talent everywhere.</span>
-      <span>Over 70,000+ jobs verified and listed · Updated daily</span>
-    </div>
-  </div>
-</footer>
-
-<script src="shared.js"></script>
-<script>
-  initTheme('.theme-toggle', 'rj44-theme-a');
-  // Similar roles
-  (function(){
-    const root = document.getElementById('similar');
-    [2,7,10].map(i => JOBS[i]).forEach(j => {
-      const [bg,fg] = LOGO_TINTS[COMPANIES.indexOf(j.company) % LOGO_TINTS.length] || ['#eff6ff','#2563eb'];
-      const a = document.createElement('a');
-      a.href = 'A Job.html';
-      a.innerHTML = `<span class="job-logo" style="--lm-bg:${bg};--lm-fg:${fg}">${monogram(j.company)}</span>
-        <span><div class="st">${j.title}</div><div class="sm">${j.company} · ${j.region}</div></span>
-        <span class="sp">${j.pay.split('–')[0]}+</span>`;
-      root.appendChild(a);
-    });
-  })();
-</script>
-</body>
-</html>
+// ---- AI toolkit ----
+export const AI_TOOLS = [
+  { key: 'cv', icon: 'spark', title: 'AI CV review', blurb: 'Score your CV and get fixes in seconds.', cta: 'Review my CV',
+    result: ['Strong match for remote VA & coordination roles.', 'Add 2 metrics to your last role (time saved, inbox volume).', 'Lead with tools: Notion, Google Workspace, Slack.', 'Tighten the summary to 2 lines.'] },
+  { key: 'cover', icon: 'doc', title: 'AI cover letter', blurb: 'A tailored letter for any role you pick.', cta: 'Write my letter',
+    result: ['Dear Hiring Team,', 'I\u2019m excited to apply for this remote role. Over the past three years I\u2019ve supported distributed founders\u2014owning calendars, inbox triage and research across timezones\u2014cutting admin time by ~30%.', 'I\u2019d love to bring that same calm, organised support to your team.', 'Warmly, Ada'] },
+  { key: 'interview', icon: 'chat', title: 'AI interview prep', blurb: 'Practice the questions you\u2019ll actually get.', cta: 'Start practising',
+    result: ['Tell me about a time you managed competing priorities.', 'How do you keep a founder\u2019s inbox at zero?', 'Which tools do you reach for first, and why?', 'How do you handle a timezone clash with a client?'] },
+];

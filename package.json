@@ -1,69 +1,75 @@
-{
-  "name": "remotejobs44",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "type-check": "tsc --noEmit",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
-    "test:unit:coverage": "vitest run --coverage"
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^3.9.0",
-    "@radix-ui/react-avatar": "^1.1.0",
-    "@radix-ui/react-checkbox": "^1.1.1",
-    "@radix-ui/react-dialog": "^1.1.1",
-    "@radix-ui/react-dropdown-menu": "^2.1.1",
-    "@radix-ui/react-select": "^2.1.1",
-    "@radix-ui/react-switch": "^1.1.0",
-    "@radix-ui/react-tabs": "^1.1.0",
-    "@radix-ui/react-toast": "^1.2.1",
-    "@radix-ui/react-tooltip": "^1.1.2",
-    "@sparticuz/chromium": "^149.0.0",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.106.1",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/functions": "^3.6.0",
-    "@vercel/speed-insights": "^2.0.0",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.400.0",
-    "next": "16.2.6",
-    "next-themes": "^0.4.6",
-    "puppeteer-core": "^25.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-hook-form": "^7.80.0",
-    "sharp": "^0.33.4",
-    "tailwind-merge": "^3.6.0",
-    "zod": "^3.23.8",
-    "zustand": "^5.0.14"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.45.2",
-    "@tailwindcss/forms": "^0.5.11",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/node": "^20.14.10",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitest/coverage-v8": "^4.1.7",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "16.2.9",
-    "postcss": "^8.5.10",
-    "simple-icons": "^16.24.0",
-    "tailwindcss": "^4.3.1",
-    "typescript": "^5.5.3",
-    "vitest": "^4.1.7"
-  },
-  "overrides": {
-    "postcss": "$postcss"
-  }
+# RemoteJobs44 — Native app (React Native / Expo)
+
+A React Native port of the RemoteJobs44 mobile experience, sharing the **Deep Ocean** design language with the PWA in `../app`. Built with **Expo** so the same codebase ships to **Android (`.apk`/`.aab`)** and **iOS (`.ipa`)**.
+
+## What's inside
+```
+_native/
+├─ App.tsx              Navigation root (onboarding → auth gate → tabs + stack)
+├─ app.json            Expo config (icons, splash, bundle IDs)
+├─ package.json        Dependencies (Expo 51, React Navigation, AsyncStorage, SVG)
+├─ assets/             icon.png · adaptive-icon.png · splash.png
+└─ src/
+   ├─ theme.ts         Light + dark tokens (mirrors the PWA palette)
+   ├─ data.ts          Mock data + `API.*` seam · notifications · statuses · plans · AI
+   ├─ store.tsx        Context + AsyncStorage (saved/applied/profile/theme/Pro/onboarding)
+   ├─ ui.tsx           Icon, Logo, CompanyLogo, JobCard
+   ├─ screens.tsx      Auth · Feed · Search · Detail · Applications · Saved · Profile
+   ├─ extra.tsx        Onboarding · Inbox · Edit profile · Preferences · Invite
+   └─ pro.tsx          Plans/Paywall · Settings · AI toolkit · Reset password
+```
+
+> The folder is named **`_native`** (leading underscore) so this project's
+> design-system compiler ignores it — npm packages like React Navigation can't
+> resolve in that pass. Rename to `native/` if you lift it into its own repo.
+
+## Run it (development)
+```bash
+cd _native
+npm install
+npx expo start            # press a = Android, i = iOS, or scan the QR in Expo Go
+```
+> Requires Node 18+. For native runs you need Android Studio (emulator) or Xcode (simulator); or use the **Expo Go** app on a real device.
+
+## Build store binaries (EAS)
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure        # writes eas.json, sets the projectId in app.json
+
+# Android — installable .apk for sideloading / testing:
+eas build -p android --profile preview
+
+# Android — .aab for the Play Store:
+eas build -p android --profile production
+
+# iOS — .ipa (needs an Apple Developer account):
+eas build -p ios --profile production
+```
+The `.apk` download link is printed when the build finishes (and appears in your Expo dashboard).
+
+> Tip: add this to `eas.json` so the preview profile emits an installable APK rather than an AAB:
+> ```json
+> { "build": { "preview": { "android": { "buildType": "apk" } } } }
+> ```
+
+## Wiring a real backend
+Everything goes through `src/data.ts → API`. Replace the mock bodies with `fetch()`:
+```ts
+async listJobs(f) {
+  const r = await fetch(`https://api.remotejobs44.com/jobs?` + new URLSearchParams(f as any));
+  return r.json();
 }
+```
+No screen changes needed — the UI only depends on the `API` shape and the `Job` type.
+
+## Parity notes
+- **Reconciliation:** the screens in `extra.tsx` / `pro.tsx` (onboarding, inbox,
+  edit profile, job preferences, plans/paywall, settings, AI toolkit, reset
+  password) plus the Pro/free daily-apply cap, 6-state application tracker,
+  notification bell + badge, similar-roles and “apply on company site” close the
+  gaps documented in `../uploads/MOBILE_DESIGN_RECONCILIATION.md`.
+- **Fonts:** the PWA uses Sora + DM Sans (Google Fonts). Add them with `expo-font` / `@expo-google-fonts/sora` + `@expo-google-fonts/dm-sans` and set `theme.font` for pixel parity; the scaffold falls back to system fonts.
+- **Company logos** load from DuckDuckGo's favicon service (same as the PWA) with a monogram fallback.
+- **Persistence** uses AsyncStorage; the PWA uses localStorage. Same keys/shape conceptually.
+- Screens are intentionally compact ports — extend Detail (apply sheet, share), Notifications, and CV/skills editing to match the PWA 1:1 as needed.

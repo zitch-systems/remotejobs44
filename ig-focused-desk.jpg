@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Deep Ocean — Member Dashboard (Desktop)" subtitle="Post-login dashboard: tracker, matches, tools, profile" viewport="1280x900" -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — RemoteJobs44</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  /* ============ Member Dashboard — Deep Ocean ============ */
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  /* Top bar */
+  .topbar { position: relative;
+    flex-shrink: 0; display: flex; align-items: center; gap: 18px;
+    height: 60px; padding: 0 24px;
+    background: var(--bg-card); border-bottom: 1px solid var(--border-1);
+    z-index: 100;
+  }
+  .topbar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .topbar .brand b { font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--fg-1); letter-spacing: -0.02em; }
+  .topbar .brand b span { color: var(--brand-600); }
+  .topbar-search { /* centered */ position: absolute; left: 50%; transform: translateX(-50%); top: 18px; width: clamp(240px, 30vw, 360px); flex: none; max-width: none; }
+  .topbar-search .search-box { height: 36px; background: var(--bg-section); border-color: var(--border-2); }
+  .topbar-search .search-box input { font-size: 13.5px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .tb-ico { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border-2); background: var(--bg-section); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg-3); position: relative; }
+  .tb-ico:hover { color: var(--fg-1); border-color: var(--brand-400); }
+  .tb-badge { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--brand-600); color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center; }
+  .tb-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--brand-300); cursor: pointer; }
+  .tb-name { font-size: 13.5px; font-weight: 600; color: var(--fg-1); }
+
+  /* Shell */
+  .shell { flex: 1; display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    overflow-y: auto; background: var(--bg-card); border-right: 1px solid var(--border-1);
+    padding: 20px 12px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; } .sidebar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  .nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-4); padding: 14px 10px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--fg-2); text-decoration: none; cursor: pointer; transition: all var(--dur-fast); }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--bg-section); color: var(--fg-1); }
+  .nav-item.active { background: var(--brand-50); color: var(--brand-700); font-weight: 700; }
+  [data-theme="dark"] .nav-item.active { background: rgba(59,130,246,0.14); color: var(--brand-400); }
+  .nav-item .nbadge { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--brand-600); padding: 1px 7px; border-radius: 999px; }
+  .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-3); }
+
+  /* Main */
+  .main { overflow-y: auto; background: var(--bg-app); }
+  .main::-webkit-scrollbar { width: 6px; } .main::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  .dash-wrap { max-width: 1040px; margin: 0 auto; padding: 28px 28px 48px; display: flex; flex-direction: column; gap: 28px; }
+
+  /* Greeting */
+  .greeting { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .greeting-copy h1 { font-family: var(--font-display); font-weight: 800; font-size: 24px; color: var(--fg-1); margin: 0 0 4px; letter-spacing: -0.02em; }
+  .greeting-copy p { font-size: 14px; color: var(--fg-3); margin: 0; }
+  .greeting-actions { display: flex; gap: 10px; }
+
+  /* Stats row */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stat-card { background: var(--bg-card); border: 1.5px solid var(--border-1); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .stat-card .si { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; }
+  .stat-card .si svg { width: 18px; height: 18px; }
+  .stat-card .sn { font-family: var(--font-display); font-weight: 800; font-size: 28px; color: var(--fg-1); letter-spacing: -0.03em; line-height: 1; }
+  .stat-card .sl { font-size: 13px; color: var(--fg-3); margin-top: 2px; }
+  .stat-card .sdelta { font-size: 12px; font-weight: 600; color: var(--success); margin-top: 6px; }
+
+  /* Two-col grid */
+  .grid-2 { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  /* Section heading */
+  .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--fg-1); margin: 0; }
+  .sec-head .sub { font-size: 13px; color: var(--fg-3); }
+  .sec-head a { font-size: 13px; font-weight: 600; color: var(--brand-600); text-decoration: none; }
+  .sec-head a:hover { text-decoration: underline; }
+
+  /* Card base */
+  .card { background: var(--bg-card); border: 1.5px solid var(--border-1); border-radius: 16px; padding: 20px; }
+
+  /* Progress bar */
+  .progress-bar { height: 8px; border-radius: 999px; background: var(--border-2); overflow: hidden; margin-top: 8px; }
+  .progress-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand-500), var(--accent)); }
+
+  /* Application rows */
+  .app-row { display: flex; align-items: center; gap: 13px; padding: 12px 0; border-bottom: 1px solid var(--border-3); }
+  .app-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .app-logo { width: 38px; height: 38px; border-radius: 10px; font-size: 13px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+  .app-info { flex: 1; min-width: 0; }
+  .app-info .at { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-info .am { font-size: 12.5px; color: var(--fg-3); margin-top: 1px; }
+  .app-status { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+  .status-applied { background: rgba(37,99,235,0.1); color: var(--brand-600); }
+  .status-interview { background: rgba(249,115,22,0.1); color: var(--accent); }
+  .status-offer { background: rgba(34,197,94,0.12); color: var(--success); }
+  .status-saved { background: var(--bg-section); color: var(--fg-3); }
+
+  /* Match rows */
+  .match-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border-3); }
+  .match-row:last-child { border-bottom: none; }
+  .match-row .app-info .am { display: flex; align-items: center; gap: 8px; }
+  .match-pct { font-family: var(--font-display); font-weight: 800; font-size: 15px; color: var(--success); flex-shrink: 0; }
+
+  /* Tools quick-launch */
+  .tool-row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 12px; border: 1.5px solid var(--border-1); background: var(--bg-section); text-decoration: none; transition: border-color var(--dur-fast), background var(--dur-fast); }
+  .tool-row:hover { border-color: var(--brand-400); background: var(--brand-50); }
+  [data-theme="dark"] .tool-row:hover { background: rgba(59,130,246,0.1); }
+  .tool-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+  .tool-ic svg { width: 18px; height: 18px; }
+  .tool-name { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--fg-1); }
+  .tool-desc { font-size: 12px; color: var(--fg-3); margin-top: 1px; }
+  .tool-arrow { margin-left: auto; color: var(--fg-4); }
+  .tool-arrow svg { width: 16px; height: 16px; }
+
+  /* CV strength */
+  .cv-ring-wrap { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
+  .cv-ring { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+  .cv-ring svg { transform: rotate(-90deg); }
+  .cv-ring .score { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--fg-1); }
+  .cv-tips { display: flex; flex-direction: column; gap: 8px; }
+  .cv-tip { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--fg-2); }
+  .cv-tip .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Alert banner */
+  .alert-banner { display: flex; align-items: center; gap: 14px; background: var(--brand-50); border: 1.5px solid var(--brand-200); border-radius: 14px; padding: 14px 18px; }
+  [data-theme="dark"] .alert-banner { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
+  .alert-banner .ab-ic { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-100); color: var(--brand-700); display: grid; place-items: center; flex-shrink: 0; }
+  [data-theme="dark"] .alert-banner .ab-ic { background: rgba(37,99,235,0.2); color: var(--brand-400); }
+  .alert-banner .ab-ic svg { width: 20px; height: 20px; }
+  .alert-banner .ab-copy { flex: 1; }
+  .alert-banner .ab-copy b { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--brand-800); display: block; }
+  [data-theme="dark"] .alert-banner .ab-copy b { color: var(--brand-300); }
+  .alert-banner .ab-copy span { font-size: 13px; color: var(--fg-2); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <a class="brand" href="Member Dashboard Desktop.html">
+    <svg viewBox="0 0 32 32" fill="none" style="width:30px;height:30px"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M8 20 Q12 10 16 16 Q20 22 23 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="23" cy="12" r="2.5" fill="#f97316"/></svg>
+    <b>RemoteJobs<span>44</span></b>
+  </a>
+  <div class="topbar-search">
+    <div class="search-box">
+      <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Search remote jobs…">
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-toggle tb-ico" aria-label="Toggle dark mode" aria-pressed="false" style="border:none">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+    <div class="tb-ico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="tb-badge">3</span>
+    </div>
+    <span class="tb-name">Ada Obi</span>
+    <img class="tb-avatar" src="assets/people-4-portrait.jpg" alt="Ada Obi">
+  </div>
+</header>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-label">Menu</div>
+    <a class="nav-item active" href="Member Dashboard Desktop.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item" href="Browse Jobs.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+      Browse Jobs
+      <span class="nbadge">12</span>
+    </a>
+    <a class="nav-item" href="Saved Jobs.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      Saved Jobs
+    </a>
+    <a class="nav-item" href="Applications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Applications
+      <span class="nbadge">4</span>
+    </a>
+    <div class="nav-label">Tools</div>
+    <a class="nav-item" href="CV Builder.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+      CV Builder
+    </a>
+    <a class="nav-item" href="Cover Letter.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Cover Letters
+    </a>
+    <a class="nav-item" href="AI Interview.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      AI Interview
+    </a>
+    <a class="nav-item" href="Job Match.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      Job Match
+    </a>
+    <div class="nav-label">Account</div>
+    <a class="nav-item" href="Profile.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </a>
+    <a class="nav-item" href="Alerts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      Alerts<span class="nbadge">3</span>
+    </a>
+    <div class="sidebar-footer">
+      <a class="nav-item" href="B Login.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="dash-wrap">
+
+      <!-- Alert banner -->
+      <div class="alert-banner">
+        <div class="ab-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <div class="ab-copy">
+          <b>12 new roles match your saved search</b>
+          <span>Engineering · Remote · Senior — updated this morning</span>
+        </div>
+        <a href="Browse Jobs.html" class="btn btn-primary btn-sm">Browse now</a>
+      </div>
+
+      <!-- Greeting -->
+      <div class="greeting" data-screen-label="Dashboard · Greeting">
+        <div class="greeting-copy">
+          <h1>Good morning, Ada 👋</h1>
+          <p>You have 4 active applications and 3 interviews to prepare for this week.</p>
+        </div>
+        <div class="greeting-actions">
+          <a href="Browse Jobs.html" class="btn btn-ghost btn-sm">Browse jobs</a>
+          <a href="CV Builder.html" class="btn btn-primary btn-sm">Upload new CV</a>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-row" data-screen-label="Dashboard · Stats">
+        <div class="stat-card">
+          <div class="si" style="background:#eff6ff;color:#2563eb">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="sn">4</div>
+          <div class="sl">Active applications</div>
+          <div class="sdelta">↑ 2 this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="si" style="background:#fff7ed;color:#ea580c">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          </div>
+          <div class="sn">3</div>
+          <div class="sl">Interviews scheduled</div>
+          <div class="sdelta">↑ 1 new invite</div>
+        </div>
+        <div class="stat-card">
+          <div class="si" style="background:#f0fdf4;color:#16a34a">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="sn">18</div>
+          <div class="sl">Saved jobs</div>
+          <div class="sdelta">5 still open</div>
+        </div>
+        <div class="stat-card">
+          <div class="si" style="background:#faf5ff;color:#9333ea">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+          </div>
+          <div class="sn">78%</div>
+          <div class="sl">Profile strength</div>
+          <div class="progress-bar"><i style="width:78%"></i></div>
+        </div>
+      </div>
+
+      <!-- Two-col main -->
+      <div class="grid-2" data-screen-label="Dashboard · Main">
+        <!-- Applications -->
+        <div>
+          <div class="sec-head"><h2>Application tracker</h2><a href="Applications.html">View all →</a></div>
+          <div class="card">
+            <div class="app-row">
+              <div class="app-logo" style="background:#eff6ff;color:#2563eb">V</div>
+              <div class="app-info"><div class="at">Senior Frontend Engineer</div><div class="am">Vercel · Remote Worldwide</div></div>
+              <span class="app-status status-interview">Interview</span>
+            </div>
+            <div class="app-row">
+              <div class="app-logo" style="background:#fdf2f8;color:#db2777">St</div>
+              <div class="app-info"><div class="at">Product Designer</div><div class="am">Stripe · Remote US/EU</div></div>
+              <span class="app-status status-applied">Applied</span>
+            </div>
+            <div class="app-row">
+              <div class="app-logo" style="background:#fff7ed;color:#ea580c">An</div>
+              <div class="app-info"><div class="at">Growth Marketing Lead</div><div class="am">Andela · Remote Africa</div></div>
+              <span class="app-status status-interview">Interview</span>
+            </div>
+            <div class="app-row">
+              <div class="app-logo" style="background:#f0fdf4;color:#16a34a">Sh</div>
+              <div class="app-info"><div class="at">Full-Stack Engineer</div><div class="am">Shopify · Remote Canada/US</div></div>
+              <span class="app-status status-offer">Offer 🎉</span>
+            </div>
+            <div class="app-row">
+              <div class="app-logo" style="background:#eff6ff;color:#2563eb">Gi</div>
+              <div class="app-info"><div class="at">Staff Engineer</div><div class="am">GitHub · Remote Worldwide</div></div>
+              <span class="app-status status-saved">Saved</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <!-- CV strength -->
+          <div>
+            <div class="sec-head"><h2>CV strength</h2><a href="#">Improve →</a></div>
+            <div class="card">
+              <div class="cv-ring-wrap">
+                <div class="cv-ring">
+                  <svg width="72" height="72" viewBox="0 0 72 72">
+                    <circle cx="36" cy="36" r="28" fill="none" stroke="var(--border-2)" stroke-width="8"/>
+                    <circle cx="36" cy="36" r="28" fill="none" stroke="url(#cvGrad)" stroke-width="8" stroke-dasharray="175.9" stroke-dashoffset="38.7" stroke-linecap="round"/>
+                    <defs><linearGradient id="cvGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#f97316"/></linearGradient></defs>
+                  </svg>
+                  <div class="score">78</div>
+                </div>
+                <div>
+                  <div style="font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--fg-1)">ATS Score: Good</div>
+                  <div style="font-size:13px;color:var(--fg-3);margin-top:3px">Add 2 more skills to hit 90+</div>
+                </div>
+              </div>
+              <div class="cv-tips">
+                <div class="cv-tip"><span class="dot" style="background:#22c55e"></span>Contact details complete</div>
+                <div class="cv-tip"><span class="dot" style="background:#22c55e"></span>Work history added</div>
+                <div class="cv-tip"><span class="dot" style="background:#f97316"></span>Skills section needs 2 more</div>
+                <div class="cv-tip"><span class="dot" style="background:#ef4444"></span>Missing a summary section</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top matches -->
+          <div>
+            <div class="sec-head"><h2>Top job matches</h2><a href="Browse Jobs.html">See all →</a></div>
+            <div class="card">
+              <div class="match-row">
+                <div class="app-logo" style="background:#eff6ff;color:#2563eb;width:36px;height:36px;font-size:12px;border-radius:9px">Fg</div>
+                <div class="app-info"><div class="at" style="font-size:13.5px">Staff UX Designer</div><div class="am"><span>Figma</span><span style="color:var(--border-2)"> · </span><span>Remote</span></div></div>
+                <span class="match-pct">94%</span>
+              </div>
+              <div class="match-row">
+                <div class="app-logo" style="background:#fdf2f8;color:#db2777;width:36px;height:36px;font-size:12px;border-radius:9px">Li</div>
+                <div class="app-info"><div class="at" style="font-size:13.5px">Frontend Lead</div><div class="am"><span>Linear</span><span style="color:var(--border-2)"> · </span><span>Remote EU</span></div></div>
+                <span class="match-pct">91%</span>
+              </div>
+              <div class="match-row">
+                <div class="app-logo" style="background:#f0fdf4;color:#16a34a;width:36px;height:36px;font-size:12px;border-radius:9px">No</div>
+                <div class="app-info"><div class="at" style="font-size:13.5px">Senior Product Engineer</div><div class="am"><span>Notion</span><span style="color:var(--border-2)"> · </span><span>Remote</span></div></div>
+                <span class="match-pct">88%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tools grid -->
+      <div data-screen-label="Dashboard · Tools">
+        <div class="sec-head"><h2>Your tools</h2></div>
+        <div class="grid-3">
+          <a class="tool-row" href="CV Builder.html">
+            <div class="tool-ic" style="background:#eff6ff;color:#2563eb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg></div>
+            <div><div class="tool-name">CV Builder</div><div class="tool-desc">ATS-ready · 78% score</div></div>
+            <div class="tool-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          </a>
+          <a class="tool-row" href="AI Interview.html">
+            <div class="tool-ic" style="background:#fff7ed;color:#ea580c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            <div><div class="tool-name">AI Interview</div><div class="tool-desc">3 sessions remaining</div></div>
+            <div class="tool-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          </a>
+          <a class="tool-row" href="Cover Letter.html">
+            <div class="tool-ic" style="background:#fdf2f8;color:#db2777"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div><div class="tool-name">Cover Letter</div><div class="tool-desc">2 drafts saved</div></div>
+            <div class="tool-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  initTheme('.theme-toggle', 'rj44-theme-dash');
+</script>
+</body>
+</html>
