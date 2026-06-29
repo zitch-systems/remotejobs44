@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { waLink } from '@/lib/whatsapp';
+import { isMemberRoute } from '@/lib/member-routes';
 
 // High-res SVG social icons - crisp at any resolution
 const SOCIAL = [
@@ -126,6 +128,10 @@ const FOOTER_LINKS = {
 };
 
 export function Footer() {
+  // Signed-in member routes use the MemberShell chrome instead of the
+  // marketing footer.
+  const pathname = usePathname();
+  if (isMemberRoute(pathname)) return null;
   // Rendered on every breakpoint (was `hidden md:block`). Under mobile-first
   // indexing Googlebot crawls the mobile viewport, so a footer hidden on
   // mobile starved the programmatic landing pages of their sitewide internal

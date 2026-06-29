@@ -15,6 +15,7 @@ import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, Slid
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { isMemberRoute } from '@/lib/member-routes';
 
 // Surfacing the high-value SEO hub pages (Salary Guide, Resources) in the
 // primary nav gives them a sitewide internal link from a prominent,
@@ -87,6 +88,10 @@ export function Header() {
   const planColor = user?.plan === 'free'
     ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
     : 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400';
+
+  // Signed-in member routes render the MemberShell top bar instead of the
+  // marketing header. Guard placed after all hooks so hook order is stable.
+  if (isMemberRoute(pathname)) return null;
 
   return (
     <header className={cn(

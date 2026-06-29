@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import './deep-ocean.css';
+import './member.css';
 import { Analytics }      from '@vercel/analytics/next';
 import { SpeedInsights }  from '@vercel/speed-insights/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';
@@ -9,6 +10,7 @@ import { AuthSyncProvider } from '@/components/providers/AuthSyncProvider';
 import { Header }         from '@/components/layout/Header';
 import { Footer }         from '@/components/layout/Footer';
 import { BottomNav }      from '@/components/layout/BottomNav';
+import { MainShell }      from '@/components/layout/MainShell';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { ModalRoot }      from '@/components/ui/Modal';
 import { PWAInstall }     from '@/components/ui/PWAInstall';
@@ -198,9 +200,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 safe-area-top above and the BottomNav footprint + safe-area-
                 bottom below, so children never sit under the notch or the
                 home indicator. Replaces the old flat pt-[68px] pb-[68px]. */}
-            <main id="main-content" className="flex-1 app-main">
+            <MainShell>
               {children}
-            </main>
+            </MainShell>
             <Footer />
             <BottomNav />
             <ToastContainer />
