@@ -36,18 +36,21 @@ type TxtVariant =
   | 'eyebrow'
   | 'stat';
 
+// Sizes follow the spec's authoritative "reduced type scale" (CLAUDE.md §3):
+// section header / greeting 16.5, sub-section head 15.5, card title / job role
+// 14.5, meta 12.5, stat value 17.
 const VARIANT: Record<TxtVariant, { font: string; size: number; lh: number; ls?: number; upper?: boolean }> = {
   screenTitle: { font: fonts.displayExtrabold, size: fontSizes.xl, lh: 1.1, ls: tracking.tight },
   h1: { font: fonts.displayExtrabold, size: 25, lh: 1.12, ls: tracking.tight },
-  h2: { font: fonts.displayExtrabold, size: fontSizes.md, lh: 1.2, ls: tracking.tight },
-  h3: { font: fonts.displayBold, size: fontSizes.base, lh: 1.3 },
-  cardTitle: { font: fonts.displayBold, size: 15, lh: 1.3 },
+  h2: { font: fonts.displayExtrabold, size: 16.5, lh: 1.2, ls: tracking.tight },
+  h3: { font: fonts.displayBold, size: 15.5, lh: 1.3 },
+  cardTitle: { font: fonts.displayBold, size: 14.5, lh: 1.3 },
   bodyLg: { font: fonts.body, size: fontSizes.base, lh: 1.55 },
   body: { font: fonts.body, size: fontSizes.sm, lh: 1.55 },
   label: { font: fonts.displayBold, size: fontSizes.xs, lh: 1.3 },
-  meta: { font: fonts.body, size: fontSizes.xs, lh: 1.4 },
+  meta: { font: fonts.body, size: 12.5, lh: 1.4 },
   eyebrow: { font: fonts.displayBold, size: fontSizes.xs, lh: 1.3, ls: tracking.wider, upper: true },
-  stat: { font: fonts.displayExtrabold, size: fontSizes.md, lh: 1.1 },
+  stat: { font: fonts.displayExtrabold, size: 17, lh: 1.1 },
 };
 
 export function Txt({
@@ -217,7 +220,7 @@ export function Button({
       ) : (
         <>
           {icon}
-          <Text style={{ fontFamily: fonts.displayBold, fontSize: 15, color: fg }}>{label}</Text>
+          <Text style={{ fontFamily: fonts.displayBold, fontSize: 14, color: fg }}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -290,7 +293,7 @@ export function Chip({ label, active, onPress }: { label: string; active?: boole
       <Text
         style={{
           fontFamily: fonts.displaySemibold,
-          fontSize: 14,
+          fontSize: 12,
           color: active ? '#ffffff' : colors.fg2,
         }}
       >
@@ -380,7 +383,7 @@ export function Field({
       >
         {leading}
         <TextInput
-          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.fg1, paddingVertical: 0 }}
+          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.fg1, paddingVertical: 0 }}
           placeholderTextColor={colors.fg4}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
