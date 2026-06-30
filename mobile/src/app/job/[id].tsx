@@ -1,13 +1,15 @@
 // src/app/job/[id].tsx — phone job-detail route: header + shared body + fixed
 // apply bar + success burst (handoff §3). Content lives in <JobDetailBody/>.
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Linking, Pressable, ScrollView, Share, View } from 'react-native';
+import { Alert, Animated, Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, Bookmark, Check, ExternalLink, Share2, Zap } from 'lucide-react-native';
-import { IconButton, Txt } from '@/components/ui';
+import { ArrowLeft, BadgeCheck, Bookmark, Check, Clock, ExternalLink, MapPin, Share2, Zap } from 'lucide-react-native';
+import { Txt } from '@/components/ui';
+import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
@@ -21,6 +23,42 @@ import { useAppStore } from '@/store/app';
 import { useRecentJobs } from '@/store/recent-jobs';
 import { toast } from '@/store/toast';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
+
+// Translucent white icon button for the dark detail hero (§5.4).
+function HeroIcon({ children, onPress, label }: { children: React.ReactNode; onPress: () => void; label: string }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        {
+          width: 38,
+          height: 38,
+          borderRadius: 11,
+          backgroundColor: 'rgba(255,255,255,0.12)',
+          borderWidth: 1.5,
+          borderColor: 'rgba(255,255,255,0.18)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        pressed && { transform: [{ scale: 0.96 }] },
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+// Meta chip on the dark hero (region / type / level).
+function HeroMeta({ icon, label }: { icon?: React.ReactNode; label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' }}>
+      {icon}
+      <Txt style={{ fontSize: 12, color: 'rgba(255,255,255,0.88)' }}>{label}</Txt>
+    </View>
+  );
+}
 
 export default function JobDetail() {
   const { colors } = useTheme();
@@ -125,22 +163,72 @@ export default function JobDetail() {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
+    <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 130 + insets.bottom, gap: spacing[4] }}
       >
-        {/* hero actions */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing[2] }}>
-          <IconButton onPress={() => router.back()}>
-            <ArrowLeft size={18} color={colors.fg1} />
-          </IconButton>
-          <IconButton onPress={onShare}>
-            <Share2 size={17} color={colors.fg1} />
-          </IconButton>
+        {/* Dark hero (§5.4): actions + logo + role + verified + meta chips,
+            bled full-width and reaching under the status bar. */}
+        <View
+          style={{
+            marginHorizontal: -spacing.screenX,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: insets.top + spacing[3],
+            paddingBottom: spacing[5],
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+            overflow: 'hidden',
+            gap: spacing[4],
+          }}
+        >
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="jdHero" x1="0" y1="0" x2="0.85" y2="1">
+                <Stop offset="0" stopColor="#102a52" />
+                <Stop offset="1" stopColor="#0a1730" />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#jdHero)" />
+          </Svg>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <HeroIcon onPress={() => router.back()} label="Back">
+              <ArrowLeft size={18} color="#fff" />
+            </HeroIcon>
+            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+              <HeroIcon onPress={onShare} label="Share">
+                <Share2 size={17} color="#fff" />
+              </HeroIcon>
+              <HeroIcon onPress={() => toggleSaved(job.id)} label={saved ? 'Remove from saved' : 'Save'}>
+                <Bookmark size={18} color={saved ? colors.accent : '#fff'} fill={saved ? colors.accent : 'transparent'} />
+              </HeroIcon>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+            <CompanyLogo job={job} size={56} radius={radii.lg} />
+            <View style={{ flex: 1 }}>
+              <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 22, lineHeight: 27, letterSpacing: -0.4, color: '#fff' }} numberOfLines={3}>
+                {job.role}
+              </Txt>
+              {job.verified ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.32)' }}>
+                  <BadgeCheck size={13} color="#4ade80" />
+                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>Verified employer</Txt>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <HeroMeta icon={<MapPin size={13} color="rgba(255,255,255,0.7)" />} label={job.location.replace(/^Remote · /, '')} />
+            <HeroMeta icon={<Clock size={13} color="rgba(255,255,255,0.7)" />} label={job.type} />
+            <HeroMeta label={job.level} />
+          </View>
         </View>
 
-        <JobDetailBody job={job} />
+        <JobDetailBody job={job} showCompanyRow={false} showMeta={false} />
         <SimilarRoles job={job} />
       </ScrollView>
 
@@ -225,6 +313,6 @@ export default function JobDetail() {
           </Animated.View>
         </View>
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 }
