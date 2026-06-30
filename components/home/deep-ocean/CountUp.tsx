@@ -38,11 +38,19 @@ export function CountUp({ target, suffix = '', className, durationMs = 1200, loo
 
     const runOnce = (then?: () => void) => {
       const start = performance.now();
+      // Targets are small (e.g. 70, 150, 10) so many animation frames round to
+      // the same integer. Only commit state when the displayed value actually
+      // changes — skips a stream of no-op re-renders and lowers INP.
+      let last = -1;
       const tick = (now: number) => {
         if (cancelled) return;
         const t = Math.min(1, (now - start) / durationMs);
         const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-        setValue(Math.round(eased * target));
+        const v = Math.round(eased * target);
+        if (v !== last) {
+          last = v;
+          setValue(v);
+        }
         if (t < 1) raf = requestAnimationFrame(tick);
         else then?.();
       };

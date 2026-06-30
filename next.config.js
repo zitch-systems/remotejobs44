@@ -18,6 +18,9 @@ const nextConfig = {
       { protocol: 'https', hostname: 'gnyilmahiyddplsrrhoq.supabase.co' },
     ],
     formats: ['image/avif', 'image/webp'],
+    // Cache optimized images for 31 days (default is 60s) so repeat views and
+    // the CDN don't re-run the optimizer — cheaper + faster LCP on return.
+    minimumCacheTTL: 2678400,
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
