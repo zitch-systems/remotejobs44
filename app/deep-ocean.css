@@ -562,38 +562,57 @@
   .deep-ocean .filter-rail--collapsible .frail-body h4 { display:none; }
 }
 @media (max-width:520px) {
+  /* === Mobile-web landing (matches the Landing_Page__Mobile_Web design) ========
+     Phone-only overrides — the desktop landing above is untouched. The hero is a
+     tighter single column (28px gutter, 23px H1, inline search row, one-line
+     stats), sections breathe at 30px, and Pricing becomes a swipeable carousel. */
   .deep-ocean .hero-b { padding-bottom:60px; }
-  .deep-ocean .hb-stats { gap:26px; }
   .deep-ocean .hero-photo { display:none; }
   .deep-ocean .lw-stage { grid-template-columns:1fr; height:440px; }
   .deep-ocean .lw-col:nth-child(n+2) { display:none; }
   .deep-ocean .cat-grid { grid-template-columns:1fr; }
 
-  /* Tighten the page gutter: 28px each side ate ~17% of a 360px screen and
-     left hero/section copy cramped. 20px keeps the rhythm but reclaims width. */
-  .deep-ocean .wrap { padding:0 20px; }
-  .deep-ocean .lw-stage { padding:0 20px; }
+  /* Hero column: 16px top inset, 28px gutter (inherited from .wrap) + 28px gap.
+     minmax(0,1fr) + min-width:0 stop the single grid track from blowing past the
+     gutter on the eyebrow-pill's long min-content (otherwise the hero's
+     overflow:hidden silently clips the H1 / search button on the right). */
+  .deep-ocean .hb-body { grid-template-columns:minmax(0,1fr); gap:28px; padding:16px 28px 0; }
+  .deep-ocean .hb-copy { min-width:0; }
+  .deep-ocean .eyebrow-pill { font-size:11px; max-width:100%; }
 
-  /* Hero H1: the desktop clamp floored at 2.6rem (~42px), so it never scaled
-     down on phones — oversized and forcing awkward wraps. Re-floor it to a
-     phone-appropriate size (~25–34px) while keeping the bold display weight. */
-  .deep-ocean .hero-b h1 { font-size:clamp(1.55rem,7vw,2.15rem); line-height:1.08; letter-spacing:-0.02em; margin:14px 0 14px; }
-  .deep-ocean .hero-b .lede { font-size:var(--fs-md); margin-bottom:22px; }
+  /* Hero H1: 23px display so it sits two/three lines deep without over-wrapping. */
+  .deep-ocean .hero-b h1 { font-size:23px; line-height:1.14; letter-spacing:-0.02em; margin:8px 0 10px; }
+  .deep-ocean .hero-b .lede { font-size:14.5px; line-height:1.5; margin:0 0 14px; }
 
-  /* Full-width search CTA: at this width the inline "Search Jobs" button
-     squeezed the input to ~120px. Wrap it to its own full-width row so the
-     field stays comfortably wide and the button is a ≥44px tap target. */
-  .deep-ocean .hb-search { flex-wrap:wrap; padding:8px 8px 8px 16px; }
-  .deep-ocean .hb-search input { min-height:30px; }
-  .deep-ocean .hb-search .btn { flex:1 1 100%; justify-content:center; padding:14px 18px; }
+  /* Search stays an inline row (icon · field · compact button) — no wrap. The
+     field keeps a 16px font so iOS Safari doesn't zoom the page on focus. */
+  .deep-ocean .hb-search { flex-wrap:nowrap; gap:10px; padding:6px 6px 6px 14px; }
+  .deep-ocean .hb-search input { font-size:16px; min-width:0; }
+  .deep-ocean .hb-search .btn { flex:0 0 auto; padding:9px 14px; font-size:13px; }
+
+  /* Stats on one line; the two auth buttons split the row evenly. */
+  .deep-ocean .hb-stats { gap:18px; margin-top:16px; }
+  .deep-ocean .hb-auth { gap:10px; margin-top:20px; }
+  .deep-ocean .hb-auth .btn { flex:1 1 0; justify-content:center; padding:14px 18px; }
 
   /* Shorter vertical rhythm so the single column doesn't scroll forever
      (phones only — desktop spacing is unchanged). */
-  .deep-ocean .sec { padding:48px 0; }
+  .deep-ocean .sec { padding:30px 0; }
   .deep-ocean .livewall { padding:60px 0; }
   .deep-ocean .cta-band { padding:64px 0; }
   .deep-ocean .section-head { margin-bottom:30px; }
-  .deep-ocean .section-head h2 { font-size:var(--fs-2xl); }
+  .deep-ocean .section-head h2 { font-size:25px; }
+
+  /* Pricing → swipeable horizontal carousel. Each tier is ~86% wide so the next
+     one peeks; the vertical padding keeps the "Most popular" badge and the Pro
+     card's shadow clear of the scroll-clip edge. */
+  .deep-ocean .price-grid {
+    display:flex; flex-wrap:nowrap; gap:12px; padding:14px 0 8px;
+    overflow-x:auto; scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .deep-ocean .price-grid::-webkit-scrollbar { display:none; }
+  .deep-ocean .price-grid .ptier { flex:0 0 86%; scroll-snap-align:start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
