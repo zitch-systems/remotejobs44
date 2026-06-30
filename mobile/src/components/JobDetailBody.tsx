@@ -45,11 +45,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function JobDetailBody({
   job,
   showCompanyRow = true,
+  showMeta = true,
   actions,
 }: {
   job: Job;
   /** Hide the logo+role row when the host already renders a cover for it. */
   showCompanyRow?: boolean;
+  /** Hide the Location/Type/Level meta cards when the host's hero shows them. */
+  showMeta?: boolean;
   /** Optional inline action row rendered under the company row (tablet pane). */
   actions?: React.ReactNode;
 }) {
@@ -77,11 +80,13 @@ export function JobDetailBody({
       {actions}
 
       {/* meta cards */}
-      <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-        <MetaCard label="Location" value={job.location.replace(/^Remote · /, '')} />
-        <MetaCard label="Type" value={job.type} />
-        <MetaCard label="Level" value={job.level} />
-      </View>
+      {showMeta ? (
+        <View style={{ flexDirection: 'row', gap: spacing[3] }}>
+          <MetaCard label="Location" value={job.location.replace(/^Remote · /, '')} />
+          <MetaCard label="Type" value={job.type} />
+          <MetaCard label="Level" value={job.level} />
+        </View>
+      ) : null}
 
       {/* match band */}
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4], padding: spacing[4] }}>
