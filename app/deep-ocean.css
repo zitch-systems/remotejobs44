@@ -247,6 +247,21 @@
     radial-gradient(ellipse 50% 60% at 92% 80%, rgba(249,115,22,0.16), transparent 60%),
     linear-gradient(102deg, rgba(8,18,36,0.94) 0%, rgba(9,20,38,0.82) 44%, rgba(10,22,40,0.54) 100%),
     url(/redesign/hero-videocall-sm.jpg) center 22%/cover no-repeat, #060e1f; }
+/* LCP: modern browsers fetch the far smaller AVIF/WebP hero via image-set
+   (40KB/66KB vs the 96KB JPEG); the JPEG rules above stay as a universal
+   fallback for engines without image-set/type() support. */
+@supports (background-image: image-set(url("i.avif") type("image/avif"))) {
+  .deep-ocean .hero-b { background:
+    radial-gradient(ellipse 64% 54% at 16% 8%, rgba(37,99,235,0.12), transparent 60%),
+    radial-gradient(ellipse 52% 60% at 94% 84%, rgba(249,115,22,0.08), transparent 60%),
+    linear-gradient(102deg, rgba(238,241,246,0.97) 0%, rgba(238,241,246,0.93) 42%, rgba(238,241,246,0.74) 100%),
+    image-set(url(/redesign/hero-videocall-sm.avif) type("image/avif"), url(/redesign/hero-videocall-sm.webp) type("image/webp"), url(/redesign/hero-videocall-sm.jpg) type("image/jpeg")) center 22%/cover no-repeat, var(--bg-app); }
+  .dark .deep-ocean .hero-b { background:
+    radial-gradient(ellipse 60% 50% at 18% 12%, rgba(37,99,235,0.32), transparent 62%),
+    radial-gradient(ellipse 50% 60% at 92% 80%, rgba(249,115,22,0.16), transparent 60%),
+    linear-gradient(102deg, rgba(8,18,36,0.94) 0%, rgba(9,20,38,0.82) 44%, rgba(10,22,40,0.54) 100%),
+    image-set(url(/redesign/hero-videocall-sm.avif) type("image/avif"), url(/redesign/hero-videocall-sm.webp) type("image/webp"), url(/redesign/hero-videocall-sm.jpg) type("image/jpeg")) center 22%/cover no-repeat, #060e1f; }
+}
 .deep-ocean .hero-b::after { content:''; position:absolute; inset:0; opacity:0.6; pointer-events:none; background-image:radial-gradient(rgba(37,99,235,0.08) 1px, transparent 1px); background-size:26px 26px; mask-image:linear-gradient(180deg, #000, transparent 70%); }
 .dark .deep-ocean .hero-b::after { opacity:0.5; background-image:radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px); }
 .deep-ocean .hb-body { position:relative; z-index:2; display:grid; grid-template-columns:1.02fr 0.98fr; gap:50px; align-items:center; padding-top:20px; }

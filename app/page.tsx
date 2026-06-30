@@ -32,8 +32,10 @@ export default async function HomePage() {
   // has downloaded + parsed, which pushes LCP out. Preloading it here (homepage
   // only, so other routes don't pay for an image they never show) hoists a
   // <link rel="preload" as="image" fetchpriority="high"> into <head> so the
-  // fetch starts in parallel with the CSS.
-  ReactDOM.preload('/redesign/hero-videocall-sm.jpg', { as: 'image', fetchPriority: 'high' });
+  // fetch starts in parallel with the CSS. We preload the AVIF — the format the
+  // image-set() rule in deep-ocean.css serves to the ~94% of browsers that
+  // support it (40KB vs the 96KB JPEG fallback the rest get).
+  ReactDOM.preload('/redesign/hero-videocall-sm.avif', { as: 'image', fetchPriority: 'high' });
 
   const [jobs, categoryCounts] = await Promise.all([
     fetchLandingJobs(40),
