@@ -4,7 +4,7 @@
 // master–detail layout at ≥ 840px.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ChevronRight, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
@@ -31,17 +31,24 @@ const keyExtractor = (j: Job) => j.id;
 const renderJobItem = ({ item }: { item: Job }) => <JobCard job={item} />;
 const FeedSeparator = () => <View style={{ height: spacing[3] }} />;
 
-function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
-  const { colors } = useTheme();
+// §5.2: translucent stat cards that sit on the navy hero band. The third
+// (Profile %) uses the sunrise-orange accent treatment.
+function HeroStat({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return (
-    <Card style={{ flex: 1, padding: spacing[3], gap: 2, ...(accent ? { backgroundColor: colors.warnBg, borderColor: colors.warnBorder } : null) }}>
-      <Txt variant="stat" color={accent ? colors.warnText : colors.fg1}>
-        {value}
-      </Txt>
-      <Txt variant="meta" color={colors.fg3}>
-        {label}
-      </Txt>
-    </Card>
+    <View
+      style={{
+        flex: 1,
+        padding: spacing[3],
+        gap: 2,
+        borderRadius: radii.field,
+        backgroundColor: accent ? 'rgba(249,115,22,0.20)' : 'rgba(255,255,255,0.10)',
+        borderWidth: 1,
+        borderColor: accent ? 'rgba(249,115,22,0.34)' : 'rgba(255,255,255,0.16)',
+      }}
+    >
+      <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 17, color: accent ? palette.accentLight : '#ffffff' }}>{value}</Txt>
+      <Txt style={{ fontSize: 11, color: accent ? 'rgba(253,186,116,0.92)' : 'rgba(255,255,255,0.62)' }}>{label}</Txt>
+    </View>
   );
 }
 
@@ -79,9 +86,11 @@ function Promo() {
 export default function Feed() {
   const { colors } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { profile } = useProfile();
   const applied = useAppStore((s) => s.applied);
+  const savedCount = useAppStore((s) => s.saved.length);
   const userId = useAppStore((s) => s.userId);
 
   const [query, setQuery] = useState('');
@@ -158,8 +167,9 @@ export default function Feed() {
   if (width >= 672) return <FeedMasterDetail />;
 
   const firstName = (profile.name || '').trim().split(/\s+/)[0] || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const appsCount = Object.keys(applied).length;
-  const interviews = Object.values(applied).filter((s) => s === 'interview' || s === 'offer').length;
   const fCount = activeFilterCount(type, level, remoteOnly, postedWithinDays) + (debouncedLocation.trim() ? 1 : 0);
   const resetFilters = () => {
     setType('Any');
@@ -171,29 +181,52 @@ export default function Feed() {
   };
 
   const header = (
-    <View style={{ gap: spacing[4], paddingTop: spacing[2] }}>
-      {/* greeting */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View>
-          <Txt variant="meta" color={colors.fg3}>
-            Welcome back
-          </Txt>
-          <Txt variant="h2">
-            Hi, <Txt variant="h2" color={colors.accent}>{firstName}</Txt>
-          </Txt>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-          <NotificationBell />
-          <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online uri={profile.avatarUrl} />
-        </View>
-      </View>
+    <View style={{ gap: spacing[4] }}>
+      {/* Navy hero band (§5.2): greeting + bell + stat trio + search, bled
+          full-width to the screen edges (negative margin cancels the list
+          gutter) and rounded at the bottom. */}
+      <View
+        style={{
+          marginHorizontal: -spacing.screenX,
+          paddingHorizontal: spacing.screenX,
+          paddingTop: insets.top + spacing[3],
+          paddingBottom: spacing[5],
+          borderBottomLeftRadius: 26,
+          borderBottomRightRadius: 26,
+          overflow: 'hidden',
+          gap: spacing[4],
+        }}
+      >
+        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="feedHero" x1="0" y1="0" x2="0.85" y2="1">
+              <Stop offset="0" stopColor="#102a52" />
+              <Stop offset="1" stopColor="#0a1730" />
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#feedHero)" />
+        </Svg>
 
-      {/* stats */}
-      <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-        <StatCard value={String(appsCount)} label="Applications" />
-        <StatCard value={String(interviews)} label="Interviews" />
-        <StatCard value={`${profile.completion}%`} label="Profile strength" accent />
-      </View>
+        {/* greeting */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Txt style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.72)' }}>{greeting} 👋</Txt>
+            <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 20, color: '#ffffff', marginTop: 1 }}>
+              Hi, <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 20, color: palette.accentLight }}>{firstName}</Txt>
+            </Txt>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+            <NotificationBell hero />
+            <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online uri={profile.avatarUrl} />
+          </View>
+        </View>
+
+        {/* stats */}
+        <View style={{ flexDirection: 'row', gap: spacing[3] }}>
+          <HeroStat value={String(appsCount)} label="Applications" />
+          <HeroStat value={String(savedCount)} label="Saved" />
+          <HeroStat value={`${profile.completion}%`} label="Profile" accent />
+        </View>
 
       {/* search + filter */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
@@ -261,6 +294,7 @@ export default function Feed() {
           ) : null}
         </Pressable>
       </View>
+      </View>
 
       {searchFocused ? (
         <SearchSuggestions
@@ -327,14 +361,14 @@ export default function Feed() {
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
+    <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <FlatList
         data={feed.loading && jobs.length === 0 ? [] : jobs}
         keyExtractor={keyExtractor}
         renderItem={renderJobItem}
         ListHeaderComponent={header}
         ItemSeparatorComponent={FeedSeparator}
-        contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingTop: spacing[1], paddingBottom: spacing[10], gap: spacing[4] }}
+        contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingTop: 0, paddingBottom: spacing[10], gap: spacing[4] }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={feed.refresh} tintColor={colors.brand} />}
         onEndReachedThreshold={0.4}
@@ -396,6 +430,6 @@ export default function Feed() {
         setLocation={setLocation}
         onReset={resetFilters}
       />
-    </SafeAreaView>
+    </View>
   );
 }

@@ -10,7 +10,8 @@ import { useAppStore } from '@/store/app';
 import { useNotifications } from '@/store/notifications';
 import { fonts, useTheme } from '@/theme';
 
-export function NotificationBell() {
+// `hero` renders the bell white-on-navy for the Feed's coloured hero band.
+export function NotificationBell({ hero }: { hero?: boolean } = {}) {
   const { colors } = useTheme();
   const router = useRouter();
   const userId = useAppStore((s) => s.userId);
@@ -32,16 +33,16 @@ export function NotificationBell() {
           width: 38,
           height: 38,
           borderRadius: 11,
-          backgroundColor: colors.bgCard,
+          backgroundColor: hero ? 'rgba(255,255,255,0.12)' : colors.bgCard,
           borderWidth: 1.5,
-          borderColor: colors.border2,
+          borderColor: hero ? 'rgba(255,255,255,0.18)' : colors.border2,
           alignItems: 'center',
           justifyContent: 'center',
         },
         pressed && { transform: [{ scale: 0.96 }] },
       ]}
     >
-      <Bell size={18} color={colors.fg2} />
+      <Bell size={18} color={hero ? '#ffffff' : colors.fg2} />
       {unread > 0 ? (
         <View
           style={{
@@ -56,7 +57,7 @@ export function NotificationBell() {
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 2,
-            borderColor: colors.bgApp,
+            borderColor: hero ? '#0b1a33' : colors.bgApp,
           }}
         >
           <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 10, color: '#fff' }}>{unread > 9 ? '9+' : unread}</Txt>
