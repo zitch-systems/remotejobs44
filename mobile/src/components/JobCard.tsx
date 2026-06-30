@@ -10,7 +10,7 @@ import { BadgeCheck, Bookmark } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
 import { isUsdSalary } from '@/lib/format';
 import { useAppStore } from '@/store/app';
-import { spacing, useTheme } from '@/theme';
+import { fonts, spacing, useTheme } from '@/theme';
 import { Card, Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 
@@ -51,13 +51,10 @@ function JobCardImpl({ job }: { job: Job }) {
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: spacing[2] }}>
-            <Pill
-              label={`${job.match}% match`}
-              bg={colors.successBg}
-              fg={colors.successText}
-              border={colors.successBorder}
-              small
-            />
+            {/* §6: match % as bold success-coloured figure (Sora 800, 14px). */}
+            <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 14, lineHeight: 18, color: colors.success }}>
+              {job.match}%
+            </Txt>
             <Pressable
               hitSlop={8}
               onPress={() => toggleSaved(job.id)}

@@ -34,13 +34,15 @@ export const palette = {
 // Note the handoff uses a slightly cooler screen bg (#f4f7fc) than the web
 // (#f8faff); we follow the handoff for the app surface.
 // ---------------------------------------------------------------------------
+// Neutrals — light. Values follow CLAUDE.md §2 (mobile-app spec): screen bg
+// #f4f7fc, "line" #e8eef6, "line-2" (input/control border) #dde5f0.
 export const lightColors = {
   bgApp: '#f4f7fc',
   bgSection: '#f1f5f9',
   bgCard: '#ffffff',
 
-  border1: '#eaeef6', // card border
-  border2: '#e6ecf5', // input / chip border
+  border1: '#e8eef6', // card border ("line")
+  border2: '#dde5f0', // input / chip border ("line-2")
   border3: '#f1f5f9', // hairline divider
 
   fg1: '#0f172a', // primary text
@@ -55,18 +57,21 @@ export const lightColors = {
   brandStrong: palette.brand700 as string,
   accent: palette.accent as string,
 
-  // Semantic status (verified, match, application statuses)
-  success: '#1ea05e',
+  // Semantic status (verified, match, application statuses) — §2.
+  // success #22c55e (match %, apply burst, Applied bar); Offer pill is
+  // #15803d on #dcfce7; Interview #b45309 on #fef3c7; Applied #1d4ed8 on
+  // #eff6ff; danger (Sign out) #e11d48.
+  success: '#22c55e',
   successText: '#15803d',
-  successBg: '#eafaf1',
+  successBg: '#dcfce7',
   successBorder: '#bbf7d0',
-  warnText: '#c2410c',
-  warnBg: '#fff4ec',
-  warnBorder: '#fed7aa',
+  warnText: '#b45309',
+  warnBg: '#fef3c7',
+  warnBorder: '#fde68a',
   infoText: '#1d4ed8',
   infoBg: '#eff6ff',
   infoBorder: '#dbeafe',
-  danger: '#dc2626',
+  danger: '#e11d48',
 
   // app chrome
   tabBar: '#ffffff',
@@ -76,39 +81,41 @@ export const lightColors = {
   // hexes) structurally matches `typeof lightColors`.
 };
 
+// Neutrals — dark ([data-theme="dark"]). §2: deeper navy — screen bg #070d1c,
+// elevated #0d1830, card #101c38, line #1c2c4d, line-2 #243558.
 export const darkColors: typeof lightColors = {
-  bgApp: '#0a1628',
-  bgSection: '#0f1e38',
-  bgCard: '#111c35',
+  bgApp: '#070d1c',
+  bgSection: '#0d1830',
+  bgCard: '#101c38',
 
-  border1: '#1e2d4a',
-  border2: '#1e3a5f',
-  border3: '#0f1e38',
+  border1: '#1c2c4d',
+  border2: '#243558',
+  border3: '#16233f',
 
-  fg1: '#e2e8f4',
-  fg2: '#cbd5e1',
-  fg3: '#94a3b8',
-  fg4: '#64748b',
+  fg1: '#f1f5fb',
+  fg2: '#aebfd6',
+  fg3: '#8497b4',
+  fg4: '#5e7295',
   fg5: '#334155',
 
   brand: palette.brand500,
   brandStrong: palette.brand400,
   accent: palette.accent,
 
-  success: '#1ea05e',
+  success: '#22c55e',
   successText: '#34d399',
-  successBg: 'rgba(30,160,94,0.14)',
-  successBorder: 'rgba(30,160,94,0.35)',
+  successBg: 'rgba(34,197,94,0.15)',
+  successBorder: 'rgba(34,197,94,0.35)',
   warnText: '#fbbf46',
   warnBg: 'rgba(245,158,11,0.14)',
   warnBorder: 'rgba(245,158,11,0.35)',
   infoText: '#60a5fa',
-  infoBg: 'rgba(37,99,235,0.14)',
+  infoBg: 'rgba(37,99,235,0.16)',
   infoBorder: 'rgba(37,99,235,0.35)',
-  danger: '#f87171',
+  danger: '#fb7185',
 
-  tabBar: '#0d1a2e',
-  rail: '#060e1f',
+  tabBar: '#0d1830',
+  rail: '#05091a',
   overlay: 'rgba(0,0,0,0.6)',
 } as const;
 
