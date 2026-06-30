@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>RemoteJobs44 — Landing (mobile reference)</title>
+
+<!-- Fonts: production uses next/font local (Sora + DM Sans). Google Fonts here is visually identical. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+
+<!-- THE REAL production stylesheet, copied verbatim from app/deep-ocean.css -->
+<link rel="stylesheet" href="deep-ocean.css">
+
+<style>
+  /* ============================================================
+     Reference-only chrome. NONE of this ships — it stands in for
+     Tailwind-built components that live OUTSIDE deep-ocean.css:
+       · components/layout/Header.tsx     (.mk-header / .mk-menu)
+       · components/layout/BottomNav.tsx  (.mk-bottomnav)
+       · components/layout/Footer.tsx     (.mk-footer)
+     plus the next/font variables deep-ocean.css reads.
+     ============================================================ */
+  :root{
+    --font-sora:'Sora'; --font-dm-sans:'DM Sans';
+    --mk-header-h:68px; --mk-bottomnav-h:72px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg-app); color:var(--fg-1);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    padding-top:var(--mk-header-h);
+    padding-bottom:var(--mk-bottomnav-h);
+  }
+
+  /* Hero bg: real CSS points at /redesign/… (server-absolute). Re-point to local assets. */
+  .deep-ocean .hero-b{
+    background:
+      radial-gradient(ellipse 64% 54% at 16% 8%, rgba(37,99,235,0.12), transparent 60%),
+      radial-gradient(ellipse 52% 60% at 94% 84%, rgba(249,115,22,0.08), transparent 60%),
+      linear-gradient(102deg, rgba(238,241,246,0.97) 0%, rgba(238,241,246,0.93) 42%, rgba(238,241,246,0.74) 100%),
+      url(assets/hero-videocall-sm.jpg) center 22%/cover no-repeat, var(--bg-app);
+  }
+  .dark .deep-ocean .hero-b{
+    background:
+      radial-gradient(ellipse 60% 50% at 18% 12%, rgba(37,99,235,0.32), transparent 62%),
+      radial-gradient(ellipse 50% 60% at 92% 80%, rgba(249,115,22,0.16), transparent 60%),
+      linear-gradient(102deg, rgba(8,18,36,0.94) 0%, rgba(9,20,38,0.82) 44%, rgba(10,22,40,0.54) 100%),
+      url(assets/hero-videocall-sm.jpg) center 22%/cover no-repeat, #060e1f;
+  }
+
+  /* ---------- Header (≙ Header.tsx) ---------- */
+  .mk-header{
+    position:fixed; top:0; left:0; right:0; z-index:50; height:var(--mk-header-h);
+    display:flex; align-items:center; gap:16px; padding:0 16px;
+    background:rgba(248,250,255,0.92); backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border-bottom:1px solid rgba(226,232,240,0.7);
+  }
+  .dark .mk-header{ background:rgba(10,22,40,0.92); border-bottom-color:rgba(30,58,95,0.7); }
+  .mk-logo{ display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-size:17px; letter-spacing:-0.02em; color:var(--fg-1); }
+  .mk-logo-mark{ position:relative; width:36px; height:36px; flex-shrink:0; }
+  .mk-logo-mark svg{ position:absolute; inset:0; width:36px; height:36px; }
+  .logo-icon-3d{ transform-origin:center; transform-style:preserve-3d; animation:logoIconFlip 4s ease-in-out infinite; }
+  @keyframes logoIconFlip{ 0%,55%{transform:perspective(360px) rotateY(0)} 80%,100%{transform:perspective(360px) rotateY(360deg)} }
+  .mk-nav{ display:none; align-items:center; gap:2px; margin-left:4px; }
+  .mk-nav a{ padding:8px 12px; border-radius:10px; font-size:14px; font-weight:500; color:var(--fg-3); }
+  .mk-nav a:hover{ color:var(--fg-1); background:rgba(241,245,249,0.8); }
+  .dark .mk-nav a:hover{ background:#0a1628; }
+  .mk-actions{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .mk-iconbtn{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--border-2); background:transparent; color:var(--fg-3); cursor:pointer; }
+  .mk-iconbtn:hover{ background:var(--bg-section); }
+  .mk-iconbtn svg{ width:20px; height:20px; }
+  .mk-auth{ display:none; align-items:center; gap:8px; }
+  .mk-btn{ font-family:var(--font-display); font-weight:600; font-size:14px; padding:8px 16px; border-radius:10px; cursor:pointer; white-space:nowrap; text-decoration:none; }
+  .mk-btn-ghost{ color:var(--fg-2); border:1px solid var(--border-2); background:transparent; }
+  .mk-btn-ghost:hover{ background:var(--bg-section); }
+  .mk-btn-primary{ background:var(--brand-700); color:#fff; border:1px solid var(--brand-700); box-shadow:var(--shadow-sm-brand); }
+  .dark .mk-btn-primary{ background:var(--brand-600); border-color:var(--brand-600); }
+  .mk-burger{ width:36px; height:36px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; border-radius:10px; border:1px solid var(--border-2); background:transparent; cursor:pointer; }
+  .mk-burger span{ display:block; width:16px; height:1.5px; background:var(--fg-2); border-radius:9999px; transition:transform .2s, opacity .2s; }
+  .mk-header.menu-open .mk-burger span:nth-child(1){ transform:translateY(6.5px) rotate(45deg); }
+  .mk-header.menu-open .mk-burger span:nth-child(2){ opacity:0; }
+  .mk-header.menu-open .mk-burger span:nth-child(3){ transform:translateY(-6.5px) rotate(-45deg); }
+
+  /* ---------- Mobile dropdown menu ---------- */
+  .mk-menu{
+    position:fixed; top:var(--mk-header-h); left:0; right:0; z-index:40;
+    background:var(--bg-card); border-bottom:1px solid var(--border-2);
+    box-shadow:0 12px 32px rgba(15,30,56,0.12);
+    max-height:0; opacity:0; overflow:hidden; pointer-events:none;
+    transition:max-height .3s, opacity .3s;
+  }
+  .mk-menu.open{ max-height:600px; opacity:1; pointer-events:auto; }
+  .mk-menu-inner{ padding:16px; display:flex; flex-direction:column; gap:4px; }
+  .mk-menu a.mk-mlink{ padding:12px 16px; border-radius:12px; font-size:16px; font-weight:500; color:var(--fg-2); }
+  .mk-menu a.mk-mlink:hover{ background:var(--bg-section); }
+  .mk-menu-cta{ display:flex; gap:8px; padding:4px 16px 16px; }
+  .mk-menu-cta .mk-btn{ flex:1; text-align:center; padding:11px; border-radius:12px; }
+
+  /* ---------- Bottom nav (≙ BottomNav.tsx, md:hidden) ---------- */
+  .mk-bottomnav{
+    position:fixed; bottom:0; left:0; right:0; z-index:50;
+    display:grid; grid-template-columns:repeat(6,1fr);
+    background:#fff; border-top:1px solid var(--border-2);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .dark .mk-bottomnav{ background:#0d1a2e; border-top-color:#1e3a5f; }
+  .mk-bn-item{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:56px; padding:10px 0 6px; color:var(--fg-4); text-decoration:none; }
+  .mk-bn-item svg{ width:20px; height:20px; }
+  .mk-bn-item span{ font-size:10px; font-weight:500; }
+  .mk-bn-item.active{ color:var(--brand-600); }
+  .dark .mk-bn-item.active{ color:var(--brand-400); }
+
+  /* ---------- Footer (≙ Footer.tsx) ---------- */
+  .mk-footer{ background:#fff; border-top:1px solid var(--border-2); padding:56px 20px 32px; }
+  .dark .mk-footer{ background:#0f1e38; border-top-color:#1e3a5f; }
+  .mk-foot-grid{ display:grid; grid-template-columns:1fr 1fr; gap:32px; max-width:1440px; margin:0 auto 40px; }
+  .mk-foot-brand{ grid-column:1 / -1; }
+  .mk-foot-brand .mk-logo{ margin-bottom:12px; }
+  .mk-foot-brand p{ font-size:13.5px; color:var(--fg-4); line-height:1.6; max-width:240px; margin:0 0 16px; }
+  .mk-foot-social{ display:flex; flex-wrap:wrap; gap:8px; }
+  .mk-foot-social a{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--border-2); color:var(--fg-3); }
+  .mk-foot-social a:hover{ border-color:var(--brand-600); color:var(--brand-700); }
+  .mk-foot-social svg{ width:18px; height:18px; }
+  .mk-foot-col h4{ font-family:var(--font-body); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:var(--fg-4); margin:0 0 14px; }
+  .mk-foot-col ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .mk-foot-col a{ font-size:13.5px; color:var(--fg-3); }
+  .mk-foot-col a:hover{ color:var(--brand-700); }
+  .mk-foot-bottom{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; max-width:1440px; margin:0 auto; padding-top:24px; border-top:1px solid var(--border-3); }
+  .mk-foot-bottom p, .mk-foot-bottom a{ font-size:12px; color:var(--fg-4); }
+
+  /* Desktop: show full nav + auth, hide burger + bottom-nav (matches Tailwind md = 768px) */
+  @media (min-width:768px){
+    .mk-nav{ display:flex; }
+    .mk-auth{ display:flex; }
+    .mk-burger{ display:none; }
+    .mk-bottomnav{ display:none; }
+    body{ padding-bottom:0; }
+    .mk-foot-grid{ grid-template-columns:2fr 1fr 1fr 1fr 1fr; }
+    .mk-foot-brand{ grid-column:auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER (Header.tsx) ===================== -->
+<header class="mk-header" id="mkHeader" data-screen-label="Header">
+  <a class="mk-logo" href="#">
+    <span class="mk-logo-mark">
+      <svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#2563eb"/></svg>
+      <svg viewBox="0 0 40 40" class="logo-icon-3d" fill="none" aria-hidden="true">
+        <path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <circle cx="29" cy="15" r="3.5" fill="#f97316"/>
+      </svg>
+    </span>
+    RemoteJobs44
+  </a>
+  <nav class="mk-nav">
+    <a href="#">Jobs</a><a href="#">Companies</a><a href="#">Salary Guide</a><a href="#">Resources</a><a href="#">Pricing</a>
+  </nav>
+  <div class="mk-actions">
+    <button class="mk-iconbtn" id="mkTheme" aria-label="Toggle theme">
+      <svg id="mkThemeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <div class="mk-auth">
+      <a class="mk-btn mk-btn-ghost" href="#">Log in</a>
+      <a class="mk-btn mk-btn-primary" href="#">Get Started</a>
+    </div>
+    <button class="mk-burger" id="mkBurger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<div class="mk-menu" id="mkMenu">
+  <div class="mk-menu-inner">
+    <a class="mk-mlink" href="#">Jobs</a><a class="mk-mlink" href="#">Companies</a><a class="mk-mlink" href="#">Salary Guide</a><a class="mk-mlink" href="#">Resources</a><a class="mk-mlink" href="#">Pricing</a>
+  </div>
+  <div class="mk-menu-cta">
+    <a class="mk-btn mk-btn-ghost" href="#">Log in</a>
+    <a class="mk-btn mk-btn-primary" href="#">Get Started</a>
+  </div>
+</div>
+
+<!-- ===================== LANDING (app/page.tsx → .deep-ocean) ===================== -->
+<main class="deep-ocean">
+
+  <!-- 1 · HERO (Hero.tsx) -->
+  <section class="hero-b" data-screen-label="Hero">
+    <div class="wrap hb-body">
+      <div class="hb-copy">
+        <span class="eyebrow-pill"><span class="dot"></span>70,000+ live remote roles · 150+ countries hiring</span>
+        <h1>The world&apos;s <em class="flip-word">remote</em> jobs.<br>One search.<br>Apply from anywhere.</h1>
+        <p class="lede">Every remote opening worth applying to — engineering, design, marketing, finance, data — <b>verified remote-friendly</b> and searchable in <b>one place</b>.</p>
+        <div class="hb-search" role="search">
+          <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" placeholder="Search 70,000+ remote jobs…" aria-label="Search jobs">
+          <button type="button" class="btn btn-primary">Search Jobs</button>
+        </div>
+        <div class="hb-chips">
+          <span class="lbl">Trending:</span>
+          <a class="hb-chip" href="#">Engineering</a><a class="hb-chip" href="#">Design</a><a class="hb-chip" href="#">Data &amp; AI</a><a class="hb-chip" href="#">Marketing</a>
+        </div>
+        <div class="hb-stats">
+          <div class="hb-stat"><span class="n" data-count="70" data-suffix="k+">0</span><div class="l">Jobs indexed</div></div>
+          <div class="hb-stat"><span class="n" data-count="150" data-suffix="+">0</span><div class="l">Countries hiring</div></div>
+          <div class="hb-stat"><span class="n" data-count="10" data-suffix="+">0</span><div class="l">Job categories</div></div>
+        </div>
+      </div>
+      <div class="preview-wrap">
+        <div class="preview">
+          <div class="preview-bar">
+            <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+            <div class="preview-url">remotejobs44.com/jobs <span class="live"><i></i>Live</span></div>
+          </div>
+          <div class="preview-search"><div class="pbox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+            <span>Remote · Worldwide · All categories</span>
+          </div></div>
+          <div class="preview-viewport"><div class="preview-track" id="previewTrack"></div></div>
+        </div>
+        <figure class="hero-photo">
+          <img src="assets/ig-high-five.jpg" alt="Two remote teammates celebrating an offer" width="172" height="204">
+          <figcaption><span class="hp-pulse"></span>Hired remotely this week</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · COMPANY MARQUEE (CompanyMarquee.tsx) -->
+  <section class="band" data-screen-label="Company marquee">
+    <div class="band-label">70,000+ roles from the companies defining remote work — indexed in one place</div>
+    <div class="marquee">
+      <div class="marquee-row"><div class="marquee-track" id="marqueeA"></div></div>
+      <div class="marquee-row"><div class="marquee-track marquee-track--rev" id="marqueeB"></div></div>
+    </div>
+  </section>
+
+  <!-- 3 · DIFFERENTIATOR (Differentiator.tsx) -->
+  <section class="sec sec--tint" data-screen-label="Differentiator">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">How we&apos;re different</span>
+        <h2>Three checks every listing passes</h2>
+        <p>Most boards quietly bury roles that secretly want you on-site. Here, every job clears the same bar before it goes live.</p>
+      </div>
+      <div class="diff-grid">
+        <div class="diff-card">
+          <span class="dnum">01 · VERIFIED</span>
+          <h3>Confirmed fully remote</h3>
+          <p>We check each employer&apos;s location policy. Roles that secretly need relocation or a single country never make the list.</p>
+          <div class="diff-mock">
+            <div class="mock-row"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Hires in <b>any timezone</b></div>
+            <div class="mock-row"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Global payroll via <b>Deel · Remote</b></div>
+          </div>
+        </div>
+        <div class="diff-card">
+          <span class="dnum">02 · TRANSPARENT</span>
+          <h3>Salary shown upfront</h3>
+          <p>Every listing carries a real pay range in USD — no &ldquo;competitive salary&rdquo;, no guessing before you apply.</p>
+          <div class="diff-mock">
+            <div class="mock-row"><b>$90k</b>&nbsp;—&nbsp;<b>$130k</b>&nbsp;<span style="color:var(--fg-4)">/ yr</span></div>
+            <div class="mock-bar"><i style="width:72%"></i></div>
+            <div class="mock-row" style="color:var(--fg-4)">Median for Senior · Remote</div>
+          </div>
+        </div>
+        <div class="diff-card">
+          <span class="dnum">03 · FAST</span>
+          <h3>Apply in one click</h3>
+          <p>Unlock the direct apply link and send your saved CV in seconds. No re-typing, no dead &ldquo;apply on company site&rdquo; loops.</p>
+          <div class="diff-mock">
+            <div class="mock-row"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>CV attached · <b>ada-cv.pdf</b></div>
+            <div class="mock-row mock-apply"><span>Direct apply link</span><span class="mbtn">Apply →</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · LISTINGS (Listings.tsx) -->
+  <section class="sec" id="listing" data-screen-label="Listings">
+    <div class="wrap wrap--wide">
+      <div class="section-head" style="text-align:left;margin:0 0 32px;max-width:680px">
+        <span class="section-kicker">Live remote roles</span>
+        <h2>Find the one that fits — in seconds</h2>
+      </div>
+      <div class="listing-grid">
+        <aside class="filter-rail">
+          <h4>Filters</h4>
+          <div class="fgroup">
+            <div class="ft">Category</div>
+            <a class="fopt" href="#"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Engineering<span class="ct">2.4k</span></a>
+            <a class="fopt" href="#"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Design<span class="ct">680</span></a>
+            <a class="fopt" href="#"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Marketing<span class="ct">540</span></a>
+            <a class="fopt" href="#"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Data &amp; AI<span class="ct">1.2k</span></a>
+          </div>
+          <div class="fgroup">
+            <div class="ft">Region</div>
+            <label class="fopt on"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Worldwide</label>
+            <label class="fopt"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Remote-first</label>
+            <label class="fopt"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>EMEA</label>
+          </div>
+          <div class="fgroup">
+            <div class="ft">Type</div>
+            <label class="fopt on"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Full-time</label>
+            <label class="fopt"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Contract</label>
+          </div>
+        </aside>
+        <div class="listing-main">
+          <div class="listing-head">
+            <span class="lh-t"><span class="pulse"></span><b id="listCount">12</b>&nbsp;roles match</span>
+            <div class="listing-search"><div class="search-box" role="search">
+              <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input type="text" placeholder="Filter roles…" aria-label="Filter roles" id="listFilter">
+            </div></div>
+          </div>
+          <div class="job-list" id="jobList"></div>
+          <div style="text-align:center;margin-top:28px"><a href="#" class="btn btn-ghost btn-lg">Load more roles →</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · CATEGORIES (Categories.tsx) -->
+  <section class="sec sec--tint" data-screen-label="Categories">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">Browse by category</span>
+        <h2>Wherever your skills are, there&apos;s a remote role</h2>
+        <p>10+ categories, updated daily. Pick a lane and jump straight into live openings.</p>
+      </div>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+  </section>
+
+  <!-- 6 · FEATURED (Featured.tsx) -->
+  <section class="sec" data-screen-label="Featured">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">Featured this week</span>
+        <h2>Roles our team is excited about</h2>
+        <p>Verified companies, transparent pay, direct apply links.</p>
+      </div>
+      <div class="fcard-grid" id="featGrid"></div>
+    </div>
+  </section>
+
+  <!-- 7 · LIVE WALL (LiveWall.tsx) -->
+  <section class="livewall" data-screen-label="Live market wall">
+    <div class="lw-head">
+      <span class="lw-kicker"><span class="lw-dot"></span>Live market</span>
+      <h2>Thousands of roles, moving in real time</h2>
+      <p>New remote jobs land every minute, across every timezone. Here&apos;s the market right now.</p>
+    </div>
+    <div class="lw-stage" id="lwStage"></div>
+  </section>
+
+  <!-- 8 · MISSION (Mission.tsx) -->
+  <section class="sec sec--tint" data-screen-label="Mission">
+    <div class="wrap">
+      <div class="mission-grid">
+        <div class="mission-copy">
+          <span class="section-kicker">Why RemoteJobs44</span>
+          <h2>Talent is everywhere. Opportunity should be too.</h2>
+          <p>The best person for a role rarely lives next to the office. We index every genuinely-remote opening worldwide and verify it actually hires across borders — so <b>where you live stops deciding what you can do</b>.</p>
+        </div>
+        <div class="mstat-grid">
+          <div class="mstat"><div class="n">150+</div><div class="l">Countries with live remote roles on the platform today</div></div>
+          <div class="mstat"><div class="n">70K+</div><div class="l">Verified remote openings, refreshed every single day</div></div>
+          <div class="mstat"><div class="n">100%</div><div class="l">of listings checked to be genuinely remote-friendly</div></div>
+          <div class="mstat"><div class="n">24/7</div><div class="l">new roles landing across every timezone, around the clock</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · HOW IT WORKS (HowItWorks.tsx) -->
+  <section class="sec" data-screen-label="How it works">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">How it works</span>
+        <h2>From browse to offer letter — in three steps</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step">
+          <div class="num">01</div>
+          <h3>Browse free, no card needed</h3>
+          <p>Search 70,000+ remote jobs across 10 categories. Filter by role, level, salary and location — free from day one.</p>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <h3>Unlock access. Start applying.</h3>
+          <p>Instantly unlock every apply link and email. One-click apply with your saved CV. No friction.</p>
+          <div class="price-row"><span class="price-pill">Day Pass · $3</span><span class="price-pill">Pro · $19/mo</span></div>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <h3>Track every application</h3>
+          <p>Follow each application from sent to offer in your personal dashboard. Know exactly where you stand.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 · CAPABILITIES (Capabilities.tsx) -->
+  <section class="sec sec--tint" data-screen-label="Capabilities">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">The RemoteJobs44 toolkit</span>
+        <h2>Everything you need to land the role</h2>
+        <p>One account, the full job-hunt stack — from first search to signed offer.</p>
+      </div>
+      <div class="cap-grid" id="capGrid"></div>
+      <div class="statline">
+        <div class="si"><div class="n">70,000+</div><div class="l">Live roles indexed and refreshed every day</div></div>
+        <div class="si"><div class="n">100% verified</div><div class="l">Every listing checked to actually hire remotely</div></div>
+        <div class="si"><div class="n">Free forever</div><div class="l">Browse and save at no cost — pay only when you apply</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 · TESTIMONIALS (Testimonials.tsx) -->
+  <section class="sec" data-screen-label="Testimonials">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">Hired through RemoteJobs44</span>
+        <h2>Real offers. Real paychecks. From home.</h2>
+        <p>5,000+ professionals across 60+ countries landed remote roles they found here.</p>
+      </div>
+      <div class="tcard-grid">
+        <figure class="tcard">
+          <div class="quote-mark">&ldquo;</div>
+          <blockquote>I&apos;d been applying for months on boards full of roles that secretly wanted me on-site. Here every listing is <b>genuinely remote</b> — I had two interviews in my first week.</blockquote>
+          <figcaption class="tcard-person">
+            <img src="assets/people-4-portrait.jpg" alt="Adaeze O." width="46" height="46">
+            <div><div class="pn">Adaeze O.</div><div class="pr">Frontend Engineer · Remote → Vercel</div></div>
+            <div class="stars" aria-label="5 out of 5">★★★★★</div>
+          </figcaption>
+        </figure>
+        <figure class="tcard">
+          <div class="quote-mark">&ldquo;</div>
+          <blockquote>The salary ranges are <b>shown upfront</b> in dollars. No guessing, no wasted applications. I negotiated $40k more than my last role.</blockquote>
+          <figcaption class="tcard-person">
+            <img src="assets/ad-blazer-man.jpg" alt="Kwame A." width="46" height="46">
+            <div><div class="pn">Kwame A.</div><div class="pr">Product Designer · Remote → Figma</div></div>
+            <div class="stars" aria-label="5 out of 5">★★★★★</div>
+          </figcaption>
+        </figure>
+        <figure class="tcard">
+          <div class="quote-mark">&ldquo;</div>
+          <blockquote>The $3 day pass paid for itself instantly — one unlock, one apply link, <b>one offer letter</b>. Best three dollars I&apos;ve ever spent.</blockquote>
+          <figcaption class="tcard-person">
+            <img src="assets/ad-coffee-woman.jpg" alt="Thandiwe M." width="46" height="46">
+            <div><div class="pn">Thandiwe M.</div><div class="pr">Data Analyst · Remote → Andela</div></div>
+            <div class="stars" aria-label="5 out of 5">★★★★★</div>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · FAQ (Faq.tsx) -->
+  <section class="sec sec--tint" data-screen-label="FAQ">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-kicker">Questions</span>
+        <h2>Everything you need to know</h2>
+      </div>
+      <div class="faq-grid">
+        <details class="faq" open>
+          <summary>Is it really free to browse?<svg class="pm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></summary>
+          <p>Yes. Search all 70,000+ roles, filter by category, salary and region, and save jobs — no card required. You only pay when you&rsquo;re ready to unlock apply links and contact details.</p>
+        </details>
+        <details class="faq">
+          <summary>What do I get with a Day Pass vs Pro?<svg class="pm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></summary>
+          <p>The $3 Day Pass unlocks every apply link and email for 24 hours. Pro ($19/mo) adds unlimited unlocks, one-click apply with a saved CV, application tracking, and early access to featured roles.</p>
+        </details>
+        <details class="faq">
+          <summary>How do you verify the jobs are really remote?<svg class="pm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></summary>
+          <p>Every listing is checked against the company&rsquo;s stated remote policy and hiring locations before it goes live. Roles that secretly require on-site work or one specific country are filtered out — what you see is what actually hires remotely.</p>
+        </details>
+        <details class="faq">
+          <summary>Can I get paid in my local currency?<svg class="pm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></summary>
+          <p>Most listed companies pay through global payroll partners like Deel, Remote and Wise, so you can receive USD, EUR or GBP, or convert to your local currency. Each listing notes the payment method where known.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 · CTA BAND (CtaBand.tsx) -->
+  <section class="cta-band" data-screen-label="CTA band">
+    <div class="wrap cta-inner">
+      <span class="eyebrow-pill"><span class="dot"></span>Join 5,000+ job seekers</span>
+      <h2>Your next role is already posted</h2>
+      <p>Join 5,000+ professionals who found their next role through RemoteJobs44. Browse free — upgrade only when you&apos;re ready to apply.</p>
+      <div class="cta-actions">
+        <a href="#" class="btn btn-primary btn-lg">Start Searching Free</a>
+        <a href="#" class="btn btn-lg" style="border-color:rgba(255,255,255,0.35);color:#fff">Browse Jobs</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===================== FOOTER (Footer.tsx) ===================== -->
+<footer class="mk-footer" data-screen-label="Footer">
+  <div class="mk-foot-grid">
+    <div class="mk-foot-brand">
+      <a class="mk-logo" href="#">
+        <span class="mk-logo-mark">
+          <svg viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="10" fill="#2563eb"/></svg>
+          <svg viewBox="0 0 40 40" fill="none"><path d="M10 26 Q15 12 20 20 Q25 28 29 15" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="29" cy="15" r="3.5" fill="#f97316"/></svg>
+        </span>
+        RemoteJobs44
+      </a>
+      <p>Your global remote career starts here. Find jobs from anywhere. Subscribe from ₦500.</p>
+      <div class="mk-foot-social">
+        <a href="#" aria-label="X"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.259 5.633zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+        <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+        <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+        <a href="#" aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+      </div>
+    </div>
+    <div class="mk-foot-col"><h4>Jobs</h4><ul><li><a href="#">All Remote Jobs</a></li><li><a href="#">Engineering</a></li><li><a href="#">Design</a></li><li><a href="#">Marketing</a></li><li><a href="#">By City</a></li></ul></div>
+    <div class="mk-foot-col"><h4>Explore</h4><ul><li><a href="#">Salary Guide</a></li><li><a href="#">Resources</a></li><li><a href="#">Compare Boards</a></li><li><a href="#">Companies Hiring</a></li><li><a href="#">How It Works</a></li></ul></div>
+    <div class="mk-foot-col"><h4>Company</h4><ul><li><a href="#">About</a></li><li><a href="#">Blog</a></li><li><a href="#">Pricing</a></li><li><a href="#">FAQ</a></li><li><a href="#">Contact</a></li></ul></div>
+    <div class="mk-foot-col"><h4>Legal</h4><ul><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms of Service</a></li><li><a href="#">Cookie Policy</a></li></ul></div>
+  </div>
+  <div class="mk-foot-bottom">
+    <p>© 2026 RemoteJobs44. All rights reserved.</p>
+    <div style="display:flex;gap:16px"><a href="#">Privacy</a><a href="#">Terms</a></div>
+  </div>
+</footer>
+
+<!-- ===================== BOTTOM NAV (BottomNav.tsx, md:hidden) ===================== -->
+<nav class="mk-bottomnav" aria-label="Mobile navigation">
+  <a class="mk-bn-item active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+  <a class="mk-bn-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Jobs</span></a>
+  <a class="mk-bn-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>Saved</span></a>
+  <a class="mk-bn-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Applied</span></a>
+  <a class="mk-bn-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>Profile</span></a>
+  <a class="mk-bn-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></a>
+</nav>
+
+<script>
+/* ---------- Sample data (real shape from components/home/deep-ocean/helpers.ts) ---------- */
+const TINTS=[['#eff6ff','#2563eb'],['#faf5ff','#9333ea'],['#fdf2f8','#db2777'],['#ecfeff','#0891b2'],['#fffbeb','#d97706'],['#fff7ed','#ea580c'],['#eef2ff','#4f46e5'],['#fff1f2','#e11d48'],['#f0fdf4','#16a34a']];
+function tintFor(seed){let h=0;for(let i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))>>>0;const[bg,fg]=TINTS[h%TINTS.length];return{bg,fg};}
+const JOBS=[
+  {title:'Senior Frontend Engineer',company:'Vercel',location:'Worldwide',type:'full-time',pay:'$160k – $210k',age:'2h ago',featured:true},
+  {title:'Product Designer',company:'Figma',location:'Remote · Americas',type:'full-time',pay:null,age:'5h ago',featured:false},
+  {title:'Growth Marketing Lead',company:'Stripe',location:'Worldwide',type:'full-time',pay:'$120k – $150k',age:'7h ago',featured:true},
+  {title:'Data Engineer',company:'GitLab',location:'Remote · EMEA',type:'full-time',pay:null,age:'9h ago',featured:false},
+  {title:'Customer Support Specialist',company:'Notion',location:'Worldwide',type:'full-time',pay:null,age:'12h ago',featured:false},
+  {title:'Staff Backend Engineer',company:'Shopify',location:'Remote',type:'full-time',pay:'$180k – $230k',age:'1d ago',featured:true},
+  {title:'Content Strategist',company:'Webflow',location:'Worldwide',type:'contract',pay:null,age:'1d ago',featured:false},
+  {title:'DevOps Engineer',company:'Cloudflare',location:'Remote · Americas',type:'full-time',pay:null,age:'1d ago',featured:false},
+  {title:'Finance Analyst',company:'Deel',location:'Worldwide',type:'full-time',pay:null,age:'2d ago',featured:false},
+  {title:'Sales Development Rep',company:'Zapier',location:'Remote',type:'full-time',pay:null,age:'2d ago',featured:false},
+  {title:'People Ops Manager',company:'Automattic',location:'Worldwide',type:'full-time',pay:null,age:'2d ago',featured:false},
+  {title:'ML Engineer',company:'Hugging Face',location:'Worldwide',type:'full-time',pay:'$170k – $220k',age:'3d ago',featured:true},
+];
+const titleType=t=>t.split('-').map(w=>w[0].toUpperCase()+w.slice(1)).join('-');
+const payLabel=j=>j.pay||titleType(j.type);
+const payCompact=j=>j.pay?j.pay.split('–')[0].trim():'Remote';
+const logoEl=co=>{const t=tintFor(co);return `<span class="job-logo" style="--lm-bg:${t.bg};--lm-fg:${t.fg}">${co[0].toUpperCase()}</span>`;};
+
+/* Hero preview rows */
+(function(){const rows=JOBS.slice(0,8).map(j=>`<a class="prow" href="#">${logoEl(j.company)}<span><div class="pt">${j.title}</div><div class="pm">${j.company} · ${j.location}</div></span><span class="pp">${payCompact(j)}</span></a>`).join('');document.getElementById('previewTrack').innerHTML=rows+rows;})();
+
+/* Listings job rows */
+(function(){const rows=JOBS.map(j=>`<a class="job-row${j.featured?' job-row--featured':''}" href="#">${logoEl(j.company)}<span class="job-main"><span class="job-title">${j.title}</span><span class="job-meta">${j.company} · ${j.location}</span></span><span class="job-tag">${j.location}</span><span class="job-pay">${payLabel(j)}</span><span class="job-age">${j.age}</span><svg class="job-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>`).join('');document.getElementById('jobList').innerHTML=rows;document.getElementById('listCount').textContent=JOBS.length;
+  const inp=document.getElementById('listFilter');inp.addEventListener('input',()=>{const n=inp.value.trim().toLowerCase();const m=JOBS.filter(j=>!n||(j.title+j.company+j.location+j.type).toLowerCase().includes(n));document.getElementById('jobList').innerHTML=m.map(j=>`<a class="job-row${j.featured?' job-row--featured':''}" href="#">${logoEl(j.company)}<span class="job-main"><span class="job-title">${j.title}</span><span class="job-meta">${j.company} · ${j.location}</span></span><span class="job-tag">${j.location}</span><span class="job-pay">${payLabel(j)}</span><span class="job-age">${j.age}</span><svg class="job-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>`).join('');document.getElementById('listCount').textContent=m.length;});})();
+
+/* Featured cards */
+(function(){const cards=JOBS.slice(0,6).map(j=>`<a class="fcard${j.featured?' fcard--featured':''}" href="#"><div class="fcard-top">${logoEl(j.company)}</div><h3 class="fcard-title">${j.title}</h3><p class="fcard-co">${j.company} · ${j.location}</p><div class="fcard-tags"><span class="fcard-type">${titleType(j.type)}</span></div><div class="fcard-foot"><span class="fcard-pay">${payLabel(j)}</span><span class="fcard-age">${j.age}</span></div></a>`).join('');document.getElementById('featGrid').innerHTML=cards;})();
+
+/* Categories */
+(function(){const CATS=[['Engineering','#eff6ff','#2563eb','2,431'],['Design','#faf5ff','#9333ea','684'],['Marketing','#fdf2f8','#db2777','542'],['Data & AI','#ecfeff','#0891b2','1,208'],['Finance','#fffbeb','#d97706','413'],['Customer Support','#fff7ed','#ea580c','396'],['People & HR','#eef2ff','#4f46e5','221'],['Sales','#fff1f2','#e11d48','358']];
+  const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>';
+  document.getElementById('catGrid').innerHTML=CATS.map(c=>`<a class="cat-tile" href="#" style="--cat-bg:${c[1]};--cat-fg:${c[2]}"><span class="ci">${ic}</span><span class="cn">${c[0]}</span><span class="cc"><b>${c[3]}</b> open roles</span></a>`).join('');})();
+
+/* Capabilities */
+(function(){const CAPS=[['Daily job alerts','New roles matching your filters land in your inbox every morning — before they fill up.'],['Saved searches','Pin the exact category, salary and region you want and pick up right where you left off.'],['One-click apply','Send your saved CV straight to the employer — no re-typing the same form ten times.'],['Application tracker','Follow every application from sent to interview to offer in one tidy dashboard.'],['Salary insights','See real pay bands in USD for every role and level so you negotiate from a position of knowledge.'],['Verified employers','Every company is checked to actually hire remotely — no ghost listings, no dead ends.']];
+  const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>';
+  document.getElementById('capGrid').innerHTML=CAPS.map(c=>`<div class="cap-tile"><span class="cap-ic">${ic}</span><h3>${c[0]}</h3><p>${c[1]}</p></div>`).join('');})();
+
+/* Live wall — 4 columns, cards duplicated for seamless loop */
+(function(){const stage=document.getElementById('lwStage');const cols=[[],[],[],[]];JOBS.forEach((j,i)=>cols[i%4].push(j));
+  stage.innerHTML=cols.map(col=>{const cards=col.map(j=>`<a class="lw-card" href="#"><div class="lw-top">${logoEl(j.company)}<span class="lw-pay">${payCompact(j)}</span></div><div class="lw-title">${j.title}</div><div class="lw-co">${j.company} · ${j.location}</div><div class="lw-foot"><span class="lw-live"><i></i>Live</span><span class="lw-age">${j.age}</span></div></a>`).join('');return `<div class="lw-col"><div class="lw-track">${cards}${cards}</div></div>`;}).join('');})();
+
+/* Company marquee — monogram chips (production self-hosts /logos/<slug>.svg) */
+(function(){const COMPANIES=['GitLab','Stripe','Shopify','Vercel','Netlify','Notion','Figma','Cloudflare','GitHub','Atlassian','Coinbase','Datadog','MongoDB','DigitalOcean','Zapier','Automattic','HashiCorp','Dropbox','Linear','Webflow','Spotify','Asana','Grammarly','Elastic','Twilio','Canva','Paystack','Flutterwave','Deel','Remote','Andela','Moniepoint'];
+  const half=Math.ceil(COMPANIES.length/2);const chip=n=>{const t=tintFor(n);return `<span class="logo-chip"><span class="logo-mark" style="--lm-bg:${t.bg};--lm-fg:${t.fg}">${n.slice(0,2).toUpperCase()}</span><span class="logo-name">${n}</span></span>`;};
+  const a=COMPANIES.slice(0,half).map(chip).join('');const b=COMPANIES.slice(half).map(chip).join('');
+  document.getElementById('marqueeA').innerHTML=a+a;document.getElementById('marqueeB').innerHTML=b+b;})();
+
+/* Header: mobile menu toggle */
+(function(){const h=document.getElementById('mkHeader'),m=document.getElementById('mkMenu'),b=document.getElementById('mkBurger');b.addEventListener('click',()=>{h.classList.toggle('menu-open');m.classList.toggle('open');});})();
+
+/* Header: theme toggle (deep-ocean.css keys off .dark + [data-theme]) */
+(function(){const SUN='<path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="5"/>';const MOON='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  document.getElementById('mkTheme').addEventListener('click',()=>{const d=document.documentElement.classList.toggle('dark');document.documentElement.setAttribute('data-theme',d?'dark':'light');document.getElementById('mkThemeIcon').innerHTML=d?SUN:MOON;});})();
+
+/* Hero stat count-up (loops, paused when off-screen) */
+(function(){const els=[...document.querySelectorAll('.hb-stat .n')];function run(el){const target=+el.dataset.count,suf=el.dataset.suffix||'';const t0=performance.now(),dur=1700;(function step(now){const p=Math.min(1,(now-t0)/dur);const e=1-Math.pow(1-p,3);el.textContent=Math.round(target*e)+suf;if(p<1)requestAnimationFrame(step);})(t0);}
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)run(e.target);}),{threshold:0.5});els.forEach(el=>io.observe(el));})();
+</script>
+</body>
+</html>
