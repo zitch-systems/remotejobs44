@@ -1,0 +1,183 @@
+// RemoteJobs44 — extended screens (part 1): onboarding, inbox, edit profile, preferences, invite.
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, TextInput, Share, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useStore } from './store';
+import { NOTIFICATIONS, CATEGORIES } from './data';
+import { Icon, Logo } from './ui';
+import { palette } from './theme';
+import { sx, Chip } from './screens';
+
+// Shared stack header
+export function TopBar({ title, nav, right }: any) {
+  const { theme } = useStore();
+  return (
+    <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4, borderBottomWidth: 1, borderBottomColor: theme.line, backgroundColor: theme.bgElev }}>
+      <Pressable onPress={() => nav.goBack()} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={20} color={theme.fg1} /></Pressable>
+      <Text style={{ flex: 1, fontWeight: '800', fontSize: 17, color: theme.fg1 }}>{title}</Text>
+      {right || null}
+    </View>
+  );
+}
+
+export function Field({ label, value, onChange, placeholder, multiline }: any) {
+  const { theme } = useStore(); const s = sx(theme);
+  return (
+    <View style={{ marginBottom: 13 }}>
+      <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.fg3, marginBottom: 6 }}>{label}</Text>
+      <View style={[s.input, multiline && { alignItems: 'flex-start' }]}>
+        <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={theme.fg4} multiline={multiline} style={[s.inputTx, multiline ? { height: 84, textAlignVertical: 'top' } : null]} />
+      </View>
+    </View>
+  );
+}
+
+const SLIDES = [
+  { icon: 'search', title: 'Every remote job, in one place', body: '70,000+ verified-remote roles across 150+ countries, matched to your skills.' },
+  { icon: 'bolt', title: 'Apply in seconds', body: 'One-tap apply with your saved CV — and track every application in one place.' },
+  { icon: 'spark', title: 'Land it with AI', body: 'AI CV review, tailored cover letters and interview prep to help you stand out.' },
+];
+
+export function OnboardingScreen() {
+  const { completeOnboarding } = useStore(); const [i, setI] = useState(0);
+  const last = i === SLIDES.length - 1; const sl = SLIDES[i];
+  return (
+    <View style={{ flex: 1, backgroundColor: palette.ocean2 }}>
+      <SafeAreaView style={{ flex: 1, padding: 26 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Logo size={34} />
+          <Pressable onPress={completeOnboarding} hitSlop={10}><Text style={{ color: '#9fb2cf', fontWeight: '700' }}>Skip</Text></Pressable>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 96, height: 96, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center', marginBottom: 30 }}><Icon name={sl.icon} size={40} color="#fff" /></View>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 26, textAlign: 'center', lineHeight: 32 }}>{sl.title}</Text>
+          <Text style={{ color: '#aebfd6', fontSize: 15, textAlign: 'center', marginTop: 12, lineHeight: 22, maxWidth: 300 }}>{sl.body}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 7, marginBottom: 20 }}>
+          {SLIDES.map((_, k) => <View key={k} style={{ width: k === i ? 22 : 7, height: 7, borderRadius: 99, backgroundColor: k === i ? '#f97316' : 'rgba(255,255,255,0.3)' }} />)}
+        </View>
+        <Pressable onPress={() => (last ? completeOnboarding() : setI(i + 1))} style={{ backgroundColor: '#fff', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}>
+          <Text style={{ color: palette.ocean2, fontWeight: '800', fontSize: 16 }}>{last ? 'Get started' : 'Next'}</Text>
+        </Pressable>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+export function InboxScreen({ navigation }: any) {
+  const { theme, markNotifsRead } = useStore();
+  useEffect(() => { markNotifsRead(); }, []);
+  const kindIcon: Record<string, string> = { match: 'spark', status: 'brief', interview: 'chat', alert: 'bell', tip: 'star' };
+  return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
+      <TopBar title="Inbox" nav={navigation} />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
+        {NOTIFICATIONS.map(n => (
+          <Pressable key={n.id} onPress={() => n.jobId && navigation.navigate('Detail', { id: n.jobId })} style={{ flexDirection: 'row', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: theme.line }}>
+            <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: theme.brand50, alignItems: 'center', justifyContent: 'center' }}><Icon name={kindIcon[n.kind] || 'bell'} size={18} color={theme.brand600} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '700', fontSize: 14, color: theme.fg1 }}>{n.title}</Text>
+              <Text style={{ fontSize: 12.5, color: theme.fg3, marginTop: 2, lineHeight: 18 }}>{n.body}</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: theme.fg4 }}>{n.at}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function EditProfileScreen({ navigation }: any) {
+  const { theme, state, updateProfile } = useStore(); const s = sx(theme); const p = state.profile;
+  const [name, setName] = useState(p.name);
+  const [title, setTitle] = useState(p.title);
+  const [location, setLocation] = useState(p.location);
+  const [bio, setBio] = useState(p.bio);
+  const [skills, setSkills] = useState<string[]>(p.skills);
+  const [skill, setSkill] = useState('');
+  const [cv, setCv] = useState(p.cv);
+  const addSkill = () => { const v = skill.trim(); if (v && !skills.includes(v)) setSkills([...skills, v]); setSkill(''); };
+  const save = () => { updateProfile({ name, title, location, bio, skills, cv }); navigation.goBack(); };
+  return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
+      <TopBar title="Edit profile" nav={navigation} right={<Pressable onPress={save} hitSlop={8} style={{ paddingHorizontal: 12 }}><Text style={{ color: theme.brand600, fontWeight: '800', fontSize: 15 }}>Save</Text></Pressable>} />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <Field label="Full name" value={name} onChange={setName} placeholder="Your name" />
+        <Field label="Headline" value={title} onChange={setTitle} placeholder="e.g. Virtual Assistant · Remote" />
+        <Field label="Location" value={location} onChange={setLocation} placeholder="City, Country" />
+        <Field label="About you" value={bio} onChange={setBio} placeholder="A short bio…" multiline />
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.fg3, marginBottom: 6 }}>Skills</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+          {skills.map(sk => (
+            <Pressable key={sk} onPress={() => setSkills(skills.filter(x => x !== sk))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.brand50, borderWidth: 1, borderColor: theme.brand100, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999 }}>
+              <Text style={{ color: theme.brand700, fontSize: 13, fontWeight: '600' }}>{sk}</Text><Icon name="x" size={12} color={theme.brand700} />
+            </Pressable>
+          ))}
+        </View>
+        <View style={[s.input, { marginBottom: 16 }]}>
+          <TextInput value={skill} onChangeText={setSkill} onSubmitEditing={addSkill} placeholder="Add a skill…" placeholderTextColor={theme.fg4} style={s.inputTx} />
+          <Pressable onPress={addSkill} hitSlop={8}><Icon name="plus" size={18} color={theme.brand600} /></Pressable>
+        </View>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.fg3, marginBottom: 6 }}>CV / Résumé</Text>
+        <Pressable onPress={() => setCv('ada-obi-cv-2025.pdf')} style={[s.cardBlock, { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }]}>
+          <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: theme.brand50, alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={18} color={theme.brand600} /></View>
+          <View style={{ flex: 1 }}><Text style={{ fontWeight: '700', fontSize: 14, color: theme.fg1 }} numberOfLines={1}>{cv || 'No file yet'}</Text><Text style={{ fontSize: 12, color: theme.fg4 }}>Tap to replace (simulated upload)</Text></View>
+          <Icon name="external" size={18} color={theme.fg4} />
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function PreferencesScreen({ navigation }: any) {
+  const { theme, state, updateProfile } = useStore(); const s = sx(theme); const p = state.profile;
+  const [role, setRole] = useState(p.targetRole);
+  const [picked, setPicked] = useState<string[]>(['VA', 'Support']);
+  const [type, setType] = useState('Full-time');
+  const [alerts, setAlerts] = useState(true);
+  const toggleCat = (k: string) => setPicked(picked.includes(k) ? picked.filter(x => x !== k) : [...picked, k]);
+  const save = () => { updateProfile({ targetRole: role }); navigation.goBack(); };
+  return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
+      <TopBar title="Job preferences" nav={navigation} right={<Pressable onPress={save} hitSlop={8} style={{ paddingHorizontal: 12 }}><Text style={{ color: theme.brand600, fontWeight: '800', fontSize: 15 }}>Save</Text></Pressable>} />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <Field label="Target role" value={role} onChange={setRole} placeholder="e.g. Virtual Assistant" />
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.fg3, marginBottom: 8, marginTop: 4 }}>Categories you're open to</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+          {CATEGORIES.map(c => <Chip key={c.key} label={c.label} on={picked.includes(c.key)} onPress={() => toggleCat(c.key)} theme={theme} />)}
+        </View>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.fg3, marginBottom: 8 }}>Job type</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
+          {['Full-time', 'Part-time', 'Contract'].map(t => <Chip key={t} label={t} on={type === t} onPress={() => setType(t)} theme={theme} />)}
+        </View>
+        <View style={[s.cardBlock, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 }]}>
+          <View style={{ flex: 1, paddingRight: 12 }}><Text style={{ fontSize: 14.5, color: theme.fg1, fontWeight: '600' }}>Daily job alerts</Text><Text style={{ fontSize: 12, color: theme.fg4, marginTop: 2 }}>New matching roles, once a day.</Text></View>
+          <Switch value={alerts} onValueChange={setAlerts} trackColor={{ true: theme.brand600 }} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function InviteScreen({ navigation }: any) {
+  const { theme } = useStore(); const s = sx(theme);
+  const code = 'ADA-44';
+  const share = () => Share.share({ message: `Join me on RemoteJobs44 — 70,000+ verified remote jobs, matched to you. Use my code ${code} to start. https://remotejobs44.com` });
+  return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
+      <TopBar title="Invite friends" nav={navigation} />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
+        <View style={{ alignItems: 'center', paddingVertical: 14 }}>
+          <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: theme.brand50, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}><Icon name="gift" size={32} color={theme.brand600} /></View>
+          <Text style={{ fontWeight: '800', fontSize: 20, color: theme.fg1, textAlign: 'center' }}>Give a week of Pro, free</Text>
+          <Text style={{ fontSize: 14, color: theme.fg3, textAlign: 'center', marginTop: 8, lineHeight: 21, maxWidth: 300 }}>Share your code — when a friend joins, you both get 7 days of RemoteJobs44 Pro.</Text>
+        </View>
+        <View style={[s.cardBlock, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, marginVertical: 12 }]}>
+          <Text style={{ fontWeight: '800', fontSize: 20, letterSpacing: 2, color: theme.fg1 }}>{code}</Text>
+          <Text style={{ color: theme.fg4, fontSize: 12.5 }}>Your code</Text>
+        </View>
+        <Pressable onPress={share} style={[s.btn, s.btnPrimary]}><Icon name="share" size={18} color="#fff" /><Text style={s.btnPrimaryTx}>Share invite</Text></Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

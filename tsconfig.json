@@ -1,56 +1,103 @@
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": [
-        "./*"
-      ],
-      "@/components/*": [
-        "./components/*"
-      ],
-      "@/lib/*": [
-        "./lib/*"
-      ],
-      "@/hooks/*": [
-        "./hooks/*"
-      ],
-      "@/styles/*": [
-        "./styles/*"
-      ]
-    }
+// RemoteJobs44 — app store: React context + AsyncStorage persistence.
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { light, dark, Theme } from './theme';
+import { NOTIFICATIONS } from './data';
+
+const KEY = 'rj44_native_v2';
+export const FREE_DAILY_CAP = 3;
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+export type Profile = { name: string; title: string; location: string; bio: string; cv: string; targetRole: string; skills: string[] };
+export type ApplyResult = 'ok' | 'already' | 'capped';
+
+export type AppState = {
+  user: { id: string; name: string; email: string } | null;
+  theme: 'light' | 'dark';
+  pro: boolean;
+  seenOnboarding: boolean;
+  saved: string[];
+  applied: Record<string, { status: string; at: number }>;
+  appsToday: { date: string; count: number };
+  readNotifs: string[];
+  profile: Profile;
+};
+
+const DEFAULT: AppState = {
+  user: null, theme: 'light', pro: false, seenOnboarding: false,
+  saved: [], applied: {}, appsToday: { date: todayKey(), count: 0 }, readNotifs: [],
+  profile: {
+    name: 'Ada Obi', title: 'Virtual Assistant · Remote', location: 'Lagos, NG',
+    bio: 'Remote-first VA supporting founders with calendars, inbox and research across timezones.',
+    cv: 'ada-obi-cv.pdf', targetRole: 'Virtual Assistant', skills: ['Calendar', 'Inbox', 'Notion', 'Research'],
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "app/tailwind.config.ts",
-    "mobile",
-    "supabase/functions"
-  ]
+};
+
+type Ctx = {
+  state: AppState; theme: Theme;
+  signIn: (u: AppState['user']) => void; signOut: () => void;
+  setTheme: (m: 'light' | 'dark') => void; toggleTheme: () => void;
+  completeOnboarding: () => void;
+  upgrade: () => void; cancelPro: () => void;
+  toggleSave: (id: string) => void; isSaved: (id: string) => boolean;
+  applyToJob: (id: string) => ApplyResult; hasApplied: (id: string) => boolean;
+  setStatus: (id: string, status: string) => void;
+  appsRemaining: () => number;
+  unreadCount: () => number; markNotifsRead: () => void;
+  updateProfile: (p: Partial<Profile>) => void;
+  resetData: () => void;
+};
+const StoreCtx = createContext<Ctx>(null as any);
+export const useStore = () => useContext(StoreCtx);
+
+export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<AppState>(DEFAULT);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(KEY).then(raw => {
+      if (raw) try { setState(s => ({ ...DEFAULT, ...JSON.parse(raw), profile: { ...DEFAULT.profile, ...(JSON.parse(raw).profile || {}) } })); } catch {}
+      setReady(true);
+    });
+  }, []);
+  useEffect(() => { if (ready) AsyncStorage.setItem(KEY, JSON.stringify(state)).catch(() => {}); }, [state, ready]);
+
+  const patch = useCallback((fn: (s: AppState) => AppState) => setState(s => fn({ ...s })), []);
+
+  const api: Ctx = {
+    state, theme: state.theme === 'dark' ? dark : light,
+    signIn: u => patch(s => ({ ...s, user: u })),
+    signOut: () => patch(s => ({ ...s, user: null })),
+    setTheme: m => patch(s => ({ ...s, theme: m })),
+    toggleTheme: () => patch(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' })),
+    completeOnboarding: () => patch(s => ({ ...s, seenOnboarding: true })),
+    upgrade: () => patch(s => ({ ...s, pro: true })),
+    cancelPro: () => patch(s => ({ ...s, pro: false })),
+    isSaved: id => state.saved.includes(id),
+    toggleSave: id => patch(s => ({ ...s, saved: s.saved.includes(id) ? s.saved.filter(x => x !== id) : [id, ...s.saved] })),
+    hasApplied: id => !!state.applied[id],
+    applyToJob: id => {
+      if (state.applied[id]) return 'already';
+      const t = todayKey();
+      const count = state.appsToday.date === t ? state.appsToday.count : 0;
+      if (!state.pro && count >= FREE_DAILY_CAP) return 'capped';
+      patch(s => {
+        const tc = s.appsToday.date === t ? s.appsToday.count : 0;
+        return { ...s, applied: { ...s.applied, [id]: { status: 'Applied', at: Date.now() } }, appsToday: { date: t, count: tc + 1 } };
+      });
+      return 'ok';
+    },
+    setStatus: (id, status) => patch(s => (s.applied[id] ? { ...s, applied: { ...s.applied, [id]: { ...s.applied[id], status } } } : s)),
+    appsRemaining: () => {
+      if (state.pro) return -1;
+      const count = state.appsToday.date === todayKey() ? state.appsToday.count : 0;
+      return Math.max(0, FREE_DAILY_CAP - count);
+    },
+    unreadCount: () => NOTIFICATIONS.filter(n => !state.readNotifs.includes(n.id)).length,
+    markNotifsRead: () => patch(s => ({ ...s, readNotifs: NOTIFICATIONS.map(n => n.id) })),
+    updateProfile: p => patch(s => ({ ...s, profile: { ...s.profile, ...p } })),
+    resetData: () => patch(() => ({ ...DEFAULT, user: state.user, seenOnboarding: true })),
+  };
+  if (!ready) return null;
+  return <StoreCtx.Provider value={api}>{children}</StoreCtx.Provider>;
 }

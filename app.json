@@ -1,150 +1,75 @@
-/* RemoteJobs44 — app shell + screens. Full-screen, light/dark. */
-:root{
-  --brand-50:#eff6ff; --brand-100:#dbeafe; --brand-400:#60a5fa; --brand-500:#3b82f6;
-  --brand-600:#2563eb; --brand-700:#1d4ed8; --accent:#f97316; --success:#22c55e;
-  --font-display:'Sora',system-ui,sans-serif; --font-body:'DM Sans',system-ui,sans-serif;
-  --bg:#f4f7fc; --bg-elev:#ffffff; --card:#ffffff; --fg-1:#0f172a; --fg-2:#475569;
-  --fg-3:#64748b; --fg-4:#94a3b8; --line:#e8eef6; --line-2:#dde5f0;
-  --shadow:0 10px 30px -16px rgba(15,30,56,.25); --tab-h:64px; --top-h:56px;
+# RemoteJobs44 — Native app (React Native / Expo)
+
+A React Native port of the RemoteJobs44 mobile experience, sharing the **Deep Ocean** design language with the PWA in `../app`. Built with **Expo** so the same codebase ships to **Android (`.apk`/`.aab`)** and **iOS (`.ipa`)**.
+
+## What's inside
+```
+_native/
+├─ App.tsx              Navigation root (onboarding → auth gate → tabs + stack)
+├─ app.json            Expo config (icons, splash, bundle IDs)
+├─ package.json        Dependencies (Expo 51, React Navigation, AsyncStorage, SVG)
+├─ assets/             icon.png · adaptive-icon.png · splash.png
+└─ src/
+   ├─ theme.ts         Light + dark tokens (mirrors the PWA palette)
+   ├─ data.ts          Mock data + `API.*` seam · notifications · statuses · plans · AI
+   ├─ store.tsx        Context + AsyncStorage (saved/applied/profile/theme/Pro/onboarding)
+   ├─ ui.tsx           Icon, Logo, CompanyLogo, JobCard
+   ├─ screens.tsx      Auth · Feed · Search · Detail · Applications · Saved · Profile
+   ├─ extra.tsx        Onboarding · Inbox · Edit profile · Preferences · Invite
+   └─ pro.tsx          Plans/Paywall · Settings · AI toolkit · Reset password
+```
+
+> The folder is named **`_native`** (leading underscore) so this project's
+> design-system compiler ignores it — npm packages like React Navigation can't
+> resolve in that pass. Rename to `native/` if you lift it into its own repo.
+
+## Run it (development)
+```bash
+cd _native
+npm install
+npx expo start            # press a = Android, i = iOS, or scan the QR in Expo Go
+```
+> Requires Node 18+. For native runs you need Android Studio (emulator) or Xcode (simulator); or use the **Expo Go** app on a real device.
+
+## Build store binaries (EAS)
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure        # writes eas.json, sets the projectId in app.json
+
+# Android — installable .apk for sideloading / testing:
+eas build -p android --profile preview
+
+# Android — .aab for the Play Store:
+eas build -p android --profile production
+
+# iOS — .ipa (needs an Apple Developer account):
+eas build -p ios --profile production
+```
+The `.apk` download link is printed when the build finishes (and appears in your Expo dashboard).
+
+> Tip: add this to `eas.json` so the preview profile emits an installable APK rather than an AAB:
+> ```json
+> { "build": { "preview": { "android": { "buildType": "apk" } } } }
+> ```
+
+## Wiring a real backend
+Everything goes through `src/data.ts → API`. Replace the mock bodies with `fetch()`:
+```ts
+async listJobs(f) {
+  const r = await fetch(`https://api.remotejobs44.com/jobs?` + new URLSearchParams(f as any));
+  return r.json();
 }
-[data-theme="dark"]{
-  --bg:#070d1c; --bg-elev:#0d1830; --card:#101c38; --fg-1:#f1f5fb; --fg-2:#aebfd6;
-  --fg-3:#8497b4; --fg-4:#5e7295; --line:#1c2c4d; --line-2:#243558;
-  --shadow:0 14px 34px -18px rgba(0,0,0,.7);
-}
-*,*::before,*::after{box-sizing:border-box;}
-[hidden]{display:none !important;}
-html,body{margin:0;height:100%;}
-body{
-  font-family:var(--font-body); background:var(--bg); color:var(--fg-1);
-  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
-}
-button{font-family:inherit;cursor:pointer;}
-img{display:block;}
-::-webkit-scrollbar{width:0;height:0;}
+```
+No screen changes needed — the UI only depends on the `API` shape and the `Job` type.
 
-/* ---- App shell ---- */
-.app{
-  position:fixed; inset:0; display:flex; flex-direction:column;
-  max-width:520px; margin:0 auto; background:var(--bg); overflow:hidden;
-}
-.screen{ flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; position:relative; }
-.screen::-webkit-scrollbar{display:none;}
-.pad{ padding:16px 18px 28px; }
-.pad > *{ max-width:100%; }
-.jcard, .appcard, .comp-card{ max-width:100%; }
-
-/* ---- Top app bar ---- */
-.topbar{
-  height:var(--top-h); flex-shrink:0; display:flex; align-items:center; gap:12px;
-  padding:0 16px; background:var(--bg-elev); border-bottom:1px solid var(--line); z-index:20;
-}
-/* Solid bars pin to the top of the scroll area; the feed's transparent hero bar scrolls with its hero. */
-.topbar:not(.hero-bar){ position:sticky; top:0; }
-.topbar.hero-bar{ background:transparent; border:none; color:#fff; }
-.topbar .tb-title{ font-family:var(--font-display); font-weight:800; font-size:18px; letter-spacing:-.02em; }
-.topbar .tb-sub{ font-size:11.5px; color:var(--fg-3); }
-.topbar .spacer{ margin-left:auto; }
-.iconbtn{
-  width:38px; height:38px; border-radius:11px; border:1px solid var(--line-2); background:var(--card);
-  color:var(--fg-2); display:grid; place-items:center; position:relative;
-}
-.iconbtn svg{ width:18px; height:18px; }
-.iconbtn .dot{ position:absolute; top:7px; right:8px; width:8px; height:8px; border-radius:50%; background:var(--accent); border:2px solid var(--card); }
-.hero-bar .iconbtn{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.2); color:#fff; }
-
-.brand-mark{ display:flex; align-items:center; gap:9px; }
-.brand-mark .logo{ width:34px; height:34px; border-radius:9px; }
-.brand-mark b{ font-family:var(--font-display); font-weight:800; font-size:17px; letter-spacing:-.02em; }
-.brand-mark b span{ color:var(--accent); }
-
-/* ---- Bottom tab bar ---- */
-.tabbar{
-  height:var(--tab-h); flex-shrink:0; display:flex; background:var(--bg-elev);
-  border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:20;
-}
-.tab{
-  flex:1; border:none; background:none; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:3px; color:var(--fg-4); font-size:10.5px; font-weight:600; position:relative;
-}
-.tab svg{ width:23px; height:23px; }
-.tab.on{ color:var(--brand-600); }
-[data-theme="dark"] .tab.on{ color:var(--brand-400); }
-.tab .badge{ position:absolute; top:7px; left:calc(50% + 7px); min-width:16px; height:16px; padding:0 4px;
-  border-radius:9px; background:var(--accent); color:#fff; font-size:9.5px; font-weight:800; display:grid; place-items:center; }
-
-/* ---- Buttons ---- */
-.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:var(--font-display);
-  font-weight:700; font-size:15px; border-radius:13px; padding:13px 18px; border:1.5px solid transparent; text-decoration:none; }
-.btn-primary{ background:var(--brand-600); color:#fff; }
-.btn-primary:active{ background:var(--brand-700); }
-.btn-ghost{ background:var(--card); border-color:var(--line-2); color:var(--fg-1); }
-.btn-block{ width:100%; }
-.btn-lg{ padding:15px 20px; font-size:16px; }
-.btn[disabled]{ opacity:.55; }
-
-/* ---- Inputs ---- */
-.field{ display:block; margin-bottom:13px; }
-.field label{ display:block; font-size:12.5px; font-weight:700; color:var(--fg-3); margin-bottom:6px; }
-.input{
-  width:100%; display:flex; align-items:center; gap:10px; background:var(--card);
-  border:1.5px solid var(--line-2); border-radius:13px; padding:13px 14px;
-}
-.input:focus-within{ border-color:var(--brand-500); box-shadow:0 0 0 4px rgba(37,99,235,.12); }
-.input svg{ width:18px; height:18px; color:var(--fg-4); flex-shrink:0; }
-.input input{ flex:1; border:none; outline:none; background:none; font-family:var(--font-body); font-size:15px; color:var(--fg-1); min-width:0; }
-.input input::placeholder{ color:var(--fg-4); }
-
-/* ---- Chips ---- */
-.chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
-.chips::-webkit-scrollbar{display:none;}
-.chip{ flex-shrink:0; white-space:nowrap; padding:8px 14px; border-radius:999px; border:1.5px solid var(--line-2);
-  background:var(--card); color:var(--fg-2); font-size:13px; font-weight:600; }
-.chip.on{ background:var(--brand-600); border-color:var(--brand-600); color:#fff; }
-
-/* ---- Job card ---- */
-.jcard{ display:flex; gap:13px; align-items:flex-start; background:var(--card); border:1.5px solid var(--line);
-  border-radius:18px; padding:15px; margin-bottom:11px; box-shadow:var(--shadow); }
-.jcard:active{ transform:scale(.99); }
-.jlogo{ width:46px; height:46px; border-radius:13px; flex-shrink:0; display:grid; place-items:center;
-  color:#fff; font-family:var(--font-display); font-weight:800; font-size:18px; position:relative; overflow:hidden; }
-.jlogo img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:21%; background:#fff; }
-.jbody{ flex:1; min-width:0; }
-.jrole{ font-family:var(--font-display); font-weight:700; font-size:15.5px; color:var(--fg-1); letter-spacing:-.01em; }
-.jmeta{ font-size:13px; color:var(--fg-3); margin-top:2px; }
-.jtags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
-.tag{ font-size:11px; font-weight:600; color:var(--fg-2); background:var(--bg); border:1px solid var(--line);
-  padding:3px 9px; border-radius:7px; }
-.tag.pay{ color:var(--brand-700); background:var(--brand-50); border-color:var(--brand-100); }
-[data-theme="dark"] .tag.pay{ color:var(--brand-400); background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.25); }
-.jmatch{ flex-shrink:0; text-align:right; }
-.jmatch .pct{ font-family:var(--font-display); font-weight:800; font-size:15px; color:var(--success); }
-.jmatch .lbl{ font-size:9.5px; color:var(--fg-4); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.jsave{ margin-top:8px; color:var(--fg-4); }
-.jsave.on{ color:var(--accent); }
-.jsave svg{ width:20px; height:20px; }
-
-/* ---- Section headers ---- */
-.shead{ display:flex; align-items:baseline; justify-content:space-between; margin:20px 0 11px; }
-.shead h2{ font-family:var(--font-display); font-weight:800; font-size:18px; letter-spacing:-.02em; margin:0; }
-.shead a{ font-size:13px; font-weight:700; color:var(--brand-600); text-decoration:none; }
-.muted{ color:var(--fg-3); font-size:13.5px; }
-
-/* ---- Empty states ---- */
-.empty{ text-align:center; padding:60px 30px; color:var(--fg-3); }
-.empty .ico{ width:64px; height:64px; border-radius:20px; margin:0 auto 16px; display:grid; place-items:center;
-  background:var(--brand-50); color:var(--brand-600); }
-[data-theme="dark"] .empty .ico{ background:rgba(59,130,246,.12); color:var(--brand-400); }
-.empty .ico svg{ width:30px; height:30px; }
-.empty h3{ font-family:var(--font-display); font-size:17px; margin:0 0 6px; color:var(--fg-1); }
-
-/* ---- Toast ---- */
-.toast{ position:fixed; left:50%; bottom:calc(var(--tab-h) + 16px); transform:translateX(-50%) translateY(20px);
-  background:var(--fg-1); color:var(--bg-elev); font-size:13.5px; font-weight:600; padding:11px 18px;
-  border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:.25s; z-index:60; }
-.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-
-/* ---- Fade/slide transition for screens ---- */
-.screen-enter{ animation:scrIn .26s cubic-bezier(.22,1,.36,1) both; }
-@keyframes scrIn{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:none;} }
-@media (prefers-reduced-motion:reduce){ .screen-enter{ animation:none; } }
+## Parity notes
+- **Reconciliation:** the screens in `extra.tsx` / `pro.tsx` (onboarding, inbox,
+  edit profile, job preferences, plans/paywall, settings, AI toolkit, reset
+  password) plus the Pro/free daily-apply cap, 6-state application tracker,
+  notification bell + badge, similar-roles and “apply on company site” close the
+  gaps documented in `../uploads/MOBILE_DESIGN_RECONCILIATION.md`.
+- **Fonts:** the PWA uses Sora + DM Sans (Google Fonts). Add them with `expo-font` / `@expo-google-fonts/sora` + `@expo-google-fonts/dm-sans` and set `theme.font` for pixel parity; the scaffold falls back to system fonts.
+- **Company logos** load from DuckDuckGo's favicon service (same as the PWA) with a monogram fallback.
+- **Persistence** uses AsyncStorage; the PWA uses localStorage. Same keys/shape conceptually.
+- Screens are intentionally compact ports — extend Detail (apply sheet, share), Notifications, and CV/skills editing to match the PWA 1:1 as needed.
