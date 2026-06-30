@@ -192,6 +192,10 @@
 .deep-ocean .fopt .ct { margin-left:auto; font-size:12px; color:var(--fg-4); }
 .deep-ocean .fopt:hover { color:var(--brand-700); }
 .dark .deep-ocean .fopt:hover { color:var(--brand-400); }
+/* Collapsible filter rail (landing): the toggle button is desktop-hidden —
+   the rail renders as a normal static sidebar wide, and only becomes a
+   tap-to-open "Filters" disclosure on phones (see the ≤960 query below). */
+.deep-ocean .frail-toggle { display:none; }
 
 /* ---------- Detail page ---------- */
 .deep-ocean .detail-grid { display:grid; grid-template-columns:1fr 360px; gap:40px; align-items:start; padding:44px 0 80px; }
@@ -479,6 +483,9 @@
   .deep-ocean .lw-stage { grid-template-columns:repeat(2,1fr); height:480px; }
   .deep-ocean .lw-col:nth-child(n+3) { display:none; }
   .deep-ocean .mission-grid, .deep-ocean .steps-grid { grid-template-columns:1fr; }
+  /* The stacked mission grid kept the desktop 56px column gap as a vertical
+     gap — far too airy on a phone. Tighten it once stacked. */
+  .deep-ocean .mission-grid { gap:32px; }
   .deep-ocean .tcard-grid { grid-template-columns:1fr; }
   .deep-ocean .diff-grid, .deep-ocean .cap-grid, .deep-ocean .statline { grid-template-columns:1fr; }
   .deep-ocean .cat-grid { grid-template-columns:repeat(2,1fr); }
@@ -486,6 +493,32 @@
   .deep-ocean .hero-photo { left:-16px; }
   .deep-ocean .listing-grid { grid-template-columns:1fr; }
   .deep-ocean .filter-rail { position:static; }
+
+  /* --- Listings filter rail → collapsible "Filters" disclosure ---------
+     A tall, always-open filter card pushed the actual job rows far down the
+     page on phones. Below the listing's single-column breakpoint the rail
+     drops its card chrome and collapses behind a full-width toggle; the
+     groups only render once the user opens it. Desktop is untouched (the
+     toggle stays display:none and the body shows inside the sticky card). */
+  .deep-ocean .filter-rail--collapsible { padding:0; border:none; background:transparent; border-radius:0; }
+  .deep-ocean .filter-rail--collapsible .frail-toggle {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; min-height:48px; padding:13px 18px;
+    background:var(--bg-card); border:1.5px solid var(--border-1); border-radius:14px;
+    font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--fg-1);
+    cursor:pointer; transition:border-color var(--dur-fast);
+  }
+  .deep-ocean .filter-rail--collapsible .frail-toggle:hover { border-color:var(--brand-300); }
+  .deep-ocean .filter-rail--collapsible .frail-tlabel { display:inline-flex; align-items:center; gap:9px; }
+  .deep-ocean .filter-rail--collapsible .frail-toggle svg { width:18px; height:18px; color:var(--fg-3); }
+  .deep-ocean .filter-rail--collapsible .frail-chev { transition:transform var(--dur-normal); }
+  .deep-ocean .filter-rail--collapsible.open .frail-chev { transform:rotate(180deg); }
+  .deep-ocean .filter-rail--collapsible .frail-body {
+    display:none; margin-top:12px; padding:20px 22px;
+    background:var(--bg-card); border:1.5px solid var(--border-1); border-radius:18px;
+  }
+  .deep-ocean .filter-rail--collapsible.open .frail-body { display:block; }
+  .deep-ocean .filter-rail--collapsible .frail-body h4 { display:none; }
 }
 @media (max-width:520px) {
   .deep-ocean .hero-b { padding-bottom:60px; }
@@ -494,6 +527,32 @@
   .deep-ocean .lw-stage { grid-template-columns:1fr; height:440px; }
   .deep-ocean .lw-col:nth-child(n+2) { display:none; }
   .deep-ocean .cat-grid { grid-template-columns:1fr; }
+
+  /* Tighten the page gutter: 28px each side ate ~17% of a 360px screen and
+     left hero/section copy cramped. 20px keeps the rhythm but reclaims width. */
+  .deep-ocean .wrap { padding:0 20px; }
+  .deep-ocean .lw-stage { padding:0 20px; }
+
+  /* Hero H1: the desktop clamp floored at 2.6rem (~42px), so it never scaled
+     down on phones — oversized and forcing awkward wraps. Re-floor it to a
+     phone-appropriate size (~25–34px) while keeping the bold display weight. */
+  .deep-ocean .hero-b h1 { font-size:clamp(1.55rem,7vw,2.15rem); line-height:1.08; letter-spacing:-0.02em; margin:14px 0 14px; }
+  .deep-ocean .hero-b .lede { font-size:var(--fs-md); margin-bottom:22px; }
+
+  /* Full-width search CTA: at this width the inline "Search Jobs" button
+     squeezed the input to ~120px. Wrap it to its own full-width row so the
+     field stays comfortably wide and the button is a ≥44px tap target. */
+  .deep-ocean .hb-search { flex-wrap:wrap; padding:8px 8px 8px 16px; }
+  .deep-ocean .hb-search input { min-height:30px; }
+  .deep-ocean .hb-search .btn { flex:1 1 100%; justify-content:center; padding:14px 18px; }
+
+  /* Shorter vertical rhythm so the single column doesn't scroll forever
+     (phones only — desktop spacing is unchanged). */
+  .deep-ocean .sec { padding:48px 0; }
+  .deep-ocean .livewall { padding:60px 0; }
+  .deep-ocean .cta-band { padding:64px 0; }
+  .deep-ocean .section-head { margin-bottom:30px; }
+  .deep-ocean .section-head h2 { font-size:var(--fs-2xl); }
 }
 
 @media (prefers-reduced-motion: reduce) {
