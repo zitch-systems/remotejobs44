@@ -5,16 +5,17 @@ import { fetchLandingJobs, fetchCategoryCounts } from '@/components/home/deep-oc
 import { Hero }            from '@/components/home/deep-ocean/Hero';
 import { CompanyMarquee }  from '@/components/home/deep-ocean/CompanyMarquee';
 import { Differentiator }  from '@/components/home/deep-ocean/Differentiator';
-import { Listings }        from '@/components/home/deep-ocean/Listings';
 import { Categories, CATEGORY_SLUGS } from '@/components/home/deep-ocean/Categories';
 import { Featured }        from '@/components/home/deep-ocean/Featured';
 import { LiveWall }        from '@/components/home/deep-ocean/LiveWall';
 import { Mission }         from '@/components/home/deep-ocean/Mission';
 import { HowItWorks }      from '@/components/home/deep-ocean/HowItWorks';
+import { Pricing }         from '@/components/home/deep-ocean/Pricing';
 import { Capabilities }    from '@/components/home/deep-ocean/Capabilities';
 import { Testimonials }    from '@/components/home/deep-ocean/Testimonials';
 import { Faq }             from '@/components/home/deep-ocean/Faq';
 import { CtaBand }         from '@/components/home/deep-ocean/CtaBand';
+import { LiveFeed }        from '@/components/home/deep-ocean/LiveFeed';
 
 export const metadata: Metadata = {
   title: 'RemoteJobs44 – Global Remote Jobs',
@@ -44,19 +45,20 @@ export default async function HomePage() {
 
   return (
     <div className="deep-ocean">
-      <Hero jobs={jobs} />
+      <Hero />
       <CompanyMarquee />
       <Differentiator />
-      <Listings jobs={jobs} categoryCounts={categoryCounts} />
       <Categories counts={categoryCounts} />
       <Featured jobs={jobs} />
       <LiveWall jobs={jobs} />
       <Mission />
       <HowItWorks />
+      <Pricing />
       <Capabilities />
       <Testimonials />
       <Faq />
       <CtaBand />
+      <LiveFeed jobs={jobs} />
     </div>
   );
 }
