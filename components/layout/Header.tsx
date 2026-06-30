@@ -240,7 +240,10 @@ export function Header() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
-            className="md:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-lg border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-100 dark:hover:bg-[#0a1628] transition-colors"
+            aria-expanded={mobileMenuOpen}
+            // 44px square: an Apple-HIG tap target. md:hidden, so this only
+            // affects the mobile bar — the desktop chrome is unchanged.
+            className="md:hidden w-11 h-11 flex flex-col items-center justify-center gap-[5px] rounded-lg border border-stone-200 dark:border-[#1e3a5f] hover:bg-stone-100 dark:hover:bg-[#0a1628] transition-colors"
           >
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-all duration-200', mobileMenuOpen && 'translate-y-[6.5px] rotate-45')} />
             <span className={cn('block w-4 h-[1.5px] bg-stone-600 dark:bg-stone-300 rounded-full transition-all duration-200', mobileMenuOpen && 'opacity-0')} />

@@ -137,7 +137,7 @@ export function Footer() {
   // mobile starved the programmatic landing pages of their sitewide internal
   // links. Extra bottom padding on mobile clears the fixed BottomNav.
   return (
-    <footer className="bg-white dark:bg-[#0f1e38] border-t border-stone-200 dark:border-[#1e3a5f] pt-16 pb-24 md:pb-8 block">
+    <footer className="bg-white dark:bg-[#0f1e38] border-t border-stone-200 dark:border-[#1e3a5f] pt-16 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 block">
       <div className="max-w-[1440px] mx-auto px-5">
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
 

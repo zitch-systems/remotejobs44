@@ -47,6 +47,11 @@ function JobRow({ job }: { job: LandingJob }) {
 
 export function Listings({ jobs, categoryCounts = {} }: { jobs: LandingJob[]; categoryCounts?: Record<string, number> }) {
   const [q, setQ] = useState('');
+  // On phones the rail collapses behind a "Filters" toggle (closed by
+  // default) so the job rows aren't buried under a tall filter block. On
+  // desktop the toggle is CSS-hidden and the body shows as a sticky sidebar,
+  // so this state is inert there.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -68,30 +73,49 @@ export function Listings({ jobs, categoryCounts = {} }: { jobs: LandingJob[]; ca
           <h2>Find the one that fits — in seconds</h2>
         </div>
         <div className="listing-grid">
-          <aside className="filter-rail">
-            <h4>Filters</h4>
-            <div className="fgroup">
-              <div className="ft">Category</div>
-              {RAIL_CATS.map(c => {
-                const n = categoryCounts[c.slug];
-                return (
-                  <Link key={c.slug} className="fopt" href={`/jobs?category=${c.slug}`}>
-                    <span className="box"><FilterTick /></span>{c.name}
-                    {n && n > 0 ? <span className="ct">{compactCount(n)}</span> : null}
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="fgroup">
-              <div className="ft">Region</div>
-              <label className="fopt on"><span className="box"><FilterTick /></span>Worldwide</label>
-              <label className="fopt"><span className="box"><FilterTick /></span>Remote-first</label>
-              <label className="fopt"><span className="box"><FilterTick /></span>EMEA</label>
-            </div>
-            <div className="fgroup">
-              <div className="ft">Type</div>
-              <label className="fopt on"><span className="box"><FilterTick /></span>Full-time</label>
-              <label className="fopt"><span className="box"><FilterTick /></span>Contract</label>
+          <aside className={`filter-rail filter-rail--collapsible${filtersOpen ? ' open' : ''}`}>
+            <button
+              type="button"
+              className="frail-toggle"
+              aria-expanded={filtersOpen}
+              aria-controls="landing-filters"
+              onClick={() => setFiltersOpen(o => !o)}
+            >
+              <span className="frail-tlabel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+                </svg>
+                Filters
+              </span>
+              <svg className="frail-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div className="frail-body" id="landing-filters">
+              <h4>Filters</h4>
+              <div className="fgroup">
+                <div className="ft">Category</div>
+                {RAIL_CATS.map(c => {
+                  const n = categoryCounts[c.slug];
+                  return (
+                    <Link key={c.slug} className="fopt" href={`/jobs?category=${c.slug}`}>
+                      <span className="box"><FilterTick /></span>{c.name}
+                      {n && n > 0 ? <span className="ct">{compactCount(n)}</span> : null}
+                    </Link>
+                  );
+                })}
+              </div>
+              <div className="fgroup">
+                <div className="ft">Region</div>
+                <label className="fopt on"><span className="box"><FilterTick /></span>Worldwide</label>
+                <label className="fopt"><span className="box"><FilterTick /></span>Remote-first</label>
+                <label className="fopt"><span className="box"><FilterTick /></span>EMEA</label>
+              </div>
+              <div className="fgroup">
+                <div className="ft">Type</div>
+                <label className="fopt on"><span className="box"><FilterTick /></span>Full-time</label>
+                <label className="fopt"><span className="box"><FilterTick /></span>Contract</label>
+              </div>
             </div>
           </aside>
 
