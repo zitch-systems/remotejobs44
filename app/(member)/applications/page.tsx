@@ -124,7 +124,7 @@ function ApplicationsContent() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{app.jobTitle}</p>
-                        <p className="text-xs text-stone-400 dark:text-stone-500">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
+                        <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                       </div>
                       {/* Progress steps */}
                       <div className="hidden sm:flex items-center gap-1">
@@ -161,7 +161,7 @@ function ApplicationsContent() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-stone-900 dark:text-stone-100 truncate group-hover:text-orange-700 dark:group-hover:text-orange-400 transition-colors">{app.jobTitle}</p>
-                      <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
+                      <p className="text-xs text-stone-400 truncate">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                     </div>
                     <span className="badge bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">🎉 Offer received</span>
                     <ArrowUpRight className="w-4 h-4 text-orange-300 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors shrink-0" />
@@ -188,7 +188,7 @@ function ApplicationsContent() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-stone-600 dark:text-stone-400 truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{app.jobTitle}</p>
-                        <p className="text-xs text-stone-400">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
+                        <p className="text-xs text-stone-400 truncate">{app.company} · Applied {formatRelativeDate(app.appliedAt)}</p>
                       </div>
                       <span className={`badge ${cfg.color}`}>{cfg.label}</span>
                       <ArrowUpRight className="w-4 h-4 text-stone-300 dark:text-stone-600 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors shrink-0" />
