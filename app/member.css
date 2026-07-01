@@ -295,4 +295,17 @@
    and the iOS home indicator. Matches the .app-main reservation exactly. */
 @media (max-width: 767px) {
   .member-content { padding-bottom: calc(var(--app-bottomnav-h) + max(8px, var(--safe-bottom))); }
+
+  /* On phones the fixed bottom tab bar (Home·Jobs·Saved·Applied·Profile·
+     Settings) is the primary navigation, exactly like every public page — so
+     hide the member shell's own horizontal top rail here. It was a SECOND,
+     top-anchored nav that only appeared on signed-in pages, which read as
+     "the navigation is at the top" and broke consistency with the rest of the
+     app. Everything it linked stays reachable on mobile: Dashboard via the
+     brand logo (top-left), Alerts via the bell icon, Jobs/Saved/Applied/
+     Profile/Settings via the bottom bar, and the AI tools from the dashboard
+     and profile pages. The 768–900px range (small tablets, where the bottom
+     bar is hidden) keeps the horizontal rail from the block above, and desktop
+     keeps the vertical sidebar — so every width still has exactly one nav. */
+  .member-sidebar { display: none; }
 }
