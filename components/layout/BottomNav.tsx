@@ -1,17 +1,19 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { House, BriefcaseBusiness, BookmarkCheck, ClipboardCheck, CircleUserRound, Settings } from 'lucide-react';
+import { House, BriefcaseBusiness, BookmarkCheck, ClipboardCheck, CircleUserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, useJobsStore } from '@/lib/store';
 
+// Five tabs — Settings merged into Profile (/settings now redirects there).
+// Six tabs left each cell only ~65px at 390px, which is what made the bar
+// read as misaligned/cramped; five gives every tab ~78px of breathing room.
 const NAV = [
   { href: '/',             icon: House,              label: 'Home'     },
   { href: '/jobs',         icon: BriefcaseBusiness,  label: 'Jobs'     },
   { href: '/saved',        icon: BookmarkCheck,      label: 'Saved'    },
   { href: '/applications', icon: ClipboardCheck,     label: 'Applied'  },
   { href: '/profile',      icon: CircleUserRound,    label: 'Profile'  },
-  { href: '/settings',     icon: Settings,           label: 'Settings' },
 ];
 
 export function BottomNav() {
@@ -35,7 +37,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-6 pb-safe"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-5 pb-safe"
       aria-label="Mobile navigation"
     >
       {NAV.map(({ href, icon: Icon, label }) => {
