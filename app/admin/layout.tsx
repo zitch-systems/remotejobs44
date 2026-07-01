@@ -227,26 +227,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Mobile nav strip — app-menu-top pins it under the safe-area-aware
-          header (was a hard-coded top-[68px] that overlapped the notch). */}
-      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2 overflow-x-auto no-scrollbar">
-        <div className="flex gap-1 min-w-max">
-          {NAV.filter(n => !n.indent).map(({ href, icon: Icon, label, exact }) => {
-            const active = exact ? pathname === href : pathname.startsWith(href);
-            return (
-              <Link key={href} href={href}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors"
-                style={active
-                  ? { background: '#2563eb', color: '#fff' }
-                  : { color: '#64748b' }}>
-                <Icon className="w-3.5 h-3.5" />{label}
-              </Link>
-            );
-          })}
-        </div>
+      {/* Mobile admin nav — a dropdown (admin-only; this layout is already
+          role-gated). Replaces the old horizontal pill strip: with 15+
+          sections most pills sat hidden off-screen and the strip read as
+          clutter. One native <select> shows the current section and jumps on
+          change — every admin page reachable in two taps, no sideways
+          scrolling. app-menu-top pins it under the safe-area-aware header. */}
+      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2">
+        <select
+          aria-label="Admin section"
+          value={
+            // Longest matching href wins so /admin/jobs/new selects "Post
+            // Job", not "Jobs"; falls back to Overview.
+            NAV.filter(n => (n.exact ? pathname === n.href : pathname.startsWith(n.href)))
+               .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? '/admin'
+          }
+          onChange={e => router.push(e.target.value)}
+          className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-sm font-medium text-slate-700 dark:text-slate-200"
+        >
+          {NAV.map(({ href, label, indent }) => (
+            <option key={href} value={href}>{indent ? `— ${label}` : label}</option>
+          ))}
+        </select>
       </div>
 
-      <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] md:pt-0 pt-12">
+      <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] md:pt-0 pt-14">
         {children}
       </main>
     </div>
