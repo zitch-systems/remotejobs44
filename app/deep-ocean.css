@@ -566,11 +566,22 @@
      Phone-only overrides — the desktop landing above is untouched. The hero is a
      tighter single column (28px gutter, 23px H1, inline search row, one-line
      stats), sections breathe at 30px, and Pricing becomes a swipeable carousel. */
-  .deep-ocean .hero-b { padding-bottom:60px; }
+  .deep-ocean .hero-b { padding-bottom:48px; }
   .deep-ocean .hero-photo { display:none; }
-  .deep-ocean .lw-stage { grid-template-columns:1fr; height:440px; }
+  .deep-ocean .lw-stage { grid-template-columns:1fr; height:380px; margin-top:28px; }
   .deep-ocean .lw-col:nth-child(n+2) { display:none; }
-  .deep-ocean .cat-grid { grid-template-columns:1fr; }
+
+  /* Browse-by-category — the phone diet. Single-column × 8 tiles measured
+     ~1,550px (2 full screens of just categories). Phones get a compact
+     2-column grid capped at 6 tiles; the remaining categories stay one tap
+     away on /jobs and in the footer. Desktop/tablet grids are unchanged. */
+  .deep-ocean .cat-grid { grid-template-columns:repeat(2,1fr); gap:10px; }
+  .deep-ocean .cat-grid .cat-tile:nth-child(n+7) { display:none; }
+  .deep-ocean .cat-tile { padding:14px; gap:7px; border-radius:14px; }
+  .deep-ocean .cat-tile .ci { width:34px; height:34px; border-radius:10px; }
+  .deep-ocean .cat-tile .ci svg { width:18px; height:18px; }
+  .deep-ocean .cat-tile .cn { font-size:14px; }
+  .deep-ocean .cat-tile .cc { font-size:12px; }
 
   /* Hero column: 16px top inset, 28px gutter (inherited from .wrap) + 28px gap.
      minmax(0,1fr) + min-width:0 stop the single grid track from blowing past the
@@ -597,11 +608,39 @@
 
   /* Shorter vertical rhythm so the single column doesn't scroll forever
      (phones only — desktop spacing is unchanged). */
-  .deep-ocean .sec { padding:30px 0; }
-  .deep-ocean .livewall { padding:60px 0; }
-  .deep-ocean .cta-band { padding:64px 0; }
-  .deep-ocean .section-head { margin-bottom:30px; }
+  .deep-ocean .sec { padding:26px 0; }
+  .deep-ocean .livewall { padding:44px 0; }
+  .deep-ocean .cta-band { padding:48px 0; }
+  .deep-ocean .section-head { margin-bottom:22px; }
   .deep-ocean .section-head h2 { font-size:25px; }
+
+  /* Toolkit ("Everything you need to land the role") — 6 stacked cards
+     measured ~1,780px on phones, the single tallest section on the page.
+     Cap it at the 4 highest-value tiles (alerts, saved searches, one-click
+     apply, tracker) with tighter card padding; the statline under it packs
+     closer. Desktop keeps all 6 in its 3-column grid. */
+  .deep-ocean .cap-grid { gap:12px; }
+  .deep-ocean .cap-grid .cap-tile:nth-child(n+5) { display:none; }
+  .deep-ocean .cap-tile { padding:16px; }
+  .deep-ocean .cap-tile h3 { margin:10px 0 5px; }
+  .deep-ocean .statline { gap:16px; margin-top:22px; padding-top:20px; }
+
+  /* Testimonials: two quotes tell the story on a phone; the third pushed the
+     section past 1,100px. Desktop keeps all three. */
+  .deep-ocean .tcard-grid .tcard:nth-child(n+3) { display:none; }
+  .deep-ocean .tcard { padding:20px; }
+
+  /* Differentiator cards: same trim, stacked 3-up on phones. */
+  .deep-ocean .diff-grid { gap:12px; }
+  .deep-ocean .diff-card { padding:18px; }
+  .deep-ocean .mission-grid { gap:22px; }
+
+  /* The Live-feed section at the page foot re-tells the Live-market wall's
+     story (auto-scrolling "live roles" + photo card) — on a 12,000px phone
+     page that's redundant weight, so phones drop the whole section (the
+     :has() targets the <section class="sec"> so no empty padded band is
+     left behind). Desktop keeps both. */
+  .deep-ocean section.sec:has(.live-feed-wrap) { display:none; }
 
   /* Pricing → swipeable horizontal carousel. Each tier is ~86% wide so the next
      one peeks; the vertical padding keeps the "Most popular" badge and the Pro
