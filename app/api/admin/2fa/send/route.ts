@@ -32,6 +32,21 @@ export async function POST(_req: NextRequest) {
 
   const code = generateCode();
   const db = createAdminSupabaseClient();
+
+  // Housekeeping (hardening phase 1): dead rows — consumed, or past expiry —
+  // were never deleted anywhere, so the table grew forever. Purge this
+  // admin's stale rows whenever a fresh code is issued; the rows are inert
+  // by definition (verify filters consumed_at IS NULL AND expires_at > now),
+  // so this cannot change any auth outcome. Fire-and-forget: a purge failure
+  // must never block a login code.
+  db.from('admin_2fa_codes')
+    .delete()
+    .eq('user_id', admin.adminId)
+    .or(`consumed_at.not.is.null,expires_at.lt.${new Date().toISOString()}`)
+    .then(({ error }) => {
+      if (error) logError({ event: 'admin2fa.purge_failed', user_id: admin.adminId, error: error.message });
+    });
+
   const { error: insErr } = await db.from('admin_2fa_codes').insert({
     user_id:    admin.adminId,
     code_hash:  hashCode(admin.adminId, code),
