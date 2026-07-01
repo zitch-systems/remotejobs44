@@ -297,6 +297,8 @@ export function JobsFiltersBar() {
           </select>
           <button
             onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            aria-controls="advanced-filters-panel"
             className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
               showFilters || activeFilterCount > 0
                 ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
@@ -382,7 +384,7 @@ export function JobsFiltersBar() {
 
       {/* Advanced filters panel */}
       {showFilters && (
-        <div className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
+        <div id="advanced-filters-panel" className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="col-span-2 sm:col-span-2 lg:col-span-2">
               <CountrySelect value={country} onChange={v => setParam('country', v)} />
