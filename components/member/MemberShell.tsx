@@ -11,7 +11,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTheme } from 'next-themes';
 import {
   LayoutGrid, Search, Bookmark, ClipboardList, FileText, FileSignature,
-  Video, BarChart3, User, Bell, Settings, LogOut, Sun, Moon,
+  Video, BarChart3, User, Bell, LogOut, Sun, Moon,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useJobsStore } from '@/lib/store';
@@ -106,10 +106,11 @@ export function MemberShell({ children }: { children: React.ReactNode }) {
     { href: '/interview', label: 'AI Interview', icon: Video },
     { href: '/match', label: 'Job Match', icon: BarChart3 },
   ];
+  // Settings merged into /profile (the /settings route redirects there),
+  // so Profile is the single account/settings entry.
   const account: NavItem[] = [
-    { href: '/profile', label: 'Profile', icon: User },
+    { href: '/profile', label: 'Profile & Settings', icon: User },
     { href: '/alerts', label: 'Alerts', icon: Bell, badge: unread || undefined },
-    { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const isActive = (href: string) =>

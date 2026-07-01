@@ -2,9 +2,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import {
   User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle,
-  Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2,
+  Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2, Moon, Sun,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
@@ -31,6 +32,12 @@ function ProfileContent() {
   const logoutStore = useAuthStore(s => s.logout);
   const { toast } = useUIStore();
   const fileRef  = useRef<HTMLInputElement>(null);
+  // Theme lives here since /settings merged into this page. next-themes is
+  // the same mechanism Header/MemberShell use; `mounted` gates the label so
+  // the SSR pass (which can't know the stored theme) matches first paint.
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [name,       setName]       = useState('');
   // Initial loading state is based on whether Zustand already has the user
@@ -478,7 +485,9 @@ function ProfileContent() {
         )}
       </div>
 
-      {/* Settings — quick links to billing / preferences / danger zone */}
+      {/* Settings — merged from the old /settings page: billing, email
+          preferences, applications, theme, support, and the danger zone all
+          live here now (the /settings route permanently redirects here). */}
       <div className="card p-6">
         <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-4 flex items-center gap-2">
           <Settings className="w-4 h-4 text-brand-600" /> Settings
@@ -501,6 +510,29 @@ function ProfileContent() {
             icon={<FileText className="w-4 h-4" />}
             title="My applications"
             sub="Track your applied jobs and statuses."
+          />
+          {/* Theme toggle — same next-themes mechanism as the Header. */}
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-stone-100 dark:border-[#1e3a5f] hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 flex items-center justify-center shrink-0">
+              {mounted && theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-stone-900 dark:text-stone-100">Theme</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 truncate">
+                {mounted ? `Currently ${theme === 'dark' ? 'dark' : 'light'} mode — tap to switch` : 'Switch between light and dark mode'}
+              </p>
+            </div>
+            <span className="text-xs text-stone-400">→</span>
+          </button>
+          <SettingsLink
+            href="mailto:hello@remotejobs44.com"
+            icon={<Mail className="w-4 h-4" />}
+            title="Contact support"
+            sub="hello@remotejobs44.com"
           />
           <SettingsLink
             href="/profile/billing#danger"
@@ -533,8 +565,10 @@ function ReviewList({ title, icon, items }: { title: string; icon: React.ReactNo
 function SettingsLink({ href, icon, title, sub, danger }: {
   href: string; icon: React.ReactNode; title: string; sub: string; danger?: boolean;
 }) {
+  // mailto:/external hrefs get a plain anchor — next/link is for app routes.
+  const Tag: any = href.startsWith('/') ? Link : 'a';
   return (
-    <Link href={href} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+    <Tag href={href} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
       danger
         ? 'border-red-100 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-900/10'
         : 'border-stone-100 dark:border-[#1e3a5f] hover:bg-stone-50 dark:hover:bg-[#162033]'
@@ -551,7 +585,7 @@ function SettingsLink({ href, icon, title, sub, danger }: {
         <p className="text-xs text-stone-400 dark:text-stone-500 truncate">{sub}</p>
       </div>
       <span className={`text-xs ${danger ? 'text-red-400' : 'text-stone-400'}`}>→</span>
-    </Link>
+    </Tag>
   );
 }
 

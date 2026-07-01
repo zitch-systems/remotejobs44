@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, SlidersHorizontal, Briefcase, Zap, ChevronDown, Megaphone } from 'lucide-react';
+import { Sun, Moon, LogOut, User, LayoutDashboard, ClipboardList, Settings, Briefcase, Zap, ChevronDown, Megaphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore, useUIStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -193,8 +193,8 @@ export function Header() {
                       {[
                         { href: '/dashboard',    icon: <LayoutDashboard className="w-4 h-4"/>, label: 'Dashboard'       },
                         { href: '/applications', icon: <ClipboardList className="w-4 h-4"/>,  label: 'My Applications'  },
-                        { href: '/profile',      icon: <User className="w-4 h-4"/>,            label: 'Profile & CV'     },
-                        { href: '/settings',     icon: <SlidersHorizontal className="w-4 h-4"/>, label: 'Settings'        },
+                        // Settings merged into /profile (the route redirects there)
+                        { href: '/profile',      icon: <User className="w-4 h-4"/>,            label: 'Profile & Settings' },
                         { href: '/pricing',      icon: <Briefcase className="w-4 h-4"/>,       label: 'Plans'            },
                         // Gate role-specific links on `hydrated` (a confirmed
                         // live session) — otherwise persisted state from a
