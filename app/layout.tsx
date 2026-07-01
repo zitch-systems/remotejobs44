@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import './deep-ocean.css';
-import './member.css';
+// NOTE: member.css is intentionally NOT imported here. It's ~28KB of
+// `.member-*` styles used only by the signed-in shell, so it's imported in
+// app/(member)/layout.tsx instead — keeping it off the render-blocking CSS
+// path for the landing and every other marketing route.
 import { Analytics }      from '@vercel/analytics/next';
 import { SpeedInsights }  from '@vercel/speed-insights/next';
 import { ThemeProvider }  from '@/components/providers/ThemeProvider';
