@@ -287,3 +287,12 @@
   .member-shell .resume-card, .member-shell .letter-card { padding: 22px; max-width: none; }
   .member-shell .al-list { padding: 16px 16px 48px; }
 }
+
+/* The shared mobile BottomNav (components/layout/BottomNav) now renders on
+   member routes too. It's `md:hidden` (visible < 768px), and MainShell drops
+   its .app-main bottom reservation on member routes — so reserve the bar's
+   footprint here, otherwise the last row of content sits behind the fixed bar
+   and the iOS home indicator. Matches the .app-main reservation exactly. */
+@media (max-width: 767px) {
+  .member-content { padding-bottom: calc(var(--app-bottomnav-h) + max(8px, var(--safe-bottom))); }
+}
