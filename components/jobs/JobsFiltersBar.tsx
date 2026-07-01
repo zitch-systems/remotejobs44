@@ -297,6 +297,8 @@ export function JobsFiltersBar() {
           </select>
           <button
             onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            aria-controls="advanced-filters-panel"
             className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
               showFilters || activeFilterCount > 0
                 ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
@@ -341,21 +343,28 @@ export function JobsFiltersBar() {
           )}
         </button>
 
-        <div className="relative">
+        {/* Job Type / Level / Posted Within are exact duplicates of fields already
+            inside the "Filters" panel below (same setParam calls, same option
+            lists). On desktop the extra horizontal room makes the quick-access
+            copies worth it; on mobile they turned two already-cramped rows into
+            visual clutter with nothing new to offer, since tapping "Filters"
+            reveals the identical controls. Hide them below sm; unchanged at
+            sm and up. */}
+        <div className="hidden sm:block relative">
           <select aria-label="Filter by job type" value={type} onChange={e => setParam('type', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {TYPES.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Job Type' : o.label}</option>)}
           </select>
         </div>
 
-        <div className="relative">
+        <div className="hidden sm:block relative">
           <select aria-label="Filter by experience level" value={level} onChange={e => setParam('level', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {LEVELS.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Level' : o.label}</option>)}
           </select>
         </div>
 
-        <div className="relative">
+        <div className="hidden sm:block relative">
           <select aria-label="Filter by date posted" value={posted} onChange={e => setParam('posted', e.target.value)}
             className={PILL_SELECT_CLASS} style={PILL_BG_STYLE}>
             {POSTED_WITHIN.map(o => <option key={o.value} value={o.value}>{o.value === '' ? 'Posted Within' : o.label}</option>)}
@@ -382,7 +391,7 @@ export function JobsFiltersBar() {
 
       {/* Advanced filters panel */}
       {showFilters && (
-        <div className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
+        <div id="advanced-filters-panel" className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="col-span-2 sm:col-span-2 lg:col-span-2">
               <CountrySelect value={country} onChange={v => setParam('country', v)} />
@@ -408,7 +417,7 @@ export function JobsFiltersBar() {
       )}
 
       {/* Category chips */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mt-5">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mt-3 sm:mt-5">
         {CATEGORIES.map(cat => {
           const m = CATEGORY_META[cat as keyof typeof CATEGORY_META];
           return (

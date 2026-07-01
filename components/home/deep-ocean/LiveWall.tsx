@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { LandingJob, payCompact, ageLabel, tintFor } from './data';
+import { CompanyMask } from '@/components/jobs/CompanyMask';
 
 // Live market wall — 4 columns of vertically-scrolling cards (CSS animated).
 // Each track's children are rendered TWICE so the -50% translate loops
@@ -15,7 +16,7 @@ function LwCard({ job }: { job: LandingJob }) {
         <span className="lw-pay">{payCompact(job)}</span>
       </div>
       <div className="lw-title">{job.title}</div>
-      <div className="lw-co">{job.company} · {job.location}</div>
+      <div className="lw-co"><CompanyMask company={job.company} /> · {job.location}</div>
       <div className="lw-foot">
         <span className="lw-live"><i />Live</span>
         <span className="lw-age">{ageLabel(job)}</span>

@@ -166,7 +166,7 @@ export function MemberShell({ children }: { children: React.ReactNode }) {
           <span className="tb-name">{user?.name || 'Member'}</span>
           {user?.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="tb-avatar" src={user.avatar} alt={displayName} />
+            <img className="tb-avatar" src={user.avatar} alt={displayName} width={34} height={34} />
           ) : (
             <Link href="/profile" className="tb-avatar-fallback" aria-label="Your profile">
               {getInitials(displayName)}

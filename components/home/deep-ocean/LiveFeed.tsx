@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { LandingJob, payCompact, tintFor } from './data';
+import { CompanyMask } from '@/components/jobs/CompanyMask';
 
 export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
   const preview = jobs.slice(0, 8);
@@ -18,7 +19,7 @@ export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
         </span>
         <span>
           <div className="pt">{job.title}</div>
-          <div className="pm">{job.company} · {job.location}</div>
+          <div className="pm"><CompanyMask company={job.company} /> · {job.location}</div>
         </span>
         <span className="pp">{payCompact(job)}</span>
       </Link>
