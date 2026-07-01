@@ -642,6 +642,11 @@
      left behind). Desktop keeps both. */
   .deep-ocean section.sec:has(.live-feed-wrap) { display:none; }
 
+  /* "Featured this week" is likewise removed from phones entirely (requested):
+     its six photo cards duplicated the Live-market wall + listings right above
+     and below it. Desktop keeps the section. */
+  .deep-ocean section.sec:has(.fcard-grid) { display:none; }
+
   /* Pricing → swipeable horizontal carousel. Each tier is ~86% wide so the next
      one peeks; the vertical padding keeps the "Most popular" badge and the Pro
      card's shadow clear of the scroll-clip edge. */

@@ -82,13 +82,13 @@ function ApplicationsContent() {
   return (
     <div className="max-w-[900px] mx-auto px-5 py-8">
       <VerifyEmailBanner />
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
         <div>
-          <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">My Applications</h1>
+          <h1 className="font-display font-extrabold text-xl sm:text-2xl text-stone-900 dark:text-stone-100 tracking-tight">My Applications</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">{applications.length} total applications</p>
         </div>
         <Link href="/jobs"
-          className="flex items-center gap-2 px-4 py-2 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
+          className="flex items-center gap-2 px-4 py-2 shrink-0 whitespace-nowrap bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
           <Briefcase className="w-4 h-4" /> Browse Jobs
         </Link>
       </div>
