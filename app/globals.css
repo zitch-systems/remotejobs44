@@ -20,6 +20,16 @@
   }
 
   html { scroll-behavior: smooth; }
+  /* Hard guarantee against sideways panning on phones: if any element ever
+     overflows the viewport width (a long unbreakable string, a wide table),
+     `clip` cuts it at the document edge instead of widening the layout
+     viewport. A wider layout viewport is what let users pan left/right and
+     made position:fixed chrome (the bottom tab bar) drift out of view while
+     scrolling. `clip` — unlike `hidden` — does NOT create a scroll container,
+     so position:sticky descendants (filter bars, member top bar) keep
+     working. Horizontal scrolling *inside* components (carousels, chip rows,
+     areas with overflow-x:auto) is unaffected. */
+  html, body { overflow-x: clip; }
   body {
     margin: 0;
     background-color: #f8faff;
