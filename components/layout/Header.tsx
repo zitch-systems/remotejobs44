@@ -22,7 +22,6 @@ import { isMemberRoute } from '@/lib/member-routes';
 // crawler-visible position — and helps users discover them.
 const NAV_LINKS = [
   { href: '/jobs',         label: 'Jobs'         },
-  { href: '/companies',    label: 'Companies'    },
   { href: '/salary-guide', label: 'Salary Guide' },
   { href: '/resources',    label: 'Resources'    },
   { href: '/pricing',      label: 'Pricing'      },

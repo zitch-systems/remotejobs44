@@ -212,7 +212,11 @@ function ExpiredJobView({ title, company }: { title: string; company: string }) 
           Position Closed
         </div>
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">
-          {title}{company ? ` at ${company}` : ''} is no longer accepting applications
+          {title}
+          {/* This view previously interpolated the raw company name here with
+              no plan check at all — the one place on the job-detail page that
+              bypassed CompanyMask's free/daily blur entirely. */}
+          {company && <> at <CompanyMask company={company} /></>} is no longer accepting applications
         </h1>
         <p className="text-stone-500 dark:text-stone-400 leading-relaxed mb-8">
           This role has been filled or has expired. Thousands of fresh remote jobs are live right now — keep your search moving.
@@ -223,7 +227,7 @@ function ExpiredJobView({ title, company }: { title: string; company: string }) 
           </Link>
           {company && (
             <Link href={`/companies/${companySlug(company)}`} className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-700 dark:text-stone-200 font-bold rounded-xl hover:border-brand-600 dark:hover:border-brand-500 transition-colors text-sm">
-              More roles at {company}
+              More roles at <CompanyMask company={company} />
             </Link>
           )}
         </div>
