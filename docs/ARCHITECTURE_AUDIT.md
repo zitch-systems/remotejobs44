@@ -98,4 +98,4 @@ This is one of the strongest parts of the codebase:
 | Database (repo-visible) | Good — solid RLS + idempotency; one dual-enforcement ambiguity |
 | Testing/CI | Needs attention — e2e suite is built but not gated in CI |
 
-See `TECHNICAL_DEBT.md` for the consolidated, prioritized task list across all dimensions, `PERFORMANCE_REPORT.md`, `SEO_REPORT.md`, and `SECURITY_REPORT.md` for the deep dives on those specific areas.
+See `TECHNICAL_DEBT.md` for the consolidated, prioritized task list across all dimensions, and `PERFORMANCE_REPORT.md`, `SEO_REPORT.md`, `SECURITY_REPORT.md`, and `ACCESSIBILITY_AUDIT.md` for the deep dives on those specific areas.
