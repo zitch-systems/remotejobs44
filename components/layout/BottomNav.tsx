@@ -19,13 +19,20 @@ export function BottomNav() {
   const { isLoggedIn, hydrated } = useAuthStore();
   const { savedJobIds } = useJobsStore();
 
-  // Rendered on every route (mobile only — `md:hidden`), including the
-  // signed-in member routes. Previously it was suppressed on member routes,
-  // which left those pages with no bottom tab bar on mobile — a jarring break
-  // from the rest of the app. The member shell keeps its own top rail for the
-  // tool/account links; this bar restores the consistent Home·Jobs·Saved·
-  // Applied·Profile·Settings tabs everywhere. (Member routes reserve the bar's
-  // footprint via .member-content padding in member.css.)
+  // This is the consumer app's mobile tab bar. It renders on every consumer
+  // route (mobile only — `md:hidden`): the public/marketing pages AND the
+  // signed-in member pages (/dashboard, /profile, /saved, …), which reserve
+  // its footprint via .member-content padding in member.css and hide their own
+  // top rail on phones so this is the single, consistent bottom nav.
+  //
+  // It does NOT belong on the internal /admin and /agent portals — those are
+  // self-contained with their own full navigation (admin has a sidebar + its
+  // own mobile nav strip; agent has its own top bar), and they don't reserve
+  // this bar's footprint, so it would overlap their content. Suppress it there.
+  if (pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/')) {
+    return null;
+  }
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1a2e] border-t border-stone-200 dark:border-[#1e3a5f] grid grid-cols-6 pb-safe"
