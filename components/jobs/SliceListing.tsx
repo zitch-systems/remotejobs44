@@ -63,7 +63,6 @@ export function SliceListing({
   // slice page a citable answer source. Cap at 25 items — long ItemLists
   // are deprioritised in rich-result eligibility.
   const itemList = jobs.length > 0 ? {
-    '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: title,
     numberOfItems: jobs.length,
@@ -75,16 +74,31 @@ export function SliceListing({
     })),
   } : null;
 
+  // CollectionPage wrapper (SEO audit gap, docs/SEO_REPORT.md): the bare
+  // ItemList said "here is a list" but nothing declared the PAGE ITSELF a
+  // curated collection — the signal Google's collection rich-results and AI
+  // engines key on. mainEntity carries the ItemList when jobs exist; the
+  // CollectionPage (name/description/url) is emitted even for an empty
+  // slice so the page type is always declared. URL derives from the last
+  // breadcrumb (every slice passes its own path there).
+  const lastCrumb = breadcrumbs && breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1] : null;
+  const collectionPage = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description: blurb,
+    ...(lastCrumb ? { url: `${BASE}${lastCrumb.href}` } : {}),
+    ...(itemList ? { mainEntity: itemList } : {}),
+  };
+
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-10">
       {breadcrumbs && breadcrumbs.length > 0 && <BreadcrumbJsonLd items={breadcrumbs} />}
       {faqs && faqs.length > 0 && <FaqJsonLd items={faqs} />}
-      {itemList && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList).replace(/</g, '\\u003c') }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionPage).replace(/</g, '\\u003c') }}
+      />
       <div className="mb-8">
         <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 tracking-tight">{title}</h1>
         <p className="text-stone-500 dark:text-stone-400 mt-2 max-w-2xl leading-relaxed">{blurb}</p>
