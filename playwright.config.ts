@@ -14,7 +14,10 @@ export default defineConfig({
     video: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // PW_CHROMIUM_PATH lets constrained environments (sandboxes with a
+    // preinstalled Chromium but no playwright-managed browsers) run the
+    // chromium project without `playwright install`. Unset = default.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}) } },
     { name: 'firefox',  use: { ...devices['Desktop Firefox'] } },
     { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
     { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },

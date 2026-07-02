@@ -88,3 +88,37 @@ jobs:
           PAYSTACK_SECRET_KEY:           'ci-placeholder-paystack-secret'
           CRON_SECRET:                   'ci-placeholder-cron-secret-min-16-chars'
         run: npm run build
+
+  # End-to-end smoke suite (hardening: the Playwright suite existed but never
+  # ran in CI — docs/TECHNICAL_DEBT.md High #3). Chromium-only for speed.
+  # Env-dependent tests are excluded because CI has no Supabase secrets:
+  # login validation + wrong-credentials (need live auth), plan-comparison
+  # and sitemap.xml (need live DB). 41 env-independent tests remain: SEO
+  # meta/OG/JSON-LD, robots/llms/manifest, security headers, 404, load-time,
+  # pricing UI, auth-page rendering. Verified green against a local prod
+  # build with the same no-Supabase constraints as this runner.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start server and run e2e
+        run: |
+          npm run start & 
+          npx wait-on -t 60000 http://localhost:3000
+          BASE_URL=http://localhost:3000 npx playwright test \
+            tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \
+            --project=chromium \
+            --grep-invert "wrong credentials|validates empty fields|plan comparison|sitemap.xml is accessible"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
