@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error(`[auth/callback] provider error: ${error} — ${errorDescription ?? '(no description)'}`);
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
+    // Carry the provider's description through as `reason` so /login can show
+    // an actionable message (e.g. cancelled consent vs. a real provider error).
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error)}&reason=${encodeURIComponent(errorDescription ?? '')}`
+    );
   }
 
   if (!code && !(tokenHash && tokenType)) {
