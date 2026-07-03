@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
+import { describeAuthCallbackError } from '@/lib/auth/callback-error';
 import { ResendVerificationLink } from '@/components/auth/ResendVerificationLink';
 
 function ThemeToggle() {
@@ -48,8 +49,17 @@ function LoginForm() {
   const [website, setWebsite] = useState('');
 
   useEffect(() => {
+    // Turn the opaque `?error=…&reason=…` the callback attaches into an
+    // actionable message. `reason` carries the real cause (expired link,
+    // missing PKCE verifier, no code, provider denial); the old code showed
+    // only "auth callback failed" and dropped it entirely.
     const err = searchParams.get('error');
-    if (err) setErrorMsg(decodeURIComponent(err).replace(/_/g, ' '));
+    if (err) {
+      const reason = searchParams.get('reason');
+      setErrorMsg(
+        describeAuthCallbackError(err, reason) ?? decodeURIComponent(err).replace(/_/g, ' '),
+      );
+    }
     if (searchParams.get('registered') === '1') {
       setSuccess(true);
       setErrorMsg('');
