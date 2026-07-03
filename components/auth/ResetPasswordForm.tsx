@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUIStore } from '@/lib/store';
+import { validatePassword, friendlyAuthError } from '@/lib/auth/password';
 
 export function ResetPasswordForm() {
   const { toast } = useUIStore();
@@ -24,16 +25,21 @@ export function ResetPasswordForm() {
     // submit was trimmed to "hello" and failed.
     const trimmed        = password.trim();
     const trimmedConfirm = confirm.trim();
-    if (trimmed.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    // Same policy as signup (length + uppercase + number) — see
+    // lib/auth/password.ts. A new password must be at least as strong as
+    // one created at registration.
+    const passwordError = validatePassword(trimmed);
+    if (passwordError) { toast(passwordError, 'error'); return; }
     if (trimmed !== trimmedConfirm) { toast('Passwords do not match', 'error'); return; }
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password: trimmed });
     if (error) {
-      // Generic message — Supabase auth errors can leak rate-limit
-      // hints. Browser console keeps the detail for support.
+      // Friendly, actionable copy instead of raw GoTrue text — e.g. a
+      // leaked-password rejection tells the user to pick a different one.
+      // Full detail stays in the console for support.
       console.error('[reset-password]', error.message);
-      toast('Could not update password. Please try again.', 'error');
+      toast(friendlyAuthError(error.message), 'error');
       setLoading(false);
       return;
     }
@@ -48,13 +54,17 @@ export function ResetPasswordForm() {
           <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">New Password</label>
           <div className="relative">
             <input type={showPass ? 'text' : 'password'} required value={password}
-              onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters"
+              onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters"
               className="input pr-10" autoComplete="new-password" />
             <button type="button" onClick={() => setShowPass(!showPass)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
               {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          {/* Disclose the rules validatePassword() enforces, matching /register. */}
+          <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+            Use 8+ characters with an uppercase letter and a number.
+          </p>
         </div>
         <div>
           <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Confirm Password</label>
