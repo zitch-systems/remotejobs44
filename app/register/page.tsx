@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock, User, Check, Moon, Sun, ArrowRight } from 'luc
 import { createClient } from '@/lib/supabase/client';
 import { useUIStore, useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
+import { passwordChecks, validatePassword, friendlyAuthError } from '@/lib/auth/password';
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -28,11 +29,10 @@ function ThemeToggle() {
 }
 
 function StrengthBar({ password }: { password: string }) {
-  const checks = [
-    { label: '8+ characters', pass: password.length >= 8 },
-    { label: 'Uppercase',     pass: /[A-Z]/.test(password) },
-    { label: 'Number',        pass: /\d/.test(password) },
-  ];
+  // Check the TRIMMED value — the submit gate validates password.trim() and
+  // submits that, so the meter must too. Otherwise trailing/leading spaces
+  // (e.g. "Ab1     ") could tick every rule green while submit still rejects.
+  const checks = passwordChecks(password.trim());
   const score = checks.filter(c => c.pass).length;
   const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-brand-500'];
   return (
@@ -98,7 +98,13 @@ export default function RegisterPage() {
     // 4 chars at signUp and Supabase would reject — confusing UX. Same
     // bug pattern as components/auth/ResetPasswordForm.tsx.
     const trimmedPassword = password.trim();
-    if (trimmedPassword.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    // Enforce the full policy the strength meter advertises (length +
+    // uppercase + number) here, BEFORE calling Supabase. Previously we only
+    // checked length, so an 8-char all-lowercase password passed the client
+    // and was rejected by Supabase's stricter server policy — surfacing a
+    // raw, cryptic auth error that read as "incorrect password" at signup.
+    const passwordError = validatePassword(trimmedPassword);
+    if (passwordError) { toast(passwordError, 'error'); return; }
     setLoading(true);
 
     // Trim password too — see the same fix on /login. Trailing-space typos
@@ -114,7 +120,10 @@ export default function RegisterPage() {
     });
 
     if (error) {
-      toast(error.message, 'error');
+      // Translate Supabase's raw auth strings into friendly, actionable copy
+      // (e.g. leaked-password / already-registered / stricter server policy)
+      // instead of toasting the developer-facing message verbatim.
+      toast(friendlyAuthError(error.message), 'error');
       setLoading(false);
       return;
     }
@@ -346,7 +355,7 @@ export default function RegisterPage() {
                 </div>
                 {password
                   ? <StrengthBar password={password} />
-                  : <p className="mt-[7px] text-xs text-[var(--fg-4)]">Use 8+ characters with a mix of letters and numbers.</p>}
+                  : <p className="mt-[7px] text-xs text-[var(--fg-4)]">Use 8+ characters with an uppercase letter and a number.</p>}
               </div>
 
               <div className="my-1 mb-[22px] flex items-start gap-2.5 text-[13px]">

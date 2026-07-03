@@ -1,34 +1,13 @@
 // lib/api.ts — Hybrid API: Supabase when available, mock data as fallback
-import type { Job, User, Application, SearchFilters, PaginatedJobs, AdminStats } from './types';
+import type { Job, Application, SearchFilters, PaginatedJobs, AdminStats } from './types';
 import { MOCK_JOBS } from './mock-data';
-import { uid, sleep, validateEmail } from './utils';
+import { sleep } from './utils';
 
-// ── Auth ───────────────────────────────────────────────────────────────────
-export const authApi = {
-  async login(email: string, password: string): Promise<{ user: User; token: string }> {
-    await sleep(600);
-    if (!validateEmail(email)) throw new Error('Invalid email address');
-    if (password.length < 6) throw new Error('Invalid email or password');
-    const isAdmin = email.includes('admin');
-    const user: User = {
-      id: uid(), name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      email, plan: isAdmin ? 'admin' : 'free', role: isAdmin ? 'admin' : 'user',
-      joinedAt: new Date().toISOString(), profileCompletion: 40,
-    };
-    return { user, token: 'mock_' + uid() };
-  },
-  async register(name: string, email: string, password: string): Promise<{ user: User; token: string }> {
-    await sleep(700);
-    if (!name.trim()) throw new Error('Name is required');
-    if (!validateEmail(email)) throw new Error('Invalid email address');
-    if (password.length < 8) throw new Error('Password must be at least 8 characters');
-    const user: User = {
-      id: uid(), name: name.trim(), email, plan: 'free', role: 'user',
-      joinedAt: new Date().toISOString(), profileCompletion: 20,
-    };
-    return { user, token: 'mock_' + uid() };
-  },
-};
+// Auth is handled directly by the Supabase client in the /login and
+// /register pages (see app/register/page.tsx). The old mock `authApi`
+// object lived here but had no callers and carried a stale, divergent
+// length-only password policy — a drift trap now that the real rules
+// live in lib/auth/password.ts — so it was removed.
 
 // ── Jobs ───────────────────────────────────────────────────────────────────
 export const jobsApi = {
