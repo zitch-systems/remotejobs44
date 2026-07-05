@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { ArrowLeft, FileText, Upload } from 'lucide-react-native';
 import { Button, Card, IconButton, Txt } from '@/components/ui';
-import { uploadCv, useProfile } from '@/lib/profile';
+import { getViewableCvUrl, uploadCv, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
 import { toast } from '@/store/toast';
@@ -44,6 +44,17 @@ export default function Cv() {
 
   const hasCv = Boolean(profile.cvUrl);
 
+  async function view() {
+    // The `cvs` bucket is private — mint a fresh signed URL before opening
+    // (a stored path or a legacy public URL both resolve through this helper).
+    const url = await getViewableCvUrl(profile.cvUrl);
+    if (!url) {
+      Alert.alert('Could not open CV', 'Please try re-uploading your CV.');
+      return;
+    }
+    Linking.openURL(url).catch(() => {});
+  }
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingHorizontal: spacing.screenX, paddingTop: spacing[2] }}>
@@ -71,7 +82,7 @@ export default function Cv() {
             {hasCv ? 'Your CV is attached to your profile.' : 'No CV uploaded yet.'}
           </Txt>
           {hasCv ? (
-            <Button label="View CV" variant="ghost" full={false} onPress={() => Linking.openURL(profile.cvUrl!).catch(() => {})} />
+            <Button label="View CV" variant="ghost" full={false} onPress={view} />
           ) : null}
         </Card>
 
