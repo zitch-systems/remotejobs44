@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { PLAN_AMOUNTS_KOBO as PLAN_AMOUNTS, canPurchase } from '@/lib/paystack/plans';
 import { resolvePlan } from '@/lib/auth/plan';
 import { rateLimit, releaseRateLimit, getIP } from '@/lib/rate-limit';
+import { initializePaymentSchema } from '@/lib/api-schemas';
 import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
@@ -42,11 +43,14 @@ export async function POST(req: NextRequest) {
   try {
     // Prefer NEXT_PUBLIC_APP_URL to avoid localhost bleed on Paystack callback
     const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '') || new URL(req.url).origin;
-    const { plan } = await req.json();
-
-    if (!plan || !PLAN_AMOUNTS[plan]) {
+    // Validate the request body at the boundary. The schema enum is derived
+    // from PLAN_AMOUNTS, so this rejects the same inputs the manual
+    // `!PLAN_AMOUNTS[plan]` check did — missing, unknown, or wrong-typed plan.
+    const parsed = initializePaymentSchema.safeParse(await req.json());
+    if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid plan. Must be: daily, pro, or pro_annual' }, { status: 400 });
     }
+    const { plan } = parsed.data;
 
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

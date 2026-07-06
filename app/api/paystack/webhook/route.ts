@@ -17,6 +17,7 @@ import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription'
 import { recordReferralCommission } from '@/lib/referral/commission';
 import { extractPaystackId } from '@/lib/paystack/event-id';
 import { verifyPaystackSignature } from '@/lib/paystack/verify-signature';
+import { paystackWebhookEnvelopeSchema } from '@/lib/api-schemas';
 import { logInfo, logWarn, logError } from '@/lib/log';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
@@ -94,12 +95,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
-  let event: any;
+  let parsedBody: unknown;
   try {
-    event = JSON.parse(body);
+    parsedBody = JSON.parse(body);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
+
+  // Envelope check (signature is already verified above). Asserts only the
+  // top-level shape — a non-empty `event` string — so the switch can trust it.
+  // `data` is left permissive on purpose: each branch reads its own fields
+  // defensively, so a new Paystack event type is never rejected here.
+  const envelope = paystackWebhookEnvelopeSchema.safeParse(parsedBody);
+  if (!envelope.success) {
+    logWarn({ event: 'webhook.invalid_envelope' });
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+  const event = envelope.data as any;
 
   const supabase = createAdminSupabaseClient();
 
