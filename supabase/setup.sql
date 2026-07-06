@@ -314,6 +314,7 @@ on conflict (id) do nothing;
 
 drop policy if exists "Users can upload own CV"  on storage.objects;
 drop policy if exists "Users can read own CV"    on storage.objects;
+drop policy if exists "Users can update own CV"  on storage.objects;
 drop policy if exists "Users can delete own CV"  on storage.objects;
 
 create policy "Users can upload own CV"
@@ -323,6 +324,13 @@ create policy "Users can upload own CV"
 create policy "Users can read own CV"
   on storage.objects for select
   using (bucket_id = 'cvs' and auth.uid()::text = split_part(name, '/', 1));
+
+-- UPDATE is required for upsert re-uploads (Replace CV) to an existing object
+-- key — without it Storage's upsert is denied by RLS. Same own-folder scope.
+create policy "Users can update own CV"
+  on storage.objects for update
+  using (bucket_id = 'cvs' and auth.uid()::text = split_part(name, '/', 1))
+  with check (bucket_id = 'cvs' and auth.uid()::text = split_part(name, '/', 1));
 
 create policy "Users can delete own CV"
   on storage.objects for delete

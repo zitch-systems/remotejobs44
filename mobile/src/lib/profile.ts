@@ -11,7 +11,13 @@ import { EMPTY_DETAILS, type ExperienceItem, type ProfileDetails, type ProfileLi
 
 /**
  * Upload a picked CV file to the `cvs` storage bucket (under the user's folder)
- * and save its URL on the profile. Requires migration_v39 (the bucket).
+ * and save its storage PATH on the profile. Requires migration_v39 (the bucket).
+ *
+ * The `cvs` bucket is PRIVATE (personal data), so we must NOT store a
+ * getPublicUrl() link — that returns a "Bucket not public" 400 when opened.
+ * We store the storage path (`<uid>/cv-<ts>.<ext>`) exactly like the web app
+ * (app/api/cv) and mint a short-lived signed URL on demand via
+ * getViewableCvUrl(). Returns a signed URL for the immediate post-upload view.
  */
 export async function uploadCv(userId: string, asset: { uri: string; name: string; mimeType?: string | null }): Promise<string> {
   const ext = (asset.name.split('.').pop() || 'pdf').toLowerCase();
@@ -24,10 +30,34 @@ export async function uploadCv(userId: string, asset: { uri: string; name: strin
   });
   if (error) throw error;
 
-  const url = supabase.storage.from('cvs').getPublicUrl(path).data.publicUrl;
-  const { error: upErr } = await supabase.from('profiles').update({ cv_url: url }).eq('id', userId);
+  // Persist the PATH (not a URL) so future views can re-sign it after the
+  // signed URL's TTL lapses; the web app reads the same column as a path.
+  const { error: upErr } = await supabase.from('profiles').update({ cv_url: path }).eq('id', userId);
   if (upErr) throw upErr;
-  return url;
+
+  const { data: signed } = await supabase.storage.from('cvs').createSignedUrl(path, 60 * 60);
+  return signed?.signedUrl ?? path;
+}
+
+/**
+ * Turn a stored `cv_url` value into a viewable, short-lived signed URL.
+ * Handles both the current format (a storage path) and legacy rows that stored
+ * a full public URL (pre-fix, permanently 401ing) by extracting the object path
+ * out of the `/object/public/cvs/<path>` (or `/object/cvs/<path>`) URL so the
+ * already-uploaded file is recovered rather than left dead. Returns null when
+ * there's no CV or signing fails.
+ */
+export async function getViewableCvUrl(cvUrl: string | null | undefined): Promise<string | null> {
+  if (!cvUrl) return null;
+  let path = cvUrl;
+  if (/^https?:\/\//i.test(cvUrl)) {
+    const m = cvUrl.match(/\/cvs\/(.+?)(?:\?|$)/);
+    if (!m) return cvUrl; // unknown URL shape — hand back as-is
+    path = decodeURIComponent(m[1]);
+  }
+  const { data, error } = await supabase.storage.from('cvs').createSignedUrl(path, 60 * 60);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
 }
 
 /**
