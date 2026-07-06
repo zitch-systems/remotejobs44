@@ -24,6 +24,7 @@ import { useEffect } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
+import { isRecoveryRoute } from '@/lib/auth/recovery-route';
 import { useAuthStore, useJobsStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -33,6 +34,26 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore(s => s.setUser);
 
   useEffect(() => {
+    // Password-recovery route: bail out of the ENTIRE auth-sync burst.
+    // On /reset-password the user holds a short-lived recovery session and
+    // the only auth call that should run is ResetPasswordForm's
+    // updateUser(). Everything below (syncAuth's getUser + PostgREST
+    // profile fetch, the saved-jobs / applications hydrate IIFEs, and the
+    // onAuthStateChange-driven profile fetches) acquires the SAME cross-tab
+    // navigator.locks Web Lock updateUser() needs. On slow / mobile
+    // connections that contention starved updateUser() past
+    // ResetPasswordForm's 15s watchdog — the "This is taking longer than
+    // expected" toast. PR #160 fixed the *deadlock* (sync callback) but not
+    // this *contention*. None of the sync is needed mid-recovery, so skip
+    // it. Trade-off: the Header briefly renders logged-out on this one page
+    // — correct enough for a password-reset screen, and after a successful
+    // reset we full-reload to /login where AuthSyncProvider remounts and
+    // syncs normally. Reads window.location directly (client-only effect)
+    // to avoid adding a usePathname dep that would re-subscribe on every nav.
+    if (typeof window !== 'undefined' && isRecoveryRoute(window.location.pathname)) {
+      return;
+    }
+
     // Both stores were configured with `skipHydration: true` so SSR and
     // the first client paint render the empty default state. Trigger the
     // localStorage read here on mount — Zustand re-renders subscribed
