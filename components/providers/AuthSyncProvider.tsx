@@ -21,6 +21,7 @@
 // keeps it free to wrap the whole tree in app/layout.tsx without
 // introducing an extra DOM node.
 import { useEffect } from 'react';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { useAuthStore, useJobsStore } from '@/lib/store';
@@ -253,7 +254,7 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       } catch { /* network blip — dashboard / next nav will retry */ }
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    async function handleAuthEvent(event: AuthChangeEvent, session: Session | null) {
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         ignoreNextSignedOut = true;
         setTimeout(() => { ignoreNextSignedOut = false; }, 3000);
@@ -316,6 +317,26 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(buildUser(session.user, profile));
       }
+    }
+
+    // The callback passed to onAuthStateChange MUST stay synchronous.
+    // auth-js awaits every subscriber callback while still holding the
+    // client-wide auth lock — and in browsers that lock is a navigator.locks
+    // Web Lock shared across ALL tabs, with a 5s acquire timeout on every
+    // auth call. handleAuthEvent awaits PostgREST queries (fetchProfile),
+    // and every PostgREST call internally runs auth.getSession() to attach
+    // the access token — which queues behind that same held lock. Running
+    // the handler inline therefore deadlocked until fetchProfile's 5s race
+    // expired: every SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED held the
+    // cross-tab lock ~5s (so event-driven profile fetches ALWAYS came back
+    // null), and any auth call racing it from another tab — most visibly
+    // updateUser() on /reset-password — either stalled or threw
+    // NavigatorLockAcquireTimeoutError after 5s. Deferring to a macrotask
+    // lets _notifyAllSubscribers finish and the lock release first; events
+    // still start processing in arrival order (FIFO macrotask queue), so the
+    // ignoreNextSignedOut sequencing below is preserved.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(() => { void handleAuthEvent(event, session); }, 0);
     });
 
     return () => subscription.unsubscribe();
