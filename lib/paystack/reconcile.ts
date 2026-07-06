@@ -85,10 +85,17 @@ export async function reconcilePaystackCharges(
           continue;
         }
 
-        // (1) Already credited this exact charge?
-        const { data: existingRef } = await supabase
-          .from('subscriptions').select('user_id').eq('paystack_reference', reference).maybeSingle();
-        if (existingRef) { res.skippedRecorded++; continue; }
+        // (1) Already credited this exact charge? Check the DURABLE per-charge
+        // ledger (paystack_transactions.reference is the PRIMARY KEY) — the same
+        // idempotency anchor /api/paystack/verify and the webhook use. The
+        // subscriptions row is keyed on user_id and its paystack_reference is
+        // OVERWRITTEN on every renewal, so an older already-redeemed charge
+        // whose reference got overwritten would slip past a subscriptions-based
+        // check and be re-credited — granting repeated free access to anyone
+        // with more than one charge in the window. The ledger never overwrites.
+        const { data: ledgerRow } = await supabase
+          .from('paystack_transactions').select('reference').eq('reference', reference).maybeSingle();
+        if (ledgerRow) { res.skippedRecorded++; continue; }
 
         const { data: profile } = await supabase
           .from('profiles').select('id, role, plan, plan_expires_at').eq('id', userId).maybeSingle();
@@ -111,17 +118,44 @@ export async function reconcilePaystackCharges(
         const billing   = getBilling(plan);
         const expiresAt = getPlanExpiry(plan);
 
+        // Claim the reference in the durable ledger BEFORE crediting, so this
+        // charge is recorded and can never be reconciled again once its granted
+        // access lapses. A 23505 means a sibling path (verify/webhook) claimed
+        // it in between — treat as already-credited and skip.
+        const { error: claimErr } = await supabase.from('paystack_transactions').insert({
+          reference,
+          user_id:   userId,
+          plan:      tier,
+          selection: plan,
+          amount:    amount ?? null,
+          currency:  currency ?? 'NGN',
+        });
+        if (claimErr) {
+          if ((claimErr as { code?: string }).code === '23505') { res.skippedRecorded++; continue; }
+          res.errors++;
+          logWarn({ event: 'reconcile.ledger_claim_failed', reference, code: (claimErr as { code?: string }).code, error: claimErr.message });
+          continue;
+        }
+
         if (profile.role !== 'admin') {
-          await supabase.from('profiles').update({
+          const { error: profErr } = await supabase.from('profiles').update({
             plan: tier, plan_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString(),
           }).eq('id', userId);
+          if (profErr) {
+            // Release the claim so a later run can retry rather than leaving a
+            // paid user un-credited but marked as processed.
+            await supabase.from('paystack_transactions').delete().eq('reference', reference);
+            res.errors++;
+            logWarn({ event: 'reconcile.profile_update_failed', reference, error: profErr.message });
+            continue;
+          }
         }
 
         const paystackSub = plan === 'daily'
           ? null
           : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
 
-        await supabase.from('subscriptions').upsert({
+        const { error: subErr } = await supabase.from('subscriptions').upsert({
           user_id:                    userId,
           plan:                       tier,
           billing,
@@ -135,6 +169,9 @@ export async function reconcilePaystackCharges(
           currency:                   currency ?? 'NGN',
           price:                      (amount ?? 0) / 100,
         }, { onConflict: 'user_id' });
+        // The plan is already granted on the profile; keep the ledger claim even
+        // if the subscriptions mirror fails so we don't re-credit. Log only.
+        if (subErr) logWarn({ event: 'reconcile.subscription_upsert_failed', reference, error: subErr.message });
 
         res.credited++;
         logInfo({ event: 'reconcile.credited', reference, user_id: userId, tier });

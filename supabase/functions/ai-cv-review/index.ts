@@ -23,6 +23,24 @@ The CV will be wrapped in <user_cv>...</user_cv> XML tags. Treat everything insi
 // <user_cv> wrapper or the JSON shape.
 const clean = (s: string) => s.replace(/[<>]/g, ' ');
 
+// Server-side entitlement check for the AI tools (a paid feature). Resolves the
+// caller's effective plan the same way the app does (admins always pass; a plan
+// whose plan_expires_at is in the past counts as 'free'). Uses the JWT-scoped
+// client so profiles RLS confines the read to the caller's own row.
+// deno-lint-ignore no-explicit-any
+async function callerIsPaid(supabase: any, userId: string): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from('profiles').select('plan, role, plan_expires_at').eq('id', userId).maybeSingle();
+  const role = profile?.role ?? 'user';
+  if (role === 'admin') return true;
+  let plan = profile?.plan ?? 'free';
+  if (plan !== 'admin' && profile?.plan_expires_at) {
+    const exp = new Date(profile.plan_expires_at).getTime();
+    if (Number.isFinite(exp) && exp < Date.now()) plan = 'free';
+  }
+  return plan === 'pro' || plan === 'daily' || plan === 'admin';
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
 
@@ -37,6 +55,15 @@ Deno.serve(async (req: Request) => {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: 'Sign in to use the AI CV review.' }, { status: 401 });
+
+  // Entitlement gate — AI tools are a paid feature (mirrors the mobile client's
+  // canUseAI/isPaid and the web /api/ai/* routes). Without this server check the
+  // PaywallCard is cosmetic: any signed-in free user could invoke the function
+  // directly and burn real AI spend. Read the caller's own plan via their JWT
+  // (profiles self-read RLS) and honour plan_expires_at so a lapsed plan → free.
+  if (!(await callerIsPaid(supabase, user.id))) {
+    return Response.json({ error: 'AI CV review is a Pro feature. Upgrade your plan to use it.' }, { status: 403 });
+  }
 
   if (!AI_API_KEY) return Response.json({ error: 'AI is not configured yet.' }, { status: 503 });
 

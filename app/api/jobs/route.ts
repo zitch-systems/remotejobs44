@@ -181,8 +181,12 @@ export async function GET(req: NextRequest) {
       // location keyword for the RPC's ILIKE filter. The first term is
       // usually the most specific (e.g. region=africa → 'africa').
       const locTerm = (() => {
-        if (country && REGION_TERMS[country]) return REGION_TERMS[country][0];
-        if (region  && REGION_TERMS[region])  return REGION_TERMS[region][0];
+        // Array.isArray (not bare truthiness) so a user-supplied region/country
+        // like `constructor` / `toString` resolves to an INHERITED Object.proto
+        // member (a function) rather than a real entry — that then blew up on
+        // `[0]` / `.map` below with a 500.
+        if (country && Array.isArray(REGION_TERMS[country])) return REGION_TERMS[country][0];
+        if (region  && Array.isArray(REGION_TERMS[region]))  return REGION_TERMS[region][0];
         return country || region || null;
       })();
       const postedDays = (posted && /^\d+$/.test(posted)) ? Math.min(365, parseInt(posted, 10)) : null;
@@ -280,7 +284,10 @@ export async function GET(req: NextRequest) {
     // Country takes priority over region (more specific). Both fall through
     // to a location ILIKE substring match if not in the REGION_TERMS map.
     const locFilter = country || region;
-    if (locFilter && REGION_TERMS[locFilter]) {
+    // Array.isArray guards against user-supplied `locFilter` values that name an
+    // inherited Object.prototype member ('constructor', 'toString', …): bare
+    // `REGION_TERMS[locFilter]` would be a truthy function and `.map` 500s.
+    if (locFilter && Array.isArray(REGION_TERMS[locFilter])) {
       const orTerms = REGION_TERMS[locFilter].map(t => `location.ilike.%${t}%`).join(',');
       query = query.or(orTerms);
     } else if (locFilter) {
