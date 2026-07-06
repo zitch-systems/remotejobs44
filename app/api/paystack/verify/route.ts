@@ -8,6 +8,7 @@ import { recordReferralCommission } from '@/lib/referral/commission';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier, getBilling, getPlanExpiry,
 } from '@/lib/paystack/plans';
+import { paystackReferenceSchema } from '@/lib/api-schemas';
 import { logError, logWarn } from '@/lib/log';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? '';
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
   // a request the attacker designed against api.paystack.co — Bearer
   // auth is automatically attached, so they could potentially probe
   // other Paystack endpoints on our merchant account.
-  if (!/^[A-Za-z0-9_-]{1,80}$/.test(reference)) {
+  if (!paystackReferenceSchema.safeParse(reference).success) {
     logWarn({ event: 'paystack.verify.invalid_reference', reference: reference.slice(0, 30) });
     return NextResponse.redirect(`${APP_URL}/pricing?error=invalid_reference`);
   }

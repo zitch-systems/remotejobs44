@@ -4,6 +4,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { evaluateFreeTrial, freeTrialBlockedMessage } from '@/lib/auth/free-trial';
 import { resolvePlan } from '@/lib/auth/plan';
+import { applicationCreateSchema } from '@/lib/api-schemas';
 import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
@@ -57,18 +58,23 @@ export async function POST(req: NextRequest) {
     // already-applied request with a clean 409 BEFORE any plan / free-trial
     // gating. Re-applying to a job you already applied to must never surface
     // as a "subscribe" paywall — that count gate is for NEW applications.
-    const body = await req.json();
-    const { jobId } = body;
-    if (!jobId) return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
-    // applications.job_id is uuid — short-circuit a bad shape locally
-    // rather than letting PostgREST 22P02 cascade into the 500 branch.
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (typeof jobId !== 'string' || !UUID_RE.test(jobId)) {
-      return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+    // Validate the body at the boundary. The schema requires a uuid `jobId`
+    // (applications.job_id is uuid — a bad shape would otherwise cascade into
+    // a PostgREST 22P02 → 500) and coerces `autoApplied` to a boolean rather
+    // than rejecting a non-boolean, matching the old `=== true` semantics.
+    const body = await req.json().catch(() => null);
+    const parsed = applicationCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      // Preserve the original two-message contract: a missing/empty jobId is
+      // "required", anything present-but-malformed is "Invalid".
+      const jobIdMissing = body == null || body.jobId === undefined
+        || body.jobId === null || body.jobId === '';
+      return NextResponse.json(
+        { error: jobIdMissing ? 'jobId is required' : 'Invalid jobId' },
+        { status: 400 },
+      );
     }
-    // auto_applied is a boolean column. Coerce defensively so a client
-    // sending `autoApplied: "hello"` doesn't 22023 the whole insert.
-    const autoApplied = body.autoApplied === true;
+    const { jobId, autoApplied } = parsed.data;
 
     const { data: existing } = await supabase
       .from('applications')
