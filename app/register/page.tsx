@@ -110,14 +110,28 @@ export default function RegisterPage() {
     // Trim password too — see the same fix on /login. Trailing-space typos
     // from autocomplete account for a meaningful chunk of "invalid creds"
     // failures in our auth logs.
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password: trimmedPassword,
-      options: {
-        data: { name },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    //
+    // try/catch because auth-js THROWS (rather than returning { error })
+    // when it can't acquire the cross-tab auth lock within 5s — without
+    // the catch, that rejection escaped handleSubmit and left the button
+    // stuck on its loading state. Same guard as /login and /reset-password.
+    let data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'];
+    let error: Awaited<ReturnType<typeof supabase.auth.signUp>>['error'];
+    try {
+      ({ data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password: trimmedPassword,
+        options: {
+          data: { name },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      }));
+    } catch (err: any) {
+      console.error('[register]', err);
+      toast(friendlyAuthError(err?.message), 'error');
+      setLoading(false);
+      return;
+    }
 
     if (error) {
       // Translate Supabase's raw auth strings into friendly, actionable copy

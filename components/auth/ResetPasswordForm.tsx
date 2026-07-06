@@ -32,19 +32,51 @@ export function ResetPasswordForm() {
     if (passwordError) { toast(passwordError, 'error'); return; }
     if (trimmed !== trimmedConfirm) { toast('Passwords do not match', 'error'); return; }
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: trimmed });
-    if (error) {
-      // Friendly, actionable copy instead of raw GoTrue text — e.g. a
-      // leaked-password rejection tells the user to pick a different one.
-      // Full detail stays in the console for support.
-      console.error('[reset-password]', error.message);
-      toast(friendlyAuthError(error.message), 'error');
+
+    // Watchdog: never leave the button stuck on "Updating…". Same pattern
+    // as /login's sign-in watchdog. updateUser() can stall past its result
+    // in two real ways: a slow /auth/v1/user round-trip, or waiting on the
+    // cross-tab auth lock (navigator.locks) that another tab is holding —
+    // and when that lock wait exceeds 5s, auth-js THROWS
+    // NavigatorLockAcquireTimeoutError instead of returning { error }.
+    // Without the try/catch below, that throw escaped handleSubmit as an
+    // unhandled rejection and the spinner span forever.
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
       setLoading(false);
-      return;
+      toast('This is taking longer than expected. Please try again.', 'error');
+    }, 15000);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password: trimmed });
+      clearTimeout(timer);
+      if (timedOut) return; // user already saw the timeout message
+      if (error) {
+        // Friendly, actionable copy instead of raw GoTrue text — e.g. a
+        // leaked-password rejection tells the user to pick a different one.
+        // Full detail stays in the console for support.
+        console.error('[reset-password]', error.message);
+        // No recovery session — the emailed link expired, was already used,
+        // or the cookies didn't survive to this page. Only a fresh link fixes
+        // that, so say so instead of the raw "Auth session missing!".
+        const msg = /session/i.test(error.message)
+          ? 'Your reset link has expired or was already used. Please request a new one from the login page.'
+          : friendlyAuthError(error.message);
+        toast(msg, 'error');
+        setLoading(false);
+        return;
+      }
+      toast('Password updated! Please log in.', 'success');
+      window.location.replace('/login');
+    } catch (err: unknown) {
+      clearTimeout(timer);
+      if (timedOut) return;
+      console.error('[reset-password]', err);
+      toast('Could not update your password. Please try again.', 'error');
+      setLoading(false);
     }
-    toast('Password updated! Please log in.', 'success');
-    window.location.replace('/login');
   }
 
   return (
