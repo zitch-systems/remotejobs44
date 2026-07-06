@@ -10,7 +10,7 @@ export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
   title: 'For Employers — Hire Remote Talent from Africa | RemoteJobs44',
-  description: 'Reach 5,000+ vetted African remote workers — software engineers, designers, marketers, customer success. List your remote role on RemoteJobs44.',
+  description: 'Post remote roles and reach 5,000+ vetted African professionals — engineers, designers, marketers, and customer success. Direct apply to your ATS. List on RemoteJobs44.',
   alternates: { canonical: `${BASE}/for-employers` },
 };
 

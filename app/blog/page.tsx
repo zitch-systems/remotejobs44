@@ -2,15 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Blog – Remote Work Tips & Job Search Guides',
-  description: 'Tips for finding remote jobs, landing interviews, and building a remote career from anywhere in the world.',
+  title: 'Blog — Remote Work & Job Search Guides for African Professionals',
+  description: 'Guides and tips for finding remote jobs, landing interviews, and building a remote career from Nigeria, Kenya, South Africa and across Africa.',
   // Self-canonical. Without this the page inherited the root metadataBase
   // and (previously) the homepage canonical, telling Google /blog was a
   // duplicate of /. Now it points at itself.
   alternates: { canonical: 'https://remotejobs44.com/blog' },
   openGraph: {
-    title: 'RemoteJobs44 Blog – Remote Work Tips & Job Search Guides',
-    description: 'Tips for finding remote jobs, landing interviews, and building a remote career from anywhere in the world.',
+    title: 'RemoteJobs44 Blog — Remote Work & Job Search Guides for African Professionals',
+    description: 'Guides and tips for finding remote jobs, landing interviews, and building a remote career from Nigeria, Kenya, South Africa and across Africa.',
     url: 'https://remotejobs44.com/blog',
     type: 'website',
   },

@@ -3,8 +3,12 @@ import Link from 'next/link';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
-  title: 'About RemoteJobs44',
-  description: 'RemoteJobs44 connects job seekers worldwide with the best remote opportunities from top companies.',
+  title: 'About RemoteJobs44 — Remote Jobs for African Professionals',
+  description: 'RemoteJobs44 is a remote job board built for African professionals — 70,000+ verified roles across engineering, design, product, and more. Based in Nigeria.',
+  openGraph: {
+    title: 'About RemoteJobs44',
+    description: 'Remote job board built for African professionals. 70,000+ verified roles. Based in Nigeria.',
+  },
 };
 
 // Refresh stats hourly. Cheap counts on indexed columns, but no point
