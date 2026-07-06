@@ -40,15 +40,20 @@ export const maxDuration = 30;
 // exports none — two metadata exports on the same segment silently
 // override each other field-by-field and had drifted out of sync.)
 export const metadata: Metadata = {
-  title: 'Browse Remote Jobs',
-  description: 'Search 70,000+ verified remote jobs from global companies. Filter by category, skill, country, timezone, salary, and more — apply from Nigeria, Africa & worldwide.',
+  title: 'Browse Remote Jobs — Engineering, Design, Marketing & More',
+  description: 'Search 70,000+ verified remote jobs across engineering, design, product, marketing, finance and operations. Filter by role, country, timezone and salary. Browse free.',
   keywords: ['remote jobs', 'work from home jobs', 'remote jobs Nigeria', 'remote jobs Africa', 'online jobs', 'telecommute jobs', 'remote engineering jobs', 'remote design jobs'],
   alternates: { canonical: 'https://remotejobs44.com/jobs' },
   openGraph: {
-    title: 'Browse 70,000+ Remote Jobs | RemoteJobs44',
-    description: 'Find remote jobs from top global companies. Filter by category, salary, region. Subscribe from ₦500.',
+    title: 'Browse Remote Jobs | RemoteJobs44',
+    description: 'Filter 70,000+ verified remote roles by category, country, timezone and salary. Updated every 6 hours.',
     url: 'https://remotejobs44.com/jobs',
     images: [{ url: '/api/og', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Browse Remote Jobs | RemoteJobs44',
+    description: 'Search 70,000+ verified remote jobs — engineering, design, marketing and more. Filter by country, timezone, salary. Browse free.',
   },
 };
 

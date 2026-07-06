@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     description: 'Browse 70,000+ verified remote jobs. Engineering, design, marketing and more.',
     images: [{ url: '/api/og', width: 1200, height: 630, alt: 'RemoteJobs44 – Remote Jobs Board' }],
   },
-  twitter: { card: 'summary_large_image', title: 'RemoteJobs44 – Remote Jobs', description: 'Browse 70,000+ remote jobs worldwide.', images: ['/api/og'] },
+  twitter: { card: 'summary_large_image', title: 'RemoteJobs44 – Remote Jobs', description: 'Find 70,000+ verified remote jobs. Search from Nigeria, Kenya, South Africa and beyond — engineering, design, marketing and more.', images: ['/api/og'] },
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -109,7 +109,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               '@id': 'https://remotejobs44.com/#website',
               name:'RemoteJobs44',
               url: 'https://remotejobs44.com',
-              description:'The best remote job board for Nigerian and African job seekers. Find engineering, design, marketing, and more remote roles worldwide.',
+              description:'Remote job board for Nigerian and African job seekers. 70,000+ verified fully-remote roles — engineering, design, marketing, product and more. Browse free.',
               potentialAction:{
                 '@type':'SearchAction',
                 target:{ '@type':'EntryPoint', urlTemplate:'https://remotejobs44.com/jobs?q={search_term_string}' },
