@@ -20,10 +20,30 @@ export const SESSION_TTL_MS    = 12 * 60 * 60 * 1000;  // verified for 12 hours
 export const MAX_CODE_ATTEMPTS = 5;
 export const ADMIN_2FA_COOKIE  = 'rj44_admin2fa';
 
-// HMAC/secret. Prefer a dedicated secret; fall back to the service-role key,
-// which is always present server-side and never shipped to the client.
+// HMAC/secret for the verified-session cookie.
+//
+// FAIL CLOSED: a missing or weak secret must NEVER degrade to signing cookies
+// with an empty (or otherwise guessable) key. If ADMIN_2FA_SECRET is absent or
+// too short, secret() throws — signSession() then throws (the verify route 500s
+// and issues no cookie) and verifySession() rejects every cookie. A
+// misconfigured deploy therefore blocks admin access loudly instead of minting
+// forgeable sessions.
+//
+// We deliberately no longer fall back to SUPABASE_SERVICE_ROLE_KEY: reusing the
+// database key to sign auth cookies is a key-reuse smell (SECURITY_REPORT item
+// #3), and the silent fallback hid misconfiguration. ADMIN_2FA_SECRET must be
+// set in every environment that enables admin 2FA.
+export const MIN_ADMIN_2FA_SECRET_LENGTH = 16;
+
 function secret(): string {
-  return process.env.ADMIN_2FA_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const s = process.env.ADMIN_2FA_SECRET ?? '';
+  if (s.length < MIN_ADMIN_2FA_SECRET_LENGTH) {
+    throw new Error(
+      `ADMIN_2FA_SECRET is missing or too short (need >= ${MIN_ADMIN_2FA_SECRET_LENGTH} chars). ` +
+      'Admin 2FA fails closed until it is configured.',
+    );
+  }
+  return s;
 }
 
 /** A fresh zero-padded numeric one-time code, e.g. "048213". */
@@ -44,22 +64,29 @@ export function codesMatch(storedHash: string, userId: string, submitted: string
 
 // ── Verified-session cookie: `${userId}.${expEpochMs}.${hmacHex}` ──────────────
 export function signSession(userId: string, now = Date.now()): string {
+  // secret() throws if unconfigured — signing fails closed rather than
+  // producing a cookie signed with an empty key.
+  const key = secret();
   const exp = now + SESSION_TTL_MS;
   const payload = `${userId}.${exp}`;
-  const sig = createHmac('sha256', secret()).update(payload).digest('hex');
+  const sig = createHmac('sha256', key).update(payload).digest('hex');
   return `${payload}.${sig}`;
 }
 
 /** True when the cookie is a valid, unexpired signature for THIS user. */
 export function verifySession(cookieValue: string | undefined | null, userId: string, now = Date.now()): boolean {
-  if (!cookieValue || !secret()) return false;
+  if (!cookieValue) return false;
+  // A misconfigured secret rejects every cookie (fail closed) instead of
+  // throwing out of a plain status check.
+  let key: string;
+  try { key = secret(); } catch { return false; }
   const parts = cookieValue.split('.');
   if (parts.length !== 3) return false;
   const [uid, expStr, sig] = parts;
   if (uid !== userId) return false;
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp < now) return false;
-  const expected = createHmac('sha256', secret()).update(`${uid}.${expStr}`).digest('hex');
+  const expected = createHmac('sha256', key).update(`${uid}.${expStr}`).digest('hex');
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
