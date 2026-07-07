@@ -38,6 +38,16 @@ const MAX_JOBS_PER_SOURCE = 200;
 // leave sources unmarked and the lock held until TTL).
 const USER_SOURCES_BUDGET_MS = 45_000;
 
+// Wall-clock cap for the hardcoded SOURCES loop. Each source can burn ~40s in
+// the worst case (getJson's 20s timeout × 2 attempts + backoff), so a couple of
+// hanging upstreams could otherwise run this loop past the function's 60s
+// maxDuration and get the whole pipeline killed mid-run — leaving the cron lock
+// held until its TTL and the daily route's downstream tasks (expiry, freshness,
+// alerts) unrun. On a healthy run every source answers in 1–3s and the loop
+// finishes well under this, so no legitimate source is ever skipped; the cap
+// only bites when feeds hang. Skipped sources run first next cycle.
+const HARDCODED_SOURCES_BUDGET_MS = 40_000;
+
 // Feed bodies larger than this aren't feeds. Mirrors /api/rss's cap.
 const MAX_FEED_BYTES = 5 * 1024 * 1024;
 
@@ -375,6 +385,12 @@ export async function runIngest(): Promise<IngestResult> {
     if (pausedUrls.has(source.sourceUrl)) {
       pausedNames.push(source.name);
       results[source.name] = 'paused';
+      continue;
+    }
+    // Out of time budget (a hanging upstream ate the window): skip the rest so
+    // the function isn't killed mid-pipeline. They run first next cycle.
+    if (Date.now() - ingestStartedAt > HARDCODED_SOURCES_BUDGET_MS) {
+      results[source.name] = 'skipped: ingest time budget exhausted, runs next cycle';
       continue;
     }
     try {

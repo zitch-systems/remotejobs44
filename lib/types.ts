@@ -153,7 +153,6 @@ export interface SearchFilters {
   salary?: string;     // range key like "60-100" (means salary_max between 60k–100k)
   timezone?: string;   // matches jobs.timezone column substring
   posted?: string;     // "1" | "7" | "14" | "30" — days since posted_at
-  companySize?: string;// startup | mid | large
 }
 
 export interface PaginatedJobs {

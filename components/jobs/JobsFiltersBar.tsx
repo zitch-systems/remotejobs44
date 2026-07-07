@@ -222,7 +222,10 @@ export function JobsFiltersBar() {
   const sort        = searchParams.get('sort')        ?? 'newest';
 
   const activeFilterCount = [type, level, salary, timezone, posted, region, country].filter(Boolean).length;
-  const hasActiveChips = category !== 'all' || type || level || country || posted;
+  // region + timezone were counted toward the "Filters" badge but had no
+  // removable chip, so the only way to clear them was re-opening the panel.
+  // Include them here so they get a chip like every other active filter.
+  const hasActiveChips = category !== 'all' || type || level || country || posted || region || timezone;
 
   // Only offer sort options the backend actually honours for the current
   // mode — never let the <select> display an option that silently no-ops:
@@ -231,10 +234,14 @@ export function JobsFiltersBar() {
   //     ignored. Offer newest + relevant only (drop salary).
   //   • Without a query: relevance has nothing to rank (no FTS), so it silently
   //     fell back to newest. Offer newest + salary only (drop relevant).
+  //   • With a query: search_jobs orders by ts_rank and takes NO sort argument,
+  //     so BOTH "Newest" and "Highest salary" silently no-op. Offer only
+  //     "Most relevant" so the control never claims an ordering it can't honour.
+  //   • Without a query: relevance has nothing to rank, so offer newest + salary.
   const sortOptions = q
-    ? SORTS.filter(s => s.value !== 'salary')
+    ? SORTS.filter(s => s.value === 'relevant')
     : SORTS.filter(s => s.value !== 'relevant');
-  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
+  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : (q ? 'relevant' : 'newest');
 
   useEffect(() => { setSearchInput(q); }, [q]);
 
@@ -384,6 +391,8 @@ export function JobsFiltersBar() {
           {type    && <FilterChip label={TYPES.find(t => t.value === type)?.label}     onRemove={() => setParam('type',    '')} />}
           {level   && <FilterChip label={LEVELS.find(l => l.value === level)?.label}   onRemove={() => setParam('level',   '')} />}
           {country && <FilterChip label={COUNTRIES.find(c => c.value === country)?.label?.replace(/^\S+\s/, '')} onRemove={() => setParam('country', '')} />}
+          {region  && <FilterChip label={REGIONS.find(r => r.value === region)?.label} onRemove={() => setParam('region', '')} />}
+          {timezone && <FilterChip label={TIMEZONES.find(t => t.value === timezone)?.label} onRemove={() => setParam('timezone', '')} />}
           {posted  && <FilterChip label={POSTED_WITHIN.find(p => p.value === posted)?.label} onRemove={() => setParam('posted', '')} />}
           {remoteOnly && <FilterChip label="Remote only" onRemove={() => setParam('remote', 'false')} />}
         </div>

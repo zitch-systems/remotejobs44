@@ -390,13 +390,44 @@ function validateFieldValues(body: any): string | null {
   if (body.category    !== undefined && !VALID_CATEGORIES.includes(body.category)) return 'invalid category';
   if (body.type        !== undefined && !VALID_TYPES.includes(body.type))          return 'invalid type';
   if (body.level       !== undefined && !VALID_LEVELS.includes(body.level))        return 'invalid level';
+  // salary_min / salary_max are int4 columns. The old check only gated
+  // `< 0` / NaN, so a fractional or out-of-int4-range value (e.g.
+  // 3_000_000_000) reached PostgREST as a 22003 "integer out of range" and
+  // surfaced as a generic 500 that looked identical to a DB outage. Bound
+  // both to a non-negative int within int4 so a bad value is a clean 400.
+  const INT4_MAX = 2_147_483_647;
   if (body.salaryMin !== undefined && body.salaryMin !== null) {
     const n = Number(body.salaryMin);
-    if (isNaN(n) || n < 0) return 'salaryMin must be a non-negative number';
+    if (isNaN(n) || n < 0 || !Number.isInteger(n) || n > INT4_MAX) return 'salaryMin must be an integer between 0 and 2147483647';
   }
   if (body.salaryMax !== undefined && body.salaryMax !== null) {
     const n = Number(body.salaryMax);
-    if (isNaN(n) || n < 0) return 'salaryMax must be a non-negative number';
+    if (isNaN(n) || n < 0 || !Number.isInteger(n) || n > INT4_MAX) return 'salaryMax must be an integer between 0 and 2147483647';
+  }
+  // skills is a text[] column — a string (or any non-string-array) reaches
+  // PostgREST as a 22P02 "malformed array literal" → 500. Require a real
+  // string array so a malformed payload is a clean 400.
+  if (body.skills !== undefined && body.skills !== null
+      && !(Array.isArray(body.skills) && body.skills.every((s: any) => typeof s === 'string'))) {
+    return 'skills must be an array of strings';
+  }
+  // posted_at / expires_at are timestamptz — an unparseable date reaches
+  // PostgREST as a 22007 → 500. Validate the shape here instead.
+  if (body.posted  !== undefined && body.posted  !== null && body.posted  !== '' && Number.isNaN(Date.parse(String(body.posted))))  return 'posted must be a valid date';
+  if (body.expires !== undefined && body.expires !== null && body.expires !== '' && Number.isNaN(Date.parse(String(body.expires)))) return 'expires must be a valid date';
+  // Free-text columns are unbounded `text`, so these don't 500 — but an
+  // unvalidated value still persists and feeds JSON-LD / emails. Cheap caps
+  // + format gates keep the data clean.
+  if (body.currency !== undefined && body.currency !== null && String(body.currency).length > 8)   return 'currency too long (max 8)';
+  if (body.timezone !== undefined && body.timezone !== null && String(body.timezone).length > 100) return 'timezone too long (max 100)';
+  if (body.logo     !== undefined && body.logo     !== null && String(body.logo).length     > 300) return 'logo too long (max 300)';
+  if (body.applyEmail !== undefined && body.applyEmail !== null && body.applyEmail !== ''
+      && (String(body.applyEmail).length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.applyEmail)))) {
+    return 'applyEmail must be a valid email';
+  }
+  if (body.sourceUrl !== undefined && body.sourceUrl !== null && body.sourceUrl !== ''
+      && (String(body.sourceUrl).length > 500 || !/^https?:\/\/.+/.test(String(body.sourceUrl)))) {
+    return 'sourceUrl must be a valid URL';
   }
   if (body.applyUrl !== undefined && body.applyUrl !== null && body.applyUrl !== '' && !/^https?:\/\/.+/.test(body.applyUrl)) return 'applyUrl must be a valid URL';
   // jobs.company_id is a nullable uuid — short-circuit a bad shape so
@@ -531,8 +562,27 @@ export async function PATCH(req: NextRequest) {
     if (body.isActive    !== undefined) updates.is_active    = body.isActive;
     if (body.expires     !== undefined) updates.expires_at   = body.expires;
 
-    const { data: job, error } = await supabase.from('jobs').update(updates).eq('id', id).select().single();
-    if (error) throw new Error('update_failed');
+    // A body with no recognised field leaves `updates` empty; PostgREST
+    // rejects an empty UPDATE (or no-ops and returns a misleading 200 with an
+    // audit entry recording zero changed columns). Fail fast with a clear 400.
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
+    }
+
+    // maybeSingle (not single): an unknown/concurrently-deleted id matches
+    // zero rows. single() would return a PGRST116 error → generic 500; we want
+    // a clean 404 so the admin can tell "gone" from "server fault".
+    const { data: job, error } = await supabase.from('jobs').update(updates).eq('id', id).select().maybeSingle();
+    if (error) {
+      // 23505 = unique_violation on jobs_apply_url_idx — the admin edited the
+      // apply URL to one that already exists on another row. Mirror POST's 409
+      // so it reads as a duplicate, not a server fault.
+      if ((error as { code?: string }).code === '23505') {
+        return NextResponse.json({ error: 'A job with this apply URL already exists.' }, { status: 409 });
+      }
+      throw new Error('update_failed');
+    }
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     safeRevalidate('/jobs', `/jobs/${id}`);
     await recordAdminAction({
       adminId: auth.adminId, adminEmail: auth.adminEmail,
