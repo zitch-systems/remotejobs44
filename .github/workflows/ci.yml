@@ -116,7 +116,7 @@ jobs:
             tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \
             --project=chromium \
             --grep-invert "wrong credentials|validates empty fields|plan comparison|sitemap.xml is accessible"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
