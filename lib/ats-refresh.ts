@@ -24,6 +24,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { isValidATSPlatform, type ATSPlatform } from '@/lib/ats-detect';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
+import { detectScam } from '@/lib/scam-detect';
 import { logInfo, logWarn } from '@/lib/log';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
@@ -81,7 +82,7 @@ export function parseATSApiUrl(
 // (snake_case). Mirrors app/api/admin/companies/refresh/route.ts so the manual
 // and recurring ATS paths insert identical shapes.
 function toJobRow(j: any): Record<string, any> {
-  return {
+  const row: Record<string, any> = {
     title:        j.title ?? 'Untitled',
     company:      j.company ?? 'Unknown',
     logo:         j.logo ?? (j.company ? String(j.company)[0] : '?'),
@@ -108,6 +109,16 @@ function toJobRow(j: any): Record<string, any> {
     source_url:   j.sourceUrl ?? null,
     remote:       j.remote ?? true,
   };
+  // Same first-pass scam screen the aggregator ingest applies — ATS boards are
+  // first-party but not immune to a spammy/compromised posting, and this keeps
+  // the two write paths consistent. flagged + flagged_reason are set on EVERY
+  // row (explicit false/null when clean) so a batch mixing flagged and clean
+  // rows doesn't NULL-override flagged's NOT NULL default via supabase-js's
+  // union-of-keys insert column list.
+  const scam = detectScam(row);
+  row.flagged        = scam ? true : false;
+  row.flagged_reason = scam ? scam.flagged_reason : null;
+  return row;
 }
 
 // For every apply_url still listed on a board: bump last_seen_at, and flip

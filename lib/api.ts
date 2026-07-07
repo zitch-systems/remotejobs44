@@ -26,7 +26,6 @@ export const jobsApi = {
       if (filters.salary)      params.set('salary', filters.salary);
       if (filters.timezone)    params.set('timezone', filters.timezone);
       if (filters.posted)      params.set('posted', filters.posted);
-      if (filters.companySize) params.set('companySize', filters.companySize);
       params.set('page',    String(filters.page ?? 1));
       params.set('perPage', String(filters.perPage ?? 12));
       try {

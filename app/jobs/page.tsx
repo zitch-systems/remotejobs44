@@ -8,6 +8,7 @@
 // (which re-runs this server fetch).
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { unstable_cache } from 'next/cache';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
@@ -403,6 +404,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   // raw object that previously came in synchronously).
   const sp = await searchParams;
   const { jobs, total, page, pages, fuzzy, error: fetchError } = await fetchJobs(sp);
+
+  // A stale/hand-entered ?page=N past the last page would otherwise render the
+  // generic "No jobs found" empty state even though the result set is large.
+  // Bounce to the last real page instead. Only when we genuinely have results
+  // and aren't in an error state (an errored fetch reports pages=1 and owns its
+  // own error UI).
+  if (!fetchError && total > 0 && page > pages) {
+    redirect(paginationHref(sp, pages));
+  }
 
   const category   = (sp.category ?? 'all') as JobCategory | 'all';
   const q          = sp.q ?? '';

@@ -71,13 +71,18 @@ export async function GET(req: NextRequest) {
   const now       = new Date().toISOString();
   const proCutoff = new Date(Date.now() - PRO_GRACE_MS).toISOString();
 
-  // Day Pass — hard expiry
+  // Day Pass — hard expiry. Compare-and-set: expire the subscription rows with
+  // the expiry predicate re-checked *inside* the UPDATE and derive the profile
+  // ids from the rows actually updated. A Paystack renewal landing between a
+  // stale SELECT and the write would otherwise still downgrade a just-paid
+  // user; this mirrors the fix already applied in /api/cron/expire-daily.
   const { data: expiredDaily } = await supabase
     .from('subscriptions')
-    .select('user_id')
+    .update({ status: 'expired' })
     .eq('billing', 'daily')
     .eq('status', 'active')
-    .lt('current_period_end', now);
+    .lt('current_period_end', now)
+    .select('user_id');
 
   let expiredDayPasses = 0;
   if (expiredDaily && expiredDaily.length > 0) {
@@ -87,33 +92,26 @@ export async function GET(req: NextRequest) {
     // their actual privileges, but the plan tag matters for UI.
     await supabase.from('profiles').update({ plan: 'free' })
       .in('id', ids).neq('role', 'admin');
-    await supabase.from('subscriptions')
-      .update({ status: 'expired' })
-      .in('user_id', ids)
-      .eq('billing', 'daily');
     expiredDayPasses = ids.length;
   }
 
-  // Pro Monthly / Annual — 24h grace
+  // Pro Monthly / Annual — 24h grace. Same compare-and-set as the daily branch.
   const { data: expiredPro } = await supabase
     .from('subscriptions')
-    .select('user_id')
+    .update({ status: 'expired' })
     .in('billing', ['monthly', 'annually'])
     // payment_failed is included so users whose card declines get
     // downgraded by the next cron pass — they were leaking ~12 free Pro
     // days/year while only 'active'/'cancelled' were checked.
     .in('status', ['active', 'cancelled', 'payment_failed'])
-    .lt('current_period_end', proCutoff);
+    .lt('current_period_end', proCutoff)
+    .select('user_id');
 
   let expiredPro_n = 0;
   if (expiredPro && expiredPro.length > 0) {
     const ids = expiredPro.map((s: { user_id: string }) => s.user_id);
     await supabase.from('profiles').update({ plan: 'free' })
       .in('id', ids).neq('role', 'admin');
-    await supabase.from('subscriptions')
-      .update({ status: 'expired' })
-      .in('user_id', ids)
-      .in('billing', ['monthly', 'annually']);
     expiredPro_n = ids.length;
   }
 
