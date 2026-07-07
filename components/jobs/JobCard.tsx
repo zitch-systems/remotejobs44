@@ -1,5 +1,5 @@
 'use client';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import Link from 'next/link';
 import { BookmarkPlus, BookmarkCheck, MapPin, Timer, ArrowUpRight, Banknote, Sparkles, Star, Lock, Zap } from 'lucide-react';
 import { cn, formatRelativeDate, formatSalary, capitalize, CATEGORY_META } from '@/lib/utils';
@@ -58,6 +58,11 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   const toggleSave     = useJobsStore(s => s.toggleSave);
   const addApplication = useJobsStore(s => s.addApplication);
   const toast = useUIStore(s => s.toast);
+  // Re-entrancy lock for the async apply path. `applied` doesn't flip until the
+  // POST resolves, so a rapid double-tap would otherwise fire two apply POSTs,
+  // double-count the Day Pass quota, and open two tabs. A ref (not state) keeps
+  // the guard render-free so it doesn't defeat the memoised per-card selectors.
+  const applyingRef = useRef(false);
 
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
@@ -94,6 +99,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
 
   async function handleApply(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
+    if (applyingRef.current) return; // apply POST already in flight — ignore double-tap
     if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
     if (!canApplyNow) { modalService.open(<PaywallModal mode="subscribe" />); return; }
     if (isDaily && dailyLimitReached) {
@@ -124,6 +130,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       return;
     }
 
+    applyingRef.current = true;
     try {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
@@ -143,6 +150,8 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       } else {
         toast(err.message, 'error');
       }
+    } finally {
+      applyingRef.current = false;
     }
   }
 
@@ -161,7 +170,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors truncate">{job.title}</p>
-          <p className="text-xs text-stone-400 dark:text-stone-500 truncate">
+          <p className="text-xs text-stone-500 dark:text-stone-500 truncate">
             {hideCompany ? <span className="blur-[2px] select-none">Company</span> : job.company}
             {' · '}{job.location}{job.timezone ? ` · ${job.timezone}` : ''}
           </p>
@@ -171,7 +180,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px]">{capitalize(job.type.replace('-', ' '))}</span>
         </div>
         {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
-        <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
+        <span className="text-xs text-stone-500 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
         <button onClick={handleApply} onAuxClick={cancelAux}
           aria-label={applied ? 'Already applied' : canApplyNow ? 'Apply to this job' : 'Subscribe to apply'}
           title={applied ? 'Already applied' : canApplyNow ? 'Apply' : 'Subscribe to apply'}
@@ -251,7 +260,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       </div>
 
       {/* Meta */}
-      <div className="flex flex-wrap gap-3 text-xs text-stone-400 dark:text-stone-500">
+      <div className="flex flex-wrap gap-3 text-xs text-stone-500 dark:text-stone-500">
         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
         {job.timezone && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{job.timezone}</span>}
       </div>
@@ -262,7 +271,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           {salary && (
             <span className="font-display font-bold text-sm text-brand-700 dark:text-brand-400 flex items-center gap-1"><Banknote className="w-3.5 h-3.5" />{salary}</span>
           )}
-          <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{formatRelativeDate(job.posted)}</p>
+          <p className="text-xs text-stone-500 dark:text-stone-500 mt-0.5">{formatRelativeDate(job.posted)}</p>
         </div>
         <button onClick={handleApply} onAuxClick={cancelAux}
           className={cn(

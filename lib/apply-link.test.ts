@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { extractDirectApplyLink, enrichDirectApplyLinks } from './apply-link';
 
+// enrichDirectApplyLinks now resolves hosts through the DNS-aware SSRF guard.
+// Stub it to reuse the real string-only guard so reserved `.example` test hosts
+// pass without a real lookup, while literal internal hosts stay blocked.
+vi.mock('@/lib/ssrf-guard', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ssrf-guard')>();
+  return { ...actual, validateExternalUrlAndResolve: async (raw: string) => actual.validateExternalUrl(raw) };
+});
+
 const BOARD_PAGE = 'https://www.club.example/job/social-media-manager/';
 
 // WP Job Manager single-job page, default templates: the apply section

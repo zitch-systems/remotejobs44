@@ -8,7 +8,7 @@
 // the ingest pipeline and the /api/rss preview can retry against the
 // real feed instead of erroring with "Unrecognised feed format".
 import { parseFeed, type ParsedFeed } from '@/lib/feed-parser';
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 
 // <link rel="alternate"> types that denote a syndication feed.
 const FEED_LINK_TYPES = new Set([
@@ -103,7 +103,10 @@ export interface DiscoveredFeed {
 // usable feed.
 export async function tryDiscoveredFeeds(html: string, pageUrl: string): Promise<DiscoveredFeed | null> {
   for (const candidate of discoverFeedCandidates(html, pageUrl)) {
-    const v = validateExternalUrl(candidate);
+    // DNS-aware guard: a discovered <link rel="alternate"> href is third-party
+    // content, so a public hostname that resolves to an internal/metadata IP
+    // must be rejected — the string-only validator can't see the A record.
+    const v = await validateExternalUrlAndResolve(candidate);
     if (!v.ok) continue;
     try {
       const res = await fetch(v.url.toString(), {

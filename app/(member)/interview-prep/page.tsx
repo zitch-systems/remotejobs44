@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Brain, Sparkles, AlertCircle, CheckCircle, MessageCircle, Shield, LogIn } from 'lucide-react';
 import { useAuthStore, useUIStore } from '@/lib/store';
+import { useMemberGate } from '@/lib/member/use-member-gate';
+import { MemberLoading } from '@/components/member/MemberLoading';
 
 interface PrepQ {
   q: string;
@@ -24,6 +26,7 @@ interface Prep {
 
 export default function InterviewPrepPage() {
   const router = useRouter();
+  const { ready } = useMemberGate();
   const { isLoggedIn } = useAuthStore();
   const { toast } = useUIStore();
   const [role, setRole]   = useState('');
@@ -51,6 +54,8 @@ export default function InterviewPrepPage() {
       setLoading(false);
     }
   }
+
+  if (!ready) return <MemberLoading />;
 
   return (
     <div className="max-w-[860px] mx-auto px-5 py-10">

@@ -23,12 +23,20 @@ export async function GET(req: NextRequest) {
   const proCutoff = new Date(Date.now() - PRO_GRACE_MS).toISOString();
 
   // ── Day Pass: hard expiry ───────────────────────────────────────────
+  // Compare-and-set: expire the subscription rows with the expiry predicate
+  // re-checked *inside* the UPDATE (not a stale id list from an earlier
+  // SELECT), and derive the profile ids from the rows actually updated. If a
+  // Paystack renewal lands between reads and writes — extending
+  // current_period_end and flipping status back to 'active' — that row no
+  // longer matches `status='active' AND current_period_end < now`, so a
+  // just-paid user is never wrongly downgraded.
   const { data: expiredDaily } = await supabase
     .from('subscriptions')
-    .select('user_id')
+    .update({ status: 'expired' })
     .eq('billing', 'daily')
     .eq('status', 'active')
-    .lt('current_period_end', now);
+    .lt('current_period_end', now)
+    .select('user_id');
 
   const dailyIds = (expiredDaily ?? []).map((s: { user_id: string }) => s.user_id);
   if (dailyIds.length > 0) {
@@ -38,8 +46,6 @@ export async function GET(req: NextRequest) {
     // is purely a wrong-label bug but worth avoiding.
     await supabase.from('profiles').update({ plan: 'free' })
       .in('id', dailyIds).neq('role', 'admin');
-    await supabase.from('subscriptions').update({ status: 'expired' })
-      .in('user_id', dailyIds).eq('billing', 'daily');
   }
 
   // ── Pro Monthly / Annual: 24h grace period ──────────────────────────
@@ -49,21 +55,23 @@ export async function GET(req: NextRequest) {
   // statuses need to be eligible for the downgrade once expiry is real.
   const { data: expiredPro } = await supabase
     .from('subscriptions')
-    .select('user_id')
+    .update({ status: 'expired' })
     .in('billing', ['monthly', 'annually'])
     // payment_failed users are downgraded in this sweep too — Paystack
     // marks them via invoice.payment_failed webhook, which sets
     // current_period_end to now, so they fall past `proCutoff` on the
     // next cron run.
     .in('status', ['active', 'cancelled', 'payment_failed'])
-    .lt('current_period_end', proCutoff);
+    // Same compare-and-set as the daily branch: the expiry predicate is part
+    // of the UPDATE, so a renewal that pushes current_period_end past
+    // proCutoff between reads and writes excludes the row from downgrade.
+    .lt('current_period_end', proCutoff)
+    .select('user_id');
 
   const proIds = (expiredPro ?? []).map((s: { user_id: string }) => s.user_id);
   if (proIds.length > 0) {
     await supabase.from('profiles').update({ plan: 'free' })
       .in('id', proIds).neq('role', 'admin');
-    await supabase.from('subscriptions').update({ status: 'expired' })
-      .in('user_id', proIds).in('billing', ['monthly', 'annually']);
   }
 
   return NextResponse.json({

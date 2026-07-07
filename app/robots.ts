@@ -9,7 +9,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        // Explicitly allow /api/og: every page's og:image / twitter:image
+        // resolves to /api/og?..., and social crawlers (Twitter/X, LinkedIn)
+        // honour robots.txt when fetching card images. Under longest-match
+        // precedence this /api/og allow beats the /api/ disallow below, so
+        // link previews render an image while the rest of /api/ stays blocked.
+        allow: ['/', '/api/og'],
         // /jobs is a CSR'd search UI; the *canonical* surface for crawlers
         // is the programmatic landing tree at /jobs/category|skill|country|
         // region|city|industry|timezone/[slug]. Blocking the faceted

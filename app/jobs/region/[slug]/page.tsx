@@ -30,7 +30,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!region) return {};
   const title = `Remote Jobs in ${region.label} | RemoteJobs44`;
   const description = `${region.blurb} Browse and apply — updated daily.`;
-  const url = `${BASE}/jobs/region/${region.slug}`;
+  // /jobs/region/worldwide and /jobs/country/worldwide are the same query
+  // (fully-remote, open to anyone) and shipped identical titles/H1s, competing
+  // for the same term. Point this one's canonical at the country variant so the
+  // duplicate consolidates onto a single indexed URL instead of cannibalising.
+  const url = region.slug === 'worldwide'
+    ? `${BASE}/jobs/country/worldwide`
+    : `${BASE}/jobs/region/${region.slug}`;
   const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${region.label}`)}&subtitle=${encodeURIComponent('Browse on RemoteJobs44')}`;
   return {
     title, description,
