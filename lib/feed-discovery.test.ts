@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { discoverFeedCandidates, looksLikeHtml, tryDiscoveredFeeds } from './feed-discovery';
 
+// tryDiscoveredFeeds now resolves candidate hosts through the DNS-aware SSRF
+// guard. Reserved `.example` test hosts never resolve (NXDOMAIN → blocked), so
+// stub the DNS-aware validator to reuse the real string-only guard: literal
+// internal hosts (localhost, private IPs) are still rejected, but resolvable
+// public test hosts pass without a real lookup.
+vi.mock('@/lib/ssrf-guard', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ssrf-guard')>();
+  return { ...actual, validateExternalUrlAndResolve: async (raw: string) => actual.validateExternalUrl(raw) };
+});
+
 const PAGE = 'https://www.club.example/jobs/';
 
 // Minimal WP Job Manager listing page: WP asset paths + the plugin's

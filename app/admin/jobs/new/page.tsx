@@ -27,6 +27,21 @@ const LEVELS: { value: JobLevel; label: string }[] = [
   { value:'executive', label:'Executive / VP' },
 ];
 
+// Declared at module scope — NOT inside NewJobPage. When this lived inside the
+// component, every keystroke produced a new `Field` function identity, so React
+// unmounted and remounted the entire subtree (including the <input>) on each
+// character, blurring the focused field after every letter. Hoisting keeps the
+// component type stable across renders so inputs retain focus.
+function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">{label}</label>
+      {children}
+      {hint && <p className="text-xs text-stone-500 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
 export default function NewJobPage() {
   const router  = useRouter();
   const { toast } = useUIStore();
@@ -76,14 +91,6 @@ export default function NewJobPage() {
       setSaving(false);
     }
   }
-
-  const Field = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) => (
-    <div>
-      <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-stone-400 mt-1">{hint}</p>}
-    </div>
-  );
 
   return (
     <div className="max-w-[800px] mx-auto px-5 py-8">

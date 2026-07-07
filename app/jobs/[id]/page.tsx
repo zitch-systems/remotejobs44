@@ -291,13 +291,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // if the scraped body had no recoverable structure.
   const descriptionHtml = jobDescriptionToHtml(job.description ?? '')
     || normalizeJobDescription(job.description ?? '');
+  // JobPosting.description is a REQUIRED field — an empty string makes Google
+  // Search Console report "Missing field 'description'" and drop the rich
+  // result. Many rows have no scraped body (the page itself falls back to
+  // "full description is on the company's site"), so synthesize a minimal but
+  // valid description for the structured data in that case.
+  const jsonLdDescription = descriptionHtml
+    || `${job.title} at ${job.company} — a remote ${catMeta.label.toLowerCase()} role`
+       + `${job.location ? ` (${job.location})` : ''}. View details and apply on RemoteJobs44.`;
   const applicantLocations = inferApplicantLocations(job.location);
 
   const jsonLd: Record<string, any> = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
     title: job.title,
-    description: descriptionHtml,
+    description: jsonLdDescription,
     datePosted: job.posted,
     validThrough,
     identifier: {

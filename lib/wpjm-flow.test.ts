@@ -15,6 +15,15 @@ import { tryDiscoveredFeeds } from './feed-discovery';
 import { feedJobToDbRow } from './feed-parser';
 import { enrichDirectApplyLinks } from './apply-link';
 
+// The discovery + enrichment paths now resolve hosts through the DNS-aware SSRF
+// guard. Stub the DNS-aware validator to reuse the real string-only guard so
+// the reserved `.example` virtual-board hosts pass without a real lookup, while
+// literal internal hosts stay blocked.
+vi.mock('@/lib/ssrf-guard', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ssrf-guard')>();
+  return { ...actual, validateExternalUrlAndResolve: async (raw: string) => actual.validateExternalUrl(raw) };
+});
+
 const ORIGIN = 'https://www.club.example';
 const PAGE = `${ORIGIN}/jobs/`;
 

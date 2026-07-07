@@ -9,7 +9,7 @@
 // jobs can send applicants straight to the company instead of bouncing
 // through the board. Conservative by design: when nothing scores high
 // enough we keep the board page, which still works for applicants.
-import { validateExternalUrl } from '@/lib/ssrf-guard';
+import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { detectATSFromUrl } from '@/lib/ats-detect';
 
 export interface DirectApply {
@@ -150,7 +150,10 @@ export async function enrichDirectApplyLinks(
   for (let i = 0; i < out.length; i += concurrency) {
     const batch = out.slice(i, i + concurrency).map(async (row, bi) => {
       const pageUrl = typeof row.apply_url === 'string' ? row.apply_url : '';
-      const v = validateExternalUrl(pageUrl);
+      // DNS-aware guard: apply_url comes from third-party feeds (WP Job Manager
+      // etc.), so a public hostname resolving to an internal IP must be blocked
+      // before we fetch the page to enrich the direct-apply link.
+      const v = await validateExternalUrlAndResolve(pageUrl);
       if (!v.ok) return;
       try {
         const r = await fetchImpl(v.url.toString(), {
