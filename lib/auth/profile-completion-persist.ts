@@ -37,7 +37,7 @@ export async function recomputeAndPersistProfileCompletion(user: UserHandle): Pr
       { count: applicationsCount },
       { count: savedJobsCount },
     ] = await Promise.all([
-      admin.from('profiles').select('name, email, cv_url, profile_completion').eq('id', user.id).maybeSingle(),
+      admin.from('profiles').select('name, email, cv_url, target_role, cv_text, profile_completion').eq('id', user.id).maybeSingle(),
       admin.from('applications').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
       admin.from('saved_jobs').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     ]);
@@ -51,6 +51,8 @@ export async function recomputeAndPersistProfileCompletion(user: UserHandle): Pr
       email:             user.email ?? profile.email,
       emailConfirmedAt:  user.emailConfirmedAt,
       cvUrl:             profile.cv_url,
+      targetRole:        profile.target_role,
+      cvText:            profile.cv_text,
       applicationsCount: applicationsCount ?? 0,
       savedJobsCount:    savedJobsCount    ?? 0,
     });

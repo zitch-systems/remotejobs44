@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import {
   User, Mail, Save, Zap, Shield, LogOut, Upload, FileText, CheckCircle,
-  Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2, Moon, Sun,
+  Brain, Sparkles, AlertCircle, Settings, CreditCard, Bell, Trash2, Moon, Sun, Lock,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
@@ -39,7 +39,13 @@ function ProfileContent() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  const [name,       setName]       = useState('');
+  // Lazy-init from the persisted user so the name baseline matches on the
+  // first painted frame of a warm-cache navigation (Zustand is already
+  // rehydrated by AuthSyncProvider). Without this, `name` starts '' while
+  // user.name is "John", which briefly reads as an unsaved edit and lights up
+  // the "Unsaved changes" hint / AI-card Save button until /api/profile
+  // resolves. The async load below still reconciles to the server value.
+  const [name,       setName]       = useState(() => useAuthStore.getState().user?.name ?? '');
   // Initial loading state is based on whether Zustand already has the user
   // from the last session. If we do, render the page immediately with the
   // persisted data and refresh in the background — never block first paint
@@ -52,9 +58,15 @@ function ProfileContent() {
   const [profileCompletion, setProfileCompletion] = useState<number>(20);
 
   const [cvText, setCvText]       = useState('');
-  const [targetRole, setTargetRole] = useState('Remote');
+  const [targetRole, setTargetRole] = useState('');
   const [reviewing, setReviewing] = useState(false);
   const [review, setReview]       = useState<any>(null);
+  // Last-saved baselines for target role + CV text so we can tell whether the
+  // form has unsaved edits (name's baseline is the store's user.name). These
+  // used to be write-only React state that was silently dropped on every
+  // reload — now they load from and persist to the profile.
+  const [savedTargetRole, setSavedTargetRole] = useState('');
+  const [savedCvText, setSavedCvText]         = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +131,12 @@ function ProfileContent() {
         });
         setName(profile.name ?? '');
         setProfileCompletion(profile.profile_completion ?? 20);
+        // Hydrate the persisted profile-content fields + their baselines so
+        // Target Role / Your CV Text survive navigation instead of resetting.
+        setTargetRole(profile.target_role ?? '');
+        setCvText(profile.cv_text ?? '');
+        setSavedTargetRole(profile.target_role ?? '');
+        setSavedCvText(profile.cv_text ?? '');
 
         // Fetch CV signed URL if profile has a cv_url path. /api/cv mints
         // a short-lived signed URL each call so the link in <a href> stays
@@ -156,23 +174,69 @@ function ProfileContent() {
     return () => { cancelled = true; clearTimeout(failsafe); };
   }, []);
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  // Single save path for every editable profile field (name + target role +
+  // CV text). Goes through PATCH /api/profile because migration_v9 lets the
+  // browser-side client write only `name` — target_role + cv_text must be
+  // written server-side with the service-role client. Both the "Save changes"
+  // button and the AI-review-card "Save" button call this, so the two inputs
+  // that previously vanished on reload now actually persist.
+  async function saveProfile() {
     if (!user) return;
-    const trimmed = name.trim();
-    if (!trimmed) { toast('Name cannot be empty', 'error'); return; }
-    if (trimmed === user.name) { toast('No changes to save', 'info'); return; }
+    const trimmedName = name.trim();
+    if (!trimmedName) { toast('Name cannot be empty', 'error'); return; }
+
+    // Send only the fields that actually changed.
+    const patch: Record<string, string> = {};
+    if (trimmedName !== (user.name ?? '').trim()) patch.name = trimmedName;
+    if (targetRole.trim() !== savedTargetRole.trim()) patch.target_role = targetRole.trim();
+    if (cvText !== savedCvText) patch.cv_text = cvText;
+
+    if (Object.keys(patch).length === 0) { toast('No changes to save', 'info'); return; }
+
     setSaving(true);
     try {
-      const { error } = await supabase.from('profiles').update({ name: trimmed }).eq('id', user.id);
-      if (error) throw new Error(error.message);
-      setUser({ ...user, name: trimmed });
-      toast('Profile updated', 'success');
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to save changes');
+
+      const p = data.profile;
+      if (p) {
+        // Authoritative sync from the server response (includes the freshly
+        // recomputed completion %).
+        setUser({
+          ...user,
+          name: p.name ?? trimmedName,
+          profileCompletion: p.profile_completion ?? user.profileCompletion,
+        });
+        setName(p.name ?? trimmedName);
+        setTargetRole(p.target_role ?? '');
+        setCvText(p.cv_text ?? '');
+        setSavedTargetRole(p.target_role ?? '');
+        setSavedCvText(p.cv_text ?? '');
+        if (typeof p.profile_completion === 'number') setProfileCompletion(p.profile_completion);
+      } else {
+        // Defensive: a 200 without a profile body shouldn't happen (the route
+        // always returns { profile } on success), but sync optimistically from
+        // what we sent rather than leaving the baselines stale.
+        setUser({ ...user, name: trimmedName });
+        setSavedTargetRole(targetRole.trim());
+        setSavedCvText(cvText);
+      }
+      toast('Profile saved', 'success');
     } catch (err: any) {
-      toast(err?.message ?? 'Failed to save', 'error');
+      toast(err?.message ?? 'Failed to save changes', 'error');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    await saveProfile();
   }
 
   async function handleCvUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -275,6 +339,13 @@ function ProfileContent() {
     );
   }
 
+  // Any editable field diverging from its last-saved baseline. Drives the
+  // "unsaved changes" hint and the AI-card Save button's enabled state.
+  const dirty =
+    name.trim() !== (user.name ?? '').trim() ||
+    targetRole.trim() !== savedTargetRole.trim() ||
+    cvText !== savedCvText;
+
   const planLabel = user.plan === 'daily' ? 'Day Pass' : user.plan === 'pro' ? 'Pro' : user.plan === 'admin' ? 'Admin' : 'Free';
   const planColor =
     user.plan === 'admin' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400' :
@@ -355,18 +426,28 @@ function ProfileContent() {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label htmlFor="profile-name" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Full name</label>
-            <input id="profile-name" value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Your name" maxLength={120} />
+            <input id="profile-name" value={name} onChange={e => setName(e.target.value)} disabled={saving} className="input disabled:opacity-60" placeholder="Your name" maxLength={120} />
           </div>
           <div>
             <label htmlFor="profile-email" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">Email address</label>
             <input id="profile-email" value={user.email} disabled className="input opacity-60 cursor-not-allowed" />
             <p className="text-[11px] text-stone-400 mt-1">Email is managed via Supabase auth. Contact support to change it.</p>
           </div>
-          <button type="submit" disabled={saving || !name.trim() || name.trim() === user.name}
-            className="flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors text-sm">
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          {/* Enabled whenever the name is valid and we aren't mid-save — the
+              click always produces feedback ("No changes to save" or "Profile
+              saved"), so it never reads as an unresponsive button. It also
+              saves Target Role + Your CV Text below, which is what users
+              expected "Save changes" to do all along. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button type="submit" disabled={saving || !name.trim()}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors text-sm">
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            {dirty && !saving && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">Unsaved changes</span>
+            )}
+          </div>
         </form>
       </div>
 
@@ -402,12 +483,34 @@ function ProfileContent() {
         )}
 
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleCvUpload} />
-        <button onClick={() => fileRef.current?.click()} disabled={uploading || !isPro()}
-          className="flex items-center gap-2 px-4 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
-          <Upload className="w-4 h-4" />
-          {uploading ? 'Uploading…' : cvUrl ? 'Replace CV' : 'Upload CV'}
-        </button>
-        {!isPro() && <p className="text-[11px] text-stone-400 mt-2">Upgrade to Pro to enable CV upload and auto-apply.</p>}
+        {isPro() ? (
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="flex items-center gap-2 px-4 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
+            <Upload className="w-4 h-4" />
+            {uploading ? 'Uploading…' : cvUrl ? 'Replace CV' : 'Upload CV'}
+          </button>
+        ) : (
+          // Free tier: instead of a dead, greyed-out button (which read as
+          // "there's no way to upload"), show an explicit locked panel that
+          // says why the option is disabled and links straight to the upgrade.
+          <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4">
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                  {cvUrl ? 'Replacing your CV file is a Pro feature' : 'Uploading a CV file is a Pro feature'}
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                  Upgrade to upload or replace your CV file (PDF/Word) and unlock one-click auto-apply. Your Target Role, CV text, and AI CV Review below stay free.
+                </p>
+                <Link href="/pricing"
+                  className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold rounded-lg transition-colors">
+                  <Zap className="w-4 h-4" /> Upgrade from ₦500
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI CV review */}
@@ -427,19 +530,29 @@ function ProfileContent() {
         <div className="space-y-3">
           <div>
             <label htmlFor="profile-target-role" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Target role</label>
-            <input id="profile-target-role" type="text" value={targetRole} onChange={e => setTargetRole(e.target.value)} className="input text-sm" placeholder="e.g. Senior Backend Engineer" maxLength={100} />
+            <input id="profile-target-role" type="text" value={targetRole} onChange={e => setTargetRole(e.target.value)} disabled={saving} className="input text-sm disabled:opacity-60" placeholder="e.g. Senior Backend Engineer" maxLength={100} />
           </div>
           <div>
             <label htmlFor="profile-cv-text" className="block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Your CV text</label>
-            <textarea id="profile-cv-text" value={cvText} onChange={e => setCvText(e.target.value)} rows={6} maxLength={12000}
+            <textarea id="profile-cv-text" value={cvText} onChange={e => setCvText(e.target.value)} disabled={saving} rows={6} maxLength={12000}
               placeholder="Paste your CV / résumé text here (max 12,000 chars)…"
-              className="input text-sm font-mono resize-y" />
+              className="input text-sm font-mono resize-y disabled:opacity-60" />
           </div>
-          <button onClick={handleReview} disabled={reviewing || cvText.trim().length < 50}
-            className="flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
-            {reviewing ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Brain className="w-4 h-4" />}
-            {reviewing ? 'Reviewing…' : 'Review my CV'}
-          </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={handleReview} disabled={reviewing || cvText.trim().length < 50}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors">
+              {reviewing ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Brain className="w-4 h-4" />}
+              {reviewing ? 'Reviewing…' : 'Review my CV'}
+            </button>
+            {/* Persist Target Role + Your CV Text (and any name edit above)
+                without needing to scroll back up to "Save changes". */}
+            <button type="button" onClick={saveProfile} disabled={saving || !dirty}
+              className="flex items-center gap-2 px-4 py-2.5 border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          <p className="text-[11px] text-stone-400">Your Target Role and CV text are saved to your profile and restored when you return.</p>
         </div>
 
         {review && (
