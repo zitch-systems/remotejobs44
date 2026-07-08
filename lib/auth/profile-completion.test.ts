@@ -63,12 +63,54 @@ describe('computeProfileCompletion', () => {
     })).toBe(15); // +15 ≥1 save
   });
 
+  it('credits target role and CV text as separate +10 signals', () => {
+    // These are additive on top of the original five (raw total 120, cap 100)
+    // so filling profile content actually moves the ring.
+    expect(computeProfileCompletion({
+      name: null, email: 'john@example.com',
+      emailConfirmedAt: null, cvUrl: null,
+      targetRole: 'Senior Backend Engineer',
+      applicationsCount: 0, savedJobsCount: 0,
+    })).toBe(10); // +10 target role only
+    expect(computeProfileCompletion({
+      name: null, email: 'john@example.com',
+      emailConfirmedAt: null, cvUrl: null,
+      cvText: 'Experienced engineer with 8 years building distributed systems…',
+      applicationsCount: 0, savedJobsCount: 0,
+    })).toBe(10); // +10 CV text only
+  });
+
+  it('treats whitespace-only target role / CV text as not set', () => {
+    expect(computeProfileCompletion({
+      name: null, email: 'john@example.com',
+      emailConfirmedAt: null, cvUrl: null,
+      targetRole: '   ', cvText: '\n\t ',
+      applicationsCount: 0, savedJobsCount: 0,
+    })).toBe(0);
+  });
+
+  it('moves a name+email+cv (70) user up when they fill profile content', () => {
+    // Reproduces the "stuck at 70%" report: the user has name + confirmed
+    // email + uploaded CV but no job activity. Filling target role + CV text
+    // now lifts them to 90 instead of leaving the ring frozen.
+    const base = {
+      name: 'John Doe', email: 'john@example.com',
+      emailConfirmedAt: PAST, cvUrl: 'user-id/cv.pdf',
+      applicationsCount: 0, savedJobsCount: 0,
+    };
+    expect(computeProfileCompletion(base)).toBe(70);
+    expect(computeProfileCompletion({
+      ...base, targetRole: 'Data Analyst', cvText: 'A'.repeat(200),
+    })).toBe(90);
+  });
+
   it('caps at 100 when every signal is set', () => {
     expect(computeProfileCompletion({
       name: 'John Doe', email: 'john@example.com',
       emailConfirmedAt: PAST, cvUrl: 'user-id/cv.pdf',
+      targetRole: 'Senior Backend Engineer', cvText: 'A'.repeat(500),
       applicationsCount: 7, savedJobsCount: 4,
-    })).toBe(100); // 20 + 20 + 30 + 15 + 15
+    })).toBe(100); // 20 + 20 + 30 + 10 + 10 + 15 + 15 = 120, capped at 100
   });
 
   it('treats whitespace-only fields as not set', () => {

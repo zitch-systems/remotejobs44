@@ -6,14 +6,23 @@
 // anything in between, so the number drifted from reality immediately
 // after the first /api/cv upload.
 //
-// Five signals, all worth distinct amounts so the ring fills as users
-// complete real, meaningful steps:
+// Seven signals so the ring fills as users complete real, meaningful steps:
 //
 //   * Name set to something other than the email-prefix default  +20
 //   * Email confirmed (auth.users.email_confirmed_at is non-null) +20
 //   * CV uploaded (profiles.cv_url is set)                        +30
-//   * ≥1 application                                              +15
-//   * ≥1 saved job                                                +15
+//   * Target role filled (profiles.target_role)                  +10
+//   * CV text filled (profiles.cv_text)                          +10
+//   * ≥1 application                                             +15
+//   * ≥1 saved job                                               +15
+//
+// The two profile-content signals (target role + CV text) are ADDITIVE on
+// top of the original five: the raw total is 120, capped at 100. This is
+// deliberate — it means filling in the profile-content fields the /profile
+// page collects actually moves the ring (users reported it "stuck" because
+// those fields didn't count), while NEVER dropping an existing user's stored
+// value below what the original five signals gave them (no surprise
+// regressions on next recompute).
 //
 // Capped at 100. Recomputed on every /api/profile GET — the route
 // writes the new value back to profiles.profile_completion when it
@@ -28,6 +37,10 @@ export interface ProfileCompletionSignals {
   emailConfirmedAt: string | null | undefined;
   /** profiles.cv_url. Non-null + non-empty means a CV is on file. */
   cvUrl:            string | null | undefined;
+  /** profiles.target_role — the role the member is targeting. */
+  targetRole?:      string | null | undefined;
+  /** profiles.cv_text — pasted CV body used for AI review. */
+  cvText?:          string | null | undefined;
   /** Count of rows in `applications` for the user. */
   applicationsCount: number;
   /** Count of rows in `saved_jobs` for the user. */
@@ -50,6 +63,12 @@ export function computeProfileCompletion(s: ProfileCompletionSignals): number {
   }
   if (s.cvUrl && String(s.cvUrl).trim().length > 0) {
     pct += 30;
+  }
+  if (s.targetRole && String(s.targetRole).trim().length > 0) {
+    pct += 10;
+  }
+  if (s.cvText && String(s.cvText).trim().length > 0) {
+    pct += 10;
   }
   if (s.applicationsCount > 0) {
     pct += 15;
