@@ -1,7 +1,9 @@
 // lib/ingest-pipeline.ts
 // Pulls remote jobs from every active source in the in-code SOURCES list
-// (Remotive, Jobicy, RemoteOK, Arbeitnow, Findwork (if key), SerpApi (if
-// key)) and upserts them into public.jobs, deduped on apply_url
+// (Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas, Findwork
+// (if key), SerpApi (if key), JobSpy (if JOBSPY_API_URL is set — scrapes
+// LinkedIn/Indeed/ZipRecruiter/Google via a JobSpy API service)) and upserts
+// them into public.jobs, deduped on apply_url
 // (migration_v25 restored the unique index). A posting we already have is
 // left untouched (ON CONFLICT DO NOTHING) instead of re-inserted, so the
 // daily cron no longer multiplies rows — but we bump its last_seen_at
@@ -20,6 +22,10 @@ import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { enrichDirectApplyLinks } from '@/lib/apply-link';
 import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
+import {
+  isJobSpyConfigured, fetchJobSpyJobs, jobSpyJobToDbRow,
+  jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES,
+} from '@/lib/jobspy';
 import { logInfo, logWarn, logError } from '@/lib/log';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
@@ -305,6 +311,17 @@ const SOURCES: Source[] = [
         remote: true, featured: false, is_new: true, is_active: true,
       };
     },
+  } as Source)) : []),
+  // JobSpy — scrapes LinkedIn / Indeed / ZipRecruiter / Google Jobs via a
+  // self-hosted JobSpy API (see lib/jobspy.ts). One source per default query,
+  // mirroring SerpApi, so each family of roles is refreshed and paged
+  // independently and a hanging query can't starve the others. Only present
+  // when JOBSPY_API_URL is set — otherwise this spreads to nothing.
+  ...(isJobSpyConfigured() ? JOBSPY_DEFAULT_QUERIES.map(query => ({
+    name: `JobSpy:${query.replace(/^remote /, '')}`,
+    sourceUrl: jobSpySourceUrl(query),
+    fetch: (): Promise<RawJob[]> => fetchJobSpyJobs({ searchTerm: query, resultsWanted: 40, isRemote: true }),
+    normalise: (j: RawJob): Record<string, any> | null => jobSpyJobToDbRow(j as any),
   } as Source)) : []),
 ];
 

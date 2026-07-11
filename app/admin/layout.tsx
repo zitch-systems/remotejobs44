@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Briefcase, Users, BarChart3,
   Rss, Building2, Settings, CreditCard,
-  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt, Megaphone
+  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt, Megaphone, Radar
 } from 'lucide-react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ const NAV = [
   { href: '/admin/analytics',     icon: BarChart3,       label: 'Analytics'                   },
   { href: '/admin/company-import',icon: Building2,       label: 'Bulk Import'                 },
   { href: '/admin/ai-discovery',   icon: Brain,           label: 'AI Discovery'                },
+  { href: '/admin/jobspy',        icon: Radar,           label: 'JobSpy'                      },
   { href: '/admin/sources',       icon: Rss,             label: 'Sources'                     },
   { href: '/admin/broadcasts',    icon: Mail,            label: 'Broadcasts'                  },
   { href: '/admin/audit',         icon: ShieldCheck,     label: 'Audit Log'                   },
