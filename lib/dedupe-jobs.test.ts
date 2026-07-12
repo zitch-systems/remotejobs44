@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dedupeByApplyUrl } from './dedupe-jobs';
+import { dedupeByApplyUrl, jobIdentityKey, filterByIdentity } from './dedupe-jobs';
 
 describe('dedupeByApplyUrl', () => {
   it('collapses repeated apply_urls to a single row', () => {
@@ -77,5 +77,67 @@ describe('dedupeByApplyUrl', () => {
       { apply_url: 'https://x.com/a', title: 'sparse', description: 'short' },
     ]);
     expect(out[0].title).toBe('rich');
+  });
+});
+
+describe('jobIdentityKey', () => {
+  it('is case- and whitespace-insensitive (mirrors dedupe_jobs lower(btrim()))', () => {
+    const a = jobIdentityKey({ title: '  Senior Engineer ', company: 'ACME', location: 'Remote' });
+    const b = jobIdentityKey({ title: 'senior engineer', company: 'acme', location: 'remote' });
+    expect(a).toBe(b);
+  });
+
+  it('treats null/undefined/missing location the same (SQL coalesces to empty)', () => {
+    const withNull = jobIdentityKey({ title: 'Dev', company: 'Acme', location: null });
+    const withUndef = jobIdentityKey({ title: 'Dev', company: 'Acme' });
+    const withEmpty = jobIdentityKey({ title: 'Dev', company: 'Acme', location: '  ' });
+    expect(withNull).toBe(withUndef);
+    expect(withNull).toBe(withEmpty);
+  });
+
+  it('distinguishes the same role at different companies or locations', () => {
+    const base = { title: 'Software Engineer', company: 'Acme', location: 'Remote' };
+    expect(jobIdentityKey(base)).not.toBe(jobIdentityKey({ ...base, company: 'Globex' }));
+    expect(jobIdentityKey(base)).not.toBe(jobIdentityKey({ ...base, location: 'Berlin' }));
+  });
+});
+
+describe('filterByIdentity', () => {
+  const existing = new Set([
+    jobIdentityKey({ title: 'Software Engineer', company: 'Acme', location: 'Remote' }),
+  ]);
+
+  it('drops a candidate already on the platform (any source), keeping the rest', () => {
+    const { kept, dropped } = filterByIdentity(
+      [
+        // same role, different casing + a fresh apply_url — the exact cross-
+        // source dupe apply_url dedup can't see.
+        { title: 'software engineer', company: 'ACME', location: 'remote', apply_url: 'https://linkedin.com/x' },
+        { title: 'Product Manager',   company: 'Acme', location: 'Remote', apply_url: 'https://linkedin.com/y' },
+      ] as any[],
+      existing,
+    );
+    expect(dropped).toBe(1);
+    expect(kept).toHaveLength(1);
+    expect(kept[0].title).toBe('Product Manager');
+  });
+
+  it('passes through rows too sparse to match (missing title or company)', () => {
+    const { kept, dropped } = filterByIdentity(
+      [
+        { title: '', company: 'Acme', location: 'Remote' },
+        { title: 'Software Engineer', company: '', location: 'Remote' },
+      ],
+      existing,
+    );
+    expect(dropped).toBe(0);
+    expect(kept).toHaveLength(2);
+  });
+
+  it('is a no-op against an empty existing set', () => {
+    const rows = [{ title: 'Software Engineer', company: 'Acme', location: 'Remote' }];
+    const { kept, dropped } = filterByIdentity(rows, new Set());
+    expect(dropped).toBe(0);
+    expect(kept).toEqual(rows);
   });
 });

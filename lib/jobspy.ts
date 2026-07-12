@@ -31,15 +31,34 @@ export type JobSpySite = (typeof ALLOWED_SITES)[number];
 
 const DEFAULT_SITES: JobSpySite[] = ['indeed', 'linkedin', 'zip_recruiter', 'google'];
 
-// Search terms the daily cron rotates through, mirroring the SerpApi source's
-// worldwide, remote-first coverage across the main job families.
+// Search terms the daily JobSpy cron works through — one broad query per
+// platform job category (see mapCategory below) so a day's run pulls "all
+// jobs" across the whole taxonomy, not just engineering. The cron rotates
+// its starting point each day and works within a time budget, so if the
+// scraper is slow and not every query fits in one run, coverage still comes
+// round over a couple of days rather than always favouring the top of the
+// list. Add a term here to widen coverage; keep them remote-first.
 export const JOBSPY_DEFAULT_QUERIES = [
   'remote software engineer',
-  'remote product manager',
+  'remote frontend developer',
+  'remote backend developer',
+  'remote devops engineer',
   'remote data scientist',
+  'remote data analyst',
+  'remote product manager',
   'remote designer',
   'remote marketing manager',
+  'remote content writer',
+  'remote sales representative',
   'remote customer success',
+  'remote finance manager',
+  'remote accountant',
+  'remote human resources',
+  'remote recruiter',
+  'remote operations manager',
+  'remote project manager',
+  'remote legal counsel',
+  'remote',
 ];
 
 export interface JobSpySearchOptions {

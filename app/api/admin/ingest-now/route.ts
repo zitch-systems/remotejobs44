@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
-import { runIngest } from '@/lib/ingest-pipeline';
+import { runIngest, runJobSpyIngest } from '@/lib/ingest-pipeline';
 import { refreshStaleATSBoards } from '@/lib/ats-refresh';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { logError, logWarn } from '@/lib/log';
@@ -17,25 +17,33 @@ export async function POST() {
   try {
     const result = await runIngest();
 
+    // Also run JobSpy (LinkedIn/Indeed/ZipRecruiter/Google via the JobSpy API)
+    // so "Run now" does a full refresh, not just the free feeds — it has its
+    // own daily cron (the workhorse) but admins expect this button to pull
+    // everything. Small budget here: a top-up, not full coverage, since this
+    // route shares its 120s with the feed ingest above and the ATS sweep below.
+    // No-op when JOBSPY_API_URL is unset.
+    const jobspy = await runJobSpyIngest({ budgetMs: 20_000 });
+
     // Also walk a batch of the least-recently-refreshed ATS company boards.
     // The bulk of the catalogue lives here (~34k ATS jobs vs a few hundred
     // from the aggregator feeds): this keeps still-listed postings from ageing
     // out of the 60-day staleness sweep and recovers any it had already
     // retired. maxDuration is 120s for this route, so give it a real budget —
     // clicking "Run now" a few times cycles the whole board set.
-    const ats = await refreshStaleATSBoards(createAdminSupabaseClient(), { budgetMs: 60_000, maxBoards: 300 });
+    const ats = await refreshStaleATSBoards(createAdminSupabaseClient(), { budgetMs: 50_000, maxBoards: 300 });
 
-    // Flush the public listings when either path changed something.
-    if (result.totalAdded > 0 || ats.added > 0 || ats.reactivated > 0) {
+    // Flush the public listings when any path changed something.
+    if (result.totalAdded > 0 || jobspy.totalAdded > 0 || ats.added > 0 || ats.reactivated > 0) {
       try { revalidatePath('/jobs'); revalidatePath('/'); }
       catch (err: any) { logWarn({ event: 'admin.ingest_now.revalidate_failed', error: err?.message ?? String(err) }); }
     }
     await recordAdminAction({
       adminId: auth.adminId, adminEmail: auth.adminEmail,
       action: 'ingest.run_now', targetType: null, targetId: null,
-      metadata: { totalAdded: result.totalAdded, paused: result.paused, skipped: result.skipped, ats },
+      metadata: { totalAdded: result.totalAdded, paused: result.paused, skipped: result.skipped, jobspy: { totalAdded: jobspy.totalAdded, skipped: jobspy.skipped }, ats },
     });
-    return NextResponse.json({ ...result, ats });
+    return NextResponse.json({ ...result, jobspy, ats });
   } catch (err: any) {
     // Pipeline failures often include feed-source hostnames + parser
     // diagnostics — useful in logs, not on a public response shape.

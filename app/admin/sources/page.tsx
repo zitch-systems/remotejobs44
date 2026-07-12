@@ -216,7 +216,7 @@ export default function SourcesPage() {
           <div className="min-w-0">
             <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-1">Run Ingest Now</h2>
             <p className="text-xs text-stone-400 dark:text-stone-500">
-              Runs the same pipeline the cron runs at 06:00 UTC: hardcoded sources (Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas, Findwork/SerpApi/JobSpy if keyed) + every active row below. JobSpy also has its own console under Admin → JobSpy.
+              Runs the same pipeline the cron runs at 06:00 UTC: hardcoded sources (Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas, Findwork/SerpApi if keyed) + every active row below, plus a short JobSpy top-up. JobSpy also runs on its own cron at 12:00 UTC and has its own console under Admin → JobSpy.
             </p>
             {ingestResult && (
               ingestResult.skipped ? (
