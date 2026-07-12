@@ -7,19 +7,26 @@
 // Component: the job is fetched server-side, the JobPosting structured
 // data + description + requirements + benefits ship in the initial HTML,
 // and only the auth-dependent interactive bits (apply / save / share /
-// admin / CV helper) plus the free-user company-name visual blur are
-// client islands.
+// admin / CV helper) are client islands.
+//
+// EMPLOYER MASK: the company name is a subscriber feature — only Pro
+// (monthly/annual) and admins get it. The decision is made server-side in
+// fetchJob (see canSeeCompanyName + lib/jobs/company-mask.ts): for every
+// other requester the real name never enters the response — not the DOM,
+// not the <head> metadata, not the JSON-LD, not the client-island props.
+// The old client-side CSS blur (CompanyMask) hid nothing here: the name
+// sat in the tab title, view-source, and the structured data for everyone.
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Clock, ArrowLeft, Flag, ChevronRight, Check } from 'lucide-react';
-import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
-import { getRequesterPlan, canSeePaidFields } from '@/lib/auth/requester-plan';
-import { getJobDetailRow, getExpiredJobMeta } from '@/lib/jobs/job-detail';
+import { MapPin, Clock, ArrowLeft, Flag, ChevronRight, Check, Lock } from 'lucide-react';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { canSeePaidFields, canSeeCompanyName } from '@/lib/auth/requester-plan';
+import { getJobDetailRow, getExpiredJobMeta, getRequesterPlanCached } from '@/lib/jobs/job-detail';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from '@/lib/jobs/company-mask';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription, jobDescriptionToHtml } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
 import { JobActionsCard } from '@/components/jobs/JobActionsCard';
-import { CompanyMask } from '@/components/jobs/CompanyMask';
 import { SourceTrustBadge } from '@/components/jobs/SourceTrustBadge';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { companySlug } from '@/lib/company-slug';
@@ -30,7 +37,7 @@ import type { Job } from '@/lib/types';
 // lives in lib/jobs/job-detail.ts via unstable_cache — that's what stops the
 // job row from being re-fetched per request / per crawler hit.
 
-async function fetchJob(id: string): Promise<Job | null> {
+async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } | null> {
   if (!id) return null;
   try {
     // Row + plan resolve concurrently:
@@ -42,10 +49,20 @@ async function fetchJob(id: string): Promise<Job | null> {
     //     (the overwhelming majority of job-detail traffic + every crawler).
     const [data, requesterPlan] = await Promise.all([
       getJobDetailRow(id),
-      createServerSupabaseClient().then(getRequesterPlan),
+      getRequesterPlanCached(),
     ]);
     if (!data) return null;
     const seePaid = canSeePaidFields(requesterPlan);
+
+    // Employer mask: the company name is Pro-only (monthly/annual + admin).
+    // Masking happens HERE, before the row fans out into the DOM, the
+    // JSON-LD, and the JobActionsCard client-island props (RSC flight
+    // payload), so a non-subscriber's browser never receives the name in
+    // any channel. scrub() additionally strips in-prose mentions ("About
+    // Acme, Inc: …") from the free-text fields, and source_url is withheld
+    // because ATS URLs spell the employer in their path/host.
+    const showCompany = canSeeCompanyName(requesterPlan);
+    const scrub = (t: string): string => (showCompany ? t : scrubCompanyMentions(t, data.company));
 
     // Paywall: apply_url/apply_email are NEVER in the shared cache (it
     // stores SAFE_JOB_COLUMNS only — see the invariant note in
@@ -67,12 +84,12 @@ async function fetchJob(id: string): Promise<Job | null> {
     // /api/jobs/route.ts but maps `posted_at → posted` (the field name the
     // Job type and downstream components actually use; the API route's
     // `postedAt` aliasing was a latent bug producing Invalid Date strings).
-    return {
+    const job: Job = {
       id:            data.id,
-      title:         data.title,
-      company:       data.company,
-      companyId:     data.company_id ?? undefined,
-      logo:          data.logo ?? (data.company?.[0]?.toUpperCase() ?? '?'),
+      title:         scrub(data.title),
+      company:       showCompany ? data.company : HIDDEN_COMPANY_LABEL,
+      companyId:     showCompany ? (data.company_id ?? undefined) : undefined,
+      logo:          showCompany ? (data.logo ?? (data.company?.[0]?.toUpperCase() ?? '?')) : '?',
       category:      data.category ?? 'other',
       type:          data.type ?? 'full-time',
       level:         data.level ?? 'mid',
@@ -81,10 +98,10 @@ async function fetchJob(id: string): Promise<Job | null> {
       currency:      data.currency ?? 'USD',
       location:      data.location ?? 'Worldwide',
       timezone:      data.timezone ?? undefined,
-      description:   data.description ?? '',
-      requirements:  data.requirements ?? undefined,
+      description:   scrub(data.description ?? ''),
+      requirements:  Array.isArray(data.requirements) ? data.requirements.map((r: any) => scrub(String(r))) : undefined,
       skills:        data.skills ?? [],
-      benefits:      data.benefits ?? undefined,
+      benefits:      Array.isArray(data.benefits) ? data.benefits.map((b: any) => scrub(String(b))) : undefined,
       applyUrl,
       applyEmail,
       posted:        data.posted_at ?? data.created_at ?? new Date().toISOString(),
@@ -92,9 +109,10 @@ async function fetchJob(id: string): Promise<Job | null> {
       featured:      data.featured ?? false,
       isNew:         data.is_new ?? false,
       source:        data.source ?? 'manual',
-      sourceUrl:     data.source_url ?? undefined,
+      sourceUrl:     showCompany ? (data.source_url ?? undefined) : undefined,
       remote:        data.remote ?? true,
     };
+    return { job, showCompany };
   } catch {
     return null;
   }
@@ -204,7 +222,13 @@ function renderJobDescription(raw: string): React.ReactNode {
 // Noindex "position closed" view for a job that existed but is no longer
 // visible. Deliberately renders NO JobPosting structured data (the role is
 // gone) and points the visitor at live inventory.
-function ExpiredJobView({ title, company }: { title: string; company: string }) {
+//
+// The employer mask applies here too: for non-subscribers the "at Company"
+// clause is dropped (a blurred upsell is pointless on a dead role), the
+// title is scrubbed of in-prose mentions, and the company-hub link — whose
+// slug spells the name — is hidden.
+function ExpiredJobView({ title, company, showCompany }: { title: string; company: string; showCompany: boolean }) {
+  const safeTitle = showCompany ? title : scrubCompanyMentions(title, company);
   return (
     <div className="deep-ocean">
       <div className="max-w-[680px] mx-auto px-5 py-20 text-center">
@@ -212,11 +236,8 @@ function ExpiredJobView({ title, company }: { title: string; company: string }) 
           Position Closed
         </div>
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-stone-900 dark:text-stone-100 tracking-tight mb-3">
-          {title}
-          {/* This view previously interpolated the raw company name here with
-              no plan check at all — the one place on the job-detail page that
-              bypassed CompanyMask's free/daily blur entirely. */}
-          {company && <> at <CompanyMask company={company} /></>} is no longer accepting applications
+          {safeTitle}
+          {showCompany && company && <> at {company}</>} is no longer accepting applications
         </h1>
         <p className="text-stone-500 dark:text-stone-400 leading-relaxed mb-8">
           This role has been filled or has expired. Thousands of fresh remote jobs are live right now — keep your search moving.
@@ -225,9 +246,9 @@ function ExpiredJobView({ title, company }: { title: string; company: string }) 
           <Link href="/jobs" className="px-6 py-3 bg-brand-700 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors text-sm">
             Browse live remote jobs
           </Link>
-          {company && (
+          {showCompany && company && (
             <Link href={`/companies/${companySlug(company)}`} className="px-6 py-3 border border-stone-200 dark:border-[#1e3a5f] text-stone-700 dark:text-stone-200 font-bold rounded-xl hover:border-brand-600 dark:hover:border-brand-500 transition-colors text-sm">
-              More roles at <CompanyMask company={company} />
+              More roles at {company}
             </Link>
           )}
         </div>
@@ -238,17 +259,26 @@ function ExpiredJobView({ title, company }: { title: string; company: string }) 
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const id = (await params).id;
-  const job = await fetchJob(id);
-  if (!job) {
+  const result = await fetchJob(id);
+  if (!result) {
     // Existed once but is now hidden (expired/flagged/inactive) → serve a
     // helpful, noindex "position closed" page with links back to live roles,
     // which is Google's recommended treatment for expired job postings
     // (better than a hard 404 for both users and crawl signals). The noindex
     // is set in generateMetadata; a genuinely unknown id still 404s.
     const expired = await getExpiredJobMeta(id);
-    if (expired) return <ExpiredJobView title={expired.title} company={expired.company} />;
+    if (expired) {
+      return (
+        <ExpiredJobView
+          title={expired.title}
+          company={expired.company}
+          showCompany={canSeeCompanyName(await getRequesterPlanCached())}
+        />
+      );
+    }
     notFound();
   }
+  const { job, showCompany } = result;
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
   const salary = formatSalary(job.salaryMin, job.salaryMax, job.currency);
@@ -324,14 +354,19 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     // inferApplicantLocations).
     ...(applicantLocations ? { applicantLocationRequirements: applicantLocations } : {}),
     directApply: false,
+    // For masked requesters job.company is already the placeholder label
+    // (see fetchJob) and the hub links are dropped — /companies/hidden-company
+    // is not a real page, and the slug would spell the employer out anyway.
     hiringOrganization: {
       '@type': 'Organization',
       name: job.company,
       // Point at our own canonical company hub so Google can tie the
       // posting to the employer entity (we don't have the employer's real
       // homepage in the feed, but the hub is a stable same-as target).
-      sameAs: `${baseUrl}/companies/${companySlug(job.company)}`,
-      url: `${baseUrl}/companies/${companySlug(job.company)}`,
+      ...(showCompany ? {
+        sameAs: `${baseUrl}/companies/${companySlug(job.company)}`,
+        url:    `${baseUrl}/companies/${companySlug(job.company)}`,
+      } : {}),
     },
     skills: job.skills?.join(', ') ?? undefined,
     url: `${baseUrl}/jobs/${job.id}`,
@@ -359,12 +394,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
       {/* Breadcrumb: Home › Jobs › <Company> › <Title>. Lets Google
-          render sitelinks under the result in SERPs. */}
+          render sitelinks under the result in SERPs. The company crumb only
+          exists for entitled requesters — its name AND href slug would both
+          hand the employer to a masked viewer reading the page source. */}
       <BreadcrumbJsonLd
         items={[
           { name: 'Home',     href: '/'                                 },
           { name: 'Jobs',     href: '/jobs'                             },
-          { name: job.company, href: `/companies/${companySlug(job.company)}` },
+          ...(showCompany ? [{ name: job.company, href: `/companies/${companySlug(job.company)}` }] : []),
           { name: job.title,  href: `/jobs/${job.id}`                   },
         ]}
       />
@@ -387,11 +424,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <div className="flex-1 min-w-0">
               <h1>{job.title}</h1>
-              {/* Real company name is always in the HTML (good for SEO + AI
-                  indexers); CompanyMask client island applies a CSS blur
-                  on hydration when the auth state is free / unrevealed-daily. */}
+              {/* Server-decided employer mask: entitled requesters get the
+                  real name in plain text; everyone else gets the placeholder
+                  label (job.company already holds it — see fetchJob) behind
+                  the same lock + blur treatment JobCard uses. No client
+                  island needed — this page renders per-request. */}
               <p className="text-sm font-semibold mt-1 text-white/80">
-                <CompanyMask company={job.company} />
+                {showCompany ? (
+                  <span>{job.company}</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5" aria-hidden>
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    <span className="blur-[4px] select-none pointer-events-none">{job.company}</span>
+                  </span>
+                )}
                 <span className="mx-2 opacity-50">·</span>
                 <span>{job.location}{job.remote ? ' · Remote' : ''}</span>
               </p>
@@ -504,8 +550,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <p className="co-blurb">
                 Spam, scam, fake employer, broken apply link — let us know and we&rsquo;ll review within 24h.
               </p>
+              {/* Masked viewers' report emails identify the job by ID/URL
+                  only — putting the employer in the subject would leak it. */}
               <a
-                href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title} at ${job.company}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
+                href={`mailto:hello@remotejobs44.com?subject=${encodeURIComponent(`Report job: ${job.title}${showCompany ? ` at ${job.company}` : ''}`)}&body=${encodeURIComponent(`Job ID: ${job.id}\nURL: ${baseUrl}/jobs/${job.id}\n\nWhat's wrong with this listing?\n`)}`}
                 className="btn btn-ghost btn-sm mt-3 no-underline"
                 style={{ width: '100%', justifyContent: 'center' }}
               >

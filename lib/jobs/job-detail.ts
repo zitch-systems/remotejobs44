@@ -19,9 +19,9 @@
 // per-request query (see app/jobs/[id]/page.tsx).
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { SAFE_JOB_COLUMNS, getRequesterPlan, type RequesterPlan } from '@/lib/auth/requester-plan';
 
 // Raw snake_case row (SAFE columns only). Typed as `any`-ish record for the
 // same reason the page casts: select() with a runtime column string can't
@@ -64,6 +64,20 @@ export const getJobDetailRow = cache(async (id: string): Promise<JobDetailRow | 
     return null;
   }
 });
+
+/**
+ * Request-deduped requester plan for the /jobs/[id] route. Both the layout's
+ * generateMetadata and the page body need the plan now that the employer
+ * name is masked server-side for non-subscribers; React cache() keeps that
+ * at one auth round-trip per request (and getRequesterPlan itself
+ * short-circuits to 'anon' for cookie-less traffic, i.e. every crawler).
+ *
+ * NEVER wrap this in unstable_cache — the result is per-user, and a shared
+ * cache would hand one visitor's entitlement to everyone.
+ */
+export const getRequesterPlanCached = cache(async (): Promise<RequesterPlan> =>
+  getRequesterPlan(await createServerSupabaseClient())
+);
 
 /** Minimal record for a job that exists but is no longer publicly visible. */
 export interface ExpiredJobMeta { title: string; company: string }
