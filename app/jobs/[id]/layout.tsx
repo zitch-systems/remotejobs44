@@ -1,14 +1,23 @@
 import type { Metadata } from 'next';
 import { normalizeJobDescription } from '@/lib/job-description';
-import { getJobDetailRow, getExpiredJobMeta } from '@/lib/jobs/job-detail';
+import { getJobDetailRow, getExpiredJobMeta, getRequesterPlanCached } from '@/lib/jobs/job-detail';
+import { canSeeCompanyName } from '@/lib/auth/requester-plan';
+import { scrubCompanyMentions } from '@/lib/jobs/company-mask';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
     // Shared cached fetch (lib/jobs/job-detail) — the page body reuses the
     // same row via React cache(), so metadata no longer costs a second
-    // Supabase round-trip per request.
+    // Supabase round-trip per request. The plan lookup is request-deduped
+    // the same way: the employer name is a subscriber (Pro monthly/annual)
+    // feature, and the <title>/description/keywords used to hand it to
+    // every visitor's browser tab regardless of the on-page mask.
     const id = (await params).id;
-    const job = await getJobDetailRow(id);
+    const [job, requesterPlan] = await Promise.all([
+      getJobDetailRow(id),
+      getRequesterPlanCached(),
+    ]);
+    const showCompany = canSeeCompanyName(requesterPlan);
 
     if (!job) {
       // Distinguish a closed posting from a genuine 404 so the <head> matches
@@ -17,8 +26,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       // recommended treatment for expired JobPostings), and a missing id 404s.
       const expired = await getExpiredJobMeta(id);
       if (expired) {
+        const expTitle = showCompany ? expired.title : scrubCompanyMentions(expired.title, expired.company);
         return {
-          title: `${expired.title}${expired.company ? ` at ${expired.company}` : ''} — Position Closed | RemoteJobs44`,
+          title: `${expTitle}${showCompany && expired.company ? ` at ${expired.company}` : ''} — Position Closed | RemoteJobs44`,
           description: 'This role is no longer accepting applications. Browse thousands of live remote jobs on RemoteJobs44.',
           robots: { index: false, follow: true },
           alternates: { canonical: `https://remotejobs44.com/jobs/${id}` },
@@ -27,10 +37,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return { title: 'Job Not Found | RemoteJobs44', robots: { index: false, follow: true } };
     }
 
-    const title = `${job.title} at ${job.company} | RemoteJobs44`;
+    // Masked view: the employer must not appear anywhere in <head> — the tab
+    // title was the single most visible leak (it named the company for every
+    // visitor while the page body blurred it). Scrub the free-text fields
+    // too, since scraped titles/descriptions often open with the name.
+    const jobTitle = showCompany ? job.title : scrubCompanyMentions(job.title, job.company);
+    const title = showCompany
+      ? `${jobTitle} at ${job.company} | RemoteJobs44`
+      : `${jobTitle} — Remote Job | RemoteJobs44`;
     const description = job.description
-      ? normalizeJobDescription(job.description).slice(0, 160).replace(/\s+/g, ' ').trim()
-      : `Apply for ${job.title} at ${job.company}. Remote job — ${job.location}. Find remote jobs at RemoteJobs44.`;
+      ? (showCompany
+          ? normalizeJobDescription(job.description)
+          : scrubCompanyMentions(normalizeJobDescription(job.description), job.company)
+        ).slice(0, 160).replace(/\s+/g, ' ').trim()
+      : `Apply for ${jobTitle}${showCompany ? ` at ${job.company}` : ''}. Remote job — ${job.location}. Find remote jobs at RemoteJobs44.`;
 
     // Only US-dollar pay goes on the share card (product rule). Build a
     // '$'-prefixed label so the /api/og route — which renders salary only when
@@ -42,7 +62,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return {
       title,
       description,
-      keywords: [job.title, job.company, 'remote job', 'work from home', job.location, job.category].filter(Boolean),
+      keywords: [jobTitle, ...(showCompany ? [job.company] : []), 'remote job', 'work from home', job.location, job.category].filter(Boolean),
       openGraph: {
         title,
         description,
@@ -50,11 +70,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         url: `https://remotejobs44.com/jobs/${(await params).id}`,
         // Company name is intentionally omitted from the share image. The OG
         // PNG is a single public asset cached for a year and fetched by social
-        // crawlers with no auth context, so it can't honour the free/day-pass
-        // company blur the way the on-page UI does — baking the real employer
-        // in would leak it to everyone and undercut the paywall. Title + (USD)
-        // salary still make a compelling card.
-        images: [{ url: `/api/og?title=${encodeURIComponent(job.title)}&salary=${encodeURIComponent(salary)}`, width: 1200, height: 630 }],
+        // crawlers with no auth context, so it can't honour the subscriber-only
+        // company reveal the way the rest of the page now does — baking the
+        // real employer in would leak it to everyone and undercut the paywall.
+        // Title + (USD) salary still make a compelling card.
+        images: [{ url: `/api/og?title=${encodeURIComponent(jobTitle)}&salary=${encodeURIComponent(salary)}`, width: 1200, height: 630 }],
       },
       twitter: { card: 'summary_large_image', title, description },
       alternates: { canonical: `https://remotejobs44.com/jobs/${(await params).id}` },

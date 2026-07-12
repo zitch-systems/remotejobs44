@@ -75,6 +75,19 @@ export function canSeePaidFields(plan: RequesterPlan): boolean {
 }
 
 /**
+ * True when the requester may see WHO the employer is on the job detail
+ * page. Stricter than canSeePaidFields: employer identity is a subscription
+ * perk — Pro monthly and Pro annual both resolve to plan 'pro' (see
+ * getPlanTier in lib/paystack/plans.ts) — plus staff admins. Day Pass
+ * deliberately does NOT qualify: it buys apply access (canSeePaidFields),
+ * not the employer reveal, matching the listing UI which blurs the company
+ * for daily users too (JobCard's hideCompany).
+ */
+export function canSeeCompanyName(plan: RequesterPlan): boolean {
+  return plan === 'pro' || plan === 'admin';
+}
+
+/**
  * The columns of `public.jobs` that anon + authenticated roles can SELECT.
  *
  * After migration_v16 the anon and authenticated roles no longer have

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getRequesterPlan, canSeePaidFields, type RequesterPlan } from './requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, type RequesterPlan } from './requester-plan';
 
 // These tests pin the paywall decision matrix that /api/jobs, the SSR
 // /jobs listing, and /jobs/[id] all rely on. A regression here would
@@ -32,6 +32,32 @@ describe('canSeePaidFields', () => {
     const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
     const seeing = allPlans.filter(canSeePaidFields);
     expect(new Set(seeing)).toEqual(new Set(['daily', 'pro', 'admin']));
+  });
+});
+
+// Pins the employer-identity gate on /jobs/[id]: the company name is a
+// subscriber (Pro monthly/annual) feature. Day Pass buys apply access but
+// NOT the employer reveal — flipping 'daily' to true here would leak the
+// name to every day-pass user server-side, where no client blur can help.
+describe('canSeeCompanyName', () => {
+  const cases: Array<[RequesterPlan, boolean]> = [
+    ['anon',  false],
+    ['free',  false],
+    ['daily', false],
+    ['pro',   true],
+    ['admin', true],
+  ];
+
+  for (const [plan, expected] of cases) {
+    it(`${plan} → ${expected ? 'sees the employer' : 'is masked'}`, () => {
+      expect(canSeeCompanyName(plan)).toBe(expected);
+    });
+  }
+
+  it('only the pro/admin allow-list passes', () => {
+    const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
+    const seeing = allPlans.filter(canSeeCompanyName);
+    expect(new Set(seeing)).toEqual(new Set(['pro', 'admin']));
   });
 });
 
