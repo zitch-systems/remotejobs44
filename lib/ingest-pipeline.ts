@@ -1,27 +1,32 @@
 // lib/ingest-pipeline.ts
 // Pulls remote jobs from every active source in the in-code SOURCES list
 // (Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas, Findwork
-// (if key), SerpApi (if key), JobSpy (if JOBSPY_API_URL is set — scrapes
-// LinkedIn/Indeed/ZipRecruiter/Google via a JobSpy API service)) and upserts
-// them into public.jobs, deduped on apply_url
-// (migration_v25 restored the unique index). A posting we already have is
-// left untouched (ON CONFLICT DO NOTHING) instead of re-inserted, so the
-// daily cron no longer multiplies rows — but we bump its last_seen_at
+// (if key), SerpApi (if key)) and upserts them into public.jobs, deduped on
+// apply_url (migration_v25 restored the unique index). A posting we already
+// have is left untouched (ON CONFLICT DO NOTHING) instead of re-inserted, so
+// the daily cron no longer multiplies rows — but we bump its last_seen_at
 // (migration_v27) so a still-listed job keeps a fresh "seen" timestamp.
 // The daily cron's staleness pass deactivates jobs not seen in any feed
 // for 60 days, so the public listings stay current.
 //
+// JobSpy (LinkedIn/Indeed/ZipRecruiter/Google via a self-hosted JobSpy API)
+// is NOT in SOURCES — it's a slow scraper that used to get starved at the
+// tail of the shared 60s daily-cron budget. It runs in its own daily cron via
+// runJobSpyIngest() below, which additionally drops any posting already on the
+// platform from another source (cross-source identity dedup) before insert.
+//
 // Called by:
 //   * /api/cron/daily       — scheduled cron, the single daily 6am UTC run
 //   * /api/cron/ingest      — manual debug re-trigger (same auth secret)
-//   * /api/admin/ingest-now — admin "run now" button
+//   * /api/admin/ingest-now — admin "run now" button (runs JobSpy too)
+//   * /api/cron/jobspy      — scheduled JobSpy scrape (runJobSpyIngest)
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { detectScam } from '@/lib/scam-detect';
 import { parseFeed, feedJobToDbRow } from '@/lib/feed-parser';
 import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { enrichDirectApplyLinks } from '@/lib/apply-link';
 import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
-import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
+import { dedupeByApplyUrl, jobIdentityKey, filterByIdentity } from '@/lib/dedupe-jobs';
 import {
   isJobSpyConfigured, fetchJobSpyJobs, jobSpyJobToDbRow,
   jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES,
@@ -311,17 +316,6 @@ const SOURCES: Source[] = [
         remote: true, featured: false, is_new: true, is_active: true,
       };
     },
-  } as Source)) : []),
-  // JobSpy — scrapes LinkedIn / Indeed / ZipRecruiter / Google Jobs via a
-  // self-hosted JobSpy API (see lib/jobspy.ts). One source per default query,
-  // mirroring SerpApi, so each family of roles is refreshed and paged
-  // independently and a hanging query can't starve the others. Only present
-  // when JOBSPY_API_URL is set — otherwise this spreads to nothing.
-  ...(isJobSpyConfigured() ? JOBSPY_DEFAULT_QUERIES.map(query => ({
-    name: `JobSpy:${query.replace(/^remote /, '')}`,
-    sourceUrl: jobSpySourceUrl(query),
-    fetch: (): Promise<RawJob[]> => fetchJobSpyJobs({ searchTerm: query, resultsWanted: 40, isRemote: true }),
-    normalise: (j: RawJob): Record<string, any> | null => jobSpyJobToDbRow(j as any),
   } as Source)) : []),
 ];
 
@@ -643,6 +637,203 @@ export async function runIngest(): Promise<IngestResult> {
       logWarn({ event: 'ingest.lock_release_failed', error: err.message });
     }
   }
+}
+
+// ── JobSpy ingest ───────────────────────────────────────────────────────────
+//
+// JobSpy scrapes LinkedIn / Indeed / ZipRecruiter / Google Jobs through a
+// self-hosted JobSpy API (lib/jobspy.ts). It runs on its own daily cron
+// (/api/cron/jobspy) instead of inside runIngest() — the scraper is slow and
+// was getting starved at the tail of the shared source budget. Each default
+// query is handled like a source: fetch → normalise → scam-screen → dedupe on
+// apply_url → DROP anything already on the platform from ANY source → upsert.
+// That drop step is the cross-source guarantee: JobSpy never re-lists a role
+// another feed already carries.
+//
+// Coverage over speed: with a broad query set and a slow scraper, not every
+// query fits in one run, so we rotate the starting query by day and work
+// within a time budget — the whole set comes round over a couple of days even
+// if one run only gets partway through.
+const JOBSPY_LOCK_NAME = 'jobspy';
+const JOBSPY_LOCK_TTL_SECONDS = 10 * 60;
+const JOBSPY_RESULTS_WANTED = 50;         // per-query target handed to the scraper
+const JOBSPY_COMPANY_PROBE_CHUNK = 100;   // companies per platform-dedup probe query
+
+export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<IngestResult> {
+  const startedAt = Date.now();
+  const budgetMs = opts?.budgetMs ?? 100_000;
+  const results: Record<string, number | string> = {};
+  let totalAdded = 0;
+
+  if (!isJobSpyConfigured()) {
+    return {
+      success: true, totalAdded: 0,
+      results: { JobSpy: 'not configured (JOBSPY_API_URL unset)' },
+      paused: [], at: new Date().toISOString(),
+      skipped: true, reason: 'JobSpy is not configured.',
+    };
+  }
+
+  const supabase = createAdminSupabaseClient();
+
+  // Own lock, separate from the 'ingest' lock, so the JobSpy cron and the feed
+  // ingest can run at their own times without blocking each other — while two
+  // JobSpy runs still can't overlap and double-scrape.
+  try {
+    const { data: acquired, error } = await supabase.rpc('try_acquire_cron_lock', {
+      lock_name: JOBSPY_LOCK_NAME, ttl_seconds: JOBSPY_LOCK_TTL_SECONDS,
+    });
+    if (error) logWarn({ event: 'jobspy.lock_rpc_unavailable', error: error.message });
+    else if (acquired === false) {
+      logInfo({ event: 'jobspy.skipped', reason: 'lock_held' });
+      return {
+        success: true, totalAdded: 0, results: {}, paused: [],
+        at: new Date().toISOString(), skipped: true,
+        reason: 'Another JobSpy run is already in progress.',
+      };
+    }
+  } catch (err: any) {
+    logWarn({ event: 'jobspy.lock_acquire_threw', error: err.message });
+  }
+
+  try {
+    // Admins can pause a JobSpy query from /admin/sources by its job_sources
+    // URL, same as any other source.
+    let pausedUrls = new Set<string>();
+    try {
+      const { data } = await supabase.from('job_sources').select('url').eq('status', 'paused');
+      pausedUrls = new Set((data ?? []).map((r: { url: string }) => r.url));
+    } catch (err: any) {
+      logWarn({ event: 'jobspy.paused_sources_read_failed', error: err.message });
+    }
+    const pausedNames: string[] = [];
+
+    for (const query of rotateByDay(JOBSPY_DEFAULT_QUERIES)) {
+      const sourceUrl = jobSpySourceUrl(query);
+      const name = `JobSpy:${query.replace(/^remote ?/, '') || 'all'}`;
+
+      if (pausedUrls.has(sourceUrl)) {
+        pausedNames.push(name);
+        results[name] = 'paused';
+        continue;
+      }
+      // Out of budget: skip the rest. The day-rotation means a different slice
+      // leads next run, so nothing is permanently starved.
+      if (Date.now() - startedAt > budgetMs) {
+        results[name] = 'skipped: JobSpy time budget exhausted, runs earlier next cycle';
+        continue;
+      }
+
+      const source: Source = {
+        name, sourceUrl,
+        fetch: (): Promise<RawJob[]> =>
+          fetchJobSpyJobs({ searchTerm: query, resultsWanted: JOBSPY_RESULTS_WANTED, isRemote: true }),
+        normalise: (j: RawJob): Record<string, any> | null => jobSpyJobToDbRow(j as any),
+      };
+
+      try {
+        const raw = await source.fetch();
+        const jobs = raw.slice(0, MAX_JOBS_PER_SOURCE)
+          .map(source.normalise)
+          .filter((j): j is Record<string, any> => !!j && !!j.apply_url)
+          .map((j): Record<string, any> => {
+            const scam = detectScam(j);
+            return scam
+              ? { ...j, flagged: true,  flagged_reason: scam.flagged_reason }
+              : { ...j, flagged: false, flagged_reason: null };
+          });
+
+        if (!jobs.length) {
+          results[name] = 0;
+          await recordSourceRun(supabase, source, 0, 'ok');
+          continue;
+        }
+
+        // 1) collapse in-batch apply_url repeats, 2) drop anything already on
+        // the platform from any source, 3) upsert the genuinely-new remainder.
+        const deduped = dedupeByApplyUrl(jobs);
+        const { kept, dropped } = await filterExistingOnPlatform(supabase, deduped);
+        const up = kept.length
+          ? await upsertJobsChunked(supabase, kept)
+          : { inserted: 0, failed: 0, firstError: null };
+
+        const suffix = dropped > 0 ? ` (+${dropped} already on platform)` : '';
+        if (up.inserted === 0 && up.failed > 0) {
+          results[name] = `db error: ${up.firstError ?? 'insert failed'}`;
+          await recordSourceRun(supabase, source, 0, 'error', up.firstError);
+        } else {
+          results[name] = up.failed > 0
+            ? `${up.inserted} (${up.failed} rows failed: ${up.firstError})${suffix}`
+            : `${up.inserted}${suffix}`;
+          totalAdded += up.inserted;
+          // Bump last_seen for the kept rows AND the cross-source dupes we
+          // skipped: the platform's existing copy of a still-listed role must
+          // stay fresh so it doesn't age out just because JobSpy deferred to it.
+          await touchLastSeen(supabase, deduped);
+          await recordSourceRun(supabase, source, up.inserted, 'ok');
+        }
+      } catch (err: any) {
+        logError({ event: 'jobspy.query_failed', query, error: err.message });
+        results[name] = `error: ${err.message}`;
+        await recordSourceRun(supabase, source, 0, 'error', err.message);
+      }
+    }
+
+    return {
+      success: true, totalAdded, results,
+      paused: pausedNames, at: new Date().toISOString(),
+    };
+  } finally {
+    try { await supabase.rpc('release_cron_lock', { lock_name: JOBSPY_LOCK_NAME }); }
+    catch (err: any) { logWarn({ event: 'jobspy.lock_release_failed', error: err.message }); }
+  }
+}
+
+// Drop rows whose (title, company, location) identity already exists as an
+// ACTIVE job on the platform, from any source. We probe by company (chunked) —
+// the most selective identity field — collect those rows' identities, and let
+// filterByIdentity (lib/dedupe-jobs) do the pure comparison with the SAME key
+// the nightly dedupe_jobs() RPC uses. Casing-variant company names this
+// exact-match probe misses are still caught by that nightly sweep, so this is
+// the cheap first line, not the only one. Best-effort: on a probe error we keep
+// the batch (the apply_url unique index + nightly sweep remain as backstops).
+async function filterExistingOnPlatform(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  rows: Array<Record<string, any>>,
+): Promise<{ kept: Array<Record<string, any>>; dropped: number }> {
+  if (!rows.length) return { kept: rows, dropped: 0 };
+  const companies = Array.from(new Set(
+    rows.map(r => String(r.company ?? '').trim()).filter(Boolean),
+  ));
+  if (!companies.length) return { kept: rows, dropped: 0 };
+
+  const existing = new Set<string>();
+  try {
+    for (let i = 0; i < companies.length; i += JOBSPY_COMPANY_PROBE_CHUNK) {
+      const chunk = companies.slice(i, i + JOBSPY_COMPANY_PROBE_CHUNK);
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('title, company, location')
+        .in('company', chunk)
+        .eq('is_active', true);
+      if (error) throw error;
+      for (const r of data ?? []) existing.add(jobIdentityKey(r as any));
+    }
+  } catch (err: any) {
+    logWarn({ event: 'jobspy.platform_dedup_probe_failed', error: err?.message ?? String(err) });
+    return { kept: rows, dropped: 0 };
+  }
+  return filterByIdentity(rows, existing);
+}
+
+// Rotate an array by the current UTC day so a budget-limited run doesn't always
+// start from the same query. The clock read is deliberate (daily fairness) and
+// isolated here.
+function rotateByDay<T>(arr: T[]): T[] {
+  if (arr.length <= 1) return arr.slice();
+  const dayNumber = Math.floor(Date.now() / 86_400_000); // whole days since epoch (UTC)
+  const offset = dayNumber % arr.length;
+  return [...arr.slice(offset), ...arr.slice(0, offset)];
 }
 
 // Refresh last_seen_at for a batch of postings we just saw in a feed.
