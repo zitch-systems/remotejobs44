@@ -17,7 +17,7 @@ type Tier = {
 const TIERS: Tier[] = [
   {
     name: 'Free',
-    price: '$0',
+    price: '₦0',
     per: 'forever',
     tag: 'Find, track and get alerted to roles.',
     features: [
@@ -29,7 +29,7 @@ const TIERS: Tier[] = [
   },
   {
     name: 'Day Pass',
-    price: '$3',
+    price: '₦500',
     per: '/ 24 hours',
     tag: 'Just need to fire off one application.',
     features: [
@@ -41,7 +41,7 @@ const TIERS: Tier[] = [
   },
   {
     name: 'Pro',
-    price: '$19',
+    price: '₦2,999',
     per: '/ month',
     tag: 'Unlimited applying, every day.',
     features: [

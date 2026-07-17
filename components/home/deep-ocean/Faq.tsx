@@ -6,7 +6,7 @@ const FAQS = [
   },
   {
     q: 'What do I get with a Day Pass vs Pro?',
-    a: 'The $3 Day Pass unlocks every apply link and email for 24 hours. Pro ($19/mo) adds unlimited unlocks, one-click apply with a saved CV, application tracking, and early access to featured roles.',
+    a: 'The ₦500 Day Pass unlocks every apply link and email for 24 hours. Pro (₦2,999/mo) adds unlimited unlocks, one-click apply with a saved CV, application tracking, and early access to featured roles.',
   },
   {
     q: 'How do you verify the jobs are really remote?',
