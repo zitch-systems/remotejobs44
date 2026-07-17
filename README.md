@@ -38,7 +38,7 @@ The HTML/CSS/JS here are **prototypes that show the intended look, copy, data sh
 behavior** — not code to paste in. Recreate them in the target stack and conventions.
 
 **Target stack (web): Next.js (App Router) + Tailwind CSS**, repo `zitch-systems/remotejobs44`
-(`app/layout.tsx`, `app/app/globals.css`, `tailwind.config.js`). If you're in that repo, **map
+(`app/layout.tsx`, `app/globals.css`, `tailwind.config.js`). If you're in that repo, **map
 the tokens in §4 onto its Tailwind theme** rather than copying raw CSS. If starting fresh,
 `create-next-app --ts --tailwind --app`.
 
