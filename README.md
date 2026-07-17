@@ -38,7 +38,7 @@ The HTML/CSS/JS here are **prototypes that show the intended look, copy, data sh
 behavior** — not code to paste in. Recreate them in the target stack and conventions.
 
 **Target stack (web): Next.js (App Router) + Tailwind CSS**, repo `zitch-systems/remotejobs44`
-(`app/layout.tsx`, `app/app/globals.css`, `tailwind.config.js`). If you're in that repo, **map
+(`app/layout.tsx`, `app/globals.css`, `tailwind.config.js`). If you're in that repo, **map
 the tokens in §4 onto its Tailwind theme** rather than copying raw CSS. If starting fresh,
 `create-next-app --ts --tailwind --app`.
 
@@ -208,7 +208,7 @@ Section order is intentional (light/dark band rhythm). Each `<section>` has a `d
 7. **Mission** (tint) — kicker "Why RemoteJobs44", H2 **"Talent is everywhere. Opportunity should
    be too."** + 4 stat cards. *Hidden ≤640px.*
 8. **How it works** (app) — kicker "How it works", H2 **"From browse to offer letter — in three
-   steps"**; 3 numbered steps; step 2 shows price pills **Day Pass · $3** / **Pro · $19/mo**.
+   steps"**; 3 numbered steps; step 2 shows price pills **Day Pass · ₦500** / **Pro · ₦2,999/mo**.
 9. **Pricing** (`#pricing`, tint) — kicker "Simple pricing", H2 **"Apply free. Pay only to
    unlock."**, 3 tiers. *Swipe carousel on mobile (scroll-snap).*
 10. **Toolkit / capabilities** (tint) — kicker "The RemoteJobs44 toolkit", H2 **"Everything you
@@ -508,8 +508,8 @@ tomorrow). **Full types and proposed REST endpoints are in `api.md`.** Seed data
 - Member shell (top bar + sidebar) is one reusable layout; all 11 member screens live inside it.
 - Live search/filter, the kanban tracker, and every tool screen behave as specified; the apply
   flow (mobile) records and blocks re-apply.
-- Copy is **worldwide**; **no** Greenhouse/Glassdoor references; pricing reads **Day Pass $3 /
-  Pro $19/mo**.
+- Copy is **worldwide**; **no** Greenhouse/Glassdoor references; pricing reads **Day Pass ₦500 /
+  Pro ₦2,999/mo** (matching the Paystack charge amounts in `lib/paystack/plans.ts`).
 - Seed data is swappable for the real API (`api.md`) without changing component props. No console
   errors.
 

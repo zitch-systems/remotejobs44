@@ -4,6 +4,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { detectMagicMime } from '@/lib/file-magic';
 import { rateLimit } from '@/lib/rate-limit';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
+import { resolvePlan } from '@/lib/auth/plan';
 import { logError, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
@@ -26,10 +27,12 @@ export async function POST(req: NextRequest) {
     // Pro-only gate. /pricing copy lists CV upload as a Pro feature
     // ("CV upload & auto-apply") but this route used to accept uploads
     // from any signed-in user including the free tier.
+    // Effective plan (expired → free), not the raw column — the daily cron
+    // is the only thing that flips profiles.plan after expiry.
     const { data: profile } = await supabase
-      .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();
-    const plan = profile?.plan ?? 'free';
-    const allowed = profile?.role === 'admin' || plan === 'daily' || plan === 'pro' || plan === 'admin';
+      .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+    const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+    const allowed = plan === 'daily' || plan === 'pro' || plan === 'admin';
     if (!allowed) {
       return NextResponse.json(
         { error: 'CV upload is a Pro feature. Upgrade your plan to upload.' },

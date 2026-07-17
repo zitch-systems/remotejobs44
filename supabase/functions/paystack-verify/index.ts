@@ -82,8 +82,30 @@ Deno.serve(async (req: Request) => {
     return Response.json({ ok: false, error: claimErr.message }, { status: 500 });
   }
 
-  // First time → grant the plan.
-  const expires = new Date(Date.now() + cfg.days * 86_400_000).toISOString();
+  // First time → grant the plan. Mirrors the web verify route's semantics:
+  //   - never overwrite an admin's plan tag;
+  //   - never DOWNGRADE an active higher tier (an active Pro user redeeming a
+  //     Day Pass charge keeps Pro — initialize blocks that purchase up front,
+  //     this is the belt-and-braces for charges that slip through);
+  //   - preserve unused paid time by extending from the LATER of now or the
+  //     current future expiry, so a renewal/upgrade never discards days the
+  //     user already paid for.
+  const { data: existing } = await admin
+    .from('profiles')
+    .select('role, plan, plan_expires_at')
+    .eq('id', user.id)
+    .maybeSingle();
+  const nowMs = Date.now();
+  const existingMs = existing?.plan_expires_at ? new Date(existing.plan_expires_at).getTime() : 0;
+  const activeTier = existingMs > nowMs ? (existing?.plan ?? 'free') : 'free';
+  const rank = (t: string) => (t === 'pro' ? 2 : t === 'daily' ? 1 : 0);
+  if (existing?.role === 'admin' || rank(cfg.plan) < rank(activeTier)) {
+    // Charge stays recorded in the ledger (for support/refund); the higher
+    // entitlement is preserved untouched.
+    return Response.json({ ok: true, plan: activeTier, unchanged: true });
+  }
+  const base = existingMs > nowMs ? existingMs : nowMs;
+  const expires = new Date(base + cfg.days * 86_400_000).toISOString();
   const { error: upErr } = await admin
     .from('profiles')
     .update({ plan: cfg.plan, plan_expires_at: expires, paystack_customer_code: tx.customer?.customer_code ?? null })

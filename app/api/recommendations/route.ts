@@ -18,7 +18,8 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from '@/lib/jobs/company-mask';
 import { logError } from '@/lib/log';
 
 const RECOMMENDATION_LIMIT = 12;
@@ -78,6 +79,9 @@ export async function GET() {
     // SAFE_JOB_COLUMNS, paid get '*'.
     const requesterPlan = await getRequesterPlan(session);
     const seePaid = canSeePaidFields(requesterPlan);
+    // Employer identity is Pro-only — mirrors /api/jobs and the /jobs/[id]
+    // server-side mask.
+    const seeCompany = canSeeCompanyName(requesterPlan);
     const cols    = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
     let candidates: any[] = [];
@@ -139,7 +143,7 @@ export async function GET() {
       .map(s => s.j);
 
     return NextResponse.json({
-      jobs: scored.map((j: any) => transform(j, seePaid)),
+      jobs: scored.map((j: any) => transform(j, seePaid, seeCompany)),
       total: scored.length,
       // Surface enough about the source so the UI can label correctly
       // ("Picked from your saved jobs" vs "Featured remote roles"). Key
@@ -154,12 +158,13 @@ export async function GET() {
   }
 }
 
-function transform(j: any, seePaid: boolean) {
+function transform(j: any, seePaid: boolean, seeCompany: boolean) {
+  const scrub = (t: string): string => (seeCompany ? t : scrubCompanyMentions(t, j.company));
   return {
     id:           j.id,
-    title:        j.title,
-    company:      j.company,
-    logo:         j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?'),
+    title:        scrub(j.title ?? ''),
+    company:      seeCompany ? j.company : HIDDEN_COMPANY_LABEL,
+    logo:         seeCompany ? (j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?')) : '?',
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? 'mid',
@@ -168,7 +173,7 @@ function transform(j: any, seePaid: boolean) {
     currency:     j.currency ?? 'USD',
     location:     j.location ?? 'Worldwide',
     timezone:     j.timezone ?? null,
-    description:  j.description ?? '',
+    description:  scrub(j.description ?? ''),
     skills:       j.skills ?? [],
     applyUrl:     seePaid ? (j.apply_url   ?? null) : null,
     applyEmail:   seePaid ? (j.apply_email ?? null) : null,

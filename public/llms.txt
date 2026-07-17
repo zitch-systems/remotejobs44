@@ -1,6 +1,6 @@
 # RemoteJobs44
 
-> RemoteJobs44 is a remote job board focused on African job seekers (Nigeria, Kenya, South Africa, Ghana, Egypt, Morocco, Rwanda, Uganda) with 50,000+ verified remote jobs from global companies. AI-powered CV review and interview prep included.
+> RemoteJobs44 is a remote job board focused on African job seekers (Nigeria, Kenya, South Africa, Ghana, Egypt, Morocco, Rwanda, Uganda) with 70,000+ verified remote jobs from global companies. AI-powered CV review and interview prep included.
 
 ## What is RemoteJobs44?
 
@@ -8,14 +8,14 @@ RemoteJobs44 (https://remotejobs44.com) is a subscription-based remote job board
 
 ## Plans
 
-- **Free**: Browse all 50,000+ jobs, save favourites
+- **Free**: Browse all 70,000+ jobs, save favourites
 - **Day Pass**: 24-hour full access, 10 applications — ₦500
 - **Pro Monthly**: Unlimited applications, alerts, AI tools — ₦2,999 / month
 - **Pro Annual**: Same as Pro Monthly, billed yearly — ₦29,999 / year (saves ₦5,989)
 
 ## Key features
 
-- 50,000+ remote jobs from 8+ aggregators and direct ATS feeds, refreshed every 6 hours
+- 70,000+ remote jobs from 8+ aggregators and direct ATS feeds, refreshed every 6 hours
 - Application tracker (Slack-style status board)
 - **AI CV review** — paste your CV, get a 0–100 score, strengths, gaps, ATS keywords missing, and rewrite tips (uses the AI provider an admin enables in /admin/ai-discovery)
 - **AI interview prep** — type a role + level, get behavioural / technical / remote-specific questions with answer skeletons and red-flag mistakes
@@ -53,7 +53,7 @@ Remote workers in Africa (especially Nigeria, Kenya, South Africa, Ghana, Egypt,
 - AI Interview Prep: https://remotejobs44.com/interview-prep
 - Career Resources hub: https://remotejobs44.com/resources
 - About: https://remotejobs44.com/about
-- Sitemap (XML): https://remotejobs44.com/sitemap.xml
+- Sitemap (XML): https://remotejobs44.com/sitemap-index.xml
 
 ## Featured resource articles
 

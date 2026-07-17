@@ -13,10 +13,10 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
-import { useJob } from '@/lib/jobs';
+import { useJob, fetchApplyChannel } from '@/lib/jobs';
 import { applyTarget } from '@/lib/apply';
 import { useProfile } from '@/lib/profile';
-import { canApply, freeTrialBlockedMessage } from '@/lib/entitlements';
+import { canApply, freeTrialBlockedMessage, isPaid } from '@/lib/entitlements';
 import { evaluateFreeTrial } from '@/lib/free-trial';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app';
@@ -91,6 +91,20 @@ export default function JobDetail() {
     if (job) addRecent(job);
   }, [job?.id, addRecent]);
 
+  // Paid-only apply channel: apply_url/apply_email are no longer in the public
+  // job row (server-side paywall, migration_v65) — entitled users fetch them
+  // via the plan-checked RPC. Free users keep the in-app one-tap apply.
+  const [channel, setChannel] = useState<{ applyUrl?: string; applyEmail?: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (job && isPaid(profile.plan)) {
+      fetchApplyChannel(job.id).then((c) => { if (alive) setChannel(c); }).catch(() => {});
+    } else {
+      setChannel(null);
+    }
+    return () => { alive = false; };
+  }, [job?.id, profile.plan]);
+
   useEffect(() => {
     if (!burst) return;
     burstAnim.setValue(0);
@@ -114,7 +128,10 @@ export default function JobDetail() {
     );
   }
 
-  const target = applyTarget(job);
+  const target = applyTarget({
+    applyUrl: job.applyUrl ?? channel?.applyUrl,
+    applyEmail: job.applyEmail ?? channel?.applyEmail,
+  });
 
   async function onApply() {
     if (applied || !job || gateLoading) return;

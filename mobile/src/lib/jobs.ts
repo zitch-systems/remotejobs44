@@ -46,8 +46,11 @@ function sanitizeText(s: string): string {
 // Re-export so existing importers (the feed) keep their import path.
 export { personalizeJobs } from './format';
 
+// apply_url / apply_email are deliberately NOT selected: they're paywalled
+// columns with no anon/authenticated SELECT grant (migration_v65 restores
+// v16's lockdown). Entitled users fetch them via fetchApplyChannel() below.
 const SAFE_COLUMNS =
-  'id,title,company,logo,category,type,level,location,apply_url,apply_email,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
+  'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
 
 interface JobRow {
   id: string;
@@ -58,8 +61,8 @@ interface JobRow {
   type: string | null;
   level: string | null;
   location: string | null;
-  apply_url: string | null;
-  apply_email: string | null;
+  apply_url?: string | null;
+  apply_email?: string | null;
   description: string | null;
   requirements: string[] | string | null;
   skills: string[] | null;
@@ -159,6 +162,24 @@ export async function fetchJobById(id: string): Promise<Job | null> {
   if (!data) return null;
   const [job] = cacheJobs([rowToJob(data as JobRow)]);
   return job;
+}
+
+/**
+ * Paid-only apply channel. apply_url/apply_email are paywalled columns the
+ * session role can't SELECT; entitled callers (unexpired daily/pro, admin)
+ * fetch them through the plan-checked SECURITY DEFINER RPC job_apply_channel
+ * (migration_v65). Free/expired callers get zero rows back — the check is
+ * server-side, not a client gate.
+ */
+export async function fetchApplyChannel(
+  jobId: string,
+): Promise<{ applyUrl?: string; applyEmail?: string } | null> {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.rpc('job_apply_channel', { p_job_id: jobId });
+  if (error || !data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { applyUrl: row.apply_url ?? undefined, applyEmail: row.apply_email ?? undefined };
 }
 
 /** Other active roles in the same category (for the detail "more like this"). */

@@ -19,8 +19,13 @@ remotejobs44/          ← this is your project root
 │   ├── layout.tsx
 │   ├── page.tsx
 │   ├── globals.css
-│   ├── dashboard/
-│   │   └── page.tsx
+│   ├── (member)/          ← route group: member-only screens
+│   │   ├── dashboard/
+│   │   │   └── page.tsx
+│   │   ├── profile/
+│   │   │   └── page.tsx
+│   │   └── applications/
+│   │       └── page.tsx
 │   ├── jobs/
 │   │   ├── page.tsx
 │   │   └── [id]/
@@ -30,10 +35,6 @@ remotejobs44/          ← this is your project root
 │   ├── register/
 │   │   └── page.tsx
 │   ├── pricing/
-│   │   └── page.tsx
-│   ├── profile/
-│   │   └── page.tsx
-│   ├── applications/
 │   │   └── page.tsx
 │   ├── auth/
 │   │   └── callback/
@@ -61,12 +62,13 @@ remotejobs44/          ← this is your project root
 │       └── yc/route.ts
 ├── components/
 │   ├── home/
-│   │   ├── HeroSection.tsx
-│   │   ├── CategoriesSection.tsx
-│   │   ├── FeaturedJobs.tsx
-│   │   ├── HowItWorks.tsx
-│   │   ├── PricingPreview.tsx
-│   │   └── CTASection.tsx
+│   │   └── deep-ocean/
+│   │       ├── Hero.tsx
+│   │       ├── Categories.tsx
+│   │       ├── Featured.tsx
+│   │       ├── HowItWorks.tsx
+│   │       ├── Pricing.tsx
+│   │       └── CtaBand.tsx
 │   ├── jobs/
 │   │   ├── JobCard.tsx
 │   │   └── PaywallModal.tsx
@@ -102,7 +104,7 @@ remotejobs44/          ← this is your project root
 │   └── migration_v2.sql
 ├── middleware.ts          ← at root level, NOT inside app/
 ├── next.config.js         ← at root level
-├── tailwind.config.ts     ← at root level
+├── tailwind.config.js     ← at root level
 ├── tsconfig.json          ← at root level
 ├── postcss.config.js      ← at root level
 └── package.json           ← at root level
@@ -148,11 +150,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJh...
 SUPABASE_SERVICE_ROLE_KEY=eyJh...
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_...
 PAYSTACK_SECRET_KEY=sk_live_...
-PAYSTACK_DAILY_PLAN_CODE=PLN_xxx
-PAYSTACK_PRO_MONTHLY_PLAN_CODE=PLN_xxx
-PAYSTACK_PRO_ANNUAL_PLAN_CODE=PLN_xxx
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+No Paystack plan codes are needed — every tier is charged as a one-time
+amount defined in `lib/paystack/plans.ts` (`PLAN_AMOUNTS_KOBO`). See
+`.env.example` for the full annotated list of variables (cron secret,
+admin 2FA, AI key encryption, error reporting, ingestion sources).
 
 ## Vercel deployment region (`vercel.json` → `regions`)
 

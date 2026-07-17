@@ -27,8 +27,8 @@ const TIERS: {
   features: string[];
   recommended?: boolean;
 }[] = [
-  { id: 'free', name: 'Free', price: '₦0', period: '', features: ['Browse 70,000+ verified jobs', 'Save favourites', '10 applications / day'] },
-  { id: 'daily', name: 'Day Pass', price: '₦500', period: '/ 24h', features: ['Full access for 24 hours', 'Unlimited applications for a day'] },
+  { id: 'free', name: 'Free', price: '₦0', period: '', features: ['Browse 70,000+ verified jobs', 'Save favourites', '3 applications in your first week'] },
+  { id: 'daily', name: 'Day Pass', price: '₦500', period: '/ 24h', features: ['Full access for 24 hours', 'Up to 10 job applications'] },
   {
     id: 'pro',
     name: 'Pro Monthly',
@@ -99,6 +99,9 @@ export default function Plans() {
 
         {TIERS.map((t) => {
           const current = t.id === profile.plan || (profile.plan === 'pro' && t.id === 'annual');
+          // Hide the Day Pass CTA for users already on a higher tier — the
+          // backend rejects the purchase (upgrade-only rule) so don't offer it.
+          const downgrade = t.id === 'daily' && (profile.plan === 'pro' || profile.plan === 'admin');
           const rec = Boolean(t.recommended);
           const loading = busy === t.id;
           return (

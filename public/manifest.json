@@ -1,7 +1,7 @@
 {
   "name": "RemoteJobs44",
   "short_name": "RJ44",
-  "description": "Find 50,000+ remote jobs. Subscribe from ₦1,000.",
+  "description": "Find 70,000+ remote jobs. Subscribe from ₦500.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -22,6 +22,6 @@
   "shortcuts": [
     { "name": "Browse Jobs",  "url": "/jobs",      "description": "Find remote jobs" },
     { "name": "Dashboard",    "url": "/dashboard", "description": "Your account"     },
-    { "name": "Pricing",      "url": "/pricing",   "description": "Subscribe ₦1,000" }
+    { "name": "Pricing",      "url": "/pricing",   "description": "Plans from ₦500" }
   ]
 }
