@@ -30,12 +30,12 @@ The platform aggregates remote job listings from major Applicant Tracking System
 
 Jobs are remote-friendly worldwide but the platform specifically highlights opportunities open to African applicants. Region filter options include: Nigeria, Ghana, Kenya, South Africa, Africa-wide, Europe, UK, US, Canada, LATAM, Asia, Worldwide.
 
-## Pricing (as of 2025)
+## Pricing (as of 2026)
 
 All prices in Nigerian Naira (₦):
 - Free plan: Browse all jobs, save favourites — ₦0
-- Pro Monthly: Unlimited applications, application tracker — ₦1,000/month
-- Pro Annual: Same as monthly, billed yearly — ₦8,000/year (save 33%)
+- Pro Monthly: Unlimited applications, application tracker — ₦2,999/month
+- Pro Annual: Same as monthly, billed yearly — ₦29,999/year (saves ₦5,989)
 - Day Pass: 10 applications valid 24 hours — ₦500
 
 Payment processed via Paystack (supports Nigerian bank cards, USSD, bank transfer).

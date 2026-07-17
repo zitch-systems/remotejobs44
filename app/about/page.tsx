@@ -56,7 +56,7 @@ function roundDown(n: number): string {
 
 const VALUES = [
   { icon: '🌍', title: 'Global first', desc: 'Remote work erases borders. We list jobs from every corner of the world, accessible to anyone with an internet connection.' },
-  { icon: '💳', title: 'Affordable access', desc: 'A Day Pass costs just ₦1,000. We believe career opportunities should be accessible, not gated behind expensive subscriptions.' },
+  { icon: '💳', title: 'Affordable access', desc: 'A Day Pass costs just ₦500. We believe career opportunities should be accessible, not gated behind expensive subscriptions.' },
   { icon: '⚡', title: 'Move fast', desc: 'Jobs are refreshed every 6 hours. You see the freshest listings before anyone else, so you can apply first.' },
   { icon: '🔒', title: 'Private by default', desc: 'We never sell your data. Your CV, applications, and profile stay private. Payments are secured by Paystack.' },
 ];
@@ -146,7 +146,7 @@ export default async function AboutPage() {
         <h2 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 mb-3">
           Ready to find your remote job?
         </h2>
-        <p className="text-stone-400 dark:text-stone-500 mb-6">Browse free. Apply from ₦1,000. Work from anywhere.</p>
+        <p className="text-stone-400 dark:text-stone-500 mb-6">Browse free. Apply from ₦500. Work from anywhere.</p>
         <div className="flex gap-3 justify-center flex-wrap">
           <Link href="/jobs"
             className="px-6 py-3 bg-brand-700 dark:bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors">

@@ -40,8 +40,8 @@ const TEMPLATES: Array<{ id: string; name: string; subject: string; body: string
   {
     id:      'plan_nudge',
     name:    'Pro plan nudge',
-    subject: 'Unlock direct apply links for ₦1,000',
-    body:    '<h2 style="margin:0 0 16px;font-size:20px;color:#1e293b">Pro unlocks the actual apply links</h2>\n<p>Hi {{NAME}},</p>\n<p>Pro is ₦1,000/month and unlocks the full apply URL on every listing, auto-apply, application tracking, and unlimited AI CV review.</p>\n<p><a href="https://remotejobs44.com/pricing" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">See plans →</a></p>',
+    subject: 'Unlock direct apply links for ₦2,999',
+    body:    '<h2 style="margin:0 0 16px;font-size:20px;color:#1e293b">Pro unlocks the actual apply links</h2>\n<p>Hi {{NAME}},</p>\n<p>Pro is ₦2,999/month and unlocks the full apply URL on every listing, auto-apply, application tracking, and unlimited AI CV review.</p>\n<p><a href="https://remotejobs44.com/pricing" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">See plans →</a></p>',
   },
 ];
 
