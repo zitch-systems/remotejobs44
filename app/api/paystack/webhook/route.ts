@@ -197,18 +197,23 @@ export async function POST(req: NextRequest) {
             logInfo({ event: 'webhook.charge_success.duplicate', reference, user_id: userId });
             break;
           }
-          // Non-conflict error (FK/transient/un-migrated table) — fall through
-          // to the legacy subscriptions check below, no regression.
+          // Non-conflict error (FK/transient/un-migrated table) — log and
+          // rely on the legacy subscriptions check below, no regression.
           logError({ event: 'webhook.charge_success.ledger_claim_failed', code: claimErr.code, error: claimErr.message, reference });
-          const { data: refRow } = await supabase
-            .from('subscriptions')
-            .select('user_id')
-            .eq('paystack_reference', reference)
-            .maybeSingle();
-          if (refRow) {
-            logInfo({ event: 'webhook.charge_success.duplicate_legacy', reference, user_id: userId });
-            break;
-          }
+        }
+        // Legacy dedup runs REGARDLESS of the claim outcome. If verify's own
+        // ledger insert failed transiently but its profile/subscriptions
+        // writes landed, the ledger has no row — so the claim above succeeds
+        // even though the charge was already credited. The reference stamped
+        // on the user's subscription row is the tell; skip the double-credit.
+        const { data: refRow } = await supabase
+          .from('subscriptions')
+          .select('user_id')
+          .eq('paystack_reference', reference)
+          .maybeSingle();
+        if (refRow) {
+          logInfo({ event: 'webhook.charge_success.duplicate_legacy', reference, user_id: userId });
+          break;
         }
       }
 
