@@ -17,8 +17,8 @@ export function HowItWorks() {
             <h3>Unlock access. Start applying.</h3>
             <p>Instantly unlock every apply link and email. One-click apply with your saved CV. No friction.</p>
             <div className="price-row">
-              <span className="price-pill">Day Pass · $3</span>
-              <span className="price-pill">Pro · $19/mo</span>
+              <span className="price-pill">Day Pass · ₦500</span>
+              <span className="price-pill">Pro · ₦2,999/mo</span>
             </div>
           </div>
           <div className="step">

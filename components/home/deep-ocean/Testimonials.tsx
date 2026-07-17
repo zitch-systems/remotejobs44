@@ -17,7 +17,7 @@ const TESTIMONIALS: T[] = [
     role: 'Product Designer · Remote → Figma',
   },
   {
-    quote: <>The $3 day pass paid for itself instantly — one unlock, one apply link, <b>one offer letter</b>. Best three dollars I&apos;ve ever spent.</>,
+    quote: <>The ₦500 day pass paid for itself instantly — one unlock, one apply link, <b>one offer letter</b>. Best ₦500 I&apos;ve ever spent.</>,
     img: '/redesign/ad-coffee-woman.jpg',
     name: 'Thandiwe M.',
     role: 'Data Analyst · Remote → Andela',
