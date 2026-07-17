@@ -7,7 +7,6 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   // without leaking it to the rendered page. error.digest is the
   // Next.js correlation id we can ask support to quote.
   useEffect(() => {
-    // eslint-disable-next-line no-console
     console.error('[app/error]', error);
   }, [error]);
 
