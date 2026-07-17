@@ -53,7 +53,7 @@ Remote workers in Africa (especially Nigeria, Kenya, South Africa, Ghana, Egypt,
 - AI Interview Prep: https://remotejobs44.com/interview-prep
 - Career Resources hub: https://remotejobs44.com/resources
 - About: https://remotejobs44.com/about
-- Sitemap (XML): https://remotejobs44.com/sitemap.xml
+- Sitemap (XML): https://remotejobs44.com/sitemap-index.xml
 
 ## Featured resource articles
 
