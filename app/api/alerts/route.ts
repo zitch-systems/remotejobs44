@@ -75,7 +75,6 @@ export async function POST(req: NextRequest) {
   if (error) {
     // Don't echo raw DB messages to the client (handler names, constraint
     // ids, etc.). Log server-side, ship a generic error.
-    // eslint-disable-next-line no-console
     console.error('[alerts.post] insert failed:', error.message);
     return NextResponse.json({ error: 'Could not create alert. Please try again.' }, { status: 500 });
   }
@@ -107,7 +106,6 @@ export async function DELETE(req: NextRequest) {
     .eq('user_id', user.id);
 
   if (error) {
-    // eslint-disable-next-line no-console
     console.error('[alerts.delete] failed:', error.message);
     return NextResponse.json({ error: 'Could not delete alert.' }, { status: 500 });
   }

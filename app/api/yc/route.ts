@@ -78,7 +78,6 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     // YC mirror failures (network, JSON parse, etc.) — log raw, return
     // generic. err.message can include the upstream YC API URL.
-    // eslint-disable-next-line no-console
     console.error('[yc.fetch] failed:', err?.message ?? String(err));
     return NextResponse.json({ sources: [], total: 0, error: 'Could not load YC companies.' }, { status: 200 });
   }

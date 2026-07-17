@@ -215,7 +215,6 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
     // a real error UI instead.
     const rpcError = !!(rowsRes.error || countRes.error);
     if (rpcError) {
-      // eslint-disable-next-line no-console
       console.error('[fetchJobs] search_jobs RPC failed:', rowsRes.error?.message ?? countRes.error?.message);
     }
     let total = Number(countRes.data ?? 0);
@@ -326,7 +325,6 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
   // surface a small `error: true` flag so the page can render an
   // actual "Couldn't load — refresh" state instead of a fake zero.
   if (error) {
-    // eslint-disable-next-line no-console
     console.error('[fetchJobs] no-q SELECT failed:', error.message);
   }
   const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
@@ -363,7 +361,6 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
     return await queryJobsListingCached(params, seePaid);
   } catch (err) {
     if (err instanceof ListingQueryError) return err.result;
-    // eslint-disable-next-line no-console
     console.error('[fetchJobs] listing query threw:', err instanceof Error ? err.message : String(err));
     return { jobs: [], total: 0, page: params.page, pages: 1, error: true };
   }
