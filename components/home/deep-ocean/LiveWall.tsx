@@ -33,6 +33,10 @@ function distribute(jobs: LandingJob[], cols: number): LandingJob[][] {
 }
 
 export function LiveWall({ jobs }: { jobs: LandingJob[] }) {
+  // No jobs → render nothing rather than an empty scrolling stage (a large
+  // blank band). Mirrors Featured's guard so a data gap degrades cleanly.
+  if (jobs.length === 0) return null;
+
   const cols = distribute(jobs.slice(0, 24), 4);
 
   return (

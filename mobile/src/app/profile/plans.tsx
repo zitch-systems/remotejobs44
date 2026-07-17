@@ -27,7 +27,7 @@ const TIERS: {
   features: string[];
   recommended?: boolean;
 }[] = [
-  { id: 'free', name: 'Free', price: '₦0', period: '', features: ['Browse 50,000+ verified jobs', 'Save favourites', '10 applications / day'] },
+  { id: 'free', name: 'Free', price: '₦0', period: '', features: ['Browse 70,000+ verified jobs', 'Save favourites', '10 applications / day'] },
   { id: 'daily', name: 'Day Pass', price: '₦500', period: '/ 24h', features: ['Full access for 24 hours', 'Unlimited applications for a day'] },
   {
     id: 'pro',

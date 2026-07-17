@@ -10,6 +10,10 @@ import { CompanyMask } from '@/components/jobs/CompanyMask';
 export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
   const preview = jobs.slice(0, 8);
 
+  // No jobs → skip the section entirely rather than showing an empty
+  // browser mock. Mirrors Featured's guard for clean degradation.
+  if (preview.length === 0) return null;
+
   const PreviewRow = ({ job }: { job: LandingJob }) => {
     const tint = tintFor(job.company);
     return (
