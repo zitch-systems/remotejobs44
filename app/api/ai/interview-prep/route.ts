@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { resolvePlan } from '@/lib/auth/plan';
 import { logError, logWarn } from '@/lib/log';
 
 const SYSTEM = `You are a senior interviewer at a global remote-first company who has interviewed hundreds of candidates from Africa, Asia, Europe and the Americas. Produce useful, specific interview prep. Output valid JSON only — no preface, no markdown fences.
@@ -63,10 +64,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Effective plan (expired → free), not the raw column — see cv-review.
     const { data: profile } = await supabase
-      .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();
-    const plan = profile?.plan ?? 'free';
-    const isPaid = profile?.role === 'admin' || ['admin','daily','pro'].includes(plan);
+      .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+    const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+    const isPaid = ['admin','daily','pro'].includes(plan);
     const limit  = isPaid ? 20 : 1;
     const rl = rateLimit(`ai:prep:${user.id}`, limit, 24 * 60 * 60 * 1000);
     if (!rl.success) {

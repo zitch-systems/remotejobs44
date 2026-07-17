@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { complete } from '@/lib/ai/provider';
 import { rateLimit, getIP } from '@/lib/rate-limit';
+import { resolvePlan } from '@/lib/auth/plan';
 import { logError, logWarn } from '@/lib/log';
 
 const SYSTEM = `You are a senior remote-hiring recruiter who reviews CVs for engineers, designers, marketers and operators applying to global remote roles from Africa. Be honest, specific, and brief. Output valid JSON only — no preface, no markdown fences.
@@ -56,11 +57,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Per-user rate limit — free users 1/day, paid users 20/day.
+    // Per-user rate limit — free users 1/day, paid users 20/day. Gate on the
+    // EFFECTIVE plan (resolvePlan downgrades a lapsed sub whose expiry has
+    // passed) — the raw column can read 'pro' for up to ~23h after expiry
+    // because only the daily cron flips it.
     const { data: profile } = await supabase
-      .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();
-    const plan = profile?.plan ?? 'free';
-    const isPaid = profile?.role === 'admin' || ['admin','daily','pro'].includes(plan);
+      .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+    const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+    const isPaid = ['admin','daily','pro'].includes(plan);
     const limit  = isPaid ? 20 : 1;
     const rl = rateLimit(`ai:cv:${user.id}`, limit, 24 * 60 * 60 * 1000);
     if (!rl.success) {

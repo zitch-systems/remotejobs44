@@ -99,6 +99,9 @@ export default function Plans() {
 
         {TIERS.map((t) => {
           const current = t.id === profile.plan || (profile.plan === 'pro' && t.id === 'annual');
+          // Hide the Day Pass CTA for users already on a higher tier — the
+          // backend rejects the purchase (upgrade-only rule) so don't offer it.
+          const downgrade = t.id === 'daily' && (profile.plan === 'pro' || profile.plan === 'admin');
           const rec = Boolean(t.recommended);
           const loading = busy === t.id;
           return (

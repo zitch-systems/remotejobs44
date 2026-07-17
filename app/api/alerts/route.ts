@@ -1,6 +1,7 @@
 // app/api/alerts/route.ts — Job alerts management
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { resolvePlan } from '@/lib/auth/plan';
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -33,10 +34,12 @@ export async function POST(req: NextRequest) {
   // Enforce per-user alert cap so a free / abusive user can't create
   // thousands of alerts and bloat the table. Free plans get a small
   // exploration cap, paid plans get a higher one.
+  // Effective plan (expired → free), not the raw column — the daily cron
+  // is the only thing that flips profiles.plan after expiry.
   const { data: profile } = await supabase
-    .from('profiles').select('plan, role').eq('id', user.id).maybeSingle();
-  const plan = profile?.plan ?? 'free';
-  const isPaid = profile?.role === 'admin' || ['admin','daily','pro'].includes(plan);
+    .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+  const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+  const isPaid = ['admin','daily','pro'].includes(plan);
   const maxAlerts = isPaid ? 50 : 3;
 
   const { count: existingCount } = await supabase

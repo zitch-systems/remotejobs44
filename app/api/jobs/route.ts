@@ -5,7 +5,8 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/sup
 import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { rateLimit, getIP } from '@/lib/rate-limit';
-import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from '@/lib/jobs/company-mask';
 import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
@@ -114,6 +115,10 @@ export async function GET(req: NextRequest) {
     const sessionClient = await createServerSupabaseClient();
     const requesterPlan = await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
+    // Employer identity (company/logo/source_url) is Pro-only, mirroring the
+    // /jobs/[id] server-side mask — without this, anyone could paginate the
+    // whole catalogue as JSON and read the names the detail page hides.
+    const seeCompany = canSeeCompanyName(requesterPlan);
 
     // Always use the admin (service-role) client for the actual jobs
     // query. Supabase sets a per-role statement_timeout: anon ~3s,
@@ -147,7 +152,7 @@ export async function GET(req: NextRequest) {
       const { data: job } = await supabase
         .from('jobs').select(cols).eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).single();
-      if (job) return NextResponse.json({ job: transformJob(job, seePaid) });
+      if (job) return NextResponse.json({ job: transformJob(job, seePaid, seeCompany) });
       const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
       return NextResponse.json({ job: mock ?? null });
     }
@@ -164,7 +169,7 @@ export async function GET(req: NextRequest) {
       const { data: rows } = await supabase
         .from('jobs').select(cols).in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
-      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid)]));
+      const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid, seeCompany)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
     }
@@ -223,7 +228,7 @@ export async function GET(req: NextRequest) {
       ]);
       if (rowsRes.error) throw new Error(rowsRes.error.message);
       let total = Number(countRes.data ?? 0);
-      let jobs  = (rowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+      let jobs  = (rowsRes.data ?? []).map((j: any) => transformJob(j, seePaid, seeCompany));
       let fuzzy = false;
 
       // Trigram typo fallback — fires only when strict FTS finds nothing.
@@ -238,7 +243,7 @@ export async function GET(req: NextRequest) {
         ]);
         if (!fRowsRes.error) {
           total = Number(fCountRes.data ?? 0);
-          jobs  = (fRowsRes.data ?? []).map((j: any) => transformJob(j, seePaid));
+          jobs  = (fRowsRes.data ?? []).map((j: any) => transformJob(j, seePaid, seeCompany));
           fuzzy = total > 0;
         }
       }
@@ -343,7 +348,7 @@ export async function GET(req: NextRequest) {
 
     if (jobs.length > 0) {
       return NextResponse.json({
-        jobs: jobs.map((j: any) => transformJob(j, seePaid)),
+        jobs: jobs.map((j: any) => transformJob(j, seePaid, seeCompany)),
         total,
         page, perPage,
         pages: Math.max(1, Math.ceil(total / perPage)),
@@ -636,15 +641,20 @@ export async function DELETE(req: NextRequest) {
 // `seePaid` controls whether the off-site application channel
 // (apply_url + apply_email) is included in the response. Anonymous and
 // Free-plan requesters get `null` for both, mirroring what the SSR
-// /jobs/[id] page sends to free users. Defaults to true for non-API
-// callers that haven't been updated to pass the flag.
-function transformJob(j: any, seePaid: boolean = true) {
+// /jobs/[id] page sends to free users. `seeCompany` gates employer
+// identity (company/companyId/logo/source_url + in-prose mentions) the
+// same way the detail page does — Pro/admin only; source_url is withheld
+// because ATS URLs spell the employer in their path/host. Both default to
+// true for the admin POST/PUT responses that haven't been updated to pass
+// the flags.
+function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = true) {
+  const scrub = (t: string): string => (seeCompany ? t : scrubCompanyMentions(t, j.company));
   return {
     id:           j.id,
-    title:        j.title,
-    company:      j.company,
-    companyId:    j.company_id ?? null,
-    logo:         j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?'),
+    title:        scrub(j.title ?? ''),
+    company:      seeCompany ? j.company : HIDDEN_COMPANY_LABEL,
+    companyId:    seeCompany ? (j.company_id ?? null) : null,
+    logo:         seeCompany ? (j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?')) : '?',
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? 'mid',
@@ -653,10 +663,10 @@ function transformJob(j: any, seePaid: boolean = true) {
     currency:     j.currency ?? 'USD',
     location:     j.location ?? 'Worldwide',
     timezone:     j.timezone ?? null,
-    description:  j.description ?? '',
-    requirements: j.requirements ?? null,
+    description:  scrub(j.description ?? ''),
+    requirements: Array.isArray(j.requirements) ? j.requirements.map((r: any) => scrub(String(r))) : (j.requirements ?? null),
     skills:       j.skills ?? [],
-    benefits:     j.benefits ?? null,
+    benefits:     Array.isArray(j.benefits) ? j.benefits.map((b: any) => scrub(String(b))) : (j.benefits ?? null),
     applyUrl:     seePaid ? (j.apply_url   ?? null) : null,
     applyEmail:   seePaid ? (j.apply_email ?? null) : null,
     postedAt:     j.posted_at ?? j.created_at,
@@ -664,7 +674,7 @@ function transformJob(j: any, seePaid: boolean = true) {
     featured:     j.featured ?? false,
     isNew:        j.is_new ?? false,
     source:       j.source ?? 'manual',
-    sourceUrl:    j.source_url ?? null,
+    sourceUrl:    seeCompany ? (j.source_url ?? null) : null,
     remote:       j.remote ?? true,
     isActive:     j.is_active ?? true,
   };
