@@ -1,33 +1,32 @@
 import { test, expect } from '@playwright/test';
 
-// These pages all require an admin / authenticated session — for an
-// unauthenticated visitor they should redirect to /login (or render a
-// "verifying access" gate that doesn't expose admin data).
-// We don't try to sign in here — that'd need a fixture user with role='admin'
-// in the database. Anonymous-redirect coverage catches the most common
-// regressions (forgetting auth gates on a new page).
+// The /admin pages have been removed from the public site. They live behind a
+// private, env-configured "knock" link (ADMIN_PORTAL_SLUG) and answer 404 to
+// anyone who has not opened it — so an anonymous visitor gets a 404, NOT a
+// redirect to /login (which would reveal the admin area exists). We can't
+// exercise the unlocked flow here without knowing the (secret) slug + a fixture
+// admin, so this covers the public-facing guarantee: /admin is a 404.
 
-test.describe('Admin route guards (anonymous)', () => {
-  test('/admin redirects unauth to /login', async ({ page }) => {
-    await page.goto('/admin');
-    // AdminLayout's check() routes to /login?next=/admin when getUser fails 401.
-    await page.waitForURL(/\/login/, { timeout: 8000 });
-    expect(page.url()).toMatch(/\/login/);
+test.describe('Admin area is hidden from the public (anonymous)', () => {
+  test('/admin returns 404', async ({ page }) => {
+    const res = await page.goto('/admin');
+    expect(res?.status()).toBe(404);
+    expect(page.url()).toMatch(/\/admin$/);
   });
 
-  test('/admin/users redirects unauth to /login', async ({ page }) => {
-    await page.goto('/admin/users');
-    await page.waitForURL(/\/login/, { timeout: 8000 });
+  test('/admin/users returns 404', async ({ page }) => {
+    const res = await page.goto('/admin/users');
+    expect(res?.status()).toBe(404);
   });
 
-  test('/admin/users/[id] redirects unauth to /login', async ({ page }) => {
-    await page.goto('/admin/users/00000000-0000-0000-0000-000000000000');
-    await page.waitForURL(/\/login/, { timeout: 8000 });
+  test('/admin/users/[id] returns 404', async ({ page }) => {
+    const res = await page.goto('/admin/users/00000000-0000-0000-0000-000000000000');
+    expect(res?.status()).toBe(404);
   });
 
-  test('/admin/companies redirects unauth to /login', async ({ page }) => {
-    await page.goto('/admin/companies');
-    await page.waitForURL(/\/login/, { timeout: 8000 });
+  test('/admin/companies returns 404', async ({ page }) => {
+    const res = await page.goto('/admin/companies');
+    expect(res?.status()).toBe(404);
   });
 });
 

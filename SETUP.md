@@ -156,7 +156,12 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 No Paystack plan codes are needed — every tier is charged as a one-time
 amount defined in `lib/paystack/plans.ts` (`PLAN_AMOUNTS_KOBO`). See
 `.env.example` for the full annotated list of variables (cron secret,
-admin 2FA, AI key encryption, error reporting, ingestion sources).
+`ADMIN_PORTAL_SLUG` — the private admin entrance, admin 2FA, AI key
+encryption, error reporting, ingestion sources).
+
+The admin area is no longer at the public `/admin` URL: it answers 404 unless
+you first open the private link `https://<your-domain>/<ADMIN_PORTAL_SLUG>`,
+which unlocks it for that browser. See `docs/AUTH_AND_ADMIN.md`.
 
 ## Vercel deployment region (`vercel.json` → `regions`)
 
