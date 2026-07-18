@@ -4,9 +4,14 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Route-level role enforcement', () => {
-  test('unauthed visitor to /admin lands on /login with next=/admin', async ({ page }) => {
-    await page.goto('/admin');
-    await expect(page).toHaveURL(/\/login\?.*next=%2Fadmin/);
+  // /admin has been removed from the public site: it now lives behind a
+  // private, env-configured "knock" link and answers 404 to anyone who hasn't
+  // opened it. An anonymous visitor must NOT be redirected to /login (that would
+  // reveal the admin area exists) — they get a plain 404, staying on /admin.
+  test('unauthed visitor to /admin gets 404, not a login redirect', async ({ page }) => {
+    const res = await page.goto('/admin');
+    expect(res?.status()).toBe(404);
+    await expect(page).toHaveURL(/\/admin$/);
   });
 
   test('unauthed visitor to /dashboard lands on /login with next=/dashboard', async ({ page }) => {

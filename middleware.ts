@@ -11,6 +11,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { ADMIN_EMAILS } from '@/lib/admin-emails';
 import { hasSupabaseAuthCookie } from '@/lib/supabase/cookies';
+import {
+  ADMIN_PORTAL_PATH,
+  ADMIN_PORTAL_COOKIE,
+  ADMIN_PORTAL_COOKIE_MAX_AGE,
+  adminPortalToken,
+} from '@/lib/admin/portal';
 
 function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -44,6 +50,17 @@ function redirectWithAuthCookies(url: URL, from: NextResponse): NextResponse {
   return redirect;
 }
 
+// The /admin pages have been removed from the public site — they answer 404 to
+// anyone who has not unlocked them via the private ADMIN_PORTAL_PATH link.
+// Rewriting to a path with no matching route makes Next render app/not-found
+// with a 404 status, so /admin is indistinguishable from a URL that was never
+// there.
+function portalNotFound(request: NextRequest): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = '/_portal-not-found';
+  return NextResponse.rewrite(url);
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAdminRoute     = path === '/admin' || path.startsWith('/admin/');
@@ -52,6 +69,36 @@ export async function middleware(request: NextRequest) {
   // authoritative role check lives in app/agent/layout.tsx + the /api/agent/*
   // routes, so we don't pay an Auth-server round-trip here.
   const isAgentRoute     = path === '/agent' || path.startsWith('/agent/');
+  // The private "knock" link that unlocks the admin portal. Visiting it mints
+  // the access cookie and forwards to /admin (see lib/admin/portal.ts).
+  const isPortalKnock    = path === ADMIN_PORTAL_PATH || path === `${ADMIN_PORTAL_PATH}/`;
+
+  // Portal knock: set the http-only access cookie and send the operator into
+  // the admin area. The cookie is applied by the browser before it follows the
+  // redirect, so the subsequent GET /admin already carries it.
+  if (isPortalKnock) {
+    const res = NextResponse.redirect(new URL('/admin', request.url));
+    res.cookies.set(ADMIN_PORTAL_COOKIE, await adminPortalToken(), {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path:     '/',
+      maxAge:   ADMIN_PORTAL_COOKIE_MAX_AGE,
+    });
+    return res;
+  }
+
+  // /admin is hidden behind the knock link: without a valid access cookie the
+  // whole admin area answers 404, exactly as if the routes didn't exist. This
+  // runs BEFORE the Auth-server round-trip below so anonymous probes of /admin
+  // are cheap 404s that never touch Supabase.
+  if (isAdminRoute) {
+    const provided = request.cookies.get(ADMIN_PORTAL_COOKIE)?.value;
+    if (!provided || provided !== (await adminPortalToken())) {
+      return portalNotFound(request);
+    }
+    // Cookie is valid — fall through to the existing role gating below.
+  }
 
   // Fast path for every non-gated route (homepage, ~250 SEO pages, /jobs,
   // /companies, /blog, …). Only the /admin branch below ever reads the

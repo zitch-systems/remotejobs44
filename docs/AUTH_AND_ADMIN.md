@@ -5,6 +5,37 @@ of session bugs (PRs #27–#29). Read this before touching `middleware.ts`,
 `lib/supabase/*`, `components/providers/AuthSyncProvider.tsx`, the `/admin`
 layout, or anything role-related.
 
+## Reaching the admin area — the private entrance
+
+The admin area has been **removed from the public `/admin` URL**. `/admin` (and
+every `/admin/*` page) answers a plain **404** to anyone who has not opened a
+private, env-configured "knock" link first. The portal still lives at `/admin`
+internally — only the *entrance* changed.
+
+How it works (`lib/admin/portal.ts` + `middleware.ts`):
+
+1. An operator opens their private link: `https://<host>/<ADMIN_PORTAL_SLUG>`.
+2. Middleware mints a signed, http-only access cookie (`rj_portal`, a
+   SHA-256 of the slug — not the slug itself) and redirects to `/admin`.
+3. Middleware lets `/admin*` through **only** when that cookie is valid; every
+   other request to `/admin*` is rewritten to the site 404. The normal auth
+   gating (session → `/login`, non-admin → `/dashboard`) runs after the cookie
+   check, unchanged.
+
+The slug is a **server-only** env var (`ADMIN_PORTAL_SLUG`, no `NEXT_PUBLIC_`
+prefix), referenced only in middleware/server code, so it never ships in a
+browser bundle. Rotate it by changing the env var and redeploying. **This is
+obscurity in front of the real gate** — `requireAdmin()` (session + role + 2FA)
+still guards every `/api/admin/*` route regardless of the cookie, so a leaked
+slug grants visibility of the login screen, never access.
+
+Notes:
+- Tell your admins to bookmark the `/<slug>` link — that is now the way in. The
+  cookie lasts ~180 days, so once knocked, `/admin` (and the admin-only "Admin
+  Panel" header shortcut) keep working in that browser until it expires.
+- `/api/admin/*` is **not** cookie-gated (the middleware matcher excludes
+  `/api/*`); those routes are protected by `requireAdmin()` as before.
+
 ## Admin access — two paths
 
 An account is an admin if **either** is true (see `resolveRole` /
@@ -90,6 +121,11 @@ These each cost a production incident. Keep them:
 
 ## Setup checklist
 
+- [ ] `ADMIN_PORTAL_SLUG` set in Vercel (Production) to your own private,
+      hard-to-guess path segment — this is the entrance to the admin area
+      (`https://remotejobs44.com/<slug>`). If unset, a public placeholder
+      default is used and the entrance is guessable. Generate with
+      `openssl rand -hex 8`.
 - [ ] `HARDCODED_ADMIN_EMAILS` set in Vercel (Production) to at least one admin
       you control — your break-glass account.
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for
