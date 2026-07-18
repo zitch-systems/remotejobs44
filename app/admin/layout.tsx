@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Briefcase, Users, BarChart3,
   Rss, Building2, Settings, CreditCard,
-  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt, Megaphone, Radar
+  PlusCircle, ChevronRight, Shield, LogOut, Brain, ShieldCheck, Mail, Receipt, Megaphone, Radar, ArrowLeftRight
 } from 'lucide-react';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -36,6 +36,37 @@ const NAV = [
   { href: '/admin/settings',      icon: Settings,        label: 'Settings'                    },
   { href: '/security/2fa',        icon: Shield,          label: 'Two-Factor Auth'             },
 ];
+
+// Optional sibling project for the cross-project switcher. Only the NAME is
+// exposed client-side (the label); the sibling's actual admin URL is a
+// server-only env var read by app/admin/switch/route.ts, so a sibling's
+// private admin path never lands in this app's public JS bundle. Unset ⇒ the
+// switcher simply doesn't render.
+const SIBLING_NAME = (process.env.NEXT_PUBLIC_ADMIN_SIBLING_NAME ?? '').trim();
+
+// Cross-project switcher. "RemoteJobs44 (current)" + a link to /admin/switch,
+// a server route that redirects into the sibling project's admin.
+function ProjectSwitcher() {
+  if (!SIBLING_NAME) return null;
+  return (
+    <div className="px-3 pt-3">
+      <div className="rounded-xl border border-slate-200 dark:border-[#1e2d4a] overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-[#eff6ff] dark:bg-[#0f1e38]">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#2563eb' }} />
+          <span className="text-xs font-bold truncate" style={{ color: '#2563eb' }}>RemoteJobs44</span>
+          <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-400 shrink-0">current</span>
+        </div>
+        {/* Plain <a>: this hits a server route that 302s to another origin, so
+            we want a full navigation, not a client-router push. */}
+        <a href="/admin/switch"
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#111c35] border-t border-slate-100 dark:border-[#1e2d4a] transition-colors">
+          <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
+          Switch to {SIBLING_NAME}
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -196,6 +227,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
+        <ProjectSwitcher />
+
         <nav className="flex-1 py-2 overflow-y-auto">
           {NAV.map(({ href, icon: Icon, label, exact, indent }) => {
             const active = exact
@@ -234,7 +267,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           clutter. One native <select> shows the current section and jumps on
           change — every admin page reachable in two taps, no sideways
           scrolling. app-menu-top pins it under the safe-area-aware header. */}
-      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2">
+      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2 flex items-center gap-2">
         <select
           aria-label="Admin section"
           value={
@@ -244,12 +277,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? '/admin'
           }
           onChange={e => router.push(e.target.value)}
-          className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-sm font-medium text-slate-700 dark:text-slate-200"
+          className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-sm font-medium text-slate-700 dark:text-slate-200"
         >
           {NAV.map(({ href, label, indent }) => (
             <option key={href} value={href}>{indent ? `— ${label}` : label}</option>
           ))}
         </select>
+        {SIBLING_NAME && (
+          <a href="/admin/switch" aria-label={`Switch to ${SIBLING_NAME}`}
+            className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#111c35] shrink-0 transition-colors">
+            <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
+            <span className="max-w-[7rem] truncate">{SIBLING_NAME}</span>
+          </a>
+        )}
       </div>
 
       <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] md:pt-0 pt-14">
