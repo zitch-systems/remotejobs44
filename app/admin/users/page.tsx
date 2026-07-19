@@ -249,7 +249,7 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {loading ? (
           <div className="p-8 animate-pulse space-y-3">
             {[1,2,3,4].map(i => <div key={i} className="skeleton h-12 rounded" />)}
@@ -260,7 +260,7 @@ export default function AdminUsersPage() {
           </div>
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
-            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400 items-center">
+            <div className="grid grid-cols-12 min-w-[720px] gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400 items-center">
               <div className="col-span-1 flex items-center">
                 <input
                   type="checkbox"
@@ -278,7 +278,7 @@ export default function AdminUsersPage() {
             {users.map(user => (
               <div key={user.id}
                 className={cn(
-                  'grid grid-cols-12 gap-3 px-5 py-3 items-center transition-colors',
+                  'grid grid-cols-12 min-w-[720px] gap-3 px-5 py-3 items-center transition-colors',
                   selected.has(user.id)
                     ? 'bg-brand-50/40 dark:bg-brand-900/10'
                     : 'hover:bg-stone-50 dark:hover:bg-[#162033]'

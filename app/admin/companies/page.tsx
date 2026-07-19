@@ -306,7 +306,7 @@ export default function AdminCompaniesPage() {
       </div>
 
       {/* Table */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {loading ? (
           <div className="p-8 animate-pulse space-y-3">
             {[1,2,3,4,5].map(i => <div key={i} className="skeleton h-12 rounded" />)}
@@ -319,7 +319,7 @@ export default function AdminCompaniesPage() {
           </div>
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
-            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400">
+            <div className="grid grid-cols-12 min-w-[720px] gap-3 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-400">
               <div className="col-span-4">Company</div>
               <div className="col-span-2">Platform</div>
               <div className="col-span-2 text-right">Active</div>
@@ -332,7 +332,7 @@ export default function AdminCompaniesPage() {
               const isUnknown    = row.platform === 'unknown' || !row.slug;
               return (
                 <div key={row.company}
-                  className="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+                  className="grid grid-cols-12 min-w-[720px] gap-3 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
                   <div className="col-span-4 min-w-0">
                     <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{row.company}</p>
                     {row.slug && <p className="text-xs text-stone-400 font-mono truncate">{row.slug}</p>}

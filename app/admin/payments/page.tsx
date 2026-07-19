@@ -123,14 +123,14 @@ export default function PaymentsPage() {
           className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400 text-stone-900 dark:text-stone-100" />
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-stone-400 animate-pulse">Loading payments…</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-stone-400">{error ? 'No payments to show.' : 'No payments yet'}</div>
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
-            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#0a1628] text-xs font-bold uppercase tracking-wider text-stone-400">
+            <div className="grid grid-cols-12 min-w-[720px] gap-2 px-5 py-3 bg-stone-50 dark:bg-[#0a1628] text-xs font-bold uppercase tracking-wider text-stone-400">
               <div className="col-span-2">Date</div>
               <div className="col-span-4">Customer</div>
               <div className="col-span-2">Plan</div>
@@ -139,7 +139,7 @@ export default function PaymentsPage() {
             </div>
             {filtered.map(p => (
               <div key={p.reference || `${p.customerEmail}-${p.paidAt}`}
-                className="grid grid-cols-12 gap-2 px-5 py-3.5 items-center hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
+                className="grid grid-cols-12 min-w-[720px] gap-2 px-5 py-3.5 items-center hover:bg-stone-50 dark:hover:bg-[#0a1628] transition-colors">
                 <div className="col-span-2 text-xs text-stone-500 dark:text-stone-400">{fmtDate(p.paidAt)}</div>
                 <div className="col-span-4 min-w-0">
                   <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{p.customerName || '—'}</p>
