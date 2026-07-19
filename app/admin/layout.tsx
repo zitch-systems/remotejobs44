@@ -37,12 +37,14 @@ const NAV = [
   { href: '/security/2fa',        icon: Shield,          label: 'Two-Factor Auth'             },
 ];
 
-// Optional sibling project for the cross-project switcher. Only the NAME is
-// exposed client-side (the label); the sibling's actual admin URL is a
-// server-only env var read by app/admin/switch/route.ts, so a sibling's
-// private admin path never lands in this app's public JS bundle. Unset ⇒ the
-// switcher simply doesn't render.
-const SIBLING_NAME = (process.env.NEXT_PUBLIC_ADMIN_SIBLING_NAME ?? '').trim();
+// Sibling project for the cross-project switcher. Only the NAME is exposed
+// client-side (the button label); the sibling's actual admin URL is a
+// server-only value read by app/admin/switch/route.ts, so the sibling's admin
+// path never lands in this app's public JS bundle. Defaults to TransformCV so
+// the toggle works out of the box; override the label with the
+// NEXT_PUBLIC_ADMIN_SIBLING_NAME env var, or set it to a single space to hide
+// the switcher.
+const SIBLING_NAME = (process.env.NEXT_PUBLIC_ADMIN_SIBLING_NAME ?? 'TransformCV').trim();
 
 // Cross-project switcher. "RemoteJobs44 (current)" + a link to /admin/switch,
 // a server route that redirects into the sibling project's admin.

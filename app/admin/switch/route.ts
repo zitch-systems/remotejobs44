@@ -14,8 +14,13 @@ import { requireAdmin } from '@/lib/admin/auth';
 
 export const dynamic = 'force-dynamic';
 
+// Sibling admin entrance. Defaults to TransformCV's admin so the switcher works
+// out of the box; override with the ADMIN_SIBLING_URL env var. Server-only, so
+// this never ships in the public bundle.
+const DEFAULT_SIBLING_URL = 'https://transformcv.vercel.app/ops-51b28e9e';
+
 function siblingUrl(): string | null {
-  const raw = process.env.ADMIN_SIBLING_URL?.trim();
+  const raw = (process.env.ADMIN_SIBLING_URL || DEFAULT_SIBLING_URL).trim();
   if (!raw) return null;
   try {
     const u = new URL(raw);
