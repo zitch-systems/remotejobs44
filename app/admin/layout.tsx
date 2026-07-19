@@ -52,16 +52,16 @@ function ProjectSwitcher() {
   if (!SIBLING_NAME) return null;
   return (
     <div className="px-3 pt-3">
-      <div className="rounded-xl border border-slate-200 dark:border-[#1e2d4a] overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#eff6ff] dark:bg-[#0f1e38]">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#2563eb' }} />
-          <span className="text-xs font-bold truncate" style={{ color: '#2563eb' }}>RemoteJobs44</span>
-          <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-400 shrink-0">current</span>
+      <div className="rounded-lg border border-[#1e2d4a] overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-[#111c35]">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#60a5fa' }} />
+          <span className="text-xs font-bold text-white truncate">RemoteJobs44</span>
+          <span className="ml-auto text-[10px] uppercase tracking-wider text-slate-500 shrink-0">current</span>
         </div>
         {/* Plain <a>: this hits a server route that 302s to another origin, so
             we want a full navigation, not a client-router push. */}
         <a href="/admin/switch"
-          className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#111c35] border-t border-slate-100 dark:border-[#1e2d4a] transition-colors">
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-[#111c35] border-t border-[#1e2d4a] transition-colors">
           <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
           Switch to {SIBLING_NAME}
         </a>
@@ -212,38 +212,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex min-h-dvh">
-      {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0a1628]">
-        <div className="p-4 border-b border-slate-100 dark:border-[#1e2d4a]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: '#2563eb' }}>
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#2563eb' }}>
-                Admin Panel
-              </p>
-              <p className="text-xs text-slate-400 truncate">{adminName}</p>
-            </div>
+      {/* Sidebar — always-dark ink chrome (matches the TransformCV admin tone);
+          the content area to the right stays light. */}
+      <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-[#1e2d4a] bg-[#0a1628] text-slate-300">
+        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-[#1e2d4a]">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: '#2563eb' }}>
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+          <div className="leading-tight min-w-0">
+            <p className="text-sm font-bold text-white truncate">RemoteJobs44</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em]" style={{ color: '#60a5fa' }}>
+              Admin
+            </p>
           </div>
         </div>
 
         <ProjectSwitcher />
 
-        <nav className="flex-1 py-2 overflow-y-auto">
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {NAV.map(({ href, icon: Icon, label, exact, indent }) => {
             const active = exact
               ? pathname === href
               : pathname.startsWith(href) && href !== '/admin';
             return (
               <Link key={href} href={href} className={cn(
-                'flex items-center gap-3 px-5 py-2.5 text-sm font-medium border-r-2 border-transparent transition-all',
-                'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#111c35]',
-                active && 'font-semibold border-r-[#2563eb]',
-                indent && 'pl-11 text-xs',
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                active
+                  ? 'text-white font-semibold'
+                  : 'text-slate-400 hover:text-white hover:bg-[#111c35]',
+                indent && 'pl-9 text-xs',
               )}
-              style={active ? { color: '#2563eb', background: '#eff6ff' } : {}}>
+              style={active ? { background: '#2563eb' } : {}}>
                 <Icon className="w-4 h-4 shrink-0" />
                 {label}
                 {active && <ChevronRight className="w-3.5 h-3.5 ml-auto" />}
@@ -252,12 +252,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="p-3 border-t border-slate-100 dark:border-[#1e2d4a] space-y-1">
-          <Link href="/" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-[#111c35] transition-colors">
+        <div className="p-3 border-t border-[#1e2d4a] space-y-1">
+          <div className="px-3 pb-1.5">
+            <p className="text-sm font-semibold text-white truncate">{adminName || 'Admin'}</p>
+            <p className="text-xs text-slate-500 truncate">{persistedUser?.email ?? ''}</p>
+          </div>
+          <Link href="/" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white rounded-lg hover:bg-[#111c35] transition-colors">
             ← Back to site
           </Link>
           <button onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+            className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 hover:text-red-300 rounded-lg hover:bg-red-900/20 transition-colors">
             <LogOut className="w-3.5 h-3.5" /> Log out
           </button>
         </div>
@@ -269,7 +273,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           clutter. One native <select> shows the current section and jumps on
           change — every admin page reachable in two taps, no sideways
           scrolling. app-menu-top pins it under the safe-area-aware header. */}
-      <div className="md:hidden fixed app-menu-top left-0 right-0 z-30 bg-white dark:bg-[#0a1628] border-b border-slate-200 dark:border-[#1e2d4a] px-4 py-2 flex items-center gap-2">
+      {/* top-0 (not app-menu-top): the marketing header no longer renders on
+          /admin, so this bar pins to the viewport top; safe-area padding keeps
+          it below a notch. */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-[#0a1628] border-b border-[#1e2d4a] px-4 py-2 flex items-center gap-2"
+        style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top))' }}>
         <select
           aria-label="Admin section"
           value={
@@ -279,7 +287,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? '/admin'
           }
           onChange={e => router.push(e.target.value)}
-          className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-sm font-medium text-slate-700 dark:text-slate-200"
+          className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-[#1e2d4a] bg-[#111c35] text-sm font-medium text-slate-200"
         >
           {NAV.map(({ href, label, indent }) => (
             <option key={href} value={href}>{indent ? `— ${label}` : label}</option>
@@ -290,7 +298,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           // dropdown, so the switcher never squeezes the select. The full
           // labelled "Switch to <project>" control lives in the desktop sidebar.
           <a href="/admin/switch" aria-label={`Switch to ${SIBLING_NAME}`} title={`Switch to ${SIBLING_NAME}`}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#111c35] shrink-0 transition-colors">
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[#1e2d4a] bg-[#111c35] text-slate-300 hover:text-white hover:bg-[#16233f] shrink-0 transition-colors">
             <ArrowLeftRight className="w-4 h-4" />
           </a>
         )}

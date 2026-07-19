@@ -90,7 +90,10 @@ export function Header() {
 
   // Signed-in member routes render the MemberShell top bar instead of the
   // marketing header. Guard placed after all hooks so hook order is stable.
-  if (isMemberRoute(pathname)) return null;
+  // The /admin portal is likewise chromeless — its dark sidebar owns the full
+  // viewport (same treatment as the TransformCV admin), so the marketing
+  // header must not stack above it.
+  if (isMemberRoute(pathname) || pathname.startsWith('/admin')) return null;
 
   return (
     <header className={cn(
