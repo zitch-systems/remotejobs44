@@ -11,6 +11,7 @@
 // plus requireAdmin() below both apply.
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
+import { mintHandoffToken } from '@/lib/admin/sso';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,5 +41,22 @@ export async function GET(request: Request) {
   const dest = siblingUrl();
   // Unconfigured (or malformed) — no-op back to the overview rather than error.
   if (!dest) return NextResponse.redirect(new URL('/admin', request.url));
+
+  // Single sign-on: when a shared ADMIN_SSO_SECRET is configured, hand the admin
+  // off with a short-lived signed token so the sibling app logs them straight in
+  // (no second password). Without the secret — or if anything about the token
+  // build fails — fall back to a plain redirect to the sibling's admin entrance,
+  // which simply prompts its own sign-in. Never a dead end either way.
+  const token = mintHandoffToken(gate.adminEmail, process.env.ADMIN_SSO_SECRET);
+  if (token) {
+    try {
+      const sso = new URL(dest);
+      sso.pathname = `${sso.pathname.replace(/\/+$/, '')}/sso`;
+      sso.searchParams.set('token', token);
+      return NextResponse.redirect(sso.toString());
+    } catch {
+      /* fall through to the plain redirect below */
+    }
+  }
   return NextResponse.redirect(dest);
 }
