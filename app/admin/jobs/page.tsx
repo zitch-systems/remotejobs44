@@ -109,8 +109,8 @@ export default function AdminJobsPage() {
           </p>
         </div>
         <Link href="/admin/jobs/new"
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors">
-          <PlusCircle className="w-4 h-4" /> Post New Job
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-700 dark:bg-brand-500 text-white text-sm font-bold rounded-lg hover:bg-brand-600 transition-colors w-full sm:w-auto">
+          <PlusCircle className="w-4 h-4 shrink-0" /> Post New Job
         </Link>
       </div>
 
@@ -122,7 +122,7 @@ export default function AdminJobsPage() {
           className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400" />
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {loading ? (
           <div className="p-8 animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-14 rounded" />)}</div>
         ) : error ? (
@@ -146,7 +146,7 @@ export default function AdminJobsPage() {
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-[#1e3a5f]">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-500">
+            <div className="grid grid-cols-12 min-w-[680px] gap-2 px-5 py-3 bg-stone-50 dark:bg-[#162033] text-xs font-bold uppercase tracking-wider text-stone-500">
               <div className="col-span-5">Job</div>
               <div className="col-span-2">Category</div>
               <div className="col-span-2">Posted</div>
@@ -155,7 +155,7 @@ export default function AdminJobsPage() {
             {jobs.map(job => {
               const cat = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
               return (
-                <div key={job.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
+                <div key={job.id} className="grid grid-cols-12 min-w-[680px] gap-2 px-5 py-3 items-center hover:bg-stone-50 dark:hover:bg-[#162033] transition-colors">
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-md bg-stone-100 dark:bg-[#162033] flex items-center justify-center text-xs font-black text-brand-700 shrink-0">
                       {job.logo ?? job.company?.[0] ?? '?'}
