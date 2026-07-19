@@ -131,7 +131,8 @@ export function Footer() {
   // Signed-in member routes use the MemberShell chrome instead of the
   // marketing footer.
   const pathname = usePathname();
-  if (isMemberRoute(pathname)) return null;
+  // Hidden on member routes AND the /admin portal (chromeless, own sidebar).
+  if (isMemberRoute(pathname) || pathname.startsWith('/admin')) return null;
   // Rendered on every breakpoint (was `hidden md:block`). Under mobile-first
   // indexing Googlebot crawls the mobile viewport, so a footer hidden on
   // mobile starved the programmatic landing pages of their sitewide internal

@@ -10,9 +10,12 @@ import { isMemberRoute } from '@/lib/member-routes';
 
 export function MainShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const member = isMemberRoute(pathname);
+  // Member routes hide the marketing Header (MemberShell owns the chrome) and
+  // so does the /admin portal (its dark sidebar owns the full viewport) — both
+  // must drop the fixed-header offset or they'd render below a blank gap.
+  const chromeless = isMemberRoute(pathname) || pathname.startsWith('/admin');
   return (
-    <main id="main-content" className={member ? 'flex-1' : 'flex-1 app-main'}>
+    <main id="main-content" className={chromeless ? 'flex-1' : 'flex-1 app-main'}>
       {children}
     </main>
   );
