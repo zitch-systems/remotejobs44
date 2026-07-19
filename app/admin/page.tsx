@@ -165,20 +165,23 @@ export default function AdminPage() {
           <h1 className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100 tracking-tight">Admin Overview</h1>
           <p className="text-sm text-stone-400 mt-1">Live data from your Supabase database</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        {/* Mobile: 2-col grid of full-width tap targets (Post Job spans the row);
+            sm+: inline row. Keeps the actions thumb-friendly on a phone instead
+            of wrapping mid-label. */}
+        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
           <button onClick={handleSync} disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing…' : 'Sync Jobs Now'}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
+            <RefreshCw className={`w-4 h-4 shrink-0 ${syncing ? 'animate-spin' : ''}`} />
+            <span className="truncate">{syncing ? 'Syncing…' : 'Sync Jobs'}</span>
           </button>
           <button onClick={handleReconcile} disabled={reconciling}
-            className="flex items-center gap-2 px-4 py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
-            <DollarSign className={`w-4 h-4 ${reconciling ? 'animate-pulse' : ''}`} />
-            {reconciling ? 'Reconciling…' : 'Reconcile Payments'}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 border border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 rounded-lg text-sm font-semibold hover:bg-stone-50 dark:hover:bg-[#162033] disabled:opacity-50 transition-colors">
+            <DollarSign className={`w-4 h-4 shrink-0 ${reconciling ? 'animate-pulse' : ''}`} />
+            <span className="truncate">{reconciling ? 'Reconciling…' : 'Reconcile'}</span>
           </button>
           <Link href="/admin/jobs/new"
-            className="flex items-center gap-2 px-4 py-2 bg-brand-700 dark:bg-brand-500 text-white rounded-lg text-sm font-bold hover:bg-brand-600 transition-colors">
-            <PlusCircle className="w-4 h-4" /> Post Job
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-brand-700 dark:bg-brand-500 text-white rounded-lg text-sm font-bold hover:bg-brand-600 transition-colors">
+            <PlusCircle className="w-4 h-4 shrink-0" /> Post Job
           </Link>
         </div>
       </div>
@@ -191,13 +194,15 @@ export default function AdminPage() {
 
       {/* Stats */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-pulse">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8 animate-pulse">
           {[1,2,3,4].map(i => <div key={i} className="skeleton h-28 rounded-lg" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {cards.map(c => (
-            <Link key={c.label} href={c.href} className="card p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group">
+            // 5 cards in a 2-col mobile grid leaves the last one orphaned — let
+            // the MRR card span the full width so the row reads as intentional.
+            <Link key={c.label} href={c.href} className={cn('card p-4 sm:p-5 hover:border-brand-600 dark:hover:border-brand-500 transition-colors group', c.label.includes('MRR') && 'col-span-2 sm:col-span-1')}>
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${colorMap[c.color]}`}>{c.icon}</div>
               <p className="font-display font-extrabold text-2xl text-stone-900 dark:text-stone-100">{c.value}</p>
               <p className="text-xs text-stone-400 mt-0.5 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">{c.sub}</p>
@@ -242,7 +247,7 @@ export default function AdminPage() {
       {health && (
         <div className="card p-5 mb-8">
           <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-brand-600" /> System Health</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { label: 'Database', ok: health.db, icon: <Globe className="w-4 h-4" /> },
               { label: 'API Routes', ok: health.api, icon: <Zap className="w-4 h-4" /> },
@@ -265,15 +270,16 @@ export default function AdminPage() {
       {/* Recent jobs with search + bulk actions */}
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-[#1e3a5f] gap-3 flex-wrap">
-          <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100">Recent Jobs</h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Inline job search */}
-            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-stone-50 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm">
+          <h2 className="font-bold text-sm text-stone-900 dark:text-stone-100 shrink-0">Recent Jobs</h2>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Inline job search — grows to fill the row on mobile instead of a
+                fixed 144px box that left the field barely tappable. */}
+            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-stone-50 dark:bg-[#162033] border border-stone-200 dark:border-[#1e3a5f] rounded-lg text-sm flex-1 sm:flex-none min-w-0">
               <Search className="w-3.5 h-3.5 text-stone-400 shrink-0" />
               <input value={jobSearch} onChange={e => setJobSearch(e.target.value)} placeholder="Filter jobs…"
-                className="bg-transparent border-none outline-none text-sm w-36 placeholder:text-stone-400 text-stone-700 dark:text-stone-300" />
+                className="bg-transparent border-none outline-none text-sm w-full sm:w-36 min-w-0 placeholder:text-stone-400 text-stone-700 dark:text-stone-300" />
             </div>
-            <Link href="/admin/jobs" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1">
+            <Link href="/admin/jobs" className="text-xs text-brand-700 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1 shrink-0">
               Manage all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>

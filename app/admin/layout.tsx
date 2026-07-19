@@ -286,10 +286,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </select>
         {SIBLING_NAME && (
-          <a href="/admin/switch" aria-label={`Switch to ${SIBLING_NAME}`}
-            className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#111c35] shrink-0 transition-colors">
-            <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
-            <span className="max-w-[7rem] truncate">{SIBLING_NAME}</span>
+          // Icon-only on mobile: a 36px square tap target next to the section
+          // dropdown, so the switcher never squeezes the select. The full
+          // labelled "Switch to <project>" control lives in the desktop sidebar.
+          <a href="/admin/switch" aria-label={`Switch to ${SIBLING_NAME}`} title={`Switch to ${SIBLING_NAME}`}
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-[#1e2d4a] bg-white dark:bg-[#0f1e38] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#111c35] shrink-0 transition-colors">
+            <ArrowLeftRight className="w-4 h-4" />
           </a>
         )}
       </div>
