@@ -48,4 +48,29 @@ describe('htmlToText', () => {
     expect(htmlToText('<div><p>A</p></div><div><p></p></div><div><p>B</p></div>'))
       .toBe('A\n\nB');
   });
+
+  it('trims indentation so table layouts do not leave space-only lines', () => {
+    // Templates are indented table markup, so each `</tr>` newline is followed
+    // by the next row's leading whitespace. Those lines are not empty — only
+    // spaces — so without a per-line trim the blank-run collapse above skips
+    // them and the text part comes out full of gaps.
+    const html = `
+      <table>
+        <tr><td>A</td></tr>
+        <tr><td>B</td></tr>
+      </table>`;
+    const out = htmlToText(html);
+    expect(out).toBe('A\n\nB');
+    // The real invariant: no line is whitespace-only. Such lines look blank
+    // but defeat the \n{3,} collapse, so gaps grow without bound.
+    expect(out.split('\n').every(l => l === l.trim())).toBe(true);
+  });
+
+  it('drops the hidden preheader block and its zero-width padding', () => {
+    // The inbox-preview line is padded with ~30 joiner entities so the client
+    // can't pull body copy in after it; left in, every text part would open
+    // with that debris.
+    const html = '<div data-preheader="1" style="display:none">Preview line&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div><p>Body</p>';
+    expect(htmlToText(html)).toBe('Body');
+  });
 });

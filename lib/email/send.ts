@@ -52,6 +52,10 @@ export function htmlToText(html: string): string {
   return html
     .replace(/<head[\s\S]*?<\/head>/gi, '')
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
+    // The inbox-preview block is visually hidden and padded with a run of
+    // zero-width joiners, so leaving it in would open every text part with
+    // the preview line followed by ~30 stray "&zwnj;" artifacts.
+    .replace(/<div[^>]*\bdata-preheader\b[^>]*>[\s\S]*?<\/div>/gi, '')
     // Keep the destination of every link — a text part whose links have been
     // stripped is worse than no text part at all.
     .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => {
@@ -69,6 +73,11 @@ export function htmlToText(html: string): string {
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
     .replace(/[ \t]+/g, ' ')
+    // Table-based layouts indent every cell, so each `</tr>` newline arrives
+    // followed by the next row's leading whitespace. Without trimming per
+    // line, the blank-run collapse below sees "\n \n \n" — lines that are not
+    // empty, only spaces — and leaves the text part full of gaps.
+    .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
