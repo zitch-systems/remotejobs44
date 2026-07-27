@@ -12,8 +12,7 @@
 // (cheap email-based role check) or fire-and-forget (DB writes).
 import { NextRequest, NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/email/send';
-import { welcomeEmail } from '@/lib/email/templates';
+import { sendWelcomeEmailOnce } from '@/lib/email/welcome';
 import { destinationForRole, type Role } from '@/lib/auth/redirect';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
@@ -96,53 +95,69 @@ export async function GET(request: NextRequest) {
   const role: Role = isHardcodedAdmin(authUser.email) ? 'admin' : 'user';
   const dest = destinationForRole(role, next);
 
-  // First-login bookkeeping (welcome email + profile row) goes to the
-  // background. Use the admin client + the service role key so RLS doesn't
-  // need the user's session — we already established it, but the cookie
-  // jar in this request has been "locked" by `cookies()` and writes from
-  // unrelated promises after the response begins can throw.
-  const createdAt  = authUser.created_at      ? new Date(authUser.created_at).getTime()      : 0;
-  const lastSignIn = authUser.last_sign_in_at ? new Date(authUser.last_sign_in_at).getTime() : 0;
-  const isFirstLogin = Math.abs(createdAt - lastSignIn) < 30_000;
+  // Onboarding bookkeeping (profile row + welcome email + referral stamp)
+  // goes to the background. Use the admin client + the service role key so
+  // RLS doesn't need the user's session — we already established it, but the
+  // cookie jar in this request has been "locked" by `cookies()` and writes
+  // from unrelated promises after the response begins can throw.
+  //
+  // These three used to run only when `Math.abs(created_at - last_sign_in_at)
+  // < 30_000` said "first login". That test is sound for OAuth, where GoTrue
+  // writes both timestamps in the same request, and wrong for an email
+  // signup, where created_at is the moment the form was submitted and
+  // last_sign_in_at the moment the user got round to clicking the link in
+  // their inbox. It was measuring time-to-open-inbox: median ~41s on this
+  // project, so the majority of email signups tripped the gate and got no
+  // welcome email and no referral attribution. Each task is now individually
+  // idempotent instead, so it is safe to run them on EVERY verified callback:
+  //   * the profile upsert uses ignoreDuplicates
+  //   * sendWelcomeEmailOnce claims profiles.welcome_email_sent_at atomically
+  //   * attributeReferral only writes when referred_by IS NULL
+  const name = (authUser.user_metadata?.name as string | undefined)
+    ?? authUser.email.split('@')[0];
 
-  if (isFirstLogin) {
-    const name = (authUser.user_metadata?.name as string | undefined)
-      ?? authUser.email.split('@')[0];
-    // waitUntil keeps the lambda alive past the redirect response so these
-    // tasks actually complete. Without it, Vercel suspends the function
-    // immediately and the welcome email + profile upsert silently die.
-    waitUntil(
-      sendEmail({ to: authUser.email, subject: welcomeEmail(name).subject, html: welcomeEmail(name).html })
-        .catch(() => {})
-    );
-    waitUntil(
-      (async () => {
-        try {
-          const admin = createAdminSupabaseClient();
-          await admin.from('profiles').upsert({
-            id:   authUser.id,
-            email: authUser.email,
-            name,
-            plan: 'free',
-            role: 'user',
-            // profile_completion omitted — DEFAULT 0 (migration_v24).
-            // The recompute fires on the next /api/profile GET.
-          }, { onConflict: 'id', ignoreDuplicates: true });
+  // waitUntil keeps the lambda alive past the redirect response so these
+  // tasks actually complete. Without it, Vercel suspends the function
+  // immediately and the work silently dies.
+  waitUntil(
+    (async () => {
+      try {
+        const admin = createAdminSupabaseClient();
 
-          // Referral attribution: when the user clicked an agent's link on
-          // this browser, the rj44_ref cookie carries the code. Stamp
-          // referred_by once (attributeReferral is a no-op if it's already
-          // set or the code isn't a live agent). Covers OAuth + email-confirm
-          // first logins; the email/password auto-confirm flow attributes via
-          // /api/referral/attribute instead.
-          const refCode = request.cookies.get('rj44_ref')?.value ?? null;
-          if (refCode) await attributeReferral(admin, { userId: authUser.id, code: refCode });
-        } catch (err) {
-          console.error('[auth/callback] background profile upsert failed:', err);
-        }
-      })()
-    );
-  }
+        // Safety net only — on_auth_user_created has created this row at
+        // signup since migration_v3. Kept for accounts that predate the
+        // trigger, and so the welcome claim below always has a row to write.
+        await admin.from('profiles').upsert({
+          id:   authUser.id,
+          email: authUser.email,
+          name,
+          plan: 'free',
+          role: 'user',
+          // profile_completion omitted — DEFAULT 0 (migration_v24).
+          // The recompute fires on the next /api/profile GET.
+        }, { onConflict: 'id', ignoreDuplicates: true });
+
+        // Referral attribution: when the user clicked an agent's link on
+        // this browser, the rj44_ref cookie carries the code. Stamp
+        // referred_by once (attributeReferral is a no-op if it's already
+        // set or the code isn't a live agent). Covers OAuth + email-confirm
+        // logins; the email/password auto-confirm flow attributes via
+        // /api/referral/attribute instead.
+        const refCode = request.cookies.get('rj44_ref')?.value ?? null;
+        if (refCode) await attributeReferral(admin, { userId: authUser.id, code: refCode });
+
+        // Last, because a send failure releases its own claim and we don't
+        // want a slow Resend call to hold up the writes above.
+        await sendWelcomeEmailOnce(admin, {
+          userId: authUser.id,
+          email:  authUser.email!,
+          name,
+        });
+      } catch (err) {
+        console.error('[auth/callback] background onboarding tasks failed:', err);
+      }
+    })()
+  );
 
   return NextResponse.redirect(`${origin}${dest}`);
 }

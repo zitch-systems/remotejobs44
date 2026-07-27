@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
 import { describeAuthCallbackError } from '@/lib/auth/callback-error';
+import { setRememberChoice } from '@/lib/auth/remember';
 import { ResendVerificationLink } from '@/components/auth/ResendVerificationLink';
 
 function ThemeToggle() {
@@ -97,6 +98,9 @@ function LoginForm() {
     setErrorMsg('');
     // Safety: reset loading if OAuth redirect doesn't happen within 10s
     const fallback = setTimeout(() => setLoading(false), 10000);
+    // Record the choice before we navigate away — the OAuth round-trip lands
+    // back on /auth/callback, not here, so this is the last chance to read it.
+    setRememberChoice(remember);
     try {
       const supabase = createClient();
       const next = searchParams.get('next') ?? '/dashboard';
@@ -193,6 +197,13 @@ function LoginForm() {
         localStorage.removeItem('rj44-auth');
         localStorage.removeItem('rj44-jobs');
       } catch {}
+
+      // Honour the "Remember me" checkbox. Until now it was wired to state and
+      // read by nothing — unticking it did not stop the session persisting
+      // across browser restarts, which is precisely what it promises on a
+      // shared machine. AuthSyncProvider ends the session on the next cold
+      // start when this records an unticked box. See lib/auth/remember.ts.
+      setRememberChoice(remember);
 
       // Best-effort profile fetch — never blocks login on failure
       let profile: any = null;

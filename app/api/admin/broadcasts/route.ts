@@ -31,7 +31,24 @@ import { requireAdmin } from '@/lib/admin/auth';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { sendEmail } from '@/lib/email/send';
+import { unsubscribeHeaders, unsubscribeUrl } from '@/lib/email/unsubscribe';
 import { logError, logInfo, logWarn } from '@/lib/log';
+
+/**
+ * Appended to every broadcast body. The admin composes free-form HTML and
+ * can't be relied on to include an opt-out, so we add one unconditionally
+ * rather than making it a checkbox someone forgets. Returns '' when no
+ * signing key is configured — better an unchanged body than a dead link.
+ */
+function unsubscribeFooter(userId: string): string {
+  const url = unsubscribeUrl(userId, 'marketing');
+  if (!url) return '';
+  return `<hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
+<p style="margin:0;color:#a8a29e;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+You're receiving this because you have a RemoteJobs44 account.
+<a href="${url}" style="color:#2563eb">Unsubscribe from marketing emails</a>.
+</p>`;
+}
 
 // 500 recipients × 1.1s inter-chunk pause × 100/chunk = ~5.5s of
 // scheduled pauses, plus the actual sendEmail latency. Fits well
@@ -94,10 +111,17 @@ export async function POST(req: NextRequest) {
 
   // ── Audience resolve ─────────────────────────────────────────────
   const supabase = createAdminSupabaseClient();
+  // email_prefs and suspended are selected because the filter below has to
+  // honour them. Neither was read before: a user who switched "Marketing
+  // emails" off at /profile still received every broadcast, and so did
+  // suspended accounts. An ignored opt-out is what turns an unsubscribe into
+  // a spam complaint, and complaint rate is domain-wide — it degrades the
+  // signup confirmation and password-reset mail too.
   let q = supabase
     .from('profiles')
-    .select('id, email, name, plan')
+    .select('id, email, name, plan, email_prefs, suspended')
     .not('email', 'is', null)
+    .or('suspended.is.null,suspended.eq.false')
     .limit(MAX_RECIPIENTS + 1); // +1 so we can detect the cap was hit
 
   if (plan !== 'all') q = q.eq('plan', plan);
@@ -145,9 +169,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to resolve audience.' }, { status: 500 });
   }
 
-  let recipients = (rawProfiles ?? []).filter((p: { id: string; email: string | null }) =>
+  const mailable = (rawProfiles ?? []).filter((p: { email: string | null }) =>
     p.email && EMAIL_RE.test(p.email)
-  ) as Array<{ id: string; email: string; name: string | null; plan: string }>;
+  ) as Array<{ id: string; email: string; name: string | null; plan: string; email_prefs: Record<string, boolean> | null }>;
+
+  // Absent key = opted in (the column default, and the fallback served by
+  // /api/profile/email-prefs), so only an explicit `false` suppresses.
+  let recipients = mailable.filter(p => p.email_prefs?.marketing !== false);
+  const optedOut = mailable.length - recipients.length;
 
   if (confirmedIds) {
     recipients = recipients.filter(r => confirmedIds!.has(r.id));
@@ -174,7 +203,14 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
     const chunk = recipients.slice(i, i + CHUNK_SIZE);
     const results = await Promise.allSettled(chunk.map(r =>
-      sendEmail({ to: r.email, subject, html })
+      sendEmail({
+        to: r.email,
+        subject,
+        // Per-recipient footer + header, so the link is signed for the
+        // person who actually received the message.
+        html: html + unsubscribeFooter(r.id),
+        headers: unsubscribeHeaders(r.id, 'marketing'),
+      })
     ));
     for (const r of results) {
       if (r.status === 'fulfilled' && r.value === true) sent++;
@@ -201,6 +237,9 @@ export async function POST(req: NextRequest) {
       sent,
       failed,
       capped: overCap,
+      // Surfaced so an admin seeing a smaller audience than they expected can
+      // tell "people opted out" from "the query is broken".
+      opted_out: optedOut,
     },
   });
 
@@ -210,5 +249,6 @@ export async function POST(req: NextRequest) {
     sent,
     failed,
     capped: overCap,
+    opted_out: optedOut,
   });
 }

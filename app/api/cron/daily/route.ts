@@ -20,6 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { jobAlertEmail } from '@/lib/email/templates';
+import { unsubscribeHeaders, unsubscribeUrl } from '@/lib/email/unsubscribe';
 import { runIngest } from '@/lib/ingest-pipeline';
 import { reconcilePaystackCharges } from '@/lib/paystack/reconcile';
 import { requireCronSecret } from '@/lib/cron-auth';
@@ -204,10 +205,18 @@ export async function GET(req: NextRequest) {
   // per alert on (category match) AND (every keyword appears in title or
   // company). Empty filters mean "all" on that axis.
   let alertsSent = 0;
+  // Counted separately from "no matching jobs" so the cron log distinguishes
+  // "nothing to send" from "suppressed by the recipient's preferences".
+  let alertsSkipped = 0;
   try {
+    // email_prefs comes along because the send loop below has to honour it —
+    // the profile toggle at /profile → "Job alerts" wrote to this column but
+    // nothing ever read it, so switching it off changed nothing and the user
+    // kept receiving alerts. That is both a broken setting and the kind of
+    // thing that earns a spam complaint instead of an unsubscribe.
     const { data: alerts } = await supabase
       .from('job_alerts')
-      .select('user_id, category, keywords, profiles(name, email, plan)')
+      .select('user_id, category, keywords, profiles(name, email, plan, email_prefs, suspended)')
       .eq('active', true)
       .eq('frequency', 'daily');
 
@@ -235,6 +244,10 @@ export async function GET(req: NextRequest) {
       for (const alert of alerts) {
         const profile = (alert as any).profiles;
         if (!profile?.email || !['pro', 'admin'].includes(profile.plan)) continue;
+        // Respect the user's opt-out. Absent key = opted in (the column
+        // default, and the fallback used by /api/profile/email-prefs).
+        if (profile.email_prefs?.job_alerts === false) { alertsSkipped += 1; continue; }
+        if (profile.suspended) { alertsSkipped += 1; continue; }
 
         // Tokenise keywords on commas/whitespace, drop empties.
         // Match is case-insensitive substring against title or company.
@@ -255,15 +268,26 @@ export async function GET(req: NextRequest) {
         // alerts; suppress the email rather than send "0 new jobs."
         if (matched.length === 0) continue;
 
-        const { subject, html } = jobAlertEmail(profile.name ?? 'there', matched);
-        await sendEmail({ to: profile.email, subject, html });
+        // One-click unsubscribe in both the footer and the List-Unsubscribe
+        // header — Gmail/Yahoo bulk-sender rules expect the header, and a
+        // recipient who can't find an opt-out reaches for "report spam",
+        // which costs us delivery on the transactional confirm/reset mail
+        // that signup depends on.
+        const unsubLink = unsubscribeUrl((alert as any).user_id, 'job_alerts');
+        const { subject, html } = jobAlertEmail(profile.name ?? 'there', matched, unsubLink);
+        await sendEmail({
+          to: profile.email,
+          subject,
+          html,
+          headers: unsubscribeHeaders((alert as any).user_id, 'job_alerts'),
+        });
         alertsSent += 1;
       }
     }
   } catch (err: any) {
     logError({ event: 'cron.daily.alert_emails_failed', error: err.message });
   }
-  log.alerts = { sent: alertsSent };
+  log.alerts = { sent: alertsSent, skipped_by_prefs: alertsSkipped };
 
   log.completedAt = new Date().toISOString();
 

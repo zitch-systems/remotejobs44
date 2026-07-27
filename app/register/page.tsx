@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useUIStore, useAuthStore } from '@/lib/store';
 import { resolveRole, destinationForRole } from '@/lib/auth/redirect';
 import { passwordChecks, validatePassword, friendlyAuthError } from '@/lib/auth/password';
+import { setRememberChoice } from '@/lib/auth/remember';
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -152,6 +153,13 @@ export default function RegisterPage() {
         localStorage.removeItem('rj44-auth');
         localStorage.removeItem('rj44-jobs');
       } catch {}
+
+      // /register has no "Remember me" control, so a new account is always a
+      // remembered session. Stated explicitly rather than left to default,
+      // because a previous user signing in on this browser with the box
+      // unticked would otherwise leave a flag behind that signs the NEW
+      // account out on the next browser restart.
+      setRememberChoice(true);
 
       // Attribute this signup to a referring agent if they arrived via a
       // referral link. The server reads the httpOnly rj44_ref cookie; we just

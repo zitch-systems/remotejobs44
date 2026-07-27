@@ -1,12 +1,14 @@
 // app/api/profile/route.ts — Get and upsert the current user's profile
 // Called on login to ensure the profile row always exists.
-// Also sends the welcome email on first profile creation, since Supabase's
-// "auto-confirm signups" setting bypasses our /auth/callback handler.
+// Also acts as the backstop for the welcome email: the "auto-confirm signups"
+// setting bypasses /auth/callback entirely, and a callback that dies mid-
+// background-task leaves the email unsent. sendWelcomeEmailOnce is idempotent
+// (see lib/email/welcome.ts), so calling it here costs one no-op UPDATE for
+// users who already have theirs.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { isHardcodedAdmin } from '@/lib/admin-emails';
-import { sendEmail } from '@/lib/email/send';
-import { welcomeEmail } from '@/lib/email/templates';
+import { sendWelcomeEmailOnce } from '@/lib/email/welcome';
 import { resolvePlan } from '@/lib/auth/plan';
 import { computeProfileCompletion } from '@/lib/auth/profile-completion';
 import { logError } from '@/lib/log';
@@ -96,6 +98,26 @@ export async function GET() {
             })
         ));
       }
+      // Catch-up welcome email. This used to live only on the "profile row
+      // missing" branch below, which the on_auth_user_created trigger has
+      // made unreachable since migration_v3 — the row always exists by the
+      // time we get here, so the fallback never fired. Moving it onto the
+      // normal read path makes /api/profile a real backstop for
+      // /auth/callback: any authenticated user who somehow never got their
+      // welcome email picks it up on their next dashboard load.
+      // sendWelcomeEmailOnce claims profiles.welcome_email_sent_at
+      // atomically, so this is a no-op (one indexed UPDATE that matches
+      // nothing) for everyone who already has one.
+      waitUntil(
+        sendWelcomeEmailOnce(admin, {
+          userId: user.id,
+          email:  profile.email ?? user.email ?? '',
+          name:   profile.name,
+        }).catch(err =>
+          logError({ event: 'profile.welcome_email_failed', user_id: user.id, error: err?.message ?? String(err) })
+        )
+      );
+
       return NextResponse.json({
         profile: { ...profile, plan, role, profile_completion: computed },
       });
@@ -123,14 +145,15 @@ export async function GET() {
       .select(SAFE_PROFILE_COLS)
       .single();
 
-    // First profile creation — fire-and-forget welcome email.
-    // We hit this path on first login regardless of whether Supabase email
-    // confirmation is on or off, so it covers the auto-confirm signup flow
-    // where /auth/callback is never reached.
+    // First profile creation — welcome email. Reached only by accounts that
+    // predate the on_auth_user_created trigger (migration_v3); every current
+    // signup is served by the catch-up call on the read path above. Kept so
+    // the rare trigger-less user still gets onboarded.
     if (!insertError && user.email) {
-      const { subject, html } = welcomeEmail(name);
-      sendEmail({ to: user.email, subject, html }).catch(err =>
-        logError({ event: 'profile.welcome_email_failed', user_id: user.id, error: err?.message ?? String(err) })
+      waitUntil(
+        sendWelcomeEmailOnce(admin, { userId: user.id, email: user.email, name }).catch(err =>
+          logError({ event: 'profile.welcome_email_failed', user_id: user.id, error: err?.message ?? String(err) })
+        )
       );
     }
 
