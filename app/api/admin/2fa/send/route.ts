@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/admin/auth';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { adminLoginCodeEmail } from '@/lib/email/templates';
 import { rateLimit } from '@/lib/rate-limit';
 import { generateCode, hashCode, ADMIN_2FA_EMAIL, CODE_TTL_MS } from '@/lib/auth/admin-2fa-server';
 import { logError, logInfo } from '@/lib/log';
@@ -57,23 +58,13 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ error: 'Could not generate a code. Please try again.' }, { status: 500 });
   }
 
-  const html = `
-    <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#1c1917">RemoteJobs44 admin login code</h2>
-      <p style="color:#57534e">Use this code to finish signing in to the admin area. It expires in 10 minutes.</p>
-      <p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#1d4ed8;margin:24px 0">${code}</p>
-      <p style="color:#a8a29e;font-size:12px">If you didn't try to sign in, ignore this email and consider changing the admin password.</p>
-    </div>`;
-  // The code stays OUT of the subject. Subjects render in lock-screen
-  // notifications and inbox previews without the phone being unlocked, and
-  // they are the part of a message that gets retained in mail server logs
-  // and search indexes — a second factor that shows up on a locked screen
-  // is not much of a second factor.
-  const sent = await sendEmail({
-    to:      ADMIN_2FA_EMAIL,
-    subject: 'RemoteJobs44 admin login code',
-    html,
-  });
+  // The code stays OUT of the subject and the inbox preview line. Both render
+  // in lock-screen notifications without the phone being unlocked, and they
+  // are the part of a message that gets retained in mail server logs and
+  // search indexes — a second factor that shows up on a locked screen is not
+  // much of a second factor. adminLoginCodeEmail() keeps both clean.
+  const { subject, html } = adminLoginCodeEmail(code, Math.round(CODE_TTL_MS / 60_000));
+  const sent = await sendEmail({ to: ADMIN_2FA_EMAIL, subject, html });
   if (!sent) {
     logError({ event: 'admin2fa.email_failed', user_id: admin.adminId });
     return NextResponse.json({ error: 'Could not send the code email. Check email configuration.' }, { status: 502 });

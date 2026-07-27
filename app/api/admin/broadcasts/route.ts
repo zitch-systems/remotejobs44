@@ -43,10 +43,13 @@ import { logError, logInfo, logWarn } from '@/lib/log';
 function unsubscribeFooter(userId: string): string {
   const url = unsubscribeUrl(userId, 'marketing');
   if (!url) return '';
+  // #78716c, not the stone-400 (#a8a29e) this used to be: at 12px on white
+  // that sat at 2.5:1, under the 4.5:1 WCAG AA floor — and an opt-out nobody
+  // can read is the one that turns into a spam complaint.
   return `<hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
-<p style="margin:0;color:#a8a29e;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<p style="margin:0;color:#78716c;font-size:12px;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
 You're receiving this because you have a RemoteJobs44 account.
-<a href="${url}" style="color:#2563eb">Unsubscribe from marketing emails</a>.
+<a href="${url}" style="color:#78716c;text-decoration:underline">Unsubscribe from marketing emails</a>.
 </p>`;
 }
 
