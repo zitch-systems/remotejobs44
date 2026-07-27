@@ -214,10 +214,7 @@ ${['Browse 70,000+ remote jobs', 'Save your favourite listings', 'Explore compan
                 </table>
               </td></tr>
             </table>
-            ${button(`${APP_URL}/jobs`, 'Browse jobs →')}
-            <div style="border-top:1px solid ${C.hairline};margin:32px 0 0;padding:20px 0 0;">
-              <p style="margin:0;color:${C.body};font-size:13px;line-height:1.6;">To apply to any job, upgrade from <strong style="color:${C.ink};">₦500</strong>. <a href="${APP_URL}/pricing" style="color:${C.blue};text-decoration:underline;">See plans →</a></p>
-            </div>`,
+            ${button(`${APP_URL}/jobs`, 'Browse jobs →')}`,
       footer: `<div>Follow us for daily job drops: <a href="https://instagram.com/remotejobs_44" style="color:${C.muted};text-decoration:underline;">@remotejobs_44 on Instagram</a></div>`,
     }),
   };
