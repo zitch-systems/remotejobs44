@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { resolvePlan } from '@/lib/auth/plan';
+import { canUseJobAlerts } from '@/lib/auth/requester-plan';
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -14,7 +15,20 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  return NextResponse.json({ alerts: data ?? [] });
+  // Ship the entitlement alongside the rows so the client renders the
+  // upgrade state from the server's answer rather than re-deriving plan
+  // rules from the Zustand store — that copy is persisted in localStorage
+  // and a user can edit it, and resolvePlan's expiry handling is subtle
+  // enough that a second implementation would drift.
+  const { data: profile } = await supabase
+    .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+  const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+
+  return NextResponse.json({
+    alerts: data ?? [],
+    canCreate: canUseJobAlerts(plan),
+    emailConfirmed: !!user.email_confirmed_at,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -31,27 +45,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Enforce per-user alert cap so a free / abusive user can't create
-  // thousands of alerts and bloat the table. Free plans get a small
-  // exploration cap, paid plans get a higher one.
+  // Subscriber gate. Alerts are a Pro perk (canUseJobAlerts) and the daily
+  // cron filters its send loop the same way, so letting anyone else create
+  // one just writes a row that never produces an email — the user ticks a
+  // box, sees the alert listed, and waits forever for mail we were never
+  // going to send. Refuse at the door instead.
   // Effective plan (expired → free), not the raw column — the daily cron
   // is the only thing that flips profiles.plan after expiry.
   const { data: profile } = await supabase
     .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
   const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
-  const isPaid = ['admin','daily','pro'].includes(plan);
-  const maxAlerts = isPaid ? 50 : 3;
+  if (!canUseJobAlerts(plan)) {
+    return NextResponse.json(
+      { error: 'Job alerts are a Pro feature. Upgrade to a monthly or annual plan to get new roles emailed to you.',
+        upgrade: true },
+      { status: 403 },
+    );
+  }
 
+  // Per-user cap so one account can't bloat the table (and the cron's send
+  // loop) with hundreds of alerts.
+  const MAX_ALERTS = 50;
   const { count: existingCount } = await supabase
     .from('job_alerts')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id);
-  if ((existingCount ?? 0) >= maxAlerts) {
+  if ((existingCount ?? 0) >= MAX_ALERTS) {
     return NextResponse.json(
-      { error: isPaid
-          ? `You've reached the ${maxAlerts}-alert limit. Delete an old alert before adding a new one.`
-          : `Free plans can create up to ${maxAlerts} alerts. Upgrade to Pro for ${50}.` },
-      { status: 403 }
+      { error: `You've reached the ${MAX_ALERTS}-alert limit. Delete an old alert before adding a new one.` },
+      { status: 403 },
     );
   }
 

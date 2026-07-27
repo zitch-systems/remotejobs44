@@ -88,6 +88,25 @@ export function canSeeCompanyName(plan: RequesterPlan): boolean {
 }
 
 /**
+ * True when the requester may own job alerts — the recurring "new roles
+ * matching your search" email sent by /api/cron/daily.
+ *
+ * Subscribers only, same shape as canSeeCompanyName: Pro monthly and Pro
+ * annual both resolve to plan 'pro', plus staff admins. Day Pass is
+ * excluded on purpose — it expires 24h after purchase, so a *recurring
+ * daily* email attached to it would either outlive the entitlement or
+ * send at most once. An alert is a subscription's worth of value.
+ *
+ * This has to agree with the plan filter in the daily cron's alert loop.
+ * They were allowed to drift before: the API let free users create alerts
+ * the cron would never send, so the rows sat there looking functional and
+ * the user was silently promised mail that never came.
+ */
+export function canUseJobAlerts(plan: RequesterPlan): boolean {
+  return plan === 'pro' || plan === 'admin';
+}
+
+/**
  * The columns of `public.jobs` that anon + authenticated roles can SELECT.
  *
  * After migration_v16 the anon and authenticated roles no longer have

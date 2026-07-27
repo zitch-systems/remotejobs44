@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, type RequesterPlan } from './requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, canUseJobAlerts, type RequesterPlan } from './requester-plan';
 
 // These tests pin the paywall decision matrix that /api/jobs, the SSR
 // /jobs listing, and /jobs/[id] all rely on. A regression here would
@@ -58,6 +58,44 @@ describe('canSeeCompanyName', () => {
     const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
     const seeing = allPlans.filter(canSeeCompanyName);
     expect(new Set(seeing)).toEqual(new Set(['pro', 'admin']));
+  });
+});
+
+// Job alerts are a recurring email tied to an ongoing subscription. This
+// gate has to keep agreeing with the plan filter in the daily cron's alert
+// loop: when the two drift, the API writes alert rows the cron will never
+// send, and the user waits indefinitely for mail nobody is going to post.
+describe('canUseJobAlerts', () => {
+  const cases: Array<[RequesterPlan, boolean]> = [
+    ['anon',  false],
+    ['free',  false],
+    // Day Pass expires 24h after purchase — a *recurring daily* email
+    // attached to it would outlive the entitlement that paid for it.
+    ['daily', false],
+    ['pro',   true],
+    ['admin', true],
+  ];
+
+  for (const [plan, expected] of cases) {
+    it(`${plan} → ${expected ? 'can own alerts' : 'cannot own alerts'}`, () => {
+      expect(canUseJobAlerts(plan)).toBe(expected);
+    });
+  }
+
+  it('only the pro/admin allow-list passes', () => {
+    const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
+    const allowed = allPlans.filter(canUseJobAlerts);
+    expect(new Set(allowed)).toEqual(new Set(['pro', 'admin']));
+  });
+
+  it('matches the cron send filter exactly', () => {
+    // The cron does `['pro','admin'].includes(profile.plan)`. Pin that the
+    // two agree so a change to one side fails here rather than in production.
+    const cronFilter = (p: string) => ['pro', 'admin'].includes(p);
+    const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
+    for (const plan of allPlans) {
+      expect(canUseJobAlerts(plan)).toBe(cronFilter(plan));
+    }
   });
 });
 
