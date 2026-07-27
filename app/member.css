@@ -258,6 +258,47 @@
 .member-shell .unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand-600); flex-shrink: 0; margin-top: 5px; }
 .member-shell .al-empty { padding: 60px 20px; text-align: center; color: var(--fg-3); font-size: 14px; }
 
+/* ──────────────────── Job alert manager ──────────────────── */
+.member-shell .ja-panel { background: var(--bg-card); border: 1.5px solid var(--border-1); border-radius: 13px; padding: 18px; margin-bottom: 18px; }
+.member-shell .ja-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 16px; }
+.member-shell .ja-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; background: var(--brand-50); color: var(--brand-600); }
+.dark .member-shell .ja-ic { background: rgb(37 99 235 / 0.18); color: var(--brand-400); }
+.member-shell .ja-ic svg { width: 19px; height: 19px; }
+.member-shell .ja-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--fg-1); margin-bottom: 2px; }
+.member-shell .ja-sub { font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+.member-shell .ja-loading { display: flex; align-items: center; gap: 8px; padding: 18px 2px; font-size: 13px; color: var(--fg-3); }
+.member-shell .ja-spin { width: 15px; height: 15px; animation: ja-spin 0.9s linear infinite; }
+@keyframes ja-spin { to { transform: rotate(360deg); } }
+.member-shell .ja-locked { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1.5px dashed var(--border-2); border-radius: 11px; }
+.member-shell .ja-locked > svg { width: 18px; height: 18px; color: var(--fg-4); flex-shrink: 0; margin-top: 2px; }
+.member-shell .ja-locked strong { display: block; font-size: 13.5px; color: var(--fg-1); margin-bottom: 4px; }
+.member-shell .ja-locked p { font-size: 13px; color: var(--fg-2); line-height: 1.55; margin-bottom: 12px; }
+.member-shell .ja-note { font-size: 12.5px; color: var(--fg-3); background: var(--bg-2); border-radius: 9px; padding: 9px 11px; margin-bottom: 12px; line-height: 1.5; }
+.member-shell .ja-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.member-shell .ja-field { display: flex; flex-direction: column; gap: 5px; }
+.member-shell .ja-grow { flex: 1; min-width: 180px; }
+.member-shell .ja-field > span { font-size: 12px; font-weight: 600; color: var(--fg-2); }
+.member-shell .ja-field em { font-style: normal; font-weight: 400; color: var(--fg-4); }
+.member-shell .ja-field select,
+.member-shell .ja-field input { padding: 8px 11px; font-size: 13px; border-radius: 9px; border: 1.5px solid var(--border-2); background: var(--bg-1); color: var(--fg-1); }
+.member-shell .ja-field select:focus,
+.member-shell .ja-field input:focus { outline: none; border-color: var(--brand-500); }
+.member-shell .ja-form .btn { display: inline-flex; align-items: center; gap: 6px; }
+.member-shell .ja-form .btn svg { width: 15px; height: 15px; }
+.member-shell .ja-hint { font-size: 12px; color: var(--fg-4); line-height: 1.5; margin-top: 9px; }
+.member-shell .ja-list { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+.member-shell .ja-empty { font-size: 13px; color: var(--fg-3); padding: 14px 2px; }
+.member-shell .ja-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border-1); border-radius: 10px; }
+.member-shell .ja-row-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.member-shell .ja-cat { font-size: 12px; font-weight: 700; color: var(--brand-700); background: var(--brand-50); border-radius: 999px; padding: 3px 9px; }
+.dark .member-shell .ja-cat { color: var(--brand-300); background: rgb(37 99 235 / 0.18); }
+.member-shell .ja-kw { font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; }
+.member-shell .ja-muted { color: var(--fg-4); font-style: italic; }
+.member-shell .ja-del { background: transparent; border: none; cursor: pointer; color: var(--fg-4); padding: 5px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; }
+.member-shell .ja-del:hover:not(:disabled) { color: #dc2626; background: rgb(220 38 38 / 0.09); }
+.member-shell .ja-del:disabled { opacity: 0.5; cursor: default; }
+.member-shell .ja-del svg { width: 16px; height: 16px; }
+
 /* ───────────────────────── Responsive ───────────────────────── */
 @media (max-width: 900px) {
   /* Sidebar → horizontal scrolling rail under the top bar */

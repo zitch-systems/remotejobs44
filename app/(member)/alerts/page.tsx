@@ -12,6 +12,7 @@ import {
 } from '@/lib/member/alerts';
 import { useMemberGate } from '@/lib/member/use-member-gate';
 import { MemberLoading } from '@/components/member/MemberLoading';
+import { JobAlertManager } from '@/components/member/JobAlertManager';
 
 type Tab = 'all' | 'jobs' | 'apps' | 'system';
 const TABS: { key: Tab; label: string }[] = [
@@ -67,6 +68,8 @@ export default function AlertsPage() {
           Mark all as read
         </button>
       </div>
+
+      <JobAlertManager />
 
       <div className="al-tabs" role="tablist" aria-label="Alert filters">
         {TABS.map(({ key, label }) => (

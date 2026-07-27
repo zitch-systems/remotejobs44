@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
     // thing that earns a spam complaint instead of an unsubscribe.
     const { data: alerts } = await supabase
       .from('job_alerts')
-      .select('user_id, category, keywords, profiles(name, email, plan, email_prefs, suspended)')
+      .select('user_id, category, keywords, profiles(name, email, plan, email_prefs, suspended, email_bounced_at, email_complained_at)')
       .eq('active', true)
       .eq('frequency', 'daily');
 
@@ -248,6 +248,12 @@ export async function GET(req: NextRequest) {
         // default, and the fallback used by /api/profile/email-prefs).
         if (profile.email_prefs?.job_alerts === false) { alertsSkipped += 1; continue; }
         if (profile.suspended) { alertsSkipped += 1; continue; }
+        // Undeliverable or previously reported us as spam (recorded by
+        // /api/webhooks/resend). Resend suppresses these on its own side
+        // anyway, so sending is a guaranteed no-op that still counts
+        // against the daily quota — and re-mailing a complainant is how a
+        // single "report spam" click becomes a domain reputation problem.
+        if (profile.email_bounced_at || profile.email_complained_at) { alertsSkipped += 1; continue; }
 
         // Tokenise keywords on commas/whitespace, drop empties.
         // Match is case-insensitive substring against title or company.

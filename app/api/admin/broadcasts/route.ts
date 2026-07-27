@@ -117,11 +117,19 @@ export async function POST(req: NextRequest) {
   // suspended accounts. An ignored opt-out is what turns an unsubscribe into
   // a spam complaint, and complaint rate is domain-wide — it degrades the
   // signup confirmation and password-reset mail too.
+  //
+  // The bounce/complaint exclusion is applied HERE rather than in the
+  // post-query filter below because of the LIMIT: rows we're going to throw
+  // away regardless would otherwise consume the recipient cap, silently
+  // shrinking the real audience. Both columns are written only by
+  // /api/webhooks/resend.
   let q = supabase
     .from('profiles')
     .select('id, email, name, plan, email_prefs, suspended')
     .not('email', 'is', null)
     .or('suspended.is.null,suspended.eq.false')
+    .is('email_bounced_at', null)
+    .is('email_complained_at', null)
     .limit(MAX_RECIPIENTS + 1); // +1 so we can detect the cap was hit
 
   if (plan !== 'all') q = q.eq('plan', plan);
