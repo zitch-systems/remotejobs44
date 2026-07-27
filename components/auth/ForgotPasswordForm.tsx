@@ -28,12 +28,19 @@ export function ForgotPasswordForm() {
       return;
     }
     setLoading(true);
+    // Normalise exactly as /login and /register do. GoTrue stores the address
+    // lowercased, and mobile keyboards routinely deliver a leading capital or
+    // a trailing space from autocomplete — either would miss the account and
+    // send nothing, while the confirmation screen below still claimed the
+    // link was on its way. A reset that silently does nothing is the worst
+    // failure mode this form has.
+    const normalizedEmail = email.trim().toLowerCase();
     // SECURITY: always render the confirmation, regardless of whether
     // the address actually exists. Showing a distinct error when
     // Supabase reports "user not found" leaks account existence — the
     // same enumeration vector closed on /login.
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
       // Browser-side console is the right channel here — we don't want

@@ -113,7 +113,11 @@ export function paymentFailedEmail(name: string, planLabel: string) {
   const safeName  = escapeHtml(name);
   const safeLabel = escapeHtml(planLabel);
   return {
-    subject: `Action needed: your ${safeLabel.replace(/<[^>]*>/g, '')} renewal didn't go through`,
+    // The subject is a plain-text header, not markup — HTML-escaping it would
+    // render a "Pro & Team" plan as the literal "Pro &amp; Team" in the
+    // recipient's inbox list. Strip tags from the raw label instead, which is
+    // the actual concern for a header value.
+    subject: `Action needed: your ${planLabel.replace(/<[^>]*>/g, '').trim()} renewal didn't go through`,
     html: `
 <!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -141,7 +145,14 @@ export function paymentFailedEmail(name: string, planLabel: string) {
   };
 }
 
-export function jobAlertEmail(name: string, jobs: Array<{ title: string; company: string; location: string; id: string }>) {
+export function jobAlertEmail(
+  name: string,
+  jobs: Array<{ title: string; company: string; location: string; id: string }>,
+  // Signed one-click link from lib/email/unsubscribe.ts. Null when no signing
+  // key is configured, in which case we fall back to the (login-gated)
+  // /profile link rather than printing a URL that would 400.
+  unsubscribeLink?: string | null,
+) {
   // Each value is ATS-supplied (title / company / location) or
   // user-supplied (name) — they MUST be escaped before splicing into
   // the HTML template. j.id is treated as URL-safe since it's UUID-
@@ -180,7 +191,11 @@ export function jobAlertEmail(name: string, jobs: Array<{ title: string; company
       <a href="${APP_URL}/jobs" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px">View All Jobs →</a>
     </div>
     <hr style="border:none;border-top:1px solid #e7e5e4;margin:32px 0">
-    <p style="margin:0;color:#a8a29e;font-size:12px">You're receiving this because you have job alerts enabled. <a href="${APP_URL}/profile" style="color:#2563eb">Manage alerts</a></p>
+    <p style="margin:0;color:#a8a29e;font-size:12px">You're receiving this because you have job alerts enabled. <a href="${APP_URL}/profile" style="color:#2563eb">Manage alerts</a>${
+      unsubscribeLink
+        ? ` · <a href="${escapeHtml(unsubscribeLink)}" style="color:#2563eb">Unsubscribe</a>`
+        : ''
+    }</p>
   </div>
 </div>
 </body></html>`,

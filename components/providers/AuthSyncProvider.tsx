@@ -25,6 +25,7 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { createClient, getAuthedUserSafe } from '@/lib/supabase/client';
 import { documentHasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import { isRecoveryRoute } from '@/lib/auth/recovery-route';
+import { clearRememberChoice, consumeRestartCheck } from '@/lib/auth/remember';
 import { useAuthStore, useJobsStore } from '@/lib/store';
 import { resolveRole } from '@/lib/auth/redirect';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -219,6 +220,21 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // "Remember me" enforcement. When the user signed in with the box
+    // unticked, lib/auth/remember.ts left a localStorage flag; sessionStorage
+    // clears when the browser closes, so the flag surviving WITHOUT its
+    // per-run marker means this is a cold start after that browser closed —
+    // exactly the case the checkbox promises to end. Runs before syncAuth()
+    // so we never briefly render the signed-in shell for a session we're
+    // about to drop. Returns early: signOut() fires SIGNED_OUT, which the
+    // listener below handles, and syncAuth() would only race it.
+    if (consumeRestartCheck()) {
+      setUser(null);
+      try { localStorage.removeItem('rj44-auth'); } catch {}
+      supabase.auth.signOut().catch(() => {});
+      return;
+    }
+
     syncAuth();
 
     // Server-side saved-jobs hydrate. Fires once on mount whenever
@@ -319,6 +335,11 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
         // lib/supabase/cookies.ts and is shared with middleware so the
         // two checks stay in lock-step.
         if (documentHasSupabaseAuthCookie()) return;
+        // Confirmed sign-out — drop the "Remember me" bookkeeping too, so the
+        // next person to sign in on this browser starts from their own choice
+        // rather than inheriting the previous user's. Centralised here
+        // because every logout button in the app routes through this event.
+        clearRememberChoice();
         setUser(null);
         return;
       }
