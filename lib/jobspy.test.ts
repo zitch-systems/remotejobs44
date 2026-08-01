@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normaliseJobSpyJob, jobSpyJobToDbRow, jobSpySourceUrl } from './jobspy';
+import { normaliseJobSpyJob, jobSpyJobToDbRow, jobSpySourceUrl, isPermanentJobSpyHttpStatus } from './jobspy';
 
 describe('normaliseJobSpyJob', () => {
   it('normalises a typical JobSpy record', () => {
@@ -119,5 +119,19 @@ describe('jobSpySourceUrl', () => {
     expect(a).toBe(b);
     expect(a).toContain('search_term=remote+designer');
     expect(jobSpySourceUrl('remote engineer')).not.toBe(a);
+  });
+});
+
+
+describe('JobSpy HTTP retries', () => {
+  it('treats missing/auth endpoints as permanent configuration failures', () => {
+    expect(isPermanentJobSpyHttpStatus(401)).toBe(true);
+    expect(isPermanentJobSpyHttpStatus(404)).toBe(true);
+  });
+
+  it('keeps rate limits and server errors retryable', () => {
+    expect(isPermanentJobSpyHttpStatus(408)).toBe(false);
+    expect(isPermanentJobSpyHttpStatus(429)).toBe(false);
+    expect(isPermanentJobSpyHttpStatus(503)).toBe(false);
   });
 });
