@@ -75,6 +75,10 @@ export function scrubCompanyIdentity(text: string, company: string | null | unde
     .replace(
       /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|ai|co|jobs|careers|dev)(?:\/[^\s<>"')\]]*)?/gi,
       PRIVATE_CHANNEL_REPLACEMENT,
+    )
+    .replace(
+      /\b(?:https?:\/\/|mailto:)(?=\[application details available after applying\])/gi,
+      '',
     );
 
   return out;
