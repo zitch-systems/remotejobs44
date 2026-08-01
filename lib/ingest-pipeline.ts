@@ -29,7 +29,7 @@ import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl, jobIdentityKey, filterByIdentity } from '@/lib/dedupe-jobs';
 import {
   isJobSpyConfigured, fetchJobSpyJobs, jobSpyJobToDbRow,
-  jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES,
+  jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES, JobSpyHttpError,
 } from '@/lib/jobspy';
 import { logInfo, logWarn, logError } from '@/lib/log';
 
@@ -776,6 +776,21 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
         logError({ event: 'jobspy.query_failed', query, error: err.message });
         results[name] = `error: ${err.message}`;
         await recordSourceRun(supabase, source, 0, 'error', err.message);
+
+        // A missing deployment, bad API key, or invalid route affects every
+        // query. Stop after the first permanent 4xx instead of issuing the
+        // same doomed request across the entire query catalogue.
+        if (err instanceof JobSpyHttpError && err.permanent) {
+          return {
+            success: false,
+            totalAdded,
+            results,
+            paused: pausedNames,
+            at: new Date().toISOString(),
+            skipped: true,
+            reason: `JobSpy service unavailable (HTTP ${err.status}). Check JOBSPY_API_URL and credentials.`,
+          };
+        }
       }
     }
 
