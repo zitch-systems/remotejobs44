@@ -22,7 +22,7 @@ import { MapPin, Clock, ArrowLeft, Flag, ChevronRight, Check, Lock } from 'lucid
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { canSeePaidFields, canSeeCompanyName } from '@/lib/auth/requester-plan';
 import { getJobDetailRow, getExpiredJobMeta, getRequesterPlanCached } from '@/lib/jobs/job-detail';
-import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from '@/lib/jobs/company-mask';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { cn, formatRelativeDate, formatSalary, CATEGORY_META } from '@/lib/utils';
 import { normalizeJobDescription, jobDescriptionToHtml } from '@/lib/job-description';
 import { skillSlug } from '@/lib/seo-slices';
@@ -62,7 +62,7 @@ async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } 
     // Acme, Inc: …") from the free-text fields, and source_url is withheld
     // because ATS URLs spell the employer in their path/host.
     const showCompany = canSeeCompanyName(requesterPlan);
-    const scrub = (t: string): string => (showCompany ? t : scrubCompanyMentions(t, data.company));
+    const scrub = (t: string): string => (showCompany ? t : scrubCompanyIdentity(t, data.company));
 
     // Paywall: apply_url/apply_email are NEVER in the shared cache (it
     // stores SAFE_JOB_COLUMNS only — see the invariant note in
@@ -228,7 +228,7 @@ function renderJobDescription(raw: string): React.ReactNode {
 // title is scrubbed of in-prose mentions, and the company-hub link — whose
 // slug spells the name — is hidden.
 function ExpiredJobView({ title, company, showCompany }: { title: string; company: string; showCompany: boolean }) {
-  const safeTitle = showCompany ? title : scrubCompanyMentions(title, company);
+  const safeTitle = showCompany ? title : scrubCompanyIdentity(title, company);
   return (
     <div className="deep-ocean">
       <div className="max-w-[680px] mx-auto px-5 py-20 text-center">
