@@ -197,17 +197,32 @@ export async function fetchJobSpyJobs(opts: JobSpySearchOptions): Promise<JobSpy
     .filter((j): j is JobSpyJob => j !== null);
 }
 
-// Shared fetch: browser-ish UA, JSON parse, one retry on any transient error,
-// 25s timeout per attempt (scrapers are slower than plain feeds).
+export function isPermanentJobSpyHttpStatus(status: number): boolean {
+  return status >= 400 && status < 500 && ![408, 425, 429].includes(status);
+}
+
+export class JobSpyHttpError extends Error {
+  readonly permanent: boolean;
+
+  constructor(public readonly status: number, statusText: string) {
+    super(`JobSpy API HTTP ${status} ${statusText}`);
+    this.name = 'JobSpyHttpError';
+    this.permanent = isPermanentJobSpyHttpStatus(status);
+  }
+}
+
+// Shared fetch: browser-ish UA, JSON parse, one retry for transient failures,
+// 25s timeout per attempt. Permanent 4xx configuration failures fail fast.
 async function getJson(url: string, init?: RequestInit): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (attempt > 0) await new Promise(res => setTimeout(res, 800 * attempt));
     try {
       const r = await fetch(url, { ...init, signal: AbortSignal.timeout(25000) });
-      if (!r.ok) throw new Error(`JobSpy API HTTP ${r.status} ${r.statusText}`);
+      if (!r.ok) throw new JobSpyHttpError(r.status, r.statusText);
       return await r.json();
     } catch (err) {
+      if (err instanceof JobSpyHttpError && err.permanent) throw err;
       lastErr = err;
     }
   }
