@@ -68,6 +68,18 @@ describe('scrubCompanyIdentity', () => {
     expect(result).toContain('application details available after applying');
   });
 
+  it('removes HTML-entity-encoded ATS links before rendering', () => {
+    const encoded = [
+      '<a href="https:&#x2F;&#x2F;www.useacme.com&#x2F;careers&#x2F;42">',
+      'https:&#x2F;&#x2F;www.useacme.com&#x2F;careers&#x2F;42</a>',
+    ].join('');
+    const result = scrubCompanyIdentity(encoded, 'Acme');
+    expect(result).not.toMatch(/acme|useacme/i);
+    expect(result).not.toContain('https://');
+    expect(result).not.toContain('https:&#');
+    expect(result).toContain('application details available after applying');
+  });
+
   it('scrubs the company name and mailto links together', () => {
     const result = scrubCompanyIdentity(
       '<a href="mailto:careers@acme.com">Email Acme</a>',
