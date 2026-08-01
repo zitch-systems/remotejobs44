@@ -13,8 +13,9 @@ import { unstable_cache } from 'next/cache';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
 import { REGION_TERMS } from '@/lib/jobs/region-terms';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
 import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
@@ -75,13 +76,15 @@ interface SearchParams {
   page?:        string;
 }
 
-function transform(j: any, seePaid: boolean): Job {
+function transform(j: any, seePaid: boolean, seeCompany: boolean): Job {
+  const scrub = (text: string): string =>
+    seeCompany ? text : scrubCompanyIdentity(text, j.company);
   return {
     id:           j.id,
-    title:        j.title,
-    company:      j.company,
-    companyId:    j.company_id ?? undefined,
-    logo:         j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?'),
+    title:        scrub(j.title ?? ''),
+    company:      seeCompany ? j.company : HIDDEN_COMPANY_LABEL,
+    companyId:    seeCompany ? (j.company_id ?? undefined) : undefined,
+    logo:         seeCompany ? (j.logo ?? (j.company?.[0]?.toUpperCase() ?? '?')) : '?',
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? 'mid',
@@ -90,10 +93,10 @@ function transform(j: any, seePaid: boolean): Job {
     currency:     j.currency ?? 'USD',
     location:     j.location ?? 'Worldwide',
     timezone:     j.timezone ?? undefined,
-    description:  j.description ?? '',
-    requirements: j.requirements ?? undefined,
+    description:  scrub(j.description ?? ''),
+    requirements: Array.isArray(j.requirements) ? j.requirements.map((r: unknown) => scrub(String(r))) : undefined,
     skills:       j.skills ?? [],
-    benefits:     j.benefits ?? undefined,
+    benefits: Array.isArray(j.benefits) ? j.benefits.map((b: unknown) => scrub(String(b))) : undefined,
     // Off-site apply channel gated by plan — see lib/auth/requester-plan.
     // Free + anon: stripped (the Apply button on JobCard shows the
     // Subscribe paywall instead of redirecting).
@@ -104,7 +107,7 @@ function transform(j: any, seePaid: boolean): Job {
     featured:     j.featured ?? false,
     isNew:        j.is_new ?? false,
     source:       j.source ?? 'manual',
-    sourceUrl:    j.source_url ?? undefined,
+    sourceUrl:    seeCompany ? (j.source_url ?? undefined) : undefined,
     remote:       j.remote ?? true,
   };
 }
@@ -116,6 +119,7 @@ interface FetchJobsResult {
   pages: number;
   fuzzy?: boolean;
   error?: boolean;
+  outOfRange?: boolean;
 }
 
 // Every input that influences the listing query, defaults applied. Built
@@ -162,7 +166,7 @@ class ListingQueryError extends Error {
 // SELECT-column list: anon/free get SAFE_JOB_COLUMNS (no apply_url/
 // apply_email), paid get '*' — `seePaid` is part of the cache key, so the
 // two variants never cross.
-async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<FetchJobsResult> {
+async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: boolean): Promise<FetchJobsResult> {
   const { q, category, type, level, salary, timezone, posted, remoteOnly, region, country, sort, page } = p;
   const supabase = createAdminSupabaseClient();
   const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
@@ -218,7 +222,7 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
       console.error('[fetchJobs] search_jobs RPC failed:', rowsRes.error?.message ?? countRes.error?.message);
     }
     let total = Number(countRes.data ?? 0);
-    let jobs  = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+    let jobs  = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid, seeCompany));
     let fuzzy = false;
 
     // Trigram typo fallback (search_jobs_trgm) — fires only when strict
@@ -232,7 +236,7 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
       ]);
       if (!fRowsRes.error) {
         total = Number(fCountRes.data ?? 0);
-        jobs  = (fRowsRes.data ?? []).map((j: any) => transform(j, seePaid));
+        jobs  = (fRowsRes.data ?? []).map((j: any) => transform(j, seePaid, seeCompany));
         fuzzy = total > 0;
       }
     }
@@ -324,19 +328,24 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean): Promise<Fet
   // Log loudly so the failure shows up in Vercel runtime logs, and
   // surface a small `error: true` flag so the page can render an
   // actual "Couldn't load — refresh" state instead of a fake zero.
-  if (error) {
+  const outOfRange = !!error && (
+    error.code === 'PGRST103' ||
+    /range not satisfiable/i.test(error.message)
+  );
+  if (error && !outOfRange) {
     console.error('[fetchJobs] no-q SELECT failed:', error.message);
   }
-  const jobs = (data ?? []).map((j: any) => transform(j, seePaid));
+  const jobs = (data ?? []).map((j: any) => transform(j, seePaid, seeCompany));
   const total = count ?? jobs.length;
   const result: FetchJobsResult = {
     jobs,
     total,
     page,
     pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
-    error: !!error,
+    error: !!error && !outOfRange,
+    outOfRange,
   };
-  if (error) throw new ListingQueryError(result);
+  if (error && !outOfRange) throw new ListingQueryError(result);
   return result;
 }
 
@@ -357,8 +366,9 @@ async function fetchJobs(sp: SearchParams): Promise<FetchJobsResult> {
   // Auth server. Only the heavy data work below is cached.
   const requesterPlan = await getRequesterPlan(await createServerSupabaseClient());
   const seePaid = canSeePaidFields(requesterPlan);
+  const seeCompany = canSeeCompanyName(requesterPlan);
   try {
-    return await queryJobsListingCached(params, seePaid);
+    return await queryJobsListingCached(params, seePaid, seeCompany);
   } catch (err) {
     if (err instanceof ListingQueryError) return err.result;
     console.error('[fetchJobs] listing query threw:', err instanceof Error ? err.message : String(err));
@@ -400,7 +410,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   // (`paginationHref(sp, …)` is functionally identical to passing the
   // raw object that previously came in synchronously).
   const sp = await searchParams;
-  const { jobs, total, page, pages, fuzzy, error: fetchError } = await fetchJobs(sp);
+  const { jobs, total, page, pages, fuzzy, error: fetchError, outOfRange } = await fetchJobs(sp);
+
+  // PostgREST returns PGRST103 before it gives us a count when an offset is
+  // beyond the result set. Recover to page one instead of presenting a fake
+  // database failure.
+  if (outOfRange && page > 1) {
+    redirect(paginationHref(sp, 1));
+  }
 
   // A stale/hand-entered ?page=N past the last page would otherwise render the
   // generic "No jobs found" empty state even though the result set is large.
