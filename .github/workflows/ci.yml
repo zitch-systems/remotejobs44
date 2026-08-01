@@ -116,6 +116,7 @@ jobs:
           BASE_URL=http://localhost:3000 npx playwright test \
             tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \
             tests/e2e/jobs.spec.ts tests/e2e/mobile-audit.spec.ts \
+            tests/e2e/admin-routes.spec.ts \
             --project=chromium \
             --grep-invert "wrong credentials|validates empty fields|plan comparison|sitemap.xml is accessible"
       - uses: actions/upload-artifact@v7
