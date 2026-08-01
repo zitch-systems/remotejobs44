@@ -54,3 +54,28 @@ export function scrubCompanyMentions(text: string, company: string | null | unde
   }
   return out;
 }
+
+
+const PRIVATE_CHANNEL_REPLACEMENT = '[application details available after applying]';
+
+/**
+ * Removes indirect employer/application disclosures from public job copy.
+ * Scraping commonly leaves career-site URLs and recruiter emails in the
+ * description even when apply_url and the company header are masked.
+ */
+export function scrubCompanyIdentity(text: string, company: string | null | undefined): string {
+  if (!text) return text;
+
+  let out = scrubCompanyMentions(text, company);
+  out = out
+    .replace(/\bmailto:[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
+    .replace(/\bhttps?:\/\/[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
+    .replace(/\bwww\.[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, PRIVATE_CHANNEL_REPLACEMENT)
+    .replace(
+      /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|ai|co|jobs|careers|dev)(?:\/[^\s<>"')\]]*)?/gi,
+      PRIVATE_CHANNEL_REPLACEMENT,
+    );
+
+  return out;
+}
