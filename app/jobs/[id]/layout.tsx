@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { normalizeJobDescription } from '@/lib/job-description';
 import { getJobDetailRow, getExpiredJobMeta, getRequesterPlanCached } from '@/lib/jobs/job-detail';
 import { canSeeCompanyName } from '@/lib/auth/requester-plan';
-import { scrubCompanyMentions } from '@/lib/jobs/company-mask';
+import { scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
@@ -26,29 +26,29 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       // recommended treatment for expired JobPostings), and a missing id 404s.
       const expired = await getExpiredJobMeta(id);
       if (expired) {
-        const expTitle = showCompany ? expired.title : scrubCompanyMentions(expired.title, expired.company);
+        const expTitle = showCompany ? expired.title : scrubCompanyIdentity(expired.title, expired.company);
         return {
-          title: `${expTitle}${showCompany && expired.company ? ` at ${expired.company}` : ''} — Position Closed | RemoteJobs44`,
+          title: `${expTitle}${showCompany && expired.company ? ` at ${expired.company}` : ''} — Position Closed`,
           description: 'This role is no longer accepting applications. Browse thousands of live remote jobs on RemoteJobs44.',
           robots: { index: false, follow: true },
           alternates: { canonical: `https://remotejobs44.com/jobs/${id}` },
         };
       }
-      return { title: 'Job Not Found | RemoteJobs44', robots: { index: false, follow: true } };
+      return { title: 'Job Not Found', robots: { index: false, follow: true } };
     }
 
     // Masked view: the employer must not appear anywhere in <head> — the tab
     // title was the single most visible leak (it named the company for every
     // visitor while the page body blurred it). Scrub the free-text fields
     // too, since scraped titles/descriptions often open with the name.
-    const jobTitle = showCompany ? job.title : scrubCompanyMentions(job.title, job.company);
+    const jobTitle = showCompany ? job.title : scrubCompanyIdentity(job.title, job.company);
     const title = showCompany
-      ? `${jobTitle} at ${job.company} | RemoteJobs44`
-      : `${jobTitle} — Remote Job | RemoteJobs44`;
+      ? `${jobTitle} at ${job.company}`
+      : `${jobTitle} — Remote Job`;
     const description = job.description
       ? (showCompany
           ? normalizeJobDescription(job.description)
-          : scrubCompanyMentions(normalizeJobDescription(job.description), job.company)
+          : scrubCompanyIdentity(normalizeJobDescription(job.description), job.company)
         ).slice(0, 160).replace(/\s+/g, ' ').trim()
       : `Apply for ${jobTitle}${showCompany ? ` at ${job.company}` : ''}. Remote job — ${job.location}. Find remote jobs at RemoteJobs44.`;
 
@@ -80,7 +80,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       alternates: { canonical: `https://remotejobs44.com/jobs/${(await params).id}` },
     };
   } catch {
-    return { title: 'Remote Job | RemoteJobs44' };
+    return { title: 'Remote Job' };
   }
 }
 
