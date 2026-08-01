@@ -66,8 +66,10 @@ const PRIVATE_CHANNEL_REPLACEMENT = '[application details available after applyi
 export function scrubCompanyIdentity(text: string, company: string | null | undefined): string {
   if (!text) return text;
 
-  let out = scrubCompanyMentions(text, company);
-  out = out
+  // Scrub complete channels before the company name. Otherwise a name inside
+  // jobs@company.com is replaced first and the remaining malformed address can
+  // evade the email/domain patterns below.
+  const out = text
     .replace(/\bmailto:[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
     .replace(/\bhttps?:\/\/[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
     .replace(/\bwww\.[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
@@ -75,7 +77,11 @@ export function scrubCompanyIdentity(text: string, company: string | null | unde
     .replace(
       /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|ai|co|jobs|careers|dev)(?:\/[^\s<>"')\]]*)?/gi,
       PRIVATE_CHANNEL_REPLACEMENT,
+    )
+    .replace(
+      /\b(?:https?:\/\/|mailto:)(?=\[application details available after applying\])/gi,
+      '',
     );
 
-  return out;
+  return scrubCompanyMentions(out, company);
 }

@@ -32,9 +32,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          # Next.js 14 supports Node 18+; 20 is LTS as of this commit
-          # and matches Vercel's default for production deploys.
-          node-version: 20
+          # Match the Node 24 runtime configured by the Vercel project and
+          # required by the current Chromium/Puppeteer dependencies.
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -91,19 +91,16 @@ jobs:
 
   # End-to-end smoke suite (hardening: the Playwright suite existed but never
   # ran in CI — docs/TECHNICAL_DEBT.md High #3). Chromium-only for speed.
-  # Env-dependent tests are excluded because CI has no Supabase secrets:
-  # login validation + wrong-credentials (need live auth), plan-comparison
-  # and sitemap.xml (need live DB). 41 env-independent tests remain: SEO
-  # meta/OG/JSON-LD, robots/llms/manifest, security headers, 404, load-time,
-  # pricing UI, auth-page rendering. Verified green against a local prod
-  # build with the same no-Supabase constraints as this runner.
+  # Env-dependent tests are excluded because CI has no Supabase secrets.
+  # The suite covers auth/pricing/SEO plus jobs interactions and a 320px
+  # overflow/touch-target regression check.
   e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
@@ -114,6 +111,7 @@ jobs:
           npx wait-on -t 60000 http://localhost:3000
           BASE_URL=http://localhost:3000 npx playwright test \
             tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \
+            tests/e2e/jobs.spec.ts tests/e2e/mobile-audit.spec.ts \
             --project=chromium \
             --grep-invert "wrong credentials|validates empty fields|plan comparison|sitemap.xml is accessible"
       - uses: actions/upload-artifact@v7

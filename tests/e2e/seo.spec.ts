@@ -71,9 +71,11 @@ test.describe('SEO & Technical', () => {
     expect(text).toContain('RemoteJobs44');
   });
 
-  test('OG image endpoint returns 200', async ({ page }) => {
-    const response = await page.goto('/api/og');
-    expect(response?.status()).toBe(200);
+  test('OG image endpoint renders dynamic currency text', async ({ request }) => {
+    const response = await request.get('/api/og?title=Senior%20Engineer%20%E2%82%A6500k&salary=%24120%2C000');
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('image/png');
+    expect((await response.body()).byteLength).toBeGreaterThan(5_000);
   });
 
   test('homepage has JSON-LD structured data', async ({ page }) => {
