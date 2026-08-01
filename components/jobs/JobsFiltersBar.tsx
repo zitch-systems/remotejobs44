@@ -164,9 +164,9 @@ function FilterSelect({ label, value, onChange, options, icon }: {
 function FilterChip({ label, onRemove }: { label: string | undefined; onRemove: () => void }) {
   if (!label) return null;
   return (
-    <span className="flex items-center gap-1 px-2.5 py-1 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 text-xs font-semibold rounded-full border border-brand-200 dark:border-brand-800">
+    <span className="min-h-11 sm:min-h-0 flex items-center gap-1 px-2.5 py-1 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 text-xs font-semibold rounded-full border border-brand-200 dark:border-brand-800">
       {label}
-      <button onClick={onRemove} className="ml-0.5 hover:text-brand-900 dark:hover:text-brand-200">
+      <button onClick={onRemove} aria-label={`Remove ${label} filter`} className="p-3 -m-2 ml-0.5 hover:text-brand-900 dark:hover:text-brand-200">
         <X className="w-3 h-3" />
       </button>
     </span>
@@ -292,21 +292,25 @@ export function JobsFiltersBar() {
             disabled={isPending}
           />
           {searchInput && (
-            <button onClick={() => { setSearchInput(''); setParam('q', ''); }} className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
+            <button
+              onClick={() => { setSearchInput(''); setParam('q', ''); }}
+              aria-label="Clear search"
+              className="p-3 -m-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <select aria-label="Sort jobs" value={effectiveSort} onChange={e => setParam('sort', e.target.value)}
-            className="input text-sm py-3 pl-3 pr-8 rounded-xl w-auto min-w-[140px]">
+            className="input text-sm py-3 pl-3 pr-8 rounded-xl w-full min-w-0 sm:w-auto sm:min-w-[140px]">
             {sortOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <button
             onClick={() => setShowFilters(!showFilters)}
             aria-expanded={showFilters}
             aria-controls="advanced-filters-panel"
-            className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
+            className={cn('min-h-11 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shadow-sm',
               showFilters || activeFilterCount > 0
                 ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600'
                 : 'bg-white dark:bg-[#0a1628] border-stone-200 dark:border-[#1e3a5f] text-stone-600 dark:text-stone-300 hover:border-brand-600 dark:hover:border-brand-500')}>
@@ -320,7 +324,7 @@ export function JobsFiltersBar() {
           </button>
           {searchInput && (
             <button onClick={handleSearch} disabled={isPending}
-              className="px-5 py-2.5 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              className="col-span-2 sm:col-span-1 min-h-11 px-5 py-2.5 bg-brand-700 dark:bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-800 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
               {isPending ? 'Searching…' : 'Search'}
             </button>
           )}
@@ -334,7 +338,7 @@ export function JobsFiltersBar() {
           onClick={() => setParam('remote', remoteOnly ? 'false' : 'true')}
           aria-pressed={remoteOnly}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all shadow-sm',
+            'min-h-11 sm:min-h-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all shadow-sm',
             remoteOnly
               ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600 hover:bg-brand-800'
               : 'bg-white dark:bg-[#0a1628] text-stone-600 dark:text-stone-300 border-stone-200 dark:border-[#1e3a5f] hover:border-brand-600 dark:hover:border-brand-500'
@@ -431,7 +435,7 @@ export function JobsFiltersBar() {
           const m = CATEGORY_META[cat as keyof typeof CATEGORY_META];
           return (
             <button key={cat} onClick={() => setParam('category', cat)}
-              className={cn('chip shrink-0 text-xs transition-all flex items-center gap-1.5',
+              className={cn('chip min-h-11 sm:min-h-0 shrink-0 text-xs transition-all flex items-center gap-1.5',
                 category === cat && 'active scale-[1.02]')}>
               {CAT_ICONS[cat]}
               {m?.label}
@@ -449,7 +453,7 @@ export function ClearAllButton() {
   const router = useRouter();
   return (
     <button onClick={() => router.push('/jobs')}
-      className="text-xs text-stone-400 hover:text-red-500 transition-colors flex items-center gap-1">
+      className="min-h-11 text-xs text-stone-400 hover:text-red-500 transition-colors flex items-center gap-1">
       <X className="w-3.5 h-3.5" /> Clear all
     </button>
   );
