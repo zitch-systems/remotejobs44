@@ -64,6 +64,7 @@ describe('scrubCompanyIdentity', () => {
     expect(result).not.toMatch(/acme\.(com|io|jobs)/i);
     expect(result).not.toContain('jobs@');
     expect(result).not.toContain('https://');
+    expect(result).not.toContain('https://[application');
     expect(result).toContain('application details available after applying');
   });
 
