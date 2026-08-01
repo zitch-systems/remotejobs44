@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 
 export const metadata: Metadata = {
-  title: 'Reset your password | RemoteJobs44',
+  title: 'Reset your password',
   description: 'Forgot your RemoteJobs44 password? Enter your email and we will send a reset link.',
   alternates: { canonical: 'https://remotejobs44.com/forgot-password' },
   robots: { index: false, follow: false }, // password-reset isn't indexable
