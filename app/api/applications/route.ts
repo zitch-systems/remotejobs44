@@ -9,7 +9,7 @@ import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
 // ── GET /api/applications — List current user's applications ─────────────
-export async function GET(req: NextRequest) {
+export async function GET(req?: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     // A tracked application is the capability that reveals the off-site
     // channel to free users. This lets them return to an application later
     // without making the full jobs catalogue public.
-    const channelJobId = new URL(req.url).searchParams.get('channel');
+    const channelJobId = req ? new URL(req.url).searchParams.get('channel') : null;
     if (channelJobId) {
       const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuid.test(channelJobId)) {
