@@ -70,6 +70,12 @@ export function scrubCompanyIdentity(text: string, company: string | null | unde
   // jobs@company.com is replaced first and the remaining malformed address can
   // evade the email/domain patterns below.
   const out = text
+    // ATS feeds often HTML-encode URL separators inside anchor text/hrefs.
+    // Decode only channel punctuation so the normal URL/email patterns see
+    // the complete value before later description normalization.
+    .replace(/(?:&#x2f;|&#47;|&sol;)/gi, '/')
+    .replace(/(?:&#x3a;|&#58;|&colon;)/gi, ':')
+    .replace(/(?:&#x40;|&#64;|&commat;)/gi, '@')
     .replace(/\bmailto:[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
     .replace(/\bhttps?:\/\/[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
     .replace(/\bwww\.[^\s<>"')\]]+/gi, PRIVATE_CHANNEL_REPLACEMENT)
