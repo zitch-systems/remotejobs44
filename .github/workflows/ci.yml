@@ -77,16 +77,13 @@ jobs:
       # cheaper checks above pass.
       - name: Build (Next.js)
         env:
-          # The build calls into app/api/* metadata generators which
-          # try to read Supabase env vars. Provide harmless placeholders
-          # so the build doesn't fail on missing env. Real values live
-          # in Vercel's project settings for production.
-          NEXT_PUBLIC_SUPABASE_URL:      'https://placeholder.supabase.co'
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
-          SUPABASE_SERVICE_ROLE_KEY:     'ci-placeholder-service-role-key'
+          # Use only the browser-safe, RLS-limited project coordinates.
+          # Fake service-role/host values made static generation wait on an
+          # unreachable backend; privileged credentials are neither required
+          # nor appropriate for a compile-time validation build.
+          NEXT_PUBLIC_SUPABASE_URL:      'https://gnyilmahiyddplsrrhoq.supabase.co'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_Nlou0I27U4KFmppxMN46ow_q_WryHY3'
           NEXT_PUBLIC_APP_URL:           'https://remotejobs44.com'
-          PAYSTACK_SECRET_KEY:           'ci-placeholder-paystack-secret'
-          CRON_SECRET:                   'ci-placeholder-cron-secret-min-16-chars'
         run: npm run build
 
   # End-to-end smoke suite (hardening: the Playwright suite existed but never
@@ -96,6 +93,13 @@ jobs:
   # overflow/touch-target regression check.
   e2e:
     runs-on: ubuntu-latest
+    # These are the project's public, browser-safe Supabase coordinates.
+    # No service-role credential is present: E2E can only perform the same
+    # RLS-limited anonymous reads as a real signed-out visitor.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: 'https://gnyilmahiyddplsrrhoq.supabase.co'
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_Nlou0I27U4KFmppxMN46ow_q_WryHY3'
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -112,6 +116,7 @@ jobs:
           BASE_URL=http://localhost:3000 npx playwright test \
             tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \
             tests/e2e/jobs.spec.ts tests/e2e/mobile-audit.spec.ts \
+            tests/e2e/admin-routes.spec.ts \
             --project=chromium \
             --grep-invert "wrong credentials|validates empty fields|plan comparison|sitemap.xml is accessible"
       - uses: actions/upload-artifact@v7
