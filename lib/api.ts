@@ -122,7 +122,7 @@ export const jobsApi = {
 
 // ── Applications ───────────────────────────────────────────────────────────
 export const applicationsApi = {
-  async apply(jobId: string, cvUrl?: string): Promise<Application> {
+  async apply(jobId: string, cvUrl?: string): Promise<Application & { applyUrl?: string; applyEmail?: string }> {
     if (typeof window !== 'undefined') {
       const res = await fetch('/api/applications', {
         method: 'POST',
@@ -134,6 +134,21 @@ export const applicationsApi = {
       throw new Error(data.error ?? 'Failed to apply');
     }
     throw new Error('apply must be called client-side');
+  },
+
+  async getChannel(jobId: string): Promise<{ applyUrl?: string; applyEmail?: string }> {
+    if (typeof window !== 'undefined') {
+      const res = await fetch(`/api/applications?channel=${encodeURIComponent(jobId)}`);
+      const data = await res.json();
+      if (res.ok) {
+        return {
+          applyUrl: data.applyUrl ?? undefined,
+          applyEmail: data.applyEmail ?? undefined,
+        };
+      }
+      throw new Error(data.error ?? 'Failed to load application link');
+    }
+    throw new Error('getChannel must be called client-side');
   },
 };
 
