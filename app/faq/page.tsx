@@ -8,7 +8,7 @@ const BASE = 'https://remotejobs44.com';
 export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
-  title: 'FAQ — RemoteJobs44',
+  title: 'Frequently Asked Questions',
   description: 'Frequently asked questions about RemoteJobs44 — pricing, payments, AI tools, application tracking, and remote work from Africa.',
   alternates: { canonical: `${BASE}/faq` },
 };
