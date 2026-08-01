@@ -9,7 +9,7 @@ const BASE = 'https://remotejobs44.com';
 export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
-  title: 'Remote Salary Guide 2026 — Engineering, Design, PM, Marketing | RemoteJobs44',
+  title: 'Remote Salary Guide 2026 — Engineering, Design, PM, Marketing',
   description: 'Benchmark salaries for remote engineering, design, product, marketing, and sales roles in 2026. USD + Naira ranges by experience level. Updated quarterly.',
   alternates: { canonical: `${BASE}/salary-guide` },
   openGraph: {
@@ -39,7 +39,7 @@ export default function SalaryGuideHub() {
           Remote Salary Benchmarks
         </h1>
         <p className="text-stone-500 dark:text-stone-400 mt-3 max-w-2xl mx-auto leading-relaxed">
-          Honest USD + Naira salary ranges for {SALARY_ROLES.length} remote roles, by experience level. Pulled from active listings on RemoteJobs44 plus public Glassdoor / Levels.fyi data.
+          Honest USD + Naira salary ranges for {SALARY_ROLES.length} remote roles, by experience level. Built from active RemoteJobs44 listings plus reputable public salary datasets.
         </p>
       </div>
 

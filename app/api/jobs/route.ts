@@ -6,7 +6,7 @@ import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visi
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { rateLimit, getIP } from '@/lib/rate-limit';
 import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
-import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from '@/lib/jobs/company-mask';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
@@ -648,7 +648,7 @@ export async function DELETE(req: NextRequest) {
 // true for the admin POST/PUT responses that haven't been updated to pass
 // the flags.
 function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = true) {
-  const scrub = (t: string): string => (seeCompany ? t : scrubCompanyMentions(t, j.company));
+  const scrub = (t: string): string => (seeCompany ? t : scrubCompanyIdentity(t, j.company));
   return {
     id:           j.id,
     title:        scrub(j.title ?? ''),

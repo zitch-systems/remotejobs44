@@ -101,25 +101,34 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
     e.preventDefault(); e.stopPropagation();
     if (applyingRef.current) return; // apply POST already in flight — ignore double-tap
     if (!loggedIn) { modalService.open(<PaywallModal mode="login" />); return; }
-    if (!canApplyNow) { modalService.open(<PaywallModal mode="subscribe" />); return; }
-    if (isDaily && dailyLimitReached) {
-      toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
+
+    const safeTarget = (applyUrl?: string, applyEmail?: string): string | null => {
+      const raw = applyUrl || (applyEmail ? `mailto:${applyEmail}` : null);
+      return isSafeOpenUrl(raw) ? raw : null;
+    };
+    const applyTarget = safeTarget(job.applyUrl, job.applyEmail);
+
+    // Existing applications retain their channel even when a free trial or
+    // day pass has since expired. The API verifies the tracked application
+    // belongs to this session before revealing it.
+    if (applied) {
+      applyingRef.current = true;
+      try {
+        const channel = applyTarget ? null : await applicationsApi.getChannel(job.id);
+        const target = applyTarget || safeTarget(channel?.applyUrl, channel?.applyEmail);
+        if (target) safeWindowOpen(target);
+        else toast('No application link available for this job', 'error');
+      } catch (err: any) {
+        toast(err.message ?? 'Could not load the application link', 'error');
+      } finally {
+        applyingRef.current = false;
+      }
       return;
     }
 
-    // Treat any non-http(s)/mailto applyUrl as missing — `javascript:` URLs
-    // from a compromised ATS feed must not reach window.open.
-    const applyTargetRaw = job.applyUrl || (job.applyEmail ? `mailto:${job.applyEmail}` : null);
-    const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
-
-    // Already-applied path: skip the API call (no double-counting against
-    // Day Pass limit, no duplicate-409) and just re-open the same link.
-    // The Apply button itself signals "Applied" via the styling below;
-    // re-clicking should still WORK because users routinely re-open
-    // application pages to upload extra docs / check status.
-    if (applied) {
-      if (applyTarget) safeWindowOpen(applyTarget);
-      else toast('No application link available for this job', 'error');
+    if (!canApplyNow) { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (isDaily && dailyLimitReached) {
+      toast('Day Pass limit reached (10/10 applications). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
     }
 
@@ -135,11 +144,12 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
-      // One toast, not two: confirm tracking, and only mention a missing link
-      // when there genuinely isn't one (the old code stacked both).
-      if (applyTarget) {
+      // Free users receive the channel only after this tracked application
+      // succeeds; paid users normally already have it on the job prop.
+      const target = applyTarget || safeTarget(app.applyUrl, app.applyEmail);
+      if (target) {
         toast('Application tracked! 🎉', 'success');
-        safeWindowOpen(applyTarget);
+        safeWindowOpen(target);
       } else {
         toast('Application tracked! No apply link on file for this job.', 'success');
       }

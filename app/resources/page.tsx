@@ -7,7 +7,7 @@ import { ARTICLES } from '@/lib/resources';
 const BASE = 'https://remotejobs44.com';
 
 export const metadata: Metadata = {
-  title: 'Career Resources — Remote Work Guides for Africa | RemoteJobs44',
+  title: 'Career Resources — Remote Work Guides for Africa',
   description: 'Honest guides for landing and keeping a remote job from Africa: salary benchmarks, CV templates, interview prep, country playbooks, and more.',
   alternates: { canonical: `${BASE}/resources` },
   openGraph: {

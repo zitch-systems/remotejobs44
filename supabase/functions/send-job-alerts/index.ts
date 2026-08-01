@@ -26,7 +26,9 @@ interface NewJob {
 
 Deno.serve(async (req: Request) => {
   const secret = Deno.env.get('PUSH_CRON_SECRET');
-  if (secret && req.headers.get('authorization') !== `Bearer ${secret}`) {
+  // Fail closed: this function holds the service-role key. A missing secret
+  // must disable the endpoint, never turn it into an unauthenticated sender.
+  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return new Response('forbidden', { status: 401 });
   }
 

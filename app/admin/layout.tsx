@@ -287,24 +287,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? '/admin'
           }
           onChange={e => router.push(e.target.value)}
-          className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-[#1e2d4a] bg-[#111c35] text-sm font-medium text-slate-200"
+          className="flex-1 min-w-0 h-11 px-3 rounded-lg border border-[#1e2d4a] bg-[#111c35] text-sm font-medium text-slate-200"
         >
           {NAV.map(({ href, label, indent }) => (
             <option key={href} value={href}>{indent ? `— ${label}` : label}</option>
           ))}
         </select>
         {SIBLING_NAME && (
-          // Icon-only on mobile: a 36px square tap target next to the section
+          // Icon-only on mobile: a 44px square tap target next to the section
           // dropdown, so the switcher never squeezes the select. The full
           // labelled "Switch to <project>" control lives in the desktop sidebar.
           <a href="/admin/switch" aria-label={`Switch to ${SIBLING_NAME}`} title={`Switch to ${SIBLING_NAME}`}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[#1e2d4a] bg-[#111c35] text-slate-300 hover:text-white hover:bg-[#16233f] shrink-0 transition-colors">
+            className="h-11 w-11 inline-flex items-center justify-center rounded-lg border border-[#1e2d4a] bg-[#111c35] text-slate-300 hover:text-white hover:bg-[#16233f] shrink-0 transition-colors">
             <ArrowLeftRight className="w-4 h-4" />
           </a>
         )}
       </div>
 
-      <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] md:pt-0 pt-14">
+      <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] pt-[calc(3.75rem+env(safe-area-inset-top))] md:pt-0">
         {children}
       </main>
     </div>

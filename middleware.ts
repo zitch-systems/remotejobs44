@@ -13,6 +13,7 @@ import { ADMIN_EMAILS } from '@/lib/admin-emails';
 import { hasSupabaseAuthCookie } from '@/lib/supabase/cookies';
 import {
   ADMIN_PORTAL_PATH,
+  ADMIN_PORTAL_CONFIGURED,
   ADMIN_PORTAL_COOKIE,
   ADMIN_PORTAL_COOKIE_MAX_AGE,
   adminPortalToken,
@@ -71,7 +72,8 @@ export async function middleware(request: NextRequest) {
   const isAgentRoute     = path === '/agent' || path.startsWith('/agent/');
   // The private "knock" link that unlocks the admin portal. Visiting it mints
   // the access cookie and forwards to /admin (see lib/admin/portal.ts).
-  const isPortalKnock    = path === ADMIN_PORTAL_PATH || path === `${ADMIN_PORTAL_PATH}/`;
+  const isPortalKnock    = !!ADMIN_PORTAL_PATH
+    && (path === ADMIN_PORTAL_PATH || path === `${ADMIN_PORTAL_PATH}/`);
 
   // Portal knock: set the http-only access cookie and send the operator into
   // the admin area. The cookie is applied by the browser before it follows the
@@ -93,6 +95,7 @@ export async function middleware(request: NextRequest) {
   // runs BEFORE the Auth-server round-trip below so anonymous probes of /admin
   // are cheap 404s that never touch Supabase.
   if (isAdminRoute) {
+    if (!ADMIN_PORTAL_CONFIGURED) return portalNotFound(request);
     const provided = request.cookies.get(ADMIN_PORTAL_COOKIE)?.value;
     if (!provided || provided !== (await adminPortalToken())) {
       return portalNotFound(request);

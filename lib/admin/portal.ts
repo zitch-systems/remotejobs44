@@ -21,9 +21,8 @@
 // browser bundle. Rotate it by changing ADMIN_PORTAL_SLUG in the environment
 // and redeploying (the value is captured at build time for the Edge runtime).
 //
-// SECURITY NOTE: the default below is a public placeholder committed to the
-// repo — set ADMIN_PORTAL_SLUG to your own private value in production, or the
-// "unguessable" link is neither private nor unguessable.
+// SECURITY NOTE: there is deliberately no committed fallback. If the variable
+// is absent or invalid the private entrance and all admin pages fail closed.
 
 // Non-secret domain-separation string folded into the cookie token so the
 // cookie value is not literally the slug.
@@ -45,15 +44,16 @@ function normalizeSlug(raw: string | undefined): string {
   const seg = cleaned.split('/')[0];
   // Never let the entrance collide with a real gated route.
   const RESERVED = new Set(['admin', 'dashboard', 'agent', 'api', 'login', 'register', 'auth']);
-  if (!seg || RESERVED.has(seg.toLowerCase())) return 'portal-7f3a9k2m4x';
+  if (!seg || RESERVED.has(seg.toLowerCase())) return '';
   return seg;
 }
 
-/** The single path segment that unlocks the portal, e.g. "portal-7f3a9k2m4x". */
+/** The single path segment that unlocks the portal. Empty means disabled. */
 export const ADMIN_PORTAL_SLUG = normalizeSlug(process.env.ADMIN_PORTAL_SLUG);
+export const ADMIN_PORTAL_CONFIGURED = ADMIN_PORTAL_SLUG.length > 0;
 
-/** The private entrance path, e.g. "/portal-7f3a9k2m4x". */
-export const ADMIN_PORTAL_PATH = `/${ADMIN_PORTAL_SLUG}`;
+/** The private entrance path, or null when configuration is invalid. */
+export const ADMIN_PORTAL_PATH = ADMIN_PORTAL_CONFIGURED ? `/${ADMIN_PORTAL_SLUG}` : null;
 
 // The slug can't change inside a running process, so compute the token once.
 let cachedToken: Promise<string> | null = null;
@@ -65,6 +65,9 @@ let cachedToken: Promise<string> | null = null;
  * and Node).
  */
 export function adminPortalToken(): Promise<string> {
+  if (!ADMIN_PORTAL_CONFIGURED) {
+    return Promise.reject(new Error('ADMIN_PORTAL_SLUG is not configured'));
+  }
   if (!cachedToken) {
     cachedToken = (async () => {
       const data = new TextEncoder().encode(`${ADMIN_PORTAL_SLUG}:${TOKEN_PEPPER}`);

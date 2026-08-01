@@ -73,23 +73,34 @@ export function JobActionsCard({ job }: { job: Job }) {
 
   async function handleApply() {
     if (!isLoggedIn()) { modalService.open(<PaywallModal mode="login" />); return; }
-    if (!isPro() && !freeTrialActive) { modalService.open(<PaywallModal mode="subscribe" />); return; }
-    if (isDaily && dailyLimitReached) {
-      toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
+
+    const safeTarget = (applyUrl?: string, applyEmail?: string): string | null => {
+      const raw = applyUrl || (applyEmail && `mailto:${applyEmail}`);
+      return isSafeOpenUrl(raw) ? raw : null;
+    };
+    const applyTarget = safeTarget(job.applyUrl, job.applyEmail);
+
+    // Existing applications retain access even after a trial/pass expires.
+    // The server only returns this channel after it verifies ownership of the
+    // tracked application.
+    if (applied) {
+      setApplying(true);
+      try {
+        const channel = applyTarget ? null : await applicationsApi.getChannel(job.id);
+        const target = applyTarget || safeTarget(channel?.applyUrl, channel?.applyEmail);
+        if (target) safeWindowOpen(target);
+        else toast('No application link available for this job', 'error');
+      } catch (err: any) {
+        toast(err.message ?? 'Could not load the application link', 'error');
+      } finally {
+        setApplying(false);
+      }
       return;
     }
 
-    const applyTargetRaw = job.applyUrl || (job.applyEmail && `mailto:${job.applyEmail}`);
-    const applyTarget    = isSafeOpenUrl(applyTargetRaw) ? applyTargetRaw : null;
-
-    // Already-applied path: skip the API call (no double-count on Day
-    // Pass, no duplicate-409) and just re-open the same link. Per user
-    // request applied users should keep clicking through — useful when
-    // they need to upload extra docs or check status on the employer
-    // site. The button itself signals "Applied" via the styling below.
-    if (applied) {
-      if (applyTarget) safeWindowOpen(applyTarget);
-      else toast('No application link available for this job', 'error');
+    if (!isPro() && !freeTrialActive) { modalService.open(<PaywallModal mode="subscribe" />); return; }
+    if (isDaily && dailyLimitReached) {
+      toast('Day Pass limit reached (10/10). Upgrade to Pro for unlimited.', 'error', 5000);
       return;
     }
 
@@ -109,7 +120,9 @@ export function JobActionsCard({ job }: { job: Job }) {
       const app = await applicationsApi.apply(job.id);
       addApplication(app);
       if (isDaily) incrementDailyApp();
-      if (applyTarget) safeWindowOpen(applyTarget);
+      const target = applyTarget || safeTarget(app.applyUrl, app.applyEmail);
+      if (target) safeWindowOpen(target);
+      else toast('Application tracked, but no application link is on file.', 'success');
     } catch (err: any) {
       toast(err.message, 'error');
     } finally {

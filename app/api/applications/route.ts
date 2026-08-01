@@ -9,12 +9,47 @@ import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
 // ── GET /api/applications — List current user's applications ─────────────
-export async function GET() {
+export async function GET(req?: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // A tracked application is the capability that reveals the off-site
+    // channel to free users. This lets them return to an application later
+    // without making the full jobs catalogue public.
+    const channelJobId = req ? new URL(req.url).searchParams.get('channel') : null;
+    if (channelJobId) {
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuid.test(channelJobId)) {
+        return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+      }
+
+      const { data: tracked } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('job_id', channelJobId)
+        .maybeSingle();
+      if (!tracked) {
+        return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+      }
+
+      const { data: job } = await createAdminSupabaseClient()
+        .from('jobs')
+        .select('apply_url, apply_email')
+        .eq('id', channelJobId)
+        .maybeSingle();
+      if (!job) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        applyUrl: job.apply_url ?? null,
+        applyEmail: job.apply_email ?? null,
+      });
     }
 
     const { data: applications, error } = await supabase
@@ -223,7 +258,7 @@ export async function POST(req: NextRequest) {
     const adminSupabase = createAdminSupabaseClient();
     const { data: job, error: jobError } = await adminSupabase
       .from('jobs')
-      .select('id, title, company, logo')
+      .select('id, title, company, logo, apply_url, apply_email')
       .eq('id', jobId)
       .maybeSingle();
 
@@ -314,7 +349,13 @@ export async function POST(req: NextRequest) {
       emailConfirmedAt: user.email_confirmed_at,
     }));
 
-    return NextResponse.json({ application: transformApplication(application) }, { status: 201 });
+    return NextResponse.json({
+      application: {
+        ...transformApplication(application),
+        applyUrl: job.apply_url ?? null,
+        applyEmail: job.apply_email ?? null,
+      },
+    }, { status: 201 });
   } catch (err: any) {
     logError({ event: 'applications.post_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to submit application. Please try again.' }, { status: 500 });

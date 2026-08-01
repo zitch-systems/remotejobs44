@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { HIDDEN_COMPANY_LABEL, scrubCompanyMentions } from './company-mask';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity, scrubCompanyMentions } from './company-mask';
 
 // These tests pin the server-side employer mask used by /jobs/[id]: for
 // non-subscribers the company name must not survive into the description,
@@ -49,5 +49,30 @@ describe('scrubCompanyMentions', () => {
 
   it('exports a non-empty display label', () => {
     expect(HIDDEN_COMPANY_LABEL.length).toBeGreaterThan(0);
+  });
+});
+
+
+describe('scrubCompanyIdentity', () => {
+  it('removes career URLs, bare domains, and recruiter emails', () => {
+    const text = [
+      'Apply at https://acme.com/careers/42?ref=board.',
+      'Questions: jobs@acme.com or www.acme.io/jobs.',
+      'Mirror: careers.acme.jobs/openings/42',
+    ].join(' ');
+    const result = scrubCompanyIdentity(text, 'Acme');
+    expect(result).not.toMatch(/acme\.(com|io|jobs)/i);
+    expect(result).not.toContain('jobs@');
+    expect(result).not.toContain('https://');
+    expect(result).toContain('application details available after applying');
+  });
+
+  it('scrubs the company name and mailto links together', () => {
+    const result = scrubCompanyIdentity(
+      '<a href="mailto:careers@acme.com">Email Acme</a>',
+      'Acme',
+    );
+    expect(result).not.toMatch(/acme/i);
+    expect(result).not.toMatch(/careers@/i);
   });
 });
