@@ -15,17 +15,32 @@ function clamp(s: string | null, fallback: string): string {
   return s.length > MAX_LEN ? s.slice(0, MAX_LEN) : s;
 }
 
+function imageSafeText(value: string): string {
+  return value
+    .replace(/₦/g, 'NGN ')
+    .replace(/€/g, 'EUR ')
+    .replace(/£/g, 'GBP ')
+    .replace(/[•·]/g, '-')
+    .replace(/[–—]/g, '-')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const title   = clamp(searchParams.get('title'),    'Find Remote Jobs');
-  const company = clamp(searchParams.get('company'),  '');
+  const title   = imageSafeText(clamp(searchParams.get('title'), 'Find Remote Jobs')) || 'Find Remote Jobs';
+  const company = imageSafeText(clamp(searchParams.get('company'), ''));
   // Only render US-dollar pay on the card. money labels are '$'-prefixed for
   // USD; non-USD glyphs (₦/€/£) both violate the product's USD-only rule AND
   // lack coverage in the default ImageResponse font (the ₦ badge used to crash
   // the edge renderer), so anything not starting with '$' is dropped.
   const salaryRaw = clamp(searchParams.get('salary'), '');
   const salary  = salaryRaw.startsWith('$') ? salaryRaw : '';
-  const sub     = clamp(searchParams.get('subtitle'), '70,000+ remote jobs • remotejobs44.com');
+  const sub     = imageSafeText(clamp(searchParams.get('subtitle'), '70,000+ remote jobs - remotejobs44.com'));
 
   return new ImageResponse(
     (
@@ -52,7 +67,7 @@ export async function GET(req: NextRequest) {
               display: 'flex', alignItems: 'center', gap: '8px',
               color: '#60a5fa', fontSize: 22, fontWeight: 600,
             }}>
-              📍 {company} · Remote
+              {`Remote at ${company}`}
             </div>
           )}
           <div style={{
@@ -64,17 +79,17 @@ export async function GET(req: NextRequest) {
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {salary && (
               <div style={{
-                background: '#1d4ed8', color: '#bfdbfe', padding: '8px 20px',
+                display: 'flex', background: '#1d4ed8', color: '#bfdbfe', padding: '8px 20px',
                 borderRadius: 999, fontSize: 18, fontWeight: 700,
               }}>
-                💰 {salary}
+                {`Salary ${salary}`}
               </div>
             )}
             <div style={{
               background: '#0f2040', border: '1px solid #1e3a5f',
               color: '#94a3b8', padding: '8px 20px', borderRadius: 999, fontSize: 18,
             }}>
-              🌍 Remote · Worldwide
+              Remote - Worldwide
             </div>
           </div>
         </div>
