@@ -96,6 +96,13 @@ jobs:
   # overflow/touch-target regression check.
   e2e:
     runs-on: ubuntu-latest
+    # These are the project's public, browser-safe Supabase coordinates.
+    # No service-role credential is present: E2E can only perform the same
+    # RLS-limited anonymous reads as a real signed-out visitor.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: 'https://gnyilmahiyddplsrrhoq.supabase.co'
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_Nlou0I27U4KFmppxMN46ow_q_WryHY3'
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
