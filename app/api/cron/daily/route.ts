@@ -186,7 +186,11 @@ export async function GET(req: NextRequest) {
   // same title+company+location accumulates active rows over time (the unique
   // index on apply_url can't catch those). dedupe_jobs() keeps the best row per
   // (title, company, location) and deactivates the rest — reversible, and it
-  // leaves the same role across different locations intact. See migration_v30.
+  // leaves the same role across different locations intact. See migration_v30,
+  // and migration_v69 for the index + per-run group cap that stopped this
+  // hitting the Postgres statement timeout every night. The cap means a large
+  // backlog drains over several nights rather than in one run, so a non-zero
+  // `deactivated` on consecutive days is expected while it catches up.
   try {
     const { data: deactivated, error: dedupeErr } = await supabase.rpc('dedupe_jobs');
     if (dedupeErr) throw dedupeErr;
