@@ -165,15 +165,15 @@ async function jobShard(shardIndex: number, now: Date): Promise<MetadataRoute.Si
   }
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
+export default async function sitemap({ id }: { id: number | string | Promise<number | string> }): Promise<MetadataRoute.Sitemap> {
   const now = today();
 
-  // Next.js supplies dynamic metadata route params as strings at runtime even
-  // though MetadataRoute's generated type declares a number. Normalise once:
-  // strict `id === 0` otherwise fails for "0", falls into jobShard(-1), and
+  // Next.js 16 supplies dynamic metadata route params as a promise-backed
+  // string at runtime. Await and normalise once: strict `id === 0` otherwise
+  // fails for "0", falls into jobShard(-1), and
   // every shard silently renders an empty <urlset> because jobShard catches
   // the invalid negative range.
-  const shardId = Number(id);
+  const shardId = Number(await Promise.resolve(id));
   if (!Number.isInteger(shardId) || shardId < 0) return [];
 
   // id 0 → the static/slice/company shard.
