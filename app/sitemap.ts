@@ -168,12 +168,20 @@ async function jobShard(shardIndex: number, now: Date): Promise<MetadataRoute.Si
 export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
   const now = today();
 
+  // Next.js supplies dynamic metadata route params as strings at runtime even
+  // though MetadataRoute's generated type declares a number. Normalise once:
+  // strict `id === 0` otherwise fails for "0", falls into jobShard(-1), and
+  // every shard silently renders an empty <urlset> because jobShard catches
+  // the invalid negative range.
+  const shardId = Number(id);
+  if (!Number.isInteger(shardId) || shardId < 0) return [];
+
   // id 0 → the static/slice/company shard.
-  if (id === 0) {
+  if (shardId === 0) {
     const [companies] = await Promise.all([companyRoutes(now)]);
     return [...staticAndSliceRoutes(now), ...companies];
   }
 
   // id ≥ 1 → job-URL shard (zero-based slice index = id - 1).
-  return jobShard(id - 1, now);
+  return jobShard(shardId - 1, now);
 }

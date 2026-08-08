@@ -6,7 +6,7 @@
     { "path": "/api/cron/ats-refresh", "schedule": "0 18 * * *" }
   ],
   "functions": {
-    "app/api/cron/daily/route.ts":        { "maxDuration": 60 },
+    "app/api/cron/daily/route.ts":        { "maxDuration": 120 },
     "app/api/cron/jobspy/route.ts":       { "maxDuration": 120 },
     "app/api/cron/ats-refresh/route.ts":  { "maxDuration": 60 },
     "app/api/cron/ingest/route.ts":       { "maxDuration": 60 },
@@ -19,7 +19,7 @@
     "app/api/admin/reconcile-payments/route.ts": { "maxDuration": 60 },
     "app/api/cv/route.ts":                { "maxDuration": 30 },
     "app/api/scrape/route.ts":            { "maxDuration": 30 },
-    "app/api/ats/route.ts":               { "maxDuration": 60, "memory": 1024 },
+    "app/api/ats/route.ts":               { "maxDuration": 60 },
     "app/api/jobs/route.ts":              { "maxDuration": 30 },
     "app/api/companies/route.ts":         { "maxDuration": 30 }
   }
