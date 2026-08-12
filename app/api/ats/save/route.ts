@@ -40,6 +40,32 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabaseClient();
 
+    // Scraped ATS content (titles/descriptions pulled from third-party boards)
+    // occasionally contains an unpaired UTF-16 surrogate — a common artifact
+    // of mis-decoded HTML/XML upstream. JSON.stringify happily round-trips a
+    // lone surrogate as a JS string, but the resulting request body has no
+    // valid UTF-8 encoding for it: Postgres's json input function rejects
+    // the ENTIRE row with "invalid input syntax for type json" (SQLSTATE
+    // 22P02), which — sent as a single-row retry — poisons that one row
+    // every time instead of ever landing. Strip unmatched surrogates before
+    // the row is built so a stray character doesn't cost the whole posting.
+    function stripLoneSurrogates(s: string): string {
+      let out = '';
+      for (let i = 0; i < s.length; i++) {
+        const code = s.charCodeAt(i);
+        if (code >= 0xD800 && code <= 0xDBFF) {
+          const next = s.charCodeAt(i + 1);
+          if (next >= 0xDC00 && next <= 0xDFFF) { out += s[i] + s[i + 1]; i++; }
+          // else: lone high surrogate — drop it
+        } else if (code >= 0xDC00 && code <= 0xDFFF) {
+          // lone low surrogate (any valid pair was already consumed above) — drop it
+        } else {
+          out += s[i];
+        }
+      }
+      return out;
+    }
+
     // Accept only http(s) URLs into the apply_url / source_url columns.
     // Callers feed this route from multiple sources (AI discovery, ATS
     // engine, company-import, raw paste) and not all of them validate
@@ -66,14 +92,20 @@ export async function POST(req: NextRequest) {
     function toTextArray(v: unknown): string[] | null {
       if (v == null) return null;
       if (Array.isArray(v)) {
-        const arr = v.map(x => String(x).trim()).filter(Boolean);
+        const arr = v.map(x => stripLoneSurrogates(String(x).trim())).filter(Boolean);
         return arr.length ? arr : null;
       }
       if (typeof v === 'string') {
-        const s = v.trim();
+        const s = stripLoneSurrogates(v.trim());
         return s ? [s] : null;
       }
       return null;
+    }
+
+    // Run a raw scraped value through stripLoneSurrogates, preserving
+    // non-string/nullish inputs (defaults below still apply via `??`).
+    function cleanStr<T>(v: T): T {
+      return (typeof v === 'string' ? stripLoneSurrogates(v) : v) as T;
     }
 
     // Transform camelCase Job to snake_case DB row. Dedup happens after
@@ -81,29 +113,29 @@ export async function POST(req: NextRequest) {
     // unique index (migration_v25), so a posting already in the DB is
     // skipped rather than duplicated.
     const rows = jobs.map(j => ({
-      title:        j.title ?? 'Untitled',
-      company:      j.company ?? 'Unknown',
-      logo:         j.logo ?? (j.company ? j.company[0] : '?'),
-      category:     j.category ?? 'other',
-      type:         j.type ?? 'full-time',
-      level:        j.level ?? null,
+      title:        cleanStr(j.title) ?? 'Untitled',
+      company:      cleanStr(j.company) ?? 'Unknown',
+      logo:         cleanStr(j.logo) ?? (j.company ? j.company[0] : '?'),
+      category:     cleanStr(j.category) ?? 'other',
+      type:         cleanStr(j.type) ?? 'full-time',
+      level:        cleanStr(j.level) ?? null,
       salary_min:   j.salaryMin ?? null,
       salary_max:   j.salaryMax ?? null,
-      currency:     j.currency ?? 'USD',
-      location:     j.location ?? 'Worldwide',
-      timezone:     j.timezone ?? null,
-      description:  j.description ?? '',
+      currency:     cleanStr(j.currency) ?? 'USD',
+      location:     cleanStr(j.location) ?? 'Worldwide',
+      timezone:     cleanStr(j.timezone) ?? null,
+      description:  cleanStr(j.description) ?? '',
       requirements: toTextArray(j.requirements),
       skills:       toTextArray(j.skills),
       benefits:     toTextArray(j.benefits),
       apply_url:    sanitiseUrl(j.applyUrl),
-      apply_email:  j.applyEmail ?? null,
+      apply_email:  cleanStr(j.applyEmail) ?? null,
       posted_at:    j.posted ? new Date(j.posted).toISOString() : new Date().toISOString(),
       expires_at:   j.expires ?? null,
       featured:     false,
       is_new:       true,
       is_active:    true,
-      source:       j.source ?? 'api',
+      source:       cleanStr(j.source) ?? 'api',
       source_url:   sanitiseUrl(j.sourceUrl),
       remote:       j.remote ?? true,
     }));
