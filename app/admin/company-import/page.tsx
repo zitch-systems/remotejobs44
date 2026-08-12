@@ -67,6 +67,22 @@ const SAVE_CONCURRENCY   = 3;
 const SAVE_BATCH_SIZE    = 500;
 const STATE_FLUSH_MS     = 250;   // batched setEntries cadence
 
+// A batch hitting the API's 60s lambda ceiling (or any platform-level
+// failure) comes back as a plain-text/HTML error page, not JSON — a bare
+// `res.json()` on that throws "Unexpected token '<'/'A'... is not valid
+// JSON", which is meaningless to whoever's driving the import. Read the body
+// as text first so failures surface the actual HTTP status + a snippet of
+// what came back instead of a raw parser error.
+async function readJsonResponse(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const snippet = text.trim().slice(0, 160) || res.statusText || 'empty response';
+    throw new Error(`Server returned HTTP ${res.status} (non-JSON): ${snippet}`);
+  }
+}
+
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
   greenhouse:      { label: 'Greenhouse',      color: 'text-brand-700 bg-brand-50 dark:text-brand-400 dark:bg-brand-900/20' },
   lever:           { label: 'Lever',           color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' },
@@ -359,7 +375,7 @@ export default function CompanyImportPage() {
           ? `/api/ats?platform=${live.platform}&slug=${live.slug}`
           : `/api/ats?url=${encodeURIComponent(live.url)}`;
         const res = await fetch(params);
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         const allJobs = data.jobs ?? [];
         queuePatch(entryId, {
           status:   data.error ? 'error' : 'done',
@@ -447,40 +463,62 @@ export default function CompanyImportPage() {
       let totalInserted = 0;
       let totalSkipped  = 0;  // existing postings deduped on apply_url
       let totalFailed   = 0;  // rows that errored at the DB
-      let firstError: string | null = null;
       // Capture the first per-batch DB error message so a partial-success
       // run can still surface what went wrong on the dead rows. Before
       // this, a 70% insert / 30% trigger-bug run would show "X saved · Y
       // skipped" looking like dedup and hide the real defect.
       let firstPartial: string | null = null;
+      // A single batch's request can blip (the API's 60s lambda ceiling
+      // under DB load, a transient network error) without the DATA being
+      // bad — retrying that one batch, rather than aborting every other
+      // in-flight/queued batch, is the difference between losing 500 jobs
+      // and losing all 90k of them. Batches that still fail after a retry
+      // are counted, not fatal — the admin sees what got saved and can
+      // re-run the save (already-saved jobs just dedupe as skipped).
+      let failedBatches = 0;
+      let firstBatchError: string | null = null;
       let cursor = 0;
       async function worker() {
         while (true) {
           const idx = cursor++;
-          if (idx >= batches.length || firstError) return;
+          if (idx >= batches.length) return;
           const batch = batches[idx];
-          try {
-            const res = await fetch('/api/ats/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jobs: batch }),
-            });
-            const data = await res.json();
-            if (!res.ok) { firstError = data.error ?? 'Failed to save jobs'; return; }
-            totalInserted += data.inserted ?? 0;
-            totalSkipped  += data.skipped  ?? 0;
-            totalFailed   += data.failed   ?? 0;
-            if (!firstPartial && data.partial_error) firstPartial = data.partial_error;
-          } catch (err: any) {
-            firstError = err.message ?? 'Network error';
+          let lastErr: string | null = null;
+          let ok = false;
+          for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+            try {
+              const res = await fetch('/api/ats/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobs: batch }),
+              });
+              const data = await readJsonResponse(res);
+              if (!res.ok) { lastErr = data.error ?? `Failed to save jobs (HTTP ${res.status})`; continue; }
+              totalInserted += data.inserted ?? 0;
+              totalSkipped  += data.skipped  ?? 0;
+              totalFailed   += data.failed   ?? 0;
+              if (!firstPartial && data.partial_error) firstPartial = data.partial_error;
+              ok = true;
+            } catch (err: any) {
+              lastErr = err.message ?? 'Network error';
+            }
+          }
+          if (!ok) {
+            failedBatches++;
+            if (!firstBatchError) firstBatchError = lastErr;
           }
         }
       }
       await Promise.all(Array.from({ length: SAVE_CONCURRENCY }, () => worker()));
-      if (firstError) {
-        alert(firstError);
-        setSaving(false);
-        return;
+
+      if (failedBatches > 0) {
+        const lostJobs = failedBatches * SAVE_BATCH_SIZE;
+        alert(
+          `${failedBatches} of ${batches.length} batches failed to save even after a retry ` +
+          `(~${lostJobs} jobs, first error: ${firstBatchError}).\n\n` +
+          `${totalInserted} jobs from the other batches saved fine. Click "Save" again to retry ` +
+          `— already-saved jobs will just be skipped as duplicates.`
+        );
       }
       // Partial-failure path: show the DB error message so the admin
       // doesn't silently lose rows thinking they were just dedup'd.
