@@ -39,6 +39,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminSupabaseClient();
   const log: Record<string, unknown> = { startedAt: new Date().toISOString() };
+  // Names of the tasks that failed this run. Every task below is independent
+  // and best-effort — one failing must not stop the others — but the route
+  // used to answer 200 {success:true} no matter what, so a run where every
+  // task errored looked identical to a clean one in Vercel's cron log. That is
+  // how a nightly job dies unnoticed.
+  const failures: string[] = [];
 
   // ── TASK 1: Ingest fresh jobs from every active source ─────────────
   // Delegate to the shared pipeline so the cron and the admin
@@ -64,6 +70,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     logError({ event: 'cron.daily.ingest_failed', error: err.message });
     log.ingest = { error: err.message };
+    failures.push('ingest');
   }
 
   // ── TASK 2: Expire subscriptions (all tiers) ──────────────────────────
@@ -77,13 +84,20 @@ export async function GET(req: NextRequest) {
   // ids from the rows actually updated. A Paystack renewal landing between a
   // stale SELECT and the write would otherwise still downgrade a just-paid
   // user; this mirrors the fix already applied in /api/cron/expire-daily.
-  const { data: expiredDaily } = await supabase
+  const { data: expiredDaily, error: dailyExpiryErr } = await supabase
     .from('subscriptions')
     .update({ status: 'expired' })
     .eq('billing', 'daily')
     .eq('status', 'active')
     .lt('current_period_end', now)
     .select('user_id');
+  // A failed expiry leaves lapsed users on a paid plan indefinitely, so it has
+  // to be loud. Without the error check the empty result read as "nobody
+  // expired today" — indistinguishable from a healthy run.
+  if (dailyExpiryErr) {
+    logError({ event: 'cron.daily.expire_day_pass_failed', error: dailyExpiryErr.message });
+    failures.push('expiry.day_pass');
+  }
 
   let expiredDayPasses = 0;
   if (expiredDaily && expiredDaily.length > 0) {
@@ -97,7 +111,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Pro Monthly / Annual — 24h grace. Same compare-and-set as the daily branch.
-  const { data: expiredPro } = await supabase
+  const { data: expiredPro, error: proExpiryErr } = await supabase
     .from('subscriptions')
     .update({ status: 'expired' })
     .in('billing', ['monthly', 'annually'])
@@ -108,6 +122,11 @@ export async function GET(req: NextRequest) {
     .lt('current_period_end', proCutoff)
     .select('user_id');
 
+  if (proExpiryErr) {
+    logError({ event: 'cron.daily.expire_pro_failed', error: proExpiryErr.message });
+    failures.push('expiry.pro');
+  }
+
   let expiredPro_n = 0;
   if (expiredPro && expiredPro.length > 0) {
     const ids = expiredPro.map((s: { user_id: string }) => s.user_id);
@@ -116,7 +135,12 @@ export async function GET(req: NextRequest) {
     expiredPro_n = ids.length;
   }
 
-  log.expiry = { expiredDayPasses, expiredPro: expiredPro_n };
+  log.expiry = {
+    expiredDayPasses,
+    expiredPro: expiredPro_n,
+    ...(dailyExpiryErr ? { dayPassError: dailyExpiryErr.message } : {}),
+    ...(proExpiryErr   ? { proError:     proExpiryErr.message   } : {}),
+  };
 
   // ── TASK 3: Job freshness pass ────────────────────────────────────
   //   * Mark jobs older than 7 days as is_new = false (UI badge).
@@ -133,22 +157,38 @@ export async function GET(req: NextRequest) {
   const sevenDaysAgo = new Date(Date.now() - NEW_JOB_DAYS  * 86_400_000).toISOString();
   const staleCutoff  = new Date(Date.now() - STALE_JOB_DAYS * 86_400_000).toISOString();
 
-  const { count: unflaggedNew } = await supabase
+  // Both sweeps rewrite a large slice of a six-figure table, which is exactly
+  // the shape that trips the Postgres statement timeout (see migration_v69 for
+  // the same failure in dedupe_jobs). supabase-js reports that as { error },
+  // not a throw — so discarding the error, as this did, reported a timed-out
+  // sweep as "0 rows" and left the freshness pass looking healthy while jobs
+  // stayed flagged new and stale rows stayed live.
+  const { count: unflaggedNew, error: unflagErr } = await supabase
     .from('jobs')
     .update({ is_new: false }, { count: 'exact' })
     .eq('is_new', true)
     .lt('posted_at', sevenDaysAgo);
+  if (unflagErr) {
+    logError({ event: 'cron.daily.unflag_new_failed', error: unflagErr.message });
+    failures.push('freshness.mark_not_new');
+  }
 
-  const { count: deactivated } = await supabase
+  const { count: deactivated, error: staleErr } = await supabase
     .from('jobs')
     .update({ is_active: false }, { count: 'exact' })
     .eq('is_active', true)
     .lt('last_seen_at', staleCutoff);
+  if (staleErr) {
+    logError({ event: 'cron.daily.stale_sweep_failed', error: staleErr.message });
+    failures.push('freshness.stale_sweep');
+  }
 
   log.freshness = {
     markedNotNew:   unflaggedNew ?? 0,
     deactivated:    deactivated  ?? 0,
     staleAfterDays: STALE_JOB_DAYS,
+    ...(unflagErr ? { markedNotNewError: unflagErr.message } : {}),
+    ...(staleErr  ? { deactivatedError:  staleErr.message  } : {}),
   };
 
   // ── TASK 3.5: Purge old paystack_webhook_events ────────────────────────
@@ -159,13 +199,18 @@ export async function GET(req: NextRequest) {
   // ops-issue investigation.
   const WEBHOOK_RETAIN_DAYS = 90;
   const webhookCutoff = new Date(Date.now() - WEBHOOK_RETAIN_DAYS * 86_400_000).toISOString();
-  const { count: purgedWebhooks } = await supabase
+  const { count: purgedWebhooks, error: purgeErr } = await supabase
     .from('paystack_webhook_events')
     .delete({ count: 'exact' })
     .lt('received_at', webhookCutoff);
+  if (purgeErr) {
+    logError({ event: 'cron.daily.webhook_purge_failed', error: purgeErr.message });
+    failures.push('webhook_purge');
+  }
   log.webhookPurge = {
     purged:          purgedWebhooks ?? 0,
     retainDays:      WEBHOOK_RETAIN_DAYS,
+    ...(purgeErr ? { error: purgeErr.message } : {}),
   };
 
   // ── TASK 3.6: Reconcile missed Paystack charges ─────────────────────────
@@ -179,6 +224,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     logError({ event: 'cron.daily.reconcile_failed', error: err?.message ?? String(err) });
     log.reconcile = { error: err?.message ?? String(err) };
+    failures.push('reconcile');
   }
 
   // ── TASK 3.7: De-duplicate jobs ─────────────────────────────────────────
@@ -198,6 +244,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     logError({ event: 'cron.daily.dedupe_failed', error: err?.message ?? String(err) });
     log.jobDedupe = { error: err?.message ?? String(err) };
+    failures.push('dedupe');
   }
 
 
@@ -296,10 +343,19 @@ export async function GET(req: NextRequest) {
     }
   } catch (err: any) {
     logError({ event: 'cron.daily.alert_emails_failed', error: err.message });
+    log.alertsError = err.message;
+    failures.push('alerts');
   }
   log.alerts = { sent: alertsSent, skipped_by_prefs: alertsSkipped };
 
   log.completedAt = new Date().toISOString();
 
+  // Answer 500 when any task failed so the failure shows up in Vercel's cron
+  // log as a failed invocation. Everything that DID succeed is already
+  // committed — the tasks are independent and there is no transaction to roll
+  // back — so the status code is a signal, not a retraction.
+  if (failures.length > 0) {
+    return NextResponse.json({ success: false, failures, ...log }, { status: 500 });
+  }
   return NextResponse.json({ success: true, ...log });
 }

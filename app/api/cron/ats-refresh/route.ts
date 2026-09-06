@@ -23,6 +23,15 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const result = await refreshStaleATSBoards(supabase, { budgetMs: 50_000, maxBoards: 300 });
 
+    // The sweep couldn't even get its board list (missing/failing
+    // stale_ats_boards RPC). Answer 500 rather than dressing an outage up as
+    // {success:true, boardsConsidered:0, ...} — that shape is identical to a
+    // healthy "nothing was stale" run, which is how this went unnoticed while
+    // every ATS posting aged towards the 60-day staleness cliff.
+    if (result.error) {
+      return NextResponse.json({ success: false, ...result }, { status: 500 });
+    }
+
     // Flush the public listings only when something actually changed, so a
     // no-op run leaves the warm cache alone.
     if (result.added > 0 || result.reactivated > 0) {

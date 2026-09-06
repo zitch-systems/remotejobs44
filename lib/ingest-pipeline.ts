@@ -27,6 +27,7 @@ import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
 import { enrichDirectApplyLinks } from '@/lib/apply-link';
 import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl, jobIdentityKey, filterByIdentity } from '@/lib/dedupe-jobs';
+import { touchLastSeen, batchByLength } from '@/lib/jobs-last-seen';
 import {
   isJobSpyConfigured, fetchJobSpyJobs, jobSpyJobToDbRow,
   jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES, JobSpyHttpError,
@@ -456,7 +457,7 @@ export async function runIngest(): Promise<IngestResult> {
         // default; this covers the ones ON CONFLICT DO NOTHING skipped. We
         // deliberately don't flip is_active, so an admin soft-delete
         // (companies/remove) isn't undone.
-        await touchLastSeen(supabase, deduped);
+        await touchLastSeen(supabase, deduped.map(r => r.apply_url), source.name);
         await recordSourceRun(supabase, source, up.inserted, 'ok');
       }
     } catch (err: any) {
@@ -476,10 +477,21 @@ export async function runIngest(): Promise<IngestResult> {
   // directly).
   const hardcodedUrls = new Set(SOURCES.map(s => s.sourceUrl));
   try {
+    // 'error' rows are included deliberately. markSourceStatus() writes
+    // status='error' on ANY failure — a 502 from the origin, a DNS blip, a
+    // timeout — so selecting only status='active' meant a single transient
+    // failure removed a source from every subsequent run, permanently, with
+    // nothing in the pipeline to ever retry it. Only an explicit
+    // status='paused' — an admin decision — keeps a source out of the run.
     const { data: customRows } = await supabase
       .from('job_sources')
       .select('id, name, url, method')
-      .eq('status', 'active');
+      .in('status', ['active', 'error'])
+      // Least-recently-attempted first. markSourceStatus() stamps last_sync_at
+      // on failures too, so a source that keeps erroring rotates to the back
+      // instead of eating the front of the budget every run and starving the
+      // healthy ones behind it.
+      .order('last_sync_at', { ascending: true, nullsFirst: true });
     const customSources = (customRows ?? []).filter(r => !hardcodedUrls.has(r.url));
     // Budget counts from the start of the whole ingest (the hardcoded
     // loop eats into it), with a small floor so user sources always get
@@ -586,7 +598,7 @@ export async function runIngest(): Promise<IngestResult> {
           // Still bump last_seen for previously-ingested items that are
           // in the feed this run, so they don't age out at 60 days.
           if (knownSeenUrls.length) {
-            await touchLastSeen(supabase, knownSeenUrls.map(u => ({ apply_url: u })));
+            await touchLastSeen(supabase, knownSeenUrls, label);
           }
           results[label] = 0;
           await markSourceStatus(supabase, row.id, 'active', 0);
@@ -603,9 +615,9 @@ export async function runIngest(): Promise<IngestResult> {
             ? `${up.inserted} (${up.failed} rows failed: ${up.firstError})`
             : up.inserted;
           totalAdded += up.inserted;
-          await touchLastSeen(supabase, deduped);
+          await touchLastSeen(supabase, deduped.map(r => r.apply_url), label);
           if (knownSeenUrls.length) {
-            await touchLastSeen(supabase, knownSeenUrls.map(u => ({ apply_url: u })));
+            await touchLastSeen(supabase, knownSeenUrls, label);
           }
           await markSourceStatus(supabase, row.id, 'active', up.inserted);
         }
@@ -769,7 +781,7 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
           // Bump last_seen for the kept rows AND the cross-source dupes we
           // skipped: the platform's existing copy of a still-listed role must
           // stay fresh so it doesn't age out just because JobSpy deferred to it.
-          await touchLastSeen(supabase, deduped);
+          await touchLastSeen(supabase, deduped.map(r => r.apply_url), source.name);
           await recordSourceRun(supabase, source, up.inserted, 'ok');
         }
       } catch (err: any) {
@@ -851,24 +863,12 @@ function rotateByDay<T>(arr: T[]): T[] {
   return [...arr.slice(offset), ...arr.slice(0, offset)];
 }
 
-// Refresh last_seen_at for a batch of postings we just saw in a feed.
-// New rows already carry last_seen_at via the column default; this covers
-// the existing rows the ON CONFLICT DO NOTHING upsert left untouched, so a
-// posting that keeps appearing never ages out of the 60-day staleness
-// sweep. Best-effort — a failure here must not fail the ingest, and we
-// never touch is_active (so an admin soft-delete stays deleted).
-async function touchLastSeen(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  rows: Array<Record<string, any>>,
-) {
-  const urls = Array.from(new Set(rows.map(r => r.apply_url).filter(Boolean)));
-  if (urls.length === 0) return;
-  try {
-    await supabase.from('jobs').update({ last_seen_at: new Date().toISOString() }).in('apply_url', urls);
-  } catch (err: any) {
-    logWarn({ event: 'ingest.touch_last_seen_failed', error: err?.message ?? String(err) });
-  }
-}
+// last_seen_at bumps go through lib/jobs-last-seen.ts. The local copy that
+// used to live here sent every apply_url in the batch as one PostgREST IN
+// list and discarded the returned error, so an over-long request line failed
+// silently and the postings it covered aged out of the 60-day staleness sweep
+// while their feeds were still listing them. The shared helper batches by
+// request size and logs what fails.
 
 // Chunked upsert with row-level isolation. The search_vector GIN trigger
 // can't take big INSERT batches reliably, and a single bad row in a
@@ -926,19 +926,30 @@ async function prepareWpjmRows(
   const withKeys = rows.map(r => ({ ...r, source_url: r.apply_url }));
   const links = withKeys.map(r => r.source_url as string);
 
-  let knownLinks = new Set<string>();
-  let knownApplyUrls: string[] = [];
-  try {
-    const { data } = await supabase
-      .from('jobs')
-      .select('apply_url, source_url')
-      .in('source_url', links);
-    knownLinks = new Set((data ?? []).map(k => k.source_url as string));
-    knownApplyUrls = (data ?? []).map(k => k.apply_url as string).filter(Boolean);
-  } catch (err: any) {
-    // Non-fatal: worst case we re-enrich known items and the apply_url
-    // upsert dedupes them.
-    logWarn({ event: 'ingest.wpjm_known_check_failed', source: label, error: err?.message ?? String(err) });
+  const knownLinks = new Set<string>();
+  const knownApplyUrls: string[] = [];
+  // Batched for the same reason as the last_seen_at bumps: this IN list is
+  // board detail-page URLs, and sending 200 of them at once overruns the
+  // PostgREST request line. supabase-js returns that as { error }, not a
+  // throw, so the previous single-shot version reported "nothing known" and we
+  // re-enriched every item on every run — burning the WPJM_ENRICH_MAX budget
+  // on items already stored instead of on the new ones.
+  for (const batch of batchByLength(links)) {
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('apply_url, source_url')
+        .in('source_url', batch);
+      if (error) throw new Error(error.message);
+      for (const k of data ?? []) {
+        knownLinks.add(k.source_url as string);
+        if (k.apply_url) knownApplyUrls.push(k.apply_url as string);
+      }
+    } catch (err: any) {
+      // Non-fatal: worst case we re-enrich known items and the apply_url
+      // upsert dedupes them.
+      logWarn({ event: 'ingest.wpjm_known_check_failed', source: label, error: err?.message ?? String(err) });
+    }
   }
 
   const fresh = withKeys.filter(r => !knownLinks.has(r.source_url));

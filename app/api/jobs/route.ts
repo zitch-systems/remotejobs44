@@ -94,6 +94,13 @@ export async function GET(req: NextRequest) {
   const timezone = searchParams.get('timezone') ?? '';
   const posted   = searchParams.get('posted') ?? '';
   const sort     = searchParams.get('sort') ?? 'newest';
+  // Admin-only visibility override. The public listing hides is_active=false,
+  // expired and flagged rows — correct for visitors, but it also meant
+  // /admin/jobs (which reads this endpoint) could not show the very rows the
+  // ingest flags for an admin to sweep, nor anything the 60-day staleness
+  // pass had retired. Ignored for non-admins: the value is only honoured
+  // after requireAdmin() passes, below.
+  const visibilityParam = searchParams.get('visibility') ?? '';
   // Clamp page/perPage at the route boundary so attacker-supplied or
   // fat-fingered values don't cascade into a 500. Audit found:
   //   ?perPage=-5    → range(0, -6) → PostgREST 500
@@ -107,6 +114,17 @@ export async function GET(req: NextRequest) {
   const rawPerPage = parseInt(searchParams.get('perPage') ?? '12', 10);
   const page    = Number.isFinite(rawPage)    && rawPage    > 0 ? Math.min(rawPage,    1000) : 1;
   const perPage = Number.isFinite(rawPerPage) && rawPerPage > 0 ? Math.min(rawPerPage, 50)   : 12;
+
+  // Authorise the visibility override before any DB work. Only these three
+  // values exist; anything else is treated as absent rather than rejected, so
+  // a stray query param can't 400 a public listing request.
+  type AdminView = 'all' | 'flagged' | 'inactive';
+  let adminView: AdminView | null = null;
+  if (visibilityParam === 'all' || visibilityParam === 'flagged' || visibilityParam === 'inactive') {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.res;
+    adminView = visibilityParam;
+  }
 
   try {
     // Resolve plan via the session-bound client — getRequesterPlan
@@ -172,6 +190,45 @@ export async function GET(req: NextRequest) {
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid, seeCompany)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });
+    }
+
+    // ── ADMIN PATH: moderation view over the unfiltered table ─────────
+    // Deliberately does NOT go through search_jobs(): that RPC hard-codes
+    // `is_active AND not flagged AND not expired` in SQL (migration_v17), so
+    // routing an admin sweep through it would return exactly the rows the
+    // sweep is supposed to skip past. A trigram-indexed ILIKE on
+    // title/company (jobs_title_trgm_idx / jobs_company_trgm_idx) covers the
+    // "find the scam posting I just saw" case this screen actually needs.
+    if (adminView) {
+      let aq = supabase.from('jobs').select('*', { count: 'exact' });
+      if (adminView === 'flagged')  aq = aq.eq('flagged', true);
+      if (adminView === 'inactive') aq = aq.eq('is_active', false);
+      // Strip the characters that would change the meaning of the filter
+      // rather than the search: backslash and double-quote (PostgREST's
+      // in-value escapes) and the LIKE wildcards % and _ (a bare '_' would
+      // match any character and a bare '%' would match everything). The value
+      // is then double-quoted, which is what makes a comma, colon or bracket
+      // in a company name — "Acme, Inc." — part of the search term instead of
+      // a separator that splits the OR list and errors the query.
+      const adminQ = q.replace(/[\\"%_]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (adminQ) {
+        aq = aq.or(`title.ilike."%${adminQ}%",company.ilike."%${adminQ}%"`);
+      }
+      if (category) aq = aq.eq('category', category);
+      if (type)     aq = aq.eq('type', type);
+      if (level)    aq = aq.eq('level', level);
+      const aFrom = (page - 1) * perPage;
+      const { data: rows, count, error } = await aq
+        .order('created_at', { ascending: false })
+        .range(aFrom, aFrom + perPage - 1);
+      if (error) throw new Error(error.message);
+      const total = count ?? 0;
+      return NextResponse.json({
+        jobs: (rows ?? []).map((j: any) => transformJob(j, true, true)),
+        total, page, perPage,
+        pages: Math.max(1, Math.ceil(total / perPage)),
+        visibility: adminView,
+      });
     }
 
     // ── Q-PRESENT PATH: relevance-ranked FTS via search_jobs RPC ───────
@@ -669,7 +726,17 @@ function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = tru
     benefits:     Array.isArray(j.benefits) ? j.benefits.map((b: any) => scrub(String(b))) : (j.benefits ?? null),
     applyUrl:     seePaid ? (j.apply_url   ?? null) : null,
     applyEmail:   seePaid ? (j.apply_email ?? null) : null,
+    // `posted` / `expires` are the names the Job type and every consumer
+    // actually read (JobCard, the job detail page, both admin job lists).
+    // Emitting only the postedAt/expiresAt spelling meant `job.posted` was
+    // undefined downstream and formatRelativeDate(undefined) rendered an empty
+    // cell — which is why the Posted column on /admin/jobs and the /admin
+    // overview was blank. app/jobs/[id]/page.tsx maps posted_at → posted for
+    // exactly this reason. Both spellings are emitted so nothing that already
+    // reads postedAt breaks.
+    posted:       j.posted_at ?? j.created_at,
     postedAt:     j.posted_at ?? j.created_at,
+    expires:      j.expires_at ?? null,
     expiresAt:    j.expires_at ?? null,
     featured:     j.featured ?? false,
     isNew:        j.is_new ?? false,
@@ -677,5 +744,9 @@ function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = tru
     sourceUrl:    seeCompany ? (j.source_url ?? null) : null,
     remote:       j.remote ?? true,
     isActive:     j.is_active ?? true,
+    // Moderation state, for the admin views. Public responses never carry a
+    // flagged row (the listing filters them out), so this reads false there.
+    flagged:      j.flagged ?? false,
+    flaggedReason: j.flagged_reason ?? null,
   };
 }

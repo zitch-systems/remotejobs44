@@ -25,14 +25,15 @@ type SourceStatus = 'active' | 'paused' | 'error';
 const ALLOWED_METHODS = new Set<SourceMethod>(['rss', 'json-api', 'scrape', 'auto', 'unknown']);
 
 interface SourceRow {
-  id:           string;
-  name:         string;
-  url:          string;
-  method:       string;
-  status:       string;
-  last_sync_at: string | null;
-  jobs_added:   number;
-  created_at:   string;
+  id:            string;
+  name:          string;
+  url:           string;
+  method:        string;
+  status:        string;
+  last_sync_at:  string | null;
+  jobs_added:    number;
+  error_message: string | null;
+  created_at:    string;
 }
 
 // GET — list every source. Admin UI renders one row per record.
@@ -43,7 +44,7 @@ export async function GET() {
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from('job_sources')
-    .select('id, name, url, method, status, last_sync_at, jobs_added, created_at')
+    .select('id, name, url, method, status, last_sync_at, jobs_added, error_message, created_at')
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) {
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
       },
       { onConflict: 'url' },
     )
-    .select('id, name, url, method, status, last_sync_at, jobs_added, created_at')
+    .select('id, name, url, method, status, last_sync_at, jobs_added, error_message, created_at')
     .single();
   if (error || !data) {
     logError({ event: 'admin.sources.create_failed', error: error?.message ?? 'unknown' });

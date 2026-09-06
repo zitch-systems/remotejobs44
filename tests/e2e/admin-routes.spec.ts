@@ -61,6 +61,29 @@ test.describe('Admin API routes (anonymous)', () => {
   });
 });
 
+// /api/jobs is a public endpoint, but its `visibility` parameter lifts the
+// listing's is_active / not-expired / not-flagged gates for the admin
+// moderation screen. It must stay behind requireAdmin: without the gate it
+// would hand any caller the rows the public listing deliberately hides.
+test.describe('Admin visibility override on /api/jobs (anonymous)', () => {
+  for (const visibility of ['all', 'flagged', 'inactive']) {
+    test(`GET /api/jobs?visibility=${visibility} returns 401`, async ({ request }) => {
+      const res = await request.get(`/api/jobs?visibility=${visibility}`);
+      expect(res.status()).toBe(401);
+    });
+  }
+
+  test('an unrecognised visibility value does not trigger the admin gate', async ({ request }) => {
+    // A stray/unknown value falls through to the public listing rather than
+    // being rejected, so it must not answer 401/403. The exact success status
+    // isn't asserted: this endpoint needs a service-role key that CI
+    // deliberately doesn't provide, so a 500 here is an environment fact, not
+    // an authorisation decision.
+    const res = await request.get('/api/jobs?visibility=bogus&perPage=1');
+    expect([401, 403]).not.toContain(res.status());
+  });
+});
+
 test.describe('Profile self-service routes (anonymous)', () => {
   test('GET /api/profile/billing returns 401', async ({ request }) => {
     const res = await request.get('/api/profile/billing');
