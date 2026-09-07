@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
   const body = await req.json().catch(() => ({}));
-  const patch: Record<string, string> = {};
+  const patch: Record<string, string | null> = {};
   if (typeof body.name === 'string') {
     patch.name = body.name.trim().slice(0, 100);
   }
@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Status must be active or paused' }, { status: 400 });
     }
     patch.status = body.status;
+    // Clearing the stored failure on resume: the reason belongs to the run
+    // that failed, and leaving it behind makes a source an admin has just
+    // re-enabled keep rendering as broken until the next run overwrites it.
+    if (body.status === 'active') patch.error_message = null;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
@@ -49,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('job_sources')
     .update(patch)
     .eq('id', id)
-    .select('id, name, url, method, status, last_sync_at, jobs_added, created_at')
+    .select('id, name, url, method, status, last_sync_at, jobs_added, error_message, created_at')
     .single();
   if (error || !data) {
     logError({ event: 'admin.source.patch_failed', admin_email: auth.adminEmail, source_id: id, error: error?.message ?? 'unknown' });

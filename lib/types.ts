@@ -53,6 +53,11 @@ export interface Job {
   views?: number;
   applications?: number;
   remote: boolean;
+  // Moderation state. Only ever populated for admin callers — the public
+  // listing filters flagged and inactive rows out before they reach a client.
+  isActive?: boolean;
+  flagged?: boolean;
+  flaggedReason?: string | null;
 }
 
 export interface Company {

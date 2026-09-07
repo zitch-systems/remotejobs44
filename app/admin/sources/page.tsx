@@ -16,14 +16,18 @@ import {
 import { cn } from '@/lib/utils';
 
 interface SourceRow {
-  id:           string;
-  name:         string;
-  url:          string;
-  method:       string;
-  status:       'active' | 'paused' | 'error';
-  last_sync_at: string | null;
-  jobs_added:   number;
-  created_at:   string;
+  id:            string;
+  name:          string;
+  url:           string;
+  method:        string;
+  status:        'active' | 'paused' | 'error';
+  last_sync_at:  string | null;
+  jobs_added:    number;
+  // Why the last run failed. The ingest has always written this column; the
+  // API just never selected it, so an "Error" row gave the admin a red dot and
+  // no way to find out what broke.
+  error_message: string | null;
+  created_at:    string;
 }
 
 const METHOD_META: Record<string, { label: string; color: string }> = {
@@ -63,6 +67,11 @@ export default function SourcesPage() {
     paused?: string[];
     skipped?: boolean;
     reason?: string;
+    // "Run now" also drives the JobSpy top-up and the ATS board sweep. Both
+    // came back in the response and were dropped on the floor, so the ~34k ATS
+    // postings — the bulk of the catalogue — refreshed with no feedback at all.
+    jobspy?: { totalAdded?: number; skipped?: boolean; reason?: string };
+    ats?: { boardsRefreshed?: number; added?: number; reactivated?: number; errors?: number; timedOut?: boolean; error?: string };
   } | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
 
@@ -148,13 +157,25 @@ export default function SourcesPage() {
   }
 
   async function handleTogglePause(source: SourceRow) {
-    const next = source.status === 'paused' ? 'active' : 'paused';
+    // 'error' resumes to 'active', it does not pause. The old ternary keyed
+    // only off 'paused', so the one action available on a broken source was to
+    // pause it — and since the ingest skipped non-active rows, an admin had no
+    // way at all to put a recovered source back into the run.
+    const next = source.status === 'active' ? 'paused' : 'active';
     try {
-      await fetch(`/api/admin/sources/${source.id}`, {
+      const r = await fetch(`/api/admin/sources/${source.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       });
+      // fetch only rejects on a network failure, so without this a 4xx/5xx
+      // fell through to loadSources() and the row simply snapped back to its
+      // old state with no explanation.
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({} as { error?: string }));
+        throw new Error(j.error || `Failed to ${next === 'active' ? 'resume' : 'pause'} ${source.name}`);
+      }
+      setError(null);
       await loadSources();
     } catch (err: any) {
       setError(err.message);
@@ -184,6 +205,8 @@ export default function SourcesPage() {
         paused:     j.paused,
         skipped:    j.skipped,
         reason:     j.reason,
+        jobspy:     j.jobspy,
+        ats:        j.ats,
       });
       // Refresh the list so last_sync_at / jobs_added are current.
       await loadSources();
@@ -233,6 +256,29 @@ export default function SourcesPage() {
                   </ul>
                   {ingestResult.paused && ingestResult.paused.length > 0 && (
                     <p className="mt-1 text-stone-400">Paused: {ingestResult.paused.join(', ')}</p>
+                  )}
+                  {ingestResult.jobspy && (
+                    <p className="mt-1 text-stone-600 dark:text-stone-300">
+                      <span className="font-semibold">JobSpy:</span>{' '}
+                      {ingestResult.jobspy.skipped
+                        ? (ingestResult.jobspy.reason ?? 'skipped')
+                        : `${ingestResult.jobspy.totalAdded ?? 0} added`}
+                    </p>
+                  )}
+                  {ingestResult.ats && (
+                    ingestResult.ats.error ? (
+                      <p className="mt-1 text-red-600 dark:text-red-400">
+                        <span className="font-semibold">ATS boards:</span> {ingestResult.ats.error}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-stone-600 dark:text-stone-300">
+                        <span className="font-semibold">ATS boards:</span>{' '}
+                        {ingestResult.ats.boardsRefreshed ?? 0} refreshed · {ingestResult.ats.added ?? 0} added ·{' '}
+                        {ingestResult.ats.reactivated ?? 0} reactivated
+                        {ingestResult.ats.errors ? ` · ${ingestResult.ats.errors} failed` : ''}
+                        {ingestResult.ats.timedOut ? ' · budget reached, more next run' : ''}
+                      </p>
+                    )
                   )}
                 </div>
               )
@@ -356,6 +402,11 @@ export default function SourcesPage() {
                       Synced {new Date(source.last_sync_at).toLocaleString()}
                     </p>
                   )}
+                  {isError && source.error_message && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 break-words" title={source.error_message}>
+                      {source.error_message}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <a href={source.url} target="_blank" rel="noopener noreferrer"
@@ -365,8 +416,9 @@ export default function SourcesPage() {
                   </a>
                   <button onClick={() => handleTogglePause(source)}
                     className="p-1.5 rounded-md text-stone-400 hover:text-amber-600 hover:bg-stone-100 dark:hover:bg-[#162033] transition-colors"
-                    title={isPaused ? 'Resume' : 'Pause'}>
-                    {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    aria-label={isPaused || isError ? `Resume ${source.name}` : `Pause ${source.name}`}
+                    title={isPaused ? 'Resume' : isError ? 'Retry — clears the error and re-enables this source' : 'Pause'}>
+                    {isPaused || isError ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                   </button>
                   <button onClick={() => handleDelete(source)}
                     className="p-1.5 rounded-md text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"

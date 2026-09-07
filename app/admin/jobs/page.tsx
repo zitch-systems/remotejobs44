@@ -9,6 +9,20 @@ import type { Job } from '@/lib/types';
 
 const PER_PAGE = 50;
 
+// Moderation views. "Live" is the public listing (active, unexpired,
+// unflagged); the others ask /api/jobs for its admin-gated visibility
+// override. Without them this screen could only ever show what a visitor
+// sees — so the rows the ingest flags as suspected scams, and everything the
+// 60-day staleness sweep retired, were unreachable from the admin UI even
+// though the flag exists specifically for an admin to act on.
+const VIEWS = [
+  { key: '',         label: 'Live' },
+  { key: 'all',      label: 'All' },
+  { key: 'flagged',  label: 'Flagged' },
+  { key: 'inactive', label: 'Inactive' },
+] as const;
+type ViewKey = (typeof VIEWS)[number]['key'];
+
 export default function AdminJobsPage() {
   const { toast } = useUIStore();
   const [jobs, setJobs]         = useState<Job[]>([]);
@@ -21,6 +35,7 @@ export default function AdminJobsPage() {
   const [error, setError]       = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [view, setView]         = useState<ViewKey>('');
 
   // Debounce the search box and reset to page 1 whenever the query changes.
   // The previous version filtered the 50 already-loaded rows client-side, so
@@ -42,6 +57,7 @@ export default function AdminJobsPage() {
     setError(false);
     const params = new URLSearchParams({ page: String(page), perPage: String(PER_PAGE) });
     if (debouncedQ) params.set('q', debouncedQ);
+    if (view) params.set('visibility', view);
     fetch(`/api/jobs?${params.toString()}`)
       .then(async res => {
         if (!res.ok) throw new Error('load_failed');
@@ -60,7 +76,7 @@ export default function AdminJobsPage() {
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [debouncedQ, page]);
+  }, [debouncedQ, page, view]);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this job?')) return;
@@ -115,11 +131,25 @@ export default function AdminJobsPage() {
       </div>
 
       {/* Search — server-side across the whole table */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg mb-5 w-full max-w-sm">
-        <Search className="w-4 h-4 text-stone-400 shrink-0" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search all jobs…"
-          aria-label="Search jobs by title or company"
-          className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400" />
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-[#0d1a2e] border border-stone-200 dark:border-[#1e3a5f] rounded-lg w-full max-w-sm">
+          <Search className="w-4 h-4 text-stone-400 shrink-0" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search all jobs…"
+            aria-label="Search jobs by title or company"
+            className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-stone-400" />
+        </div>
+        <div className="flex items-center gap-1 p-1 bg-stone-100 dark:bg-[#162033] rounded-lg" role="group" aria-label="Job visibility">
+          {VIEWS.map(v => (
+            <button key={v.key || 'live'} onClick={() => { setView(v.key); setPage(1); }}
+              aria-pressed={view === v.key}
+              className={cn('px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+                view === v.key
+                  ? 'bg-white dark:bg-[#0d1a2e] text-stone-900 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300')}>
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="card overflow-x-auto">
@@ -139,7 +169,11 @@ export default function AdminJobsPage() {
           <div className="p-10 text-center">
             <Search className="w-8 h-8 text-stone-300 dark:text-stone-600 mx-auto mb-3" />
             <p className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-              {debouncedQ ? `No jobs match “${debouncedQ}”` : 'No jobs found'}
+              {debouncedQ
+                ? `No jobs match “${debouncedQ}”`
+                : view === 'flagged'  ? 'No flagged jobs — nothing to review'
+                : view === 'inactive' ? 'No inactive jobs'
+                : 'No jobs found'}
             </p>
             <p className="text-xs text-stone-500 mt-1">{debouncedQ ? 'Try a different title or company.' : 'Post a job to get started.'}</p>
           </div>
@@ -164,6 +198,17 @@ export default function AdminJobsPage() {
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">{job.title}</p>
                         {job.featured && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
+                        {job.flagged && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                            title={job.flaggedReason ?? 'Flagged by the scam screen'}>
+                            Flagged
+                          </span>
+                        )}
+                        {job.isActive === false && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 dark:bg-stone-800 text-stone-500">
+                            Inactive
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-stone-500 truncate">{job.company}</p>
                     </div>

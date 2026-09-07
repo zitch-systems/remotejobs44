@@ -25,14 +25,14 @@ import { fetchATSJobs } from '@/lib/ats-engine';
 import { isValidATSPlatform, type ATSPlatform } from '@/lib/ats-detect';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { detectScam } from '@/lib/scam-detect';
-import { logInfo, logWarn } from '@/lib/log';
+import { markSeenAndReactivate } from '@/lib/jobs-last-seen';
+import { logInfo, logWarn, logError } from '@/lib/log';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
 // Mirrors /api/admin/companies/refresh — the search_vector GIN trigger on the
 // jobs table can't take large INSERT batches reliably.
 const INSERT_CHUNK = 25;
-const SEEN_CHUNK = 200;
 
 export interface ATSRefreshResult {
   boardsConsidered: number;
@@ -41,6 +41,15 @@ export interface ATSRefreshResult {
   reactivated: number;
   errors: number;
   timedOut: boolean;
+  /**
+   * Set when the run could not start at all — the stale_ats_boards() RPC is
+   * missing or errored, so there was no board list to walk. Distinguishes
+   * "nothing was stale" from "the sweep never ran", which the all-zero
+   * counters alone cannot: a missing function (PGRST202, the state this
+   * module shipped in before migration_v70) returned the same zeros as a
+   * healthy no-op and the cron reported success on top of them.
+   */
+  error?: string;
 }
 
 // Reverse of each ATS fetcher's URL builder in lib/ats-engine.ts: recover
@@ -121,38 +130,6 @@ function toJobRow(j: any): Record<string, any> {
   return row;
 }
 
-// For every apply_url still listed on a board: bump last_seen_at, and flip
-// is_active back on for any the sweep had retired. Returns how many rows were
-// reactivated (were inactive → now active). Chunked; never marks is_new.
-async function markSeen(supabase: AdminSupabase, urls: string[]): Promise<number> {
-  const list = Array.from(new Set(urls.filter(Boolean)));
-  if (list.length === 0) return 0;
-  const now = new Date().toISOString();
-  let reactivated = 0;
-  for (let i = 0; i < list.length; i += SEEN_CHUNK) {
-    const batch = list.slice(i, i + SEEN_CHUNK);
-    try {
-      // Reactivate the retired ones first so the count is exact…
-      const { data } = await supabase
-        .from('jobs')
-        .update({ is_active: true, last_seen_at: now })
-        .in('apply_url', batch)
-        .eq('is_active', false)
-        .select('id');
-      reactivated += data?.length ?? 0;
-      // …then keep the already-active ones fresh.
-      await supabase
-        .from('jobs')
-        .update({ last_seen_at: now })
-        .in('apply_url', batch)
-        .eq('is_active', true);
-    } catch (err: any) {
-      logWarn({ event: 'ats_refresh.mark_seen_failed', error: err?.message ?? String(err) });
-    }
-  }
-  return reactivated;
-}
-
 // Refresh the least-recently-seen ATS boards within a time budget. Oldest-first
 // (stale_ats_boards orders by max(last_seen_at) asc) so the boards closest to
 // the 60-day cliff are always handled — guaranteeing that with even a small
@@ -171,7 +148,11 @@ export async function refreshStaleATSBoards(
 
   const { data: boards, error } = await supabase.rpc('stale_ats_boards', { p_limit: maxBoards });
   if (error) {
-    logWarn({ event: 'ats_refresh.rpc_failed', error: error.message });
+    // logError, not logWarn: with no board list there is nothing to refresh,
+    // so every ATS posting keeps ageing towards the 60-day staleness cliff
+    // until this is fixed. That is an outage of the sweep, not a hiccup.
+    logError({ event: 'ats_refresh.rpc_failed', error: error.message });
+    res.error = `stale_ats_boards RPC failed: ${error.message}`;
     return res;
   }
   const list = (boards ?? []) as Array<{ source_url: string }>;
@@ -193,7 +174,14 @@ export async function refreshStaleATSBoards(
       if (rows.length === 0) { res.boardsRefreshed++; continue; }
 
       // 1) Keep still-listed postings alive + recover any the sweep retired.
-      res.reactivated += await markSeen(supabase, rows.map(r => r.apply_url as string));
+      //    Batched by request size in lib/jobs-last-seen — a board with a few
+      //    hundred postings used to overrun the PostgREST request line and the
+      //    returned error was discarded, so the bump silently did nothing.
+      res.reactivated += await markSeenAndReactivate(
+        supabase,
+        rows.map(r => r.apply_url as string),
+        `ats:${parsed.platform}/${parsed.slug}`,
+      );
 
       // 2) Insert genuinely-new postings (ON CONFLICT DO NOTHING).
       for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
