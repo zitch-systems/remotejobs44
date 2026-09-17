@@ -58,6 +58,11 @@ jobs:
         # without running anything locally.
         run: npm run test:unit -- --coverage
 
+      - name: Database regression tests
+        # PGlite runs the production SQL against an isolated local database.
+        # These suites are outside Vitest and must be invoked explicitly.
+        run: node --test tests/*.test.mjs
+
       - name: Archive coverage report
         # always(): run even when tests failed, so the failing PR's
         # report is still inspectable. Retention is short by design —
@@ -93,6 +98,7 @@ jobs:
   # overflow/touch-target regression check.
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # These are the project's public, browser-safe Supabase coordinates.
     # No service-role credential is present: E2E can only perform the same
     # RLS-limited anonymous reads as a real signed-out visitor.
