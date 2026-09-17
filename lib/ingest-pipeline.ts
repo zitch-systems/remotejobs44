@@ -475,7 +475,15 @@ export async function runIngest(): Promise<IngestResult> {
   // applies, and SSRF is re-validated on every fetch (the URL was
   // checked at POST time, but column values can be edited via the DB
   // directly).
-  const hardcodedUrls = new Set(SOURCES.map(s => s.sourceUrl));
+  // JobSpy query URLs are operational bookkeeping rows created by the
+  // dedicated JobSpy pipeline, not generic RSS/JSON feeds. Exclude them here
+  // or the 06:00 daily ingest re-fetches every JobSpy query as a custom source,
+  // duplicating the 12:00 JobSpy cron and producing a wall of HTTP 404s when
+  // the JobSpy endpoint is misconfigured.
+  const hardcodedUrls = new Set([
+    ...SOURCES.map(s => s.sourceUrl),
+    ...JOBSPY_DEFAULT_QUERIES.map(jobSpySourceUrl),
+  ]);
   try {
     // 'error' rows are included deliberately. markSourceStatus() writes
     // status='error' on ANY failure — a 502 from the origin, a DNS blip, a
