@@ -275,19 +275,19 @@ export function Header() {
         <div className="px-4 pb-4 flex gap-2">
           {mounted && isLoggedIn() ? (
             <>
-              <Link href="/dashboard" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
+              <Link href="/dashboard" className="flex-1 min-h-11 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
                 Dashboard
               </Link>
-              <button onClick={handleLogout} className="flex-1 py-2.5 text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">
+              <button onClick={handleLogout} className="flex-1 min-h-11 py-2.5 text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">
                 Log Out
               </button>
             </>
           ) : (
             <>
-              <Link href="/login" className="flex-1 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
+              <Link href="/login" className="flex-1 min-h-11 py-2.5 text-center text-sm font-semibold border border-stone-200 dark:border-[#1e3a5f] rounded-xl hover:bg-stone-50 dark:hover:bg-[#0f1e38] transition-colors text-stone-700 dark:text-stone-300">
                 Log in
               </Link>
-              <Link href="/register" className="flex-1 py-2.5 text-center text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">
+              <Link href="/register" className="flex-1 min-h-11 py-2.5 text-center text-sm font-semibold bg-brand-700 dark:bg-brand-600 text-white rounded-xl hover:bg-brand-800 transition-colors">
                 Get Started
               </Link>
             </>
