@@ -22,7 +22,7 @@ function ThemeToggle() {
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       aria-label="Toggle dark mode"
       aria-pressed={mounted ? isDark : undefined}
-      className="absolute top-5 right-6 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
+      className="absolute top-5 right-6 z-10 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
     >
       {mounted && isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
     </button>
@@ -101,6 +101,12 @@ export default function RegisterPage() {
     const passwordError = validatePassword(submittedPassword);
     if (passwordError) { toast(passwordError, 'error'); return; }
     setLoading(true);
+
+    // Registration has no "Remember me" control. Clear a session-only
+    // choice left by a previous account before the confirmation round-trip;
+    // otherwise AuthSyncProvider would sign this new account out on the next
+    // browser restart when the old flag survives in localStorage.
+    setRememberChoice(true);
 
     // try/catch because auth-js THROWS (rather than returning { error })
     // when it can't acquire the cross-tab auth lock within 5s — without
@@ -200,6 +206,10 @@ export default function RegisterPage() {
 
   async function handleGoogleSignup() {
     setLoading(true);
+    // OAuth signup also has no remember control. Record the default before
+    // navigating away so a previous user's session-only flag cannot be
+    // applied to the new account when the callback returns.
+    setRememberChoice(true);
     const fallback = setTimeout(() => setLoading(false), 10000);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -370,7 +380,7 @@ export default function RegisterPage() {
                     className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
                   />
                   <button type="button" onClick={() => setShowPass(!showPass)}
-                    className="inline-flex p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
                     aria-label={showPass ? 'Hide password' : 'Show password'}>
                     {showPass ? <EyeOff className="h-[17px] w-[17px]" /> : <Eye className="h-[17px] w-[17px]" />}
                   </button>

@@ -24,7 +24,7 @@ function ThemeToggle() {
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       aria-label="Toggle dark mode"
       aria-pressed={mounted ? isDark : undefined}
-      className="absolute top-5 right-6 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
+      className="absolute top-5 right-6 z-10 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-2)] bg-[var(--bg-card)] text-[var(--fg-3)] transition-colors hover:text-[var(--brand-600)] dark:hover:text-[var(--brand-400)]"
     >
       {mounted && isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
     </button>
@@ -58,7 +58,11 @@ function LoginForm() {
     if (err) {
       const reason = searchParams.get('reason');
       setErrorMsg(
-        describeAuthCallbackError(err, reason) ?? decodeURIComponent(err).replace(/_/g, ' '),
+        // searchParams.get() is already URL-decoded. Avoid decoding a
+        // second time: a malformed value such as `?error=%` would otherwise
+        // throw URIError and abort the rest of this effect (including the
+        // prefilled email and existing-session redirect).
+        describeAuthCallbackError(err, reason) ?? err.replace(/_/g, ' '),
       );
     }
     if (searchParams.get('registered') === '1') {
@@ -356,7 +360,7 @@ function LoginForm() {
               className="min-w-0 flex-1 border-none bg-transparent py-[13px] text-[15px] text-[var(--fg-1)] outline-none placeholder:text-[var(--fg-4)]"
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="inline-flex p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
               aria-label={showPass ? 'Hide password' : 'Show password'}>
               {showPass ? <EyeOff className="h-[17px] w-[17px]" /> : <Eye className="h-[17px] w-[17px]" />}
             </button>

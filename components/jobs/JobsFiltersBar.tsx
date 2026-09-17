@@ -153,7 +153,7 @@ function FilterSelect({ label, value, onChange, options, icon }: {
         aria-label={label}
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
+        className="w-full min-h-11 px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
       >
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -183,7 +183,7 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (v: strin
         aria-label="Country"
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
+        className="w-full min-h-11 px-3 py-2.5 text-sm rounded-lg border border-stone-200 dark:border-[#1e3a5f] bg-white dark:bg-[#0a1628] text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all"
       >
         <option value="">Any country</option>
         {COUNTRY_GROUPS.map(group => (
@@ -420,7 +420,7 @@ export function JobsFiltersBar() {
             <div className="flex items-end">
               {activeFilterCount > 0 && (
                 <button onClick={clearAll}
-                  className="w-full py-2.5 text-xs font-semibold text-red-500 border border-red-200 dark:border-red-900 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                  className="w-full min-h-11 py-2.5 text-xs font-semibold text-red-500 border border-red-200 dark:border-red-900 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
                   Clear all filters
                 </button>
               )}

@@ -28,7 +28,6 @@ import { logError, logWarn } from '@/lib/log';
 
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
-const PRO_GRACE_MS   = 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   // Shared guard: fails closed (503) when CRON_SECRET is unset/short;
@@ -59,6 +58,21 @@ export async function GET(req: NextRequest) {
       sources:    ingest.results,
       paused:     ingest.paused,
     };
+    // runIngest isolates individual source failures and reports them as
+    // strings instead of throwing. Paused and time-budget skips are expected;
+    // source/network/DB failures must still fail the cron invocation.
+    const sourceErrors = Object.entries(ingest.results).filter(([, result]) =>
+      typeof result === 'string' && (
+        result.startsWith('error:') ||
+        result.startsWith('db error:') ||
+        result.includes(' rows failed:')
+      )
+    );
+    if (!ingest.success || sourceErrors.length > 0) {
+      (log.ingest as Record<string, unknown>).errors = sourceErrors.map(([source, error]) => ({ source, error }));
+      failures.push('ingest');
+      logError({ event: 'cron.daily.ingest_source_failures', sources: sourceErrors.map(([source]) => source) });
+    }
     // Flush /jobs cache after a productive ingest so morning visitors
     // see the freshly imported postings instead of yesterday's snapshot
     // for the first 60 seconds. Skip when nothing was added — leaves
@@ -74,73 +88,21 @@ export async function GET(req: NextRequest) {
   }
 
   // ── TASK 2: Expire subscriptions (all tiers) ──────────────────────────
-  // Mirrors /api/cron/expire-daily so either cron alone can reconcile
-  // state — see that route for the rationale on the 24h pro grace window.
-  const now       = new Date().toISOString();
-  const proCutoff = new Date(Date.now() - PRO_GRACE_MS).toISOString();
-
-  // Day Pass — hard expiry. Compare-and-set: expire the subscription rows with
-  // the expiry predicate re-checked *inside* the UPDATE and derive the profile
-  // ids from the rows actually updated. A Paystack renewal landing between a
-  // stale SELECT and the write would otherwise still downgrade a just-paid
-  // user; this mirrors the fix already applied in /api/cron/expire-daily.
-  const { data: expiredDaily, error: dailyExpiryErr } = await supabase
-    .from('subscriptions')
-    .update({ status: 'expired' })
-    .eq('billing', 'daily')
-    .eq('status', 'active')
-    .lt('current_period_end', now)
-    .select('user_id');
-  // A failed expiry leaves lapsed users on a paid plan indefinitely, so it has
-  // to be loud. Without the error check the empty result read as "nobody
-  // expired today" — indistinguishable from a healthy run.
-  if (dailyExpiryErr) {
-    logError({ event: 'cron.daily.expire_day_pass_failed', error: dailyExpiryErr.message });
-    failures.push('expiry.day_pass');
+  // The RPC atomically updates subscriptions and their profile entitlements,
+  // with profile locks coordinated with payment fulfillment.
+  try {
+    const { data, error } = await supabase.rpc('expire_subscriptions', { p_batch_size: 500 });
+    if (error) throw error;
+    if (!data || typeof data.expiredDayPasses !== 'number' || typeof data.expiredPro !== 'number') {
+      throw new Error('Invalid expire_subscriptions result');
+    }
+    log.expiry = data;
+  } catch (err: any) {
+    const message = err?.message ?? String(err);
+    logError({ event: 'cron.daily.expiry_failed', error: message });
+    log.expiry = { expiredDayPasses: 0, expiredPro: 0, error: message };
+    failures.push('expiry');
   }
-
-  let expiredDayPasses = 0;
-  if (expiredDaily && expiredDaily.length > 0) {
-    const ids = expiredDaily.map((s: { user_id: string }) => s.user_id);
-    // Don't clobber profile.plan='admin' to 'free' — same reason as
-    // /api/cron/expire-daily. Role is unchanged so the user keeps
-    // their actual privileges, but the plan tag matters for UI.
-    await supabase.from('profiles').update({ plan: 'free' })
-      .in('id', ids).neq('role', 'admin');
-    expiredDayPasses = ids.length;
-  }
-
-  // Pro Monthly / Annual — 24h grace. Same compare-and-set as the daily branch.
-  const { data: expiredPro, error: proExpiryErr } = await supabase
-    .from('subscriptions')
-    .update({ status: 'expired' })
-    .in('billing', ['monthly', 'annually'])
-    // payment_failed is included so users whose card declines get
-    // downgraded by the next cron pass — they were leaking ~12 free Pro
-    // days/year while only 'active'/'cancelled' were checked.
-    .in('status', ['active', 'cancelled', 'payment_failed'])
-    .lt('current_period_end', proCutoff)
-    .select('user_id');
-
-  if (proExpiryErr) {
-    logError({ event: 'cron.daily.expire_pro_failed', error: proExpiryErr.message });
-    failures.push('expiry.pro');
-  }
-
-  let expiredPro_n = 0;
-  if (expiredPro && expiredPro.length > 0) {
-    const ids = expiredPro.map((s: { user_id: string }) => s.user_id);
-    await supabase.from('profiles').update({ plan: 'free' })
-      .in('id', ids).neq('role', 'admin');
-    expiredPro_n = ids.length;
-  }
-
-  log.expiry = {
-    expiredDayPasses,
-    expiredPro: expiredPro_n,
-    ...(dailyExpiryErr ? { dayPassError: dailyExpiryErr.message } : {}),
-    ...(proExpiryErr   ? { proError:     proExpiryErr.message   } : {}),
-  };
 
   // ── TASK 3: Job freshness pass ────────────────────────────────────
   //   * Mark jobs older than 7 days as is_new = false (UI badge).
@@ -182,7 +144,9 @@ export async function GET(req: NextRequest) {
     const { error: updateErr } = await supabase
       .from('jobs')
       .update({ is_new: false })
-      .in('id', ids);
+      .in('id', ids)
+      .eq('is_new', true)
+      .lt('posted_at', sevenDaysAgo);
     if (updateErr) { unflagErr = updateErr; break; }
     unflaggedNew += ids.length;
     if (ids.length < FRESHNESS_BATCH_SIZE) break;
@@ -213,7 +177,9 @@ export async function GET(req: NextRequest) {
     const { error: updateErr } = await supabase
       .from('jobs')
       .update({ is_active: false })
-      .in('id', ids);
+      .in('id', ids)
+      .eq('is_active', true)
+      .lt('last_seen_at', staleCutoff);
     if (updateErr) { staleErr = updateErr; break; }
     deactivated += ids.length;
     if (ids.length < FRESHNESS_BATCH_SIZE) break;
@@ -264,7 +230,12 @@ export async function GET(req: NextRequest) {
   // who paid but has no active access. Idempotent on paystack_reference + an
   // active-access guard, so it never double-credits. See lib/paystack/reconcile.
   try {
-    log.reconcile = await reconcilePaystackCharges(supabase, { sinceDays: 7, maxPages: 2 });
+    const reconcile = await reconcilePaystackCharges(supabase, { sinceDays: 7, maxPages: 2 });
+    log.reconcile = reconcile;
+    if (reconcile.errors > 0) {
+      logError({ event: 'cron.daily.reconcile_partial_failure', errors: reconcile.errors });
+      failures.push('reconcile');
+    }
   } catch (err: any) {
     logError({ event: 'cron.daily.reconcile_failed', error: err?.message ?? String(err) });
     log.reconcile = { error: err?.message ?? String(err) };
@@ -309,11 +280,12 @@ export async function GET(req: NextRequest) {
     // nothing ever read it, so switching it off changed nothing and the user
     // kept receiving alerts. That is both a broken setting and the kind of
     // thing that earns a spam complaint instead of an unsubscribe.
-    const { data: alerts } = await supabase
+    const { data: alerts, error: alertsErr } = await supabase
       .from('job_alerts')
       .select('user_id, category, keywords, profiles(name, email, plan, email_prefs, suspended, email_bounced_at, email_complained_at)')
       .eq('active', true)
       .eq('frequency', 'daily');
+    if (alertsErr) throw alertsErr;
 
     if (alerts && alerts.length > 0) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -321,7 +293,7 @@ export async function GET(req: NextRequest) {
       // doesn't get nothing just because the 10 most-recent jobs happen
       // to be in the wrong category. 500 is a soft cap — most days have
       // far fewer new postings; we slice down to 10 PER ALERT below.
-      const { data: newJobs } = await supabase
+      const { data: newJobs, error: newJobsErr } = await supabase
         .from('jobs')
         .select('id, title, company, location, category')
         .eq('is_active', true)
@@ -333,6 +305,7 @@ export async function GET(req: NextRequest) {
         .gte('created_at', yesterday)
         .order('created_at', { ascending: false })
         .limit(500);
+      if (newJobsErr) throw newJobsErr;
 
       const allCandidates = newJobs ?? [];
 

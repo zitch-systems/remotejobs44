@@ -1,163 +1,112 @@
 // app/auth/callback/route.ts
-// Supabase Auth callback handler — required for magic-link, OAuth, email
-// confirmation, and password-reset flows. Performance matters here: this
-// is the page the user lands on after clicking "Confirm your email" or
-// "Reset your password" in their inbox. Every extra DB roundtrip before
-// the final redirect = extra seconds of "loading…" with no feedback.
-//
-// Critical path (must await):
-//   1. exchangeCodeForSession — sets the session cookie. Required.
-// Everything else (profile upsert for first-login, welcome email, role
-// lookup) happens AFTER we know the redirect destination, either inline
-// (cheap email-based role check) or fire-and-forget (DB writes).
+// Supabase Auth callback handler for OAuth, email confirmation, magic links,
+// and password recovery.
 import { NextRequest, NextResponse } from 'next/server';
-import type { EmailOtpType } from '@supabase/supabase-js';
+import type { EmailOtpType, User } from '@supabase/supabase-js';
 import { sendWelcomeEmailOnce } from '@/lib/email/welcome';
-import { destinationForRole, type Role } from '@/lib/auth/redirect';
-import { isHardcodedAdmin } from '@/lib/admin-emails';
+import { destinationForRole, resolveRole, type Role } from '@/lib/auth/redirect';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { attributeReferral } from '@/lib/referral/attribution';
+import { loadCallbackProfileRole } from '@/lib/auth/callback-role';
 import { waitUntil } from '@vercel/functions';
+
+function failedCallback(origin: string, reason: string) {
+  return NextResponse.redirect(
+    `${origin}/login?error=auth_callback_failed&reason=${encodeURIComponent(reason)}`,
+  );
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code  = searchParams.get('code');
-  // Email-confirm / password-reset / magic-link templates can use the
-  // token_hash variant (recommended) so the user can click the link from
-  // any device — no PKCE code_verifier needed.
+  const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
   const tokenType = searchParams.get('type') as EmailOtpType | null;
-  const next  = searchParams.get('next');
-  const error = searchParams.get('error');
+  const next = searchParams.get('next');
+  const providerError = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  if (error) {
-    console.error(`[auth/callback] provider error: ${error} — ${errorDescription ?? '(no description)'}`);
-    // Carry the provider's description through as `reason` so /login can show
-    // an actionable message (e.g. cancelled consent vs. a real provider error).
+  if (providerError) {
+    console.error(`[auth/callback] provider error: ${providerError} — ${errorDescription ?? '(no description)'}`);
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error)}&reason=${encodeURIComponent(errorDescription ?? '')}`
+      `${origin}/login?error=${encodeURIComponent(providerError)}&reason=${encodeURIComponent(errorDescription ?? '')}`,
     );
   }
 
   if (!code && !(tokenHash && tokenType)) {
     console.error('[auth/callback] no code OR token_hash+type param in callback URL');
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed&reason=no_code`);
+    return failedCallback(origin, 'no_code');
   }
 
-  // Use the shared helper so the PKCE code_verifier cookie is read with the
-  // SAME getAll/setAll API that the browser client used to write it.
-  const supabase = await createServerSupabaseClient();
-
-  // Branch on which flow we're in:
-  //   * `code`            → PKCE OAuth / magic-link from the SAME device
-  //                         that initiated. Needs the code_verifier cookie.
-  //   * `token_hash+type` → Email-confirm / password-reset / magic-link
-  //                         from ANY device. Doesn't need a verifier.
-  //
-  // Email-confirm via PKCE was failing for users who opened the email on
-  // a different browser/device than the one that signed up — the
-  // code_verifier cookie isn't there. Supporting the token_hash flow
-  // here (and pointing the email templates at it) fixes that.
-  let authError: { message: string } | null = null;
-  let authUser: { id: string; email?: string | null; created_at?: string; last_sign_in_at?: string; user_metadata?: Record<string, any> } | null = null;
-
-  if (code) {
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) authError = exchangeError;
-    else               authUser  = data.user as any;
-  } else if (tokenHash && tokenType) {
-    const { data, error: otpError } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: tokenType,
-    });
-    if (otpError) authError = otpError;
-    else          authUser  = data.user as any;
+  // Auth SDK calls can throw for malformed input, a missing PKCE verifier,
+  // or a browser that lost its auth cookies. Always turn those failures into
+  // the same actionable login redirect instead of an opaque route 500.
+  let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  let authUser: User | null = null;
+  try {
+    supabase = await createServerSupabaseClient();
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) return failedCallback(origin, error.message);
+      authUser = data.user;
+    } else {
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash!,
+        type: tokenType!,
+      });
+      if (error) return failedCallback(origin, error.message);
+      authUser = data.user;
+    }
+  } catch (err: any) {
+    console.error('[auth/callback] auth verification threw:', err?.message ?? err);
+    return failedCallback(origin, err?.message ?? 'auth_verification_failed');
   }
 
-  if (authError) {
-    console.error('[auth/callback] auth verification failed:', authError.message);
-    return NextResponse.redirect(
-      `${origin}/login?error=auth_callback_failed&reason=${encodeURIComponent(authError.message)}`
-    );
-  }
   if (!authUser?.email) {
     return NextResponse.redirect(`${origin}${destinationForRole('user', next)}`);
   }
 
-  // Decide redirect destination synchronously via hardcoded-admin email
-  // check — no DB roundtrip. If the user is a regular member, they land
-  // on /dashboard; if they're a hardcoded admin, /admin. Members whose
-  // role is admin only in the DB (not the env list) will hit /dashboard
-  // first, then the dashboard's loadSession reads the DB role and
-  // re-routes to /admin — one extra navigation rather than blocking the
-  // entire callback on a DB query.
-  const role: Role = isHardcodedAdmin(authUser.email) ? 'admin' : 'user';
+  // Resolve DB-only admin/agent roles before redirecting. The query is
+  // best-effort and bounded: a missing profile on a brand-new signup or a
+  // transient database failure falls back to the safe email-based role, and
+  // the destination page can retry profile loading.
+  const profileRole = await loadCallbackProfileRole(() =>
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authUser!.id)
+      .maybeSingle()
+      .then(({ data }) => data?.role ?? null),
+  );
+  const role: Role = resolveRole({ profileRole, email: authUser.email });
   const dest = destinationForRole(role, next);
 
-  // Onboarding bookkeeping (profile row + welcome email + referral stamp)
-  // goes to the background. Use the admin client + the service role key so
-  // RLS doesn't need the user's session — we already established it, but the
-  // cookie jar in this request has been "locked" by `cookies()` and writes
-  // from unrelated promises after the response begins can throw.
-  //
-  // These three used to run only when `Math.abs(created_at - last_sign_in_at)
-  // < 30_000` said "first login". That test is sound for OAuth, where GoTrue
-  // writes both timestamps in the same request, and wrong for an email
-  // signup, where created_at is the moment the form was submitted and
-  // last_sign_in_at the moment the user got round to clicking the link in
-  // their inbox. It was measuring time-to-open-inbox: median ~41s on this
-  // project, so the majority of email signups tripped the gate and got no
-  // welcome email and no referral attribution. Each task is now individually
-  // idempotent instead, so it is safe to run them on EVERY verified callback:
-  //   * the profile upsert uses ignoreDuplicates
-  //   * sendWelcomeEmailOnce claims profiles.welcome_email_sent_at atomically
-  //   * attributeReferral only writes when referred_by IS NULL
+  // Profile upsert, referral attribution, and welcome email are background
+  // work. The session exchange and role-safe redirect above stay on the
+  // critical path.
   const name = (authUser.user_metadata?.name as string | undefined)
     ?? authUser.email.split('@')[0];
+  waitUntil((async () => {
+    try {
+      const admin = createAdminSupabaseClient();
+      await admin.from('profiles').upsert({
+        id: authUser!.id,
+        email: authUser!.email,
+        name,
+        plan: 'free',
+        role: 'user',
+      }, { onConflict: 'id', ignoreDuplicates: true });
 
-  // waitUntil keeps the lambda alive past the redirect response so these
-  // tasks actually complete. Without it, Vercel suspends the function
-  // immediately and the work silently dies.
-  waitUntil(
-    (async () => {
-      try {
-        const admin = createAdminSupabaseClient();
-
-        // Safety net only — on_auth_user_created has created this row at
-        // signup since migration_v3. Kept for accounts that predate the
-        // trigger, and so the welcome claim below always has a row to write.
-        await admin.from('profiles').upsert({
-          id:   authUser.id,
-          email: authUser.email,
-          name,
-          plan: 'free',
-          role: 'user',
-          // profile_completion omitted — DEFAULT 0 (migration_v24).
-          // The recompute fires on the next /api/profile GET.
-        }, { onConflict: 'id', ignoreDuplicates: true });
-
-        // Referral attribution: when the user clicked an agent's link on
-        // this browser, the rj44_ref cookie carries the code. Stamp
-        // referred_by once (attributeReferral is a no-op if it's already
-        // set or the code isn't a live agent). Covers OAuth + email-confirm
-        // logins; the email/password auto-confirm flow attributes via
-        // /api/referral/attribute instead.
-        const refCode = request.cookies.get('rj44_ref')?.value ?? null;
-        if (refCode) await attributeReferral(admin, { userId: authUser.id, code: refCode });
-
-        // Last, because a send failure releases its own claim and we don't
-        // want a slow Resend call to hold up the writes above.
-        await sendWelcomeEmailOnce(admin, {
-          userId: authUser.id,
-          email:  authUser.email!,
-          name,
-        });
-      } catch (err) {
-        console.error('[auth/callback] background onboarding tasks failed:', err);
-      }
-    })()
-  );
+      const refCode = request.cookies.get('rj44_ref')?.value ?? null;
+      if (refCode) await attributeReferral(admin, { userId: authUser!.id, code: refCode });
+      await sendWelcomeEmailOnce(admin, {
+        userId: authUser!.id,
+        email: authUser!.email!,
+        name,
+      });
+    } catch (err) {
+      console.error('[auth/callback] background onboarding tasks failed:', err);
+    }
+  })());
 
   return NextResponse.redirect(`${origin}${dest}`);
 }

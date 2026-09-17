@@ -127,6 +127,24 @@ await db.exec(`
 `);
 
 await db.exec(migration);
+await db.exec(`
+  create schema auth;
+  create function auth.uid() returns uuid language sql as
+    'select nullif(current_setting(''request.jwt.claim.sub'', true), '''')::uuid';
+  create function auth.role() returns text language sql as
+    'select nullif(current_setting(''request.jwt.claim.role'', true), '''')';
+  grant usage on schema auth to authenticated, service_role;
+  alter table public.profiles add column suspended boolean default false;
+  alter table public.profiles add column commission_rate numeric not null default 0;
+  grant insert, select on public.profiles to authenticated;
+`);
+await db.exec(await readFile(new URL('../supabase/subscription_expiry.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../supabase/profile_insert_guard.sql', import.meta.url), 'utf8'));
+
+async function expire(role = 'service_role') {
+  return asRole(role, () => scalar('select public.expire_subscriptions(500)'));
+}
+
 
 test('payment fulfillment SQL regression suite', async (t) => {
   await t.test('migration changes new webhook events to unprocessed', async () => {
@@ -374,6 +392,85 @@ test('payment fulfillment SQL regression suite', async (t) => {
       );
       assert.equal(await scalar(`select count(*)::int from public.paystack_transactions`), 0);
       assert.equal(await scalar(`select plan from public.profiles where id = '${USER_ID}'`), 'free');
+    }
+  });
+});
+
+test('atomic expiry and profile insert guards', async (t) => {
+  async function lapsed(selection = 'pro', age = '2 days', role = 'user') {
+    await resetData();
+    await insertProfile({ role, plan: role === 'admin' ? 'admin' : 'free' });
+    await fulfill({ selection, amount: selection === 'daily' ? 50000 : 299900 });
+    await db.exec(`update public.subscriptions set current_period_end = now() - interval '${age}';
+      update public.profiles set plan_expires_at = now() - interval '${age}'`);
+  }
+
+  await t.test('expires daily and pro atomically and is replay-safe', async () => {
+    for (const selection of ['daily', 'pro']) {
+      await lapsed(selection);
+      assert.deepEqual(await expire(), { expiredDayPasses: selection === 'daily' ? 1 : 0,
+        expiredPro: selection === 'pro' ? 1 : 0 });
+      assert.equal(await scalar('select status from public.subscriptions'), 'expired');
+      assert.equal(await scalar('select plan from public.profiles'), 'free');
+      assert.deepEqual(await expire(), { expiredDayPasses: 0, expiredPro: 0 });
+    }
+  });
+
+  await t.test('preserves Pro during the 24-hour grace period', async () => {
+    await lapsed('pro', '12 hours');
+    assert.deepEqual(await expire(), { expiredDayPasses: 0, expiredPro: 0 });
+    assert.equal(await scalar('select plan from public.profiles'), 'pro');
+  });
+
+  await t.test('renewed entitlement remains active when expiry runs', async () => {
+    await lapsed();
+    await fulfill({ reference: 'renewal_after_lapse' });
+    assert.deepEqual(await expire(), { expiredDayPasses: 0, expiredPro: 0 });
+    assert.equal(await scalar('select status from public.subscriptions'), 'active');
+    assert.equal(await scalar('select plan from public.profiles'), 'pro');
+  });
+
+  await t.test('profile write failure rolls subscription expiry back', async () => {
+    await lapsed();
+    await db.exec(`create function fail_downgrade() returns trigger language plpgsql as $$
+      begin if new.plan = 'free' then raise exception 'test downgrade failure'; end if;
+      return new; end; $$;
+      create trigger reject_downgrade before update on profiles
+      for each row execute function fail_downgrade();`);
+    try {
+      await assert.rejects(expire(), /test downgrade failure/);
+      assert.equal(await scalar('select status from public.subscriptions'), 'active');
+      assert.equal(await scalar('select plan from public.profiles'), 'pro');
+    } finally {
+      await db.exec('drop trigger reject_downgrade on profiles; drop function fail_downgrade();');
+    }
+  });
+
+  await t.test('admin profile is preserved and users cannot call expiry', async () => {
+    await lapsed('daily', '2 days', 'admin');
+    await expire();
+    assert.equal(await scalar('select plan from public.profiles'), 'admin');
+    for (const role of ['anon', 'authenticated']) {
+      await assert.rejects(expire(role), /permission denied for function/);
+    }
+  });
+
+  await t.test('end users cannot insert privileged profiles; normal signup still works', async () => {
+    await resetData();
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [USER_ID]);
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    try {
+      for (const fields of ["role='admin'", "plan='pro'", "plan_expires_at=now()", "suspended=true", "commission_rate=50"]) {
+        const [column, value] = fields.split('=');
+        await assert.rejects(asRole('authenticated', () => db.exec(
+          `insert into profiles(id, ${column}) values ('${USER_ID}', ${value})`
+        )), /Privileged profile fields/);
+      }
+      await asRole('authenticated', () => insertProfile());
+      assert.equal(await scalar('select role from profiles'), 'user');
+      assert.equal(await scalar('select plan from profiles'), 'free');
+    } finally {
+      await db.exec("select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claim.role', '', false)");
     }
   });
 });
