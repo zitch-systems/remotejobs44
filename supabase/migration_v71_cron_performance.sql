@@ -23,7 +23,13 @@ create index if not exists jobs_ats_api_source_last_seen_idx
 
 drop index if exists public.jobs_ats_source_url_last_seen_idx;
 
-create or replace function public.stale_ats_boards(p_limit integer default 150)
+-- Production may already contain an older manually-created function with the
+-- same input signature but different OUT columns. PostgreSQL cannot change a
+-- function's return type with CREATE OR REPLACE, so drop it transactionally
+-- before installing the canonical definition expected by lib/ats-refresh.ts.
+drop function if exists public.stale_ats_boards(integer);
+
+create function public.stale_ats_boards(p_limit integer default 150)
 returns table (
   source_url text,
   job_count  integer,
@@ -40,7 +46,7 @@ as $$
     from public.jobs j
    where j.source = 'api'
      and j.source_url is not null
-     and j.source_url ~* '^https?://(boards-api\.greenhouse\.io/|api\.lever\.co/|api\.ashbyhq\.com/|apply\.workable\.com/|api\.smartrecruiters\.com/|[a-z0-9._-]+\.recruitee\.com/|[a-z0-9._-]+\.jobs\.personio\.de/|[a-z0-9._-]+\.bamboohr\.com/|[a-z0-9._-]+\.breezy\.hr/)'
+     and j.source_url ~* '^https?://(boards-api\\.greenhouse\\.io/|api\\.lever\\.co/|api\\.ashbyhq\\.com/|apply\\.workable\\.com/|api\\.smartrecruiters\\.com/|[a-z0-9._-]+\\.recruitee\\.com/|[a-z0-9._-]+\\.jobs\\.personio\\.de/|[a-z0-9._-]+\\.bamboohr\\.com/|[a-z0-9._-]+\\.breezy\\.hr/)'
    group by j.source_url
    order by max(j.last_seen_at) asc nulls first
    limit greatest(1, least(coalesce(p_limit, 150), 2000));
