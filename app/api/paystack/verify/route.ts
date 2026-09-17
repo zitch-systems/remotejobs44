@@ -6,8 +6,9 @@ import { paymentSuccessEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 import { recordReferralCommission } from '@/lib/referral/commission';
 import {
-  isValidPlan, chargeMatchesPlan, getPlanTier, getBilling, getPlanExpiry,
+  isValidPlan, chargeMatchesPlan, getPlanTier, getBilling,
 } from '@/lib/paystack/plans';
+import { fulfillPaystackCharge, paymentPlanFromMetadata } from '@/lib/paystack/fulfill';
 import { paystackReferenceSchema } from '@/lib/api-schemas';
 import { logError, logWarn } from '@/lib/log';
 
@@ -50,16 +51,17 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }, signal: AbortSignal.timeout(20_000), cache: 'no-store' }
     );
     const data = await res.json();
 
-    if (!data.status || data.data?.status !== 'success') {
+    if (!res.ok || !data.status || data.data?.status !== 'success') {
       return NextResponse.redirect(`${APP_URL}/pricing?error=payment_failed`);
     }
 
     const { metadata, customer, amount, currency } = data.data;
-    const { user_id, plan } = metadata ?? {};
+    const user_id = metadata?.user_id;
+    const plan = paymentPlanFromMetadata(metadata);
 
     if (!user_id || !plan || !isValidPlan(plan)) {
       return NextResponse.redirect(`${APP_URL}/pricing?error=invalid_metadata`);
@@ -77,99 +79,18 @@ export async function GET(req: NextRequest) {
     const supabase  = createAdminSupabaseClient();
     const planTier  = getPlanTier(plan);
 
-    // Durable idempotency: claim the reference in the immutable per-charge
-    // ledger (paystack_transactions.reference is the PRIMARY KEY) BEFORE
-    // crediting. subscriptions.paystack_reference can't be relied on here:
-    // the table is one-row-per-user (onConflict: 'user_id'), so a later
-    // renewal OVERWRITES the prior reference. An attacker who kept an old
-    // success-callback URL could then replay GET ?reference=<old> after
-    // renewing — the subscriptions lookup below would miss (overwritten),
-    // Paystack still reports the past charge as 'success' forever, and the
-    // period would be extended again for free. The reference-PK ledger can't
-    // be overwritten, so a replay hits the 23505 short-circuit. This mirrors
-    // the mobile edge function (supabase/functions/paystack-verify).
-    const { error: claimErr } = await supabase
-      .from('paystack_transactions')
-      .insert({
-        reference,
-        user_id:   user_id,
-        plan:      planTier,
-        selection: plan,
-        amount:    amount ?? null,
-        currency:  currency ?? 'NGN',
-      });
-    if (claimErr) {
-      // 23505 = unique_violation → this reference was already redeemed.
-      // Return the success redirect WITHOUT re-extending the plan.
-      if ((claimErr as { code?: string }).code === '23505') {
-        return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${planTier}&upgraded=1`);
-      }
-      // Any other error (FK violation for an unknown user, transient DB
-      // hiccup, or the ledger table not yet migrated) — log and fall through
-      // to the legacy subscriptions-based path below, which is a safe no-op
-      // for unknown users. No regression versus the previous behaviour.
-      logWarn({ event: 'paystack.verify.ledger_claim_failed', code: (claimErr as { code?: string }).code, error: claimErr.message });
-    }
-
-    // Legacy idempotency fast-path (kept as belt-and-braces alongside the
-    // ledger claim above): if this reference is still on the user's current
-    // subscription row, it was already credited — short-circuit.
-    const { data: existingRef } = await supabase
-      .from('subscriptions')
-      .select('user_id')
-      .eq('paystack_reference', reference)
-      .maybeSingle();
-    if (existingRef) {
-      return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${planTier}&upgraded=1`);
-    }
-
-    // Update user plan — but never overwrite an admin's special 'admin' plan tag.
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('role, plan_expires_at')
-      .eq('id', user_id)
-      .maybeSingle();
-    // Preserve unused paid time on an upgrade/renewal: extend from the LATER of
-    // now or the user's current (future) expiry, so e.g. monthly→annual or a
-    // mid-period renewal doesn't discard days the user already paid for. A
-    // fresh purchase (no future expiry) extends from now as before.
-    const existingExpiryMs = existing?.plan_expires_at ? new Date(existing.plan_expires_at).getTime() : 0;
-    const expiryBase = existingExpiryMs > Date.now() ? new Date(existingExpiryMs) : new Date();
-    const expiresAt = getPlanExpiry(plan, expiryBase);
-    if (existing?.role !== 'admin') {
-      const { error: planErr } = await supabase
-        .from('profiles')
-        .update({ plan: planTier, plan_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() })
-        .eq('id', user_id);
-      if (planErr) logError({ event: 'paystack.verify.profile_update_failed', user_id, error: planErr.message });
-    }
-
-    // Look up the actual Paystack subscription so we can persist its
-    // email_token. Without that, user-initiated cancellation has to fall
-    // back to a soft cancel in our DB. Day Pass is one-off — no
-    // subscription row — so we skip the lookup there.
     const paystackSub = plan === 'daily'
       ? null
       : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
-
-    // Upsert by user_id (one active sub per user). The unique-on-
-    // paystack_reference idempotency check above means we only get here
-    // once per real charge; subsequent retries short-circuit at the
-    // existingRef branch.
-    await supabase.from('subscriptions').upsert({
-      user_id,
-      plan: planTier,
-      billing:     getBilling(plan),
-      status:      'active',
-      paystack_reference:         reference,
-      paystack_customer_code:     customer?.customer_code ?? null,
-      paystack_subscription_code: paystackSub?.subscription_code ?? null,
-      paystack_email_token:       paystackSub?.email_token ?? null,
-      current_period_start:   new Date().toISOString(),
-      current_period_end:     expiresAt.toISOString(),
-      currency:    currency ?? 'NGN',
-      price:       (amount ?? 0) / 100,
-    }, { onConflict: 'user_id' });
+    const fulfillment = await fulfillPaystackCharge(supabase, {
+      reference, userId: user_id, plan, amount, currency,
+      customerCode: customer?.customer_code,
+      subscriptionCode: paystackSub?.subscription_code,
+      emailToken: paystackSub?.email_token,
+    });
+    if (!fulfillment.credited) {
+      return NextResponse.redirect(`${APP_URL}/pricing?success=1&plan=${planTier}&upgraded=1`);
+    }
 
     // Referral commission — if an agent referred this user, log the agent's
     // cut for this charge. Idempotent (unique on reference) so the webhook

@@ -5,6 +5,13 @@ import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity, scrubCompanyMentions } from
 // non-subscribers the company name must not survive into the description,
 // requirements, benefits, or metadata text the page ships.
 describe('scrubCompanyMentions', () => {
+  it.each(["Kohl’s retail offerings", 'Kohl&#39;s retail offerings', 'Kohl&rsquo;s retail offerings'])(
+    'masks typography and HTML variants: %s', text => {
+      expect(scrubCompanyMentions(text, "Kohl's")).toBe('the company retail offerings');
+    });
+  it('masks an encoded ampersand', () => {
+    expect(scrubCompanyMentions('Ernst &amp; Young hires', 'Ernst & Young')).toBe('the company hires');
+  });
   it('replaces a plain mention', () => {
     expect(scrubCompanyMentions('Acme is hiring a senior engineer.', 'Acme'))
       .toBe('the company is hiring a senior engineer.');

@@ -23,15 +23,32 @@ export const modalService = {
 export function ModalRoot() {
   const [state, setState] = useState<{ content: ReactNode; wide: boolean; title?: string } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const previousBodyOverflow = useRef<string | null>(null);
 
   const open = useCallback((content: ReactNode, opts: { wide?: boolean; title?: string } = {}) => {
     setState({ content, wide: opts.wide ?? false, title: opts.title });
+    if (previousBodyOverflow.current === null) {
+      previousBodyOverflow.current = document.body.style.overflow;
+    }
     document.body.style.overflow = 'hidden';
   }, []);
 
   const close = useCallback(() => {
     setState(null);
-    document.body.style.overflow = '';
+    if (previousBodyOverflow.current !== null) {
+      document.body.style.overflow = previousBodyOverflow.current;
+      previousBodyOverflow.current = null;
+    }
+  }, []);
+
+  // A route change or hot reload can unmount the root while a modal is open.
+  // Always release the body lock in that case, preserving any pre-existing
+  // overflow style instead of leaving the page frozen after the modal closes.
+  useEffect(() => () => {
+    if (previousBodyOverflow.current !== null) {
+      document.body.style.overflow = previousBodyOverflow.current;
+      previousBodyOverflow.current = null;
+    }
   }, []);
 
   // Focus management + keyboard handling while open:
@@ -108,7 +125,7 @@ export function ModalRoot() {
         className="fixed inset-0 z-[401] flex items-center justify-center p-4 pointer-events-none"
       >
         <div ref={panelRef} tabIndex={-1} className={cn(
-          'relative bg-white dark:bg-[#0d1a2e] rounded-2xl shadow-2xl w-full max-h-[90dvh] overflow-y-auto animate-modal-in pointer-events-auto outline-none',
+          'relative bg-white dark:bg-[#0d1a2e] rounded-2xl shadow-2xl w-full max-h-[90dvh] overflow-y-auto overscroll-contain touch-pan-y animate-modal-in pointer-events-auto outline-none',
           state.wide ? 'max-w-2xl' : 'max-w-lg'
         )}>
           {/* Visually hidden title for screen readers if no explicit title */}
@@ -121,9 +138,10 @@ export function ModalRoot() {
 
           {/* Close button */}
           <button
+            type="button"
             onClick={close}
             aria-label="Close dialog"
-            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 dark:bg-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-[#2d5240] transition-colors"
+            className="absolute top-2 right-2 z-10 w-11 h-11 flex items-center justify-center rounded-full bg-stone-100 dark:bg-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-[#2d5240] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

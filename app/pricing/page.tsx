@@ -24,7 +24,7 @@ const PLANS = [
     cta: 'Start Free',
     popular: false,
     features: [
-      { text: 'Browse all 70,000+ remote jobs', ok: true },
+      { text: 'Browse the full remote jobs directory', ok: true },
       { text: '3 free applications in your first week', ok: true },
       { text: 'Basic search & filters', ok: true },
       { text: 'Save jobs you like', ok: true },
@@ -251,7 +251,7 @@ function PricingContent() {
 
       {/* Limited-time promo banner — reinforces the struck-through anchor prices below */}
       <div className="flex justify-center mb-12">
-        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider">
+        <span className="inline-flex max-w-full items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider text-center">
           <PartyPopper className="w-4 h-4" />
           Limited-time launch promo · save up to 75%
         </span>

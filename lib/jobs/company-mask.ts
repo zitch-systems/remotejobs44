@@ -47,7 +47,9 @@ export function scrubCompanyMentions(text: string, company: string | null | unde
 
   let out = text;
   for (const variant of variants) {
-    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/['\u2018\u2019]/g, "(?:['\u2018\u2019]|&#0*39;|&#x0*27;|&apos;|&rsquo;|&lsquo;)")
+      .replace(/&(?!(?:#|apos;|rsquo;|lsquo;))/g, '(?:&|&amp;)');
     const lead = /^\w/.test(variant) ? '\\b' : '';
     const tail = /\w$/.test(variant) ? '\\b' : '';
     out = out.replace(new RegExp(`${lead}${escaped}${tail}`, 'gi'), PROSE_REPLACEMENT);

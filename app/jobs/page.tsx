@@ -43,19 +43,19 @@ export const maxDuration = 30;
 // override each other field-by-field and had drifted out of sync.)
 export const metadata: Metadata = {
   title: 'Browse Remote Jobs — Engineering, Design, Marketing & More',
-  description: 'Search 70,000+ verified remote jobs across engineering, design, product, marketing, finance and operations. Filter by role, country, timezone and salary. Browse free.',
+  description: 'Search remote jobs across engineering, design, product, marketing, finance and operations. Filter by role, country, timezone and salary. Browse free.',
   keywords: ['remote jobs', 'work from home jobs', 'remote jobs Nigeria', 'remote jobs Africa', 'online jobs', 'telecommute jobs', 'remote engineering jobs', 'remote design jobs'],
   alternates: { canonical: 'https://remotejobs44.com/jobs' },
   openGraph: {
     title: 'Browse Remote Jobs | RemoteJobs44',
-    description: 'Filter 70,000+ verified remote roles by category, country, timezone and salary. Updated every 6 hours.',
+    description: 'Filter remote roles by category, country, timezone and salary. Updated daily.',
     url: 'https://remotejobs44.com/jobs',
     images: [{ url: '/api/og', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Browse Remote Jobs | RemoteJobs44',
-    description: 'Search 70,000+ verified remote jobs — engineering, design, marketing and more. Filter by country, timezone, salary. Browse free.',
+    description: 'Search remote jobs — engineering, design, marketing and more. Filter by country, timezone, salary. Browse free.',
   },
 };
 
@@ -475,7 +475,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <ChevronRight aria-hidden />
             <span>Browse jobs</span>
           </div>
-          <h1>Search 70,000+ remote roles</h1>
+          <h1>Find your next remote role</h1>
           <p className="sub">Every role verified remote — filter by category, region and type.</p>
           <div className="bandstats">
             <span><span className="pulse" />{total.toLocaleString()} live roles</span>
@@ -501,7 +501,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </p>
             )}
             <div className="count mt-0.5">
-              <span className="pulse" />Showing <b>{total.toLocaleString()}</b> of 70,000+ jobs
+              <span className="pulse" /><b>{total.toLocaleString()}</b> matching jobs
               {total > 0 && (
                 <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400">
                   <Zap className="w-3 h-3" />

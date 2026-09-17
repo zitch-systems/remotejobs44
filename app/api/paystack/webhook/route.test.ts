@@ -55,7 +55,7 @@ const VALID_UUID = '11111111-1111-4111-8111-111111111111';
 
 beforeEach(() => {
   resolver = () => ({});
-  rpcResolver = undefined;
+  rpcResolver = () => ({ data: { credited: true, plan: 'pro', expires_at: '2026-10-17T00:00:00Z' }, error: null });
   sentEmails.length = 0;
   referralCalls.length = 0;
   fetchSubResult = null;
@@ -84,10 +84,11 @@ describe('idempotency / dedup', () => {
       if (ctx.table === 'paystack_webhook_events' && ctx.steps.includes('insert')) {
         return { error: { code: '23505' } };
       }
+      if (ctx.table === 'paystack_webhook_events' && ctx.steps.includes('select')) return { data: { processed: true } };
       return {};
     };
     const res = await POST(makeReq({
-      event: 'charge.success',
+      event: 'subscription.expiring_cards',
       data: { reference: 'ref_dup', id: 999, metadata: { user_id: VALID_UUID, plan: 'pro' } },
     }) as any);
     expect(res.status).toBe(200);
@@ -106,6 +107,41 @@ describe('charge.success', () => {
       metadata: { user_id: VALID_UUID, plan: 'pro' },
       ...over,
     },
+  });
+
+  it('retries an unprocessed duplicate event after an atomic credit failure', async () => {
+    let attempts = 0;
+    let markedProcessed = 0;
+    resolver = ctx => {
+      if (ctx.table === 'profiles') return { data: { id: VALID_UUID, role: 'user' } };
+      if (ctx.table === 'paystack_webhook_events' && ctx.steps.includes('insert')) return { error: { code: '23505' } };
+      if (ctx.table === 'paystack_webhook_events' && ctx.steps.includes('select')) return { data: { processed: false } };
+      if (ctx.table === 'paystack_webhook_events' && ctx.steps.includes('update')) markedProcessed++;
+      return {};
+    };
+    rpcResolver = () => ++attempts === 1
+      ? { error: { message: 'temporary database failure' }, data: null }
+      : { data: { credited: true, plan: 'pro', expires_at: null }, error: null };
+    expect((await POST(makeReq(chargeBody()))).status).toBe(503);
+    expect(markedProcessed).toBe(0);
+    expect((await POST(makeReq(chargeBody()))).status).toBe(200);
+    expect(markedProcessed).toBe(1);
+    expect(referralCalls).toHaveLength(1);
+  });
+
+  it('does not confuse a profile read outage with a missing customer', async () => {
+    resolver = ctx => ctx.table === 'profiles' ? { error: { message: 'unavailable' } } : {};
+    expect((await POST(makeReq(chargeBody()))).status).toBe(503);
+    expect(sentEmails).toHaveLength(0);
+  });
+
+  it('normalizes mobile annual metadata before crediting', async () => {
+    resolver = ctx => ctx.table === 'profiles' ? { data: { id: VALID_UUID } } : {};
+    rpcResolver = (_, args: any) => {
+      expect(args.p_selection).toBe('pro_annual');
+      return { data: { credited: true, plan: 'pro' } };
+    };
+    expect((await POST(makeReq(chargeBody({ amount: 2999900, metadata: { user_id: VALID_UUID, plan: 'pro', selection: 'annual' } })))).status).toBe(200);
   });
 
   it('rejects an amount that does not match the plan → orphan alert email, no credit', async () => {
@@ -132,8 +168,14 @@ describe('charge.success', () => {
     expect(sentEmails.some(e => /Orphan/i.test(e.subject))).toBe(true);
   });
 
-  it('credits a valid charge: writes the profile plan and records referral', async () => {
+  it('credits a valid charge atomically and records referral', async () => {
     const updates: Record<string, unknown>[] = [];
+    const calls: unknown[] = [];
+    rpcResolver = (name, args) => {
+      expect(name).toBe('fulfill_paystack_charge');
+      calls.push(args);
+      return { data: { credited: true, plan: 'pro', expires_at: null }, error: null };
+    };
     resolver = (ctx) => {
       if (ctx.table === 'profiles' && ctx.steps.includes('select')) {
         // validateUserId + later profile role/expiry lookups.
@@ -145,12 +187,13 @@ describe('charge.success', () => {
     };
     const res = await POST(makeReq(chargeBody()) as any);
     expect(res.status).toBe(200);
-    expect(updates.length).toBeGreaterThan(0);
-    expect(updates[0].plan).toBe('pro');
+    expect(updates.length).toBe(0); // no independent profile writes
+    expect(calls).toEqual([expect.objectContaining({ p_reference: 'ref_ok', p_user_id: VALID_UUID, p_selection: 'pro' })]);
     expect(referralCalls.length).toBe(1);
   });
 
   it('does not double-credit when the reference is already claimed (23505)', async () => {
+    rpcResolver = () => ({ data: { credited: false, plan: 'pro', expires_at: null }, error: null });
     const updates: unknown[] = [];
     resolver = (ctx) => {
       if (ctx.table === 'profiles' && ctx.steps.includes('select')) return { data: { id: VALID_UUID, role: 'user' } };
@@ -183,7 +226,7 @@ describe('subscription.expiring_cards — WARNING only, never downgrades', () =>
   it('does not touch subscriptions/profiles', async () => {
     let mutated = false;
     resolver = (ctx) => {
-      if (ctx.steps.some(s => s === 'update' || s === 'upsert')) mutated = true;
+      if (['profiles', 'subscriptions'].includes(ctx.table) && ctx.steps.some(s => s === 'update' || s === 'upsert')) mutated = true;
       return {};
     };
     const res = await POST(makeReq({

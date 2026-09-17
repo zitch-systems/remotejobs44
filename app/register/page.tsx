@@ -30,10 +30,7 @@ function ThemeToggle() {
 }
 
 function StrengthBar({ password }: { password: string }) {
-  // Check the TRIMMED value — the submit gate validates password.trim() and
-  // submits that, so the meter must too. Otherwise trailing/leading spaces
-  // (e.g. "Ab1     ") could tick every rule green while submit still rejects.
-  const checks = passwordChecks(password.trim());
+  const checks = passwordChecks(password);
   const score = checks.filter(c => c.pass).length;
   const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-brand-500'];
   return (
@@ -94,40 +91,43 @@ export default function RegisterPage() {
       return;
     }
     if (!agree) { toast('Please accept the terms to continue', 'error'); return; }
-    // Validate against the value we'll ACTUALLY store. Otherwise pasting
-    // "    pass    " (12 chars, passes length check) would trim down to
-    // 4 chars at signUp and Supabase would reject — confusing UX. Same
-    // bug pattern as components/auth/ResetPasswordForm.tsx.
-    const trimmedPassword = password.trim();
+    // Validate and submit the exact same credential on web and mobile.
+    const submittedPassword = password;
     // Enforce the full policy the strength meter advertises (length +
     // uppercase + number) here, BEFORE calling Supabase. Previously we only
     // checked length, so an 8-char all-lowercase password passed the client
     // and was rejected by Supabase's stricter server policy — surfacing a
     // raw, cryptic auth error that read as "incorrect password" at signup.
-    const passwordError = validatePassword(trimmedPassword);
+    const passwordError = validatePassword(submittedPassword);
     if (passwordError) { toast(passwordError, 'error'); return; }
     setLoading(true);
 
-    // Trim password too — see the same fix on /login. Trailing-space typos
-    // from autocomplete account for a meaningful chunk of "invalid creds"
-    // failures in our auth logs.
-    //
     // try/catch because auth-js THROWS (rather than returning { error })
     // when it can't acquire the cross-tab auth lock within 5s — without
     // the catch, that rejection escaped handleSubmit and left the button
     // stuck on its loading state. Same guard as /login and /reset-password.
     let data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'];
     let error: Awaited<ReturnType<typeof supabase.auth.signUp>>['error'];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      setLoading(false);
+      toast('Signup is taking longer than expected. Check your email before trying again.', 'error');
+    }, 15_000);
     try {
       ({ data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
-        password: trimmedPassword,
+        password: submittedPassword,
         options: {
           data: { name },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       }));
+      clearTimeout(timer);
+      if (timedOut) return;
     } catch (err: any) {
+      clearTimeout(timer);
+      if (timedOut) return;
       console.error('[register]', err);
       toast(friendlyAuthError(err?.message), 'error');
       setLoading(false);
@@ -164,11 +164,11 @@ export default function RegisterPage() {
       // Attribute this signup to a referring agent if they arrived via a
       // referral link. The server reads the httpOnly rj44_ref cookie; we just
       // poke the endpoint. Awaited so it lands before we navigate away.
-      try { await fetch('/api/referral/attribute', { method: 'POST' }); } catch {}
+      try { await fetch('/api/referral/attribute', { method: 'POST', signal: AbortSignal.timeout(8_000) }); } catch {}
 
       let profile: any = null;
       try {
-        const res = await fetch('/api/profile');
+        const res = await fetch('/api/profile', { signal: AbortSignal.timeout(8_000) });
         if (res.ok) profile = (await res.json())?.profile ?? null;
       } catch {}
 
@@ -249,7 +249,7 @@ export default function RegisterPage() {
               Start applying to remote roles today.
             </h2>
             <p className="mb-[26px] text-[17px] leading-[1.55] text-[#aebfd6]">
-              Create your free account and unlock saved searches, job alerts, and one-click apply across 70,000+ verified remote jobs.
+              Create your free account to save jobs and set up alerts. Choose a paid plan when you’re ready to apply.
             </p>
             <ul className="flex list-none flex-col gap-[13px] p-0">
               {[
@@ -267,7 +267,7 @@ export default function RegisterPage() {
             </ul>
             <div className="mt-8 flex gap-[30px]">
               {[
-                { n: '70k+', l: 'Live roles' },
+                { n: 'Daily', l: 'New roles' },
                 { n: '150+', l: 'Countries' },
                 { n: '5,000+', l: 'Hired' },
               ].map(s => (

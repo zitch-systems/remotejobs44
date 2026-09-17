@@ -145,7 +145,7 @@ export function Header() {
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle theme"
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-[#1e3a5f] text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0a1628] transition-all"
+              className="w-11 h-11 flex items-center justify-center rounded-lg border border-slate-200 dark:border-[#1e3a5f] text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0a1628] transition-all"
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>

@@ -27,11 +27,17 @@ export async function getAdminUser(): Promise<RequireAdminResult> {
   if (error || !user) {
     return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role, suspended')
     .eq('id', user.id)
     .maybeSingle();
+  if (profileError) {
+    return { ok: false, res: NextResponse.json({ error: 'Unable to verify admin access. Please retry.' }, { status: 503 }) };
+  }
+  if (!profile) {
+    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
   const isAdmin = profile?.role === 'admin' || isHardcodedAdmin(user.email);
   if (!isAdmin) {
     return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };

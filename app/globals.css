@@ -29,7 +29,7 @@
      so position:sticky descendants (filter bars, member top bar) keep
      working. Horizontal scrolling *inside* components (carousels, chip rows,
      areas with overflow-x:auto) is unaffected. */
-  html, body { overflow-x: clip; }
+  html, body { overflow-x: hidden; overflow-x: clip; }
   body {
     margin: 0;
     background-color: #f8faff;
@@ -307,6 +307,38 @@
 
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:0.01ms!important; transition-duration:0.01ms!important; }
+}
+
+/* The member topbar has a wordmark, theme button, alert button, and avatar.
+   At 320px those fixed controls cannot share a row with the full wordmark;
+   keep the useful icon actions reachable and let the brand mark stand alone. */
+@media (max-width: 380px) {
+  .member-brand-wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+/* The shell's 34px desktop icons are too small as touch targets. Preserve
+   their visual icon size while giving mobile users a 44px hit area. */
+.member-shell .tb-ico,
+.member-shell .tb-avatar-fallback,
+.member-shell .member-avatar-link {
+  min-width: 44px;
+  min-height: 44px;
+}
+.member-shell .member-avatar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* The 40-line !important brand-* override that used to live here is gone.

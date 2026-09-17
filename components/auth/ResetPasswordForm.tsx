@@ -18,19 +18,13 @@ export function ResetPasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Trim BEFORE validation so the user's "8 char" includes their
-    // accidental trailing space — and so the stored password matches
-    // what /login + /register store (both trim too). Without this,
-    // resetting to "hello   " stored that raw, but a subsequent login
-    // submit was trimmed to "hello" and failed.
-    const trimmed        = password.trim();
-    const trimmedConfirm = confirm.trim();
+    // Preserve the exact password, matching signup and mobile sign-in.
     // Same policy as signup (length + uppercase + number) — see
     // lib/auth/password.ts. A new password must be at least as strong as
     // one created at registration.
-    const passwordError = validatePassword(trimmed);
+    const passwordError = validatePassword(password);
     if (passwordError) { toast(passwordError, 'error'); return; }
-    if (trimmed !== trimmedConfirm) { toast('Passwords do not match', 'error'); return; }
+    if (password !== confirm) { toast('Passwords do not match', 'error'); return; }
     setLoading(true);
 
     // Watchdog: never leave the button stuck on "Updating…". Same pattern
@@ -50,7 +44,7 @@ export function ResetPasswordForm() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({ password: trimmed });
+      const { error } = await supabase.auth.updateUser({ password });
       clearTimeout(timer);
       if (timedOut) return; // user already saw the timeout message
       if (error) {
@@ -83,13 +77,14 @@ export function ResetPasswordForm() {
     <div className="card p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">New Password</label>
+          <label htmlFor="new-password" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">New Password</label>
           <div className="relative">
-            <input type={showPass ? 'text' : 'password'} required value={password}
+            <input id="new-password" type={showPass ? 'text' : 'password'} required value={password}
               onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters"
               className="input pr-10" autoComplete="new-password" />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+              aria-label={showPass ? 'Hide password' : 'Show password'} aria-pressed={showPass}
+              className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-stone-400 hover:text-stone-600">
               {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
@@ -99,8 +94,8 @@ export function ResetPasswordForm() {
           </p>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Confirm Password</label>
-          <input type="password" required value={confirm}
+          <label htmlFor="confirm-password" className="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1.5">Confirm Password</label>
+          <input id="confirm-password" type="password" required value={confirm}
             onChange={e => setConfirm(e.target.value)} placeholder="Repeat password"
             className="input" autoComplete="new-password" />
         </div>

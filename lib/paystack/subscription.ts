@@ -23,7 +23,7 @@ export async function fetchActiveSubscriptionForCustomer(
   try {
     const res = await fetch(
       `https://api.paystack.co/subscription?customer=${encodeURIComponent(customerCode)}&perPage=10`,
-      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }, signal: AbortSignal.timeout(8_000), cache: 'no-store' }
     );
     if (!res.ok) return null;
     const json = await res.json();
