@@ -11,7 +11,7 @@
 //
 // Deploy: supabase functions deploy paystack-verify
 // Required secret: PAYSTACK_SECRET_KEY.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.106.1';
 
 // Canonical prices (kobo) + duration. Must match paystack-initialize.
 const PLANS: Record<string, { amount: number; days: number; plan: 'daily' | 'pro' }> = {
@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
   if (!authHeader) return Response.json({ error: 'Sign in first.' }, { status: 401 });
 
   const secret = Deno.env.get('PAYSTACK_SECRET_KEY');
-  if (!secret) return Response.json({ ok: false, configured: false });
+  if (!secret) return Response.json({ ok: false, configured: false }, { status: 503 });
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -40,10 +40,12 @@ Deno.serve(async (req: Request) => {
   if (!user) return Response.json({ error: 'Sign in first.' }, { status: 401 });
 
   const { reference } = await req.json().catch(() => ({}));
-  if (!reference) return Response.json({ ok: false, error: 'Missing reference.' }, { status: 400 });
+  if (typeof reference !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(reference)) return Response.json({ ok: false, error: 'Missing reference.' }, { status: 400 });
 
+  try {
   const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
     headers: { Authorization: `Bearer ${secret}` },
+    signal: AbortSignal.timeout(20_000),
   });
   const body = await res.json().catch(() => null);
   const tx = body?.data;
@@ -65,56 +67,21 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
-  // Idempotency gate: claim the reference. A duplicate (23505) means it was
-  // already processed → return success WITHOUT re-extending the plan.
-  const { error: claimErr } = await admin.from('paystack_transactions').insert({
-    reference,
-    user_id: user.id,
-    plan: cfg.plan,
-    selection: meta.selection,
-    amount: tx.amount,
-    currency: tx.currency,
+  const selection = meta.selection === 'annual' ? 'pro_annual' : meta.selection;
+  const { data: fulfillment, error } = await admin.rpc('fulfill_paystack_charge', {
+    p_reference: reference, p_user_id: user.id, p_selection: selection,
+    p_amount: tx.amount, p_currency: tx.currency,
+    p_customer_code: tx.customer?.customer_code ?? null,
   });
-  if (claimErr) {
-    if ((claimErr as { code?: string }).code === '23505') {
-      return Response.json({ ok: true, plan: cfg.plan, already: true });
-    }
-    return Response.json({ ok: false, error: claimErr.message }, { status: 500 });
+  if (error || !fulfillment || typeof fulfillment.credited !== 'boolean') {
+    console.error('paystack-verify fulfillment failed', error?.code ?? 'invalid_result');
+    return Response.json({ ok: false, error: 'Payment processing temporarily unavailable. Please retry verification.' }, { status: 503 });
   }
-
-  // First time → grant the plan. Mirrors the web verify route's semantics:
-  //   - never overwrite an admin's plan tag;
-  //   - never DOWNGRADE an active higher tier (an active Pro user redeeming a
-  //     Day Pass charge keeps Pro — initialize blocks that purchase up front,
-  //     this is the belt-and-braces for charges that slip through);
-  //   - preserve unused paid time by extending from the LATER of now or the
-  //     current future expiry, so a renewal/upgrade never discards days the
-  //     user already paid for.
-  const { data: existing } = await admin
-    .from('profiles')
-    .select('role, plan, plan_expires_at')
-    .eq('id', user.id)
-    .maybeSingle();
-  const nowMs = Date.now();
-  const existingMs = existing?.plan_expires_at ? new Date(existing.plan_expires_at).getTime() : 0;
-  const activeTier = existingMs > nowMs ? (existing?.plan ?? 'free') : 'free';
-  const rank = (t: string) => (t === 'pro' ? 2 : t === 'daily' ? 1 : 0);
-  if (existing?.role === 'admin' || rank(cfg.plan) < rank(activeTier)) {
-    // Charge stays recorded in the ledger (for support/refund); the higher
-    // entitlement is preserved untouched.
-    return Response.json({ ok: true, plan: activeTier, unchanged: true });
+  return Response.json({
+    ok: true, plan: fulfillment.plan, already: !fulfillment.credited,
+    plan_expires_at: fulfillment.expires_at,
+  });
+  } catch {
+    return Response.json({ ok: false, error: 'Payment verification temporarily unavailable. Please retry.' }, { status: 503 });
   }
-  const base = existingMs > nowMs ? existingMs : nowMs;
-  const expires = new Date(base + cfg.days * 86_400_000).toISOString();
-  const { error: upErr } = await admin
-    .from('profiles')
-    .update({ plan: cfg.plan, plan_expires_at: expires, paystack_customer_code: tx.customer?.customer_code ?? null })
-    .eq('id', user.id);
-  if (upErr) {
-    // Release the claim so the user can retry.
-    await admin.from('paystack_transactions').delete().eq('reference', reference);
-    return Response.json({ ok: false, error: upErr.message }, { status: 500 });
-  }
-
-  return Response.json({ ok: true, plan: cfg.plan, plan_expires_at: expires });
 });

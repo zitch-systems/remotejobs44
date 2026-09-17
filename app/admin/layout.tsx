@@ -304,7 +304,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <main className="flex-1 min-w-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] pt-[calc(3.75rem+env(safe-area-inset-top))] md:pt-0">
+      <main className="flex-1 min-w-0 min-h-0 overflow-auto bg-[#f8faff] dark:bg-[#0f1e38] pt-[calc(3.75rem+env(safe-area-inset-top))] md:pt-0">
         {children}
       </main>
     </div>

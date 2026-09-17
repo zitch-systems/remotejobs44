@@ -195,7 +195,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           aria-label={applied ? 'Already applied' : canApplyNow ? 'Apply to this job' : 'Subscribe to apply'}
           title={applied ? 'Already applied' : canApplyNow ? 'Apply' : 'Subscribe to apply'}
           className={cn(
-            'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150',
+            'shrink-0 min-h-11 min-w-11 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 inline-flex items-center justify-center',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : canApplyNow ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
               : 'border border-brand-600 text-brand-700 dark:text-brand-400 hover:bg-brand-50'
@@ -203,7 +203,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           {applied ? '✓' : canApplyNow ? 'Apply' : '🔒'}
         </button>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
-          className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
+          className={cn('shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
         </button>
@@ -244,7 +244,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           )}
         </div>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
-          className={cn('shrink-0 p-1.5 rounded-lg transition-all duration-150',
+          className={cn('shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0f1e38]')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
         </button>
@@ -285,7 +285,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         </div>
         <button onClick={handleApply} onAuxClick={cancelAux}
           className={cn(
-            'shrink-0 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150 flex items-center gap-1',
+            'shrink-0 min-h-11 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1',
             applied
               ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : dailyLimitReached

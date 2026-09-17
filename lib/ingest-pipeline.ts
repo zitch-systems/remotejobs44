@@ -21,6 +21,7 @@
 //   * /api/admin/ingest-now — admin "run now" button (runs JobSpy too)
 //   * /api/cron/jobspy      — scheduled JobSpy scrape (runJobSpyIngest)
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { parseAnnualSalary } from '@/lib/jobs/parse-salary';
 import { detectScam } from '@/lib/scam-detect';
 import { parseFeed, feedJobToDbRow } from '@/lib/feed-parser';
 import { looksLikeHtml, tryDiscoveredFeeds } from '@/lib/feed-discovery';
@@ -296,21 +297,14 @@ const SOURCES: Source[] = [
     normalise: (j: RawJob): Record<string, any> | null => {
       const applyUrl = j.apply_options?.[0]?.link ?? j.related_links?.[0]?.link ?? null;
       if (!applyUrl) return null;
-      let salaryMin: number | null = null;
-      let salaryMax: number | null = null;
-      const salaryRaw: string = j.detected_extensions?.salary ?? '';
-      if (salaryRaw) {
-        const nums = salaryRaw.replace(/[^0-9.]/g, ' ').trim().split(/\s+/).map(Number).filter(n => n > 0);
-        if (nums.length >= 2) { salaryMin = nums[0]; salaryMax = nums[1]; }
-        else if (nums.length === 1) { salaryMin = nums[0]; }
-      }
+      const salary = parseAnnualSalary(j.detected_extensions?.salary);
       return {
         title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
         logo: firstChar(j.company_name),
         category: mapCat(j.title ?? ''), type: mapType(j.detected_extensions?.schedule_type ?? ''),
         level: mapLevel(j.title ?? ''), location: j.location ?? 'Worldwide',
         description: (j.description ?? '').slice(0, 5000),
-        salary_min: salaryMin, salary_max: salaryMax, currency: 'USD',
+        salary_min: salary.min, salary_max: salary.max, currency: salary.currency,
         apply_url: applyUrl,
         posted_at: j.detected_extensions?.posted_at ? parseSerpDate(j.detected_extensions.posted_at) : new Date().toISOString(),
         source: 'serpapi', source_url: 'https://serpapi.com',
@@ -475,7 +469,15 @@ export async function runIngest(): Promise<IngestResult> {
   // applies, and SSRF is re-validated on every fetch (the URL was
   // checked at POST time, but column values can be edited via the DB
   // directly).
-  const hardcodedUrls = new Set(SOURCES.map(s => s.sourceUrl));
+  // JobSpy query URLs are operational bookkeeping rows created by the
+  // dedicated JobSpy pipeline, not generic RSS/JSON feeds. Exclude them here
+  // or the 06:00 daily ingest re-fetches every JobSpy query as a custom source,
+  // duplicating the 12:00 JobSpy cron and producing a wall of HTTP 404s when
+  // the JobSpy endpoint is misconfigured.
+  const hardcodedUrls = new Set([
+    ...SOURCES.map(s => s.sourceUrl),
+    ...JOBSPY_DEFAULT_QUERIES.map(jobSpySourceUrl),
+  ]);
   try {
     // 'error' rows are included deliberately. markSourceStatus() writes
     // status='error' on ANY failure — a 502 from the origin, a DNS blip, a

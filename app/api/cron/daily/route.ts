@@ -157,36 +157,80 @@ export async function GET(req: NextRequest) {
   const sevenDaysAgo = new Date(Date.now() - NEW_JOB_DAYS  * 86_400_000).toISOString();
   const staleCutoff  = new Date(Date.now() - STALE_JOB_DAYS * 86_400_000).toISOString();
 
-  // Both sweeps rewrite a large slice of a six-figure table, which is exactly
-  // the shape that trips the Postgres statement timeout (see migration_v69 for
-  // the same failure in dedupe_jobs). supabase-js reports that as { error },
-  // not a throw — so discarding the error, as this did, reported a timed-out
-  // sweep as "0 rows" and left the freshness pass looking healthy while jobs
-  // stayed flagged new and stale rows stayed live.
-  const { count: unflaggedNew, error: unflagErr } = await supabase
-    .from('jobs')
-    .update({ is_new: false }, { count: 'exact' })
-    .eq('is_new', true)
-    .lt('posted_at', sevenDaysAgo);
+  // Update in bounded batches. A single UPDATE across the six-figure jobs
+  // table exceeded Supabase's statement timeout and achieved nothing. Each
+  // batch is independently committed and small enough to stay below the DB
+  // timeout; any remaining backlog drains on the next daily run.
+  const FRESHNESS_BATCH_SIZE = 500;
+  const FRESHNESS_MAX_BATCHES = 20;
+
+  let unflaggedNew = 0;
+  let unflagErr: { message: string } | null = null;
+  let unflagCapped = false;
+  for (let batch = 0; batch < FRESHNESS_MAX_BATCHES; batch++) {
+    const { data: rows, error: selectErr } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('is_new', true)
+      .lt('posted_at', sevenDaysAgo)
+      .order('posted_at', { ascending: true })
+      .limit(FRESHNESS_BATCH_SIZE);
+    if (selectErr) { unflagErr = selectErr; break; }
+    const ids = (rows ?? []).map((row: { id: string }) => row.id);
+    if (ids.length === 0) break;
+
+    const { error: updateErr } = await supabase
+      .from('jobs')
+      .update({ is_new: false })
+      .in('id', ids);
+    if (updateErr) { unflagErr = updateErr; break; }
+    unflaggedNew += ids.length;
+    if (ids.length < FRESHNESS_BATCH_SIZE) break;
+    if (batch === FRESHNESS_MAX_BATCHES - 1) unflagCapped = true;
+  }
   if (unflagErr) {
     logError({ event: 'cron.daily.unflag_new_failed', error: unflagErr.message });
     failures.push('freshness.mark_not_new');
+  } else if (unflagCapped) {
+    logWarn({ event: 'cron.daily.unflag_new_backlog', updated: unflaggedNew });
   }
 
-  const { count: deactivated, error: staleErr } = await supabase
-    .from('jobs')
-    .update({ is_active: false }, { count: 'exact' })
-    .eq('is_active', true)
-    .lt('last_seen_at', staleCutoff);
+  let deactivated = 0;
+  let staleErr: { message: string } | null = null;
+  let staleCapped = false;
+  for (let batch = 0; batch < FRESHNESS_MAX_BATCHES; batch++) {
+    const { data: rows, error: selectErr } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('is_active', true)
+      .lt('last_seen_at', staleCutoff)
+      .order('last_seen_at', { ascending: true })
+      .limit(FRESHNESS_BATCH_SIZE);
+    if (selectErr) { staleErr = selectErr; break; }
+    const ids = (rows ?? []).map((row: { id: string }) => row.id);
+    if (ids.length === 0) break;
+
+    const { error: updateErr } = await supabase
+      .from('jobs')
+      .update({ is_active: false })
+      .in('id', ids);
+    if (updateErr) { staleErr = updateErr; break; }
+    deactivated += ids.length;
+    if (ids.length < FRESHNESS_BATCH_SIZE) break;
+    if (batch === FRESHNESS_MAX_BATCHES - 1) staleCapped = true;
+  }
   if (staleErr) {
     logError({ event: 'cron.daily.stale_sweep_failed', error: staleErr.message });
     failures.push('freshness.stale_sweep');
+  } else if (staleCapped) {
+    logWarn({ event: 'cron.daily.stale_sweep_backlog', updated: deactivated });
   }
 
   log.freshness = {
-    markedNotNew:   unflaggedNew ?? 0,
-    deactivated:    deactivated  ?? 0,
+    markedNotNew:   unflaggedNew,
+    deactivated,
     staleAfterDays: STALE_JOB_DAYS,
+    backlogRemaining: unflagCapped || staleCapped,
     ...(unflagErr ? { markedNotNewError: unflagErr.message } : {}),
     ...(staleErr  ? { deactivatedError:  staleErr.message  } : {}),
   };

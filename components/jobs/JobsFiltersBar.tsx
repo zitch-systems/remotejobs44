@@ -405,8 +405,8 @@ export function JobsFiltersBar() {
       {/* Advanced filters panel */}
       {showFilters && (
         <div id="advanced-filters-panel" className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div className="col-span-2 sm:col-span-2 lg:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-2">
               <CountrySelect value={country} onChange={v => setParam('country', v)} />
             </div>
             <FilterSelect label="Region"       value={region}      onChange={v => setParam('region', v)}      options={REGIONS}       icon={<Flag className="w-3 h-3" />}        />

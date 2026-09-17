@@ -173,7 +173,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={s.name}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:border-brand-500 dark:hover:text-brand-400 transition-all duration-150 hover:scale-110"
+                  className="w-11 h-11 flex items-center justify-center rounded-lg border border-stone-200 dark:border-[#1e3a5f] text-stone-500 dark:text-stone-400 hover:border-brand-600 hover:text-brand-700 dark:hover:border-brand-500 dark:hover:text-brand-400 transition-all duration-150 hover:scale-110"
                   style={{ '--hover-color': s.color } as React.CSSProperties}
                 >
                   {s.svg}

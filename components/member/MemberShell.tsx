@@ -118,7 +118,7 @@ export function MemberShell({ children }: { children: React.ReactNode }) {
 
   const renderNav = (items: NavItem[]) =>
     items.map(({ href, label, icon: Icon, badge }) => (
-      <Link key={href} href={href} className={`nav-item${isActive(href) ? ' active' : ''}`}>
+      <Link key={href} href={href} className={`nav-item${isActive(href) ? ' active' : ''}`} aria-current={isActive(href) ? 'page' : undefined}>
         <Icon />
         <span>{label}</span>
         {badge != null && <span className="nbadge">{badge}</span>}
@@ -132,7 +132,7 @@ export function MemberShell({ children }: { children: React.ReactNode }) {
       <header className="member-topbar">
         <Link href="/dashboard" className="member-brand">
           <BrandMark />
-          <b>RemoteJobs<span>44</span></b>
+          <b className="member-brand-wordmark">RemoteJobs<span>44</span></b>
         </Link>
 
         <form className="member-topsearch" onSubmit={onSearch} role="search">
@@ -166,8 +166,10 @@ export function MemberShell({ children }: { children: React.ReactNode }) {
           </Link>
           <span className="tb-name">{user?.name || 'Member'}</span>
           {user?.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="tb-avatar" src={user.avatar} alt={displayName} width={34} height={34} />
+            <Link href="/profile" className="member-avatar-link" aria-label="Your profile">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="tb-avatar" src={user.avatar} alt={displayName} width={34} height={34} />
+            </Link>
           ) : (
             <Link href="/profile" className="tb-avatar-fallback" aria-label="Your profile">
               {getInitials(displayName)}

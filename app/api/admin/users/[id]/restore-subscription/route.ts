@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Verify the user exists before touching anything
   const { data: profile } = await supabase
     .from('profiles')
-    .select('email, role')
+    .select('email, role, plan, plan_expires_at')
     .eq('id', id)
     .maybeSingle();
   if (!profile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -76,7 +76,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }, { onConflict: 'user_id' });
   if (subError) {
     logError({ event: 'admin.restore_subscription.sub_upsert_failed', admin_email: auth.adminEmail, target_user_id: id, error: subError.message });
-    // Profile was already updated — don't error out, the user is functional.
+
+    // Keep the profile and subscription sources of truth aligned. The ideal
+    // operation is transactional, but until the production RPC is available,
+    // compensate by restoring the profile values we read before the write.
+    const { error: rollbackError } = await supabase
+      .from('profiles')
+      .update({
+        plan: profile.plan,
+        plan_expires_at: profile.plan_expires_at,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (rollbackError) {
+      logError({
+        event: 'admin.restore_subscription.profile_rollback_failed',
+        admin_email: auth.adminEmail,
+        target_user_id: id,
+        error: rollbackError.message,
+      });
+    }
+    return NextResponse.json(
+      { error: 'Subscription restoration failed; no success was recorded.' },
+      { status: 500 },
+    );
   }
 
   logInfo({ event: 'admin.subscription_restored', admin_email: auth.adminEmail, target_user_id: id, target_email: profile.email, plan });

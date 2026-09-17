@@ -29,15 +29,15 @@ export async function GET() {
     const since30d = new Date(); since30d.setDate(since30d.getDate() - 29); since30d.setHours(0, 0, 0, 0);
 
     const [
-      { count: totalJobs },
-      { count: newToday },
-      { count: totalUsers },
-      { count: proCount },
-      { count: dailyCount },
-      { count: sources },
-      { data: subscriptions30dProfiles },
-      { data: activeSubs },
-      { data: mobileDeviceRows },
+      totalJobsResult,
+      newTodayResult,
+      totalUsersResult,
+      proResult,
+      dailyResult,
+      sourcesResult,
+      signupsResult,
+      activeSubsResult,
+      mobileDevicesResult,
     ] = await Promise.all([
       admin.from('jobs').select('id', { count: 'exact', head: true }).eq('is_active', true),
       admin.from('jobs').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
@@ -47,10 +47,36 @@ export async function GET() {
       admin.from('job_sources').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       admin.from('profiles').select('created_at').gte('created_at', since30d.toISOString()),
       admin.from('subscriptions').select('plan,billing,price').eq('status', 'active'),
-      // Mobile-app users: one row per (user, platform). Dedupe to distinct users
-      // and split by platform. Table may not exist on older DBs → tolerate null.
       admin.from('mobile_devices').select('user_id,platform'),
     ]);
+
+    // supabase-js returns database failures in result.error; it does not throw.
+    // Treat any failed aggregate as an unavailable dashboard instead of
+    // silently converting an outage/quota restriction into healthy zeroes.
+    const queryErrors = [
+      totalJobsResult.error,
+      newTodayResult.error,
+      totalUsersResult.error,
+      proResult.error,
+      dailyResult.error,
+      sourcesResult.error,
+      signupsResult.error,
+      activeSubsResult.error,
+      mobileDevicesResult.error,
+    ].filter((error): error is NonNullable<typeof error> => !!error);
+    if (queryErrors.length > 0) {
+      throw new Error(queryErrors.map(error => error.message).join('; '));
+    }
+
+    const totalJobs = totalJobsResult.count;
+    const newToday = newTodayResult.count;
+    const totalUsers = totalUsersResult.count;
+    const proCount = proResult.count;
+    const dailyCount = dailyResult.count;
+    const sources = sourcesResult.count;
+    const subscriptions30dProfiles = signupsResult.data;
+    const activeSubs = activeSubsResult.data;
+    const mobileDeviceRows = mobileDevicesResult.data;
 
     // Distinct mobile-app users + platform split.
     const mobileUserSet = new Set<string>();
@@ -105,11 +131,9 @@ export async function GET() {
     });
   } catch (err: any) {
     logError({ event: 'admin.stats.failed', error: err?.message ?? String(err) });
-    return NextResponse.json({
-      totalJobs: 0, newToday: 0, activeUsers: 0,
-      pro: 0, daily: 0, subscriptions: 0, sources: 0,
-      mrr: 0, signups30d: Array(30).fill(0), revenue: 0,
-      mobileUsers: 0, iosUsers: 0, androidUsers: 0,
-    });
+    return NextResponse.json(
+      { error: 'Admin statistics are temporarily unavailable.' },
+      { status: 503 },
+    );
   }
 }

@@ -146,13 +146,18 @@ function LoginForm() {
     try {
       const supabase = createClient();
 
-      // Trim whitespace from password too — users on mobile often double-tap
-      // a space after autocomplete, and that one trailing char fails the auth
-      // with "invalid_credentials" while looking identical to the user.
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Passwords are exact credentials (including spaces). Only fall back to
+      // the old trimmed behavior after an invalid-credentials response, for
+      // accounts created by earlier web releases which silently trimmed them.
+      let { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
-        password: password.trim(),
+        password,
       });
+      if (!timedOut && error?.code === 'invalid_credentials' && password !== password.trim()) {
+        ({ data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(), password: password.trim(),
+        }));
+      }
 
       // Auth call returned — clear the timer regardless of outcome
       clearTimeout(timer);
@@ -436,7 +441,7 @@ export default function LoginPage() {
 
           <div className="relative z-[2] my-auto max-w-[440px]">
             <span className="eyebrow-pill" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.18)', color: '#dbeafe' }}>
-              <span className="dot" />70,000+ live remote roles
+              <span className="dot" />Fresh remote roles, updated daily
             </span>
             <h2 className="mb-3.5 mt-[18px] font-display text-[clamp(2rem,3vw,2.85rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-white">
               Your next remote role is already posted.

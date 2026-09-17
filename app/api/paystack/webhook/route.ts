@@ -15,13 +15,14 @@ import { sendEmail } from '@/lib/email/send';
 import { paymentFailedEmail } from '@/lib/email/templates';
 import { fetchActiveSubscriptionForCustomer } from '@/lib/paystack/subscription';
 import { recordReferralCommission } from '@/lib/referral/commission';
+import { fulfillPaystackCharge, paymentPlanFromMetadata } from '@/lib/paystack/fulfill';
 import { extractPaystackId } from '@/lib/paystack/event-id';
 import { verifyPaystackSignature } from '@/lib/paystack/verify-signature';
 import { paystackWebhookEnvelopeSchema } from '@/lib/api-schemas';
 import { logInfo, logWarn, logError } from '@/lib/log';
 import {
   isValidPlan, chargeMatchesPlan, getPlanTier as planTierShared,
-  getBilling as billingShared, getPlanExpiry as planExpiryShared,
+  getBilling as billingShared,
 } from '@/lib/paystack/plans';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
@@ -73,7 +74,8 @@ async function validateUserId(supabase: ReturnType<typeof createAdminSupabaseCli
   if (!userId || typeof userId !== 'string') return false;
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID_RE.test(userId)) return false;
-  const { data } = await supabase.from('profiles').select('id, role').eq('id', userId).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('id, role').eq('id', userId).maybeSingle();
+  if (error) throw new Error(`Account lookup failed: ${error.message}`);
   return !!data;
 }
 
@@ -115,40 +117,35 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminSupabaseClient();
 
-  // Generic idempotency: short-circuit any event we've already
-  // processed. Keyed on (event_type, paystack_id) where paystack_id is
-  // the most specific identifier in the payload. The unique index on
-  // paystack_webhook_events raises a 23505 (unique_violation) on insert
-  // for a duplicate; we catch that and return 200 OK silently so
-  // Paystack stops retrying.
   const paystackId = extractPaystackId(event);
-  if (paystackId) {
-    const { error: dedupError } = await supabase
-      .from('paystack_webhook_events')
-      .insert({
-        event_type:  event.event ?? 'unknown',
-        paystack_id: paystackId,
-        payload:     event.data ?? null,
+  try {
+    if (paystackId) {
+      const { error: dedupError } = await supabase.from('paystack_webhook_events').insert({
+        event_type: event.event, paystack_id: paystackId,
+        payload: event.data ?? null, processed: false,
       });
-    if (dedupError) {
-      // 23505 = unique_violation. Treat as "already processed".
-      if (dedupError.code === '23505') {
-        logInfo({ event: 'webhook.dedup_hit', event_type: event.event, paystack_id: paystackId });
-        return NextResponse.json({ received: true, deduplicated: true });
+      if (dedupError?.code === '23505') {
+        const { data: prior, error } = await supabase.from('paystack_webhook_events')
+          .select('processed').eq('event_type', event.event).eq('paystack_id', paystackId).maybeSingle();
+        if (error || !prior) throw new Error('Unable to verify previous webhook processing');
+        // Charges always go through the atomic per-reference RPC. Merely receiving
+        // a webhook (including one logged by the old handler) never proves credit.
+        if (prior.processed && event.event !== 'charge.success') {
+          return NextResponse.json({ received: true, deduplicated: true });
+        }
+      } else if (dedupError) {
+        throw new Error(`Unable to record webhook: ${dedupError.message}`);
       }
-      // Any other insert error → log and proceed (don't block the
-      // event just because the audit log failed).
-      logError({ event: 'webhook.dedup_log_insert_failed', error: dedupError.message, event_type: event.event, paystack_id: paystackId });
     }
-  }
 
   switch (event.event) {
     case 'charge.success': {
       const { metadata, reference, amount, currency, customer } = event.data ?? {};
       const userId = metadata?.user_id;
-      const plan   = metadata?.plan;
+      const plan   = paymentPlanFromMetadata(metadata);
 
       if (!userId || !plan) break;
+      if (typeof reference !== 'string' || !reference) throw new Error('Charge reference missing');
       if (!isValidPlan(plan)) {
         logWarn({ event: 'webhook.invalid_plan', plan, user_id: userId });
         notifyOrphanCharge(reference ?? 'unknown', userId, plan ?? 'unknown', amount ?? 0);
@@ -174,97 +171,16 @@ export async function POST(req: NextRequest) {
       const tier      = planTierShared(plan);
       const billing   = billingShared(plan);
 
-      // Durable idempotency: claim the reference in the immutable per-charge
-      // ledger (paystack_transactions.reference is the PRIMARY KEY) BEFORE
-      // crediting — same anchor the verify route uses. subscriptions.
-      // paystack_reference is overwritten on renewal (onConflict: 'user_id'),
-      // so it is not a reliable dedup key; the reference-PK ledger is. If
-      // verify already claimed this reference, the insert hits 23505 and we
-      // no-op (whichever of verify/webhook landed first wins).
-      if (reference) {
-        const { error: claimErr } = await supabase
-          .from('paystack_transactions')
-          .insert({
-            reference,
-            user_id:   userId,
-            plan:      tier,
-            selection: plan,
-            amount:    amount ?? null,
-            currency:  currency ?? 'NGN',
-          });
-        if (claimErr) {
-          if (claimErr.code === '23505') {
-            logInfo({ event: 'webhook.charge_success.duplicate', reference, user_id: userId });
-            break;
-          }
-          // Non-conflict error (FK/transient/un-migrated table) — log and
-          // rely on the legacy subscriptions check below, no regression.
-          logError({ event: 'webhook.charge_success.ledger_claim_failed', code: claimErr.code, error: claimErr.message, reference });
-        }
-        // Legacy dedup runs REGARDLESS of the claim outcome. If verify's own
-        // ledger insert failed transiently but its profile/subscriptions
-        // writes landed, the ledger has no row — so the claim above succeeds
-        // even though the charge was already credited. The reference stamped
-        // on the user's subscription row is the tell; skip the double-credit.
-        const { data: refRow } = await supabase
-          .from('subscriptions')
-          .select('user_id')
-          .eq('paystack_reference', reference)
-          .maybeSingle();
-        if (refRow) {
-          logInfo({ event: 'webhook.charge_success.duplicate_legacy', reference, user_id: userId });
-          break;
-        }
-      }
-
-      // Skip plan write if user is an admin — admins get a permanent 'admin' plan tag.
-      const { data: profile } = await supabase
-        .from('profiles').select('role, plan_expires_at').eq('id', userId).maybeSingle();
-      const isAdmin = profile?.role === 'admin';
-
-      // Preserve unused paid time on an upgrade/renewal: extend from the LATER
-      // of now or the current (future) expiry so a mid-period upgrade doesn't
-      // discard days already paid for (mirrors the verify route).
-      const existingExpiryMs = profile?.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : 0;
-      const expiryBase = existingExpiryMs > Date.now() ? new Date(existingExpiryMs) : new Date();
-      const expiresAt  = planExpiryShared(plan, expiryBase);
-
-      if (!isAdmin) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            plan:            tier,
-            plan_expires_at: expiresAt.toISOString(),
-            updated_at:      new Date().toISOString(),
-          })
-          .eq('id', userId);
-        if (updateError) {
-          logError({ event: 'webhook.profile_update_failed', user_id: userId, error: updateError.message });
-        }
-      }
-
-      // Persist Paystack's subscription_code + email_token so user-initiated
-      // cancellation can call /subscription/disable directly. Day Pass is
-      // a one-off — no subscription is created — so skip the lookup.
       const paystackSub = plan === 'daily'
         ? null
         : await fetchActiveSubscriptionForCustomer(customer?.customer_code);
-
-      const { error: subError } = await supabase.from('subscriptions').upsert({
-        user_id:                    userId,
-        plan:                       tier,
-        billing,
-        status:                     'active',
-        paystack_reference:         reference ?? null,
-        paystack_customer_code:     customer?.customer_code ?? null,
-        paystack_subscription_code: paystackSub?.subscription_code ?? null,
-        paystack_email_token:       paystackSub?.email_token ?? null,
-        current_period_start:       new Date().toISOString(),
-        current_period_end:         expiresAt.toISOString(),
-        currency:                   currency ?? 'NGN',
-        price:                      (amount ?? 0) / 100,
-      }, { onConflict: 'user_id' });
-      if (subError) logError({ event: 'webhook.subscription_upsert_failed', user_id: userId, error: subError.message });
+      const fulfillment = await fulfillPaystackCharge(supabase, {
+        reference, userId, plan, amount, currency,
+        customerCode: customer?.customer_code,
+        subscriptionCode: paystackSub?.subscription_code,
+        emailToken: paystackSub?.email_token,
+      });
+      if (!fulfillment.credited) break;
 
       // Referral commission — mirror of the verify route. Idempotent on
       // reference, so whichever of verify/webhook lands second is a no-op,
@@ -293,15 +209,17 @@ export async function POST(req: NextRequest) {
       if (!(await validateUserId(supabase, userId))) break;
 
       // Don't touch admins.
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles').select('role').eq('id', userId).maybeSingle();
+      if (profileError) throw new Error(profileError.message);
       if (profile?.role === 'admin') break;
 
-      await supabase
+      const { error: cancelError } = await supabase
         .from('subscriptions')
         .update({ status: 'cancelled', updated_at: new Date().toISOString() })
         .eq('user_id', userId);
 
+      if (cancelError) throw new Error(cancelError.message);
       logInfo({ event: 'webhook.subscription_disable', user_id: userId });
       break;
     }
@@ -341,11 +259,12 @@ export async function POST(req: NextRequest) {
       // metadata.user_id (less reliable; Paystack doesn't always echo it).
       let userId: string | null = null;
       if (subCode) {
-        const { data } = await supabase
+        const { data, error: lookupError } = await supabase
           .from('subscriptions')
           .select('user_id, plan')
           .eq('paystack_subscription_code', subCode)
           .maybeSingle();
+        if (lookupError) throw new Error(lookupError.message);
         userId = data?.user_id ?? null;
       }
       if (!userId) userId = subData.metadata?.user_id ?? null;
@@ -355,18 +274,19 @@ export async function POST(req: NextRequest) {
       }
 
       // Admins are exempt — skip downgrade flow entirely.
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('name, email, role, plan')
         .eq('id', userId)
         .maybeSingle();
+      if (profileError) throw new Error(profileError.message);
       if (profile?.role === 'admin') {
         logInfo({ event: 'webhook.payment_failed.admin_skip', user_id: userId });
         break;
       }
 
       const nowIso = new Date().toISOString();
-      await supabase
+      const { error: failedPaymentError } = await supabase
         .from('subscriptions')
         .update({
           status:               'payment_failed',
@@ -374,6 +294,8 @@ export async function POST(req: NextRequest) {
           updated_at:           nowIso,
         })
         .eq('user_id', userId);
+
+      if (failedPaymentError) throw new Error(failedPaymentError.message);
 
       // Email the user — fire-and-forget. The .catch keeps the webhook
       // 200 OK even if Resend is briefly down.
@@ -393,5 +315,15 @@ export async function POST(req: NextRequest) {
       break;
   }
 
-  return NextResponse.json({ received: true });
+    if (paystackId) {
+      const { error } = await supabase.from('paystack_webhook_events')
+        .update({ processed: true }).eq('event_type', event.event).eq('paystack_id', paystackId);
+      if (error) throw new Error(`Unable to finish webhook audit: ${error.message}`);
+    }
+    return NextResponse.json({ received: true });
+  } catch (error: any) {
+    logError({ event: 'webhook.processing_failed', error: error?.message ?? String(error), event_type: event.event });
+    // Paystack retries non-2xx responses; the atomic charge RPC makes retries safe.
+    return NextResponse.json({ error: 'Payment processing temporarily unavailable' }, { status: 503 });
+  }
 }

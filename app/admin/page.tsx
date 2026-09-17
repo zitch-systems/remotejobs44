@@ -46,6 +46,7 @@ export default function AdminPage() {
       try {
         const res  = await fetch('/api/admin/stats', { cache: 'no-store' });
         const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? `Admin stats failed (${res.status})`);
         setStats({
           jobs:       Number(data.totalJobs   ?? 0),
           users:      Number(data.activeUsers ?? 0),
@@ -63,9 +64,10 @@ export default function AdminPage() {
           api:      true,
           paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
         });
-      } catch {
-        setStats({ jobs: 0, users: 0, pro: 0, daily: 0, mrr: 0, newToday: 0, signups30d: Array(30).fill(0), mobile: 0, ios: 0, android: 0 });
-        setHealth({ db: false, api: false, paystack: false });
+      } catch (err: any) {
+        setStats(null);
+        setHealth({ db: false, api: false, paystack: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY });
+        toast(err?.message ?? 'Admin statistics are unavailable.', 'error');
       } finally {
         setLoading(false);
       }
@@ -133,14 +135,22 @@ export default function AdminPage() {
 
   async function handleDeleteJob(id: string) {
     if (!confirm('Delete this job?')) return;
-    await jobsApi.deleteJob(id);
-    setRecentJobs(prev => prev.filter(j => j.id !== id));
-    toast('Job deleted', 'success');
+    try {
+      await jobsApi.deleteJob(id);
+      setRecentJobs(prev => prev.filter(j => j.id !== id));
+      toast('Job deleted', 'success');
+    } catch (err: any) {
+      toast(err?.message ?? 'Could not delete job.', 'error');
+    }
   }
 
-  async function handleToggleFeatured(job: any) {
-    await jobsApi.updateJob(job.id, { featured: !job.featured });
-    setRecentJobs(prev => prev.map(j => j.id === job.id ? { ...j, featured: !j.featured } : j));
+  async function handleToggleFeatured(job: Job) {
+    try {
+      await jobsApi.updateJob(job.id, { featured: !job.featured });
+      setRecentJobs(prev => prev.map(j => j.id === job.id ? { ...j, featured: !job.featured } : j));
+    } catch (err: any) {
+      toast(err?.message ?? 'Could not update featured status.', 'error');
+    }
   }
 
   const cards = stats ? [
@@ -251,7 +261,7 @@ export default function AdminPage() {
             {[
               { label: 'Database', ok: health.db, icon: <Globe className="w-4 h-4" /> },
               { label: 'API Routes', ok: health.api, icon: <Zap className="w-4 h-4" /> },
-              { label: 'Paystack', ok: health.paystack, icon: <Shield className="w-4 h-4" /> },
+              { label: 'Paystack configured', ok: health.paystack, icon: <Shield className="w-4 h-4" /> },
             ].map(item => (
               <div key={item.label} className={cn('flex items-center gap-2 p-3 rounded-lg border text-sm font-semibold',
                 item.ok
