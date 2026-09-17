@@ -32,5 +32,8 @@ export async function GET(req: NextRequest) {
     try { revalidatePath('/jobs'); }
     catch (err: any) { logWarn({ event: 'cron.jobspy.revalidate_failed', error: err?.message ?? String(err) }); }
   }
-  return NextResponse.json(result);
+  // A permanent upstream/configuration failure is not a successful cron run.
+  // Surface it as 502 so Vercel marks the invocation failed and monitoring can
+  // alert instead of showing a green 200 with zero jobs added.
+  return NextResponse.json(result, { status: result.success ? 200 : 502 });
 }
