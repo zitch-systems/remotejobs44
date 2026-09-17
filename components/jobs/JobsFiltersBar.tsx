@@ -203,6 +203,9 @@ export function JobsFiltersBar() {
   const searchParams = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  // Wait for URL state to initialize before accepting input, so hydration
+  // cannot erase text entered immediately after the server-rendered page loads.
+  const [hydrated, setHydrated] = useState(false);
   // useTransition surfaces the in-flight SSR navigation so the search
   // input can spin and the Search button can show "Searching…" while
   // the new /jobs?q=... route is rendered. Without this the user sees
@@ -243,7 +246,10 @@ export function JobsFiltersBar() {
     : SORTS.filter(s => s.value !== 'relevant');
   const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : (q ? 'relevant' : 'newest');
 
-  useEffect(() => { setSearchInput(q); }, [q]);
+  useEffect(() => {
+    setSearchInput(q);
+    setHydrated(true);
+  }, [q]);
 
   function setParam(key: string, value: string) {
     const p = new URLSearchParams(searchParams.toString());
@@ -289,7 +295,7 @@ export function JobsFiltersBar() {
             }}
             placeholder="Job title, skill, or company…"
             className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 disabled:opacity-60"
-            disabled={isPending}
+            disabled={isPending || !hydrated}
           />
           {searchInput && (
             <button
