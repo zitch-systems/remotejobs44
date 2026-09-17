@@ -44,6 +44,9 @@ async def run_search(options):
     # A child process, rather than a timed-out thread, lets us actually stop
     # scraper sockets/work on timeout. No key or request headers enter the child.
     env = {k: v for k, v in os.environ.items() if k != "JOBSPY_API_KEY"}
+    # Vercel may add bundled dependencies to sys.path instead of installing
+    # them into the interpreter's default site-packages directory.
+    env["PYTHONPATH"] = os.pathsep.join(str(p) for p in sys.path if p)
     process = await asyncio.create_subprocess_exec(
         sys.executable, str(WORKER), stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE, stderr=None, env=env,
