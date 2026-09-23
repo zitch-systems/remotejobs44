@@ -10,12 +10,12 @@ export function HowItWorks() {
           <div className="step">
             <div className="num">01</div>
             <h3>Browse free, no card needed</h3>
-            <p>Search 70,000+ remote jobs across 10 categories. Filter by role, level, salary and location — free from day one.</p>
+            <p>Search roles by title, category and location. Read the listed country requirements before applying.</p>
           </div>
           <div className="step">
             <div className="num">02</div>
             <h3>Unlock access. Start applying.</h3>
-            <p>Instantly unlock every apply link and email. One-click apply with your saved CV. No friction.</p>
+            <p>Unlock the available application link, then follow the employer&apos;s process for that role.</p>
             <div className="price-row">
               <span className="price-pill">Day Pass · ₦500</span>
               <span className="price-pill">Pro · ₦2,999/mo</span>

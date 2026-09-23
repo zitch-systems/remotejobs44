@@ -60,6 +60,10 @@
 }
 .deep-ocean .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
 .deep-ocean .wrap--wide { max-width: 1320px; }
+.deep-ocean .jobs-listing-body { padding-top: 32px; padding-bottom: 72px; }
+@media (max-width: 600px) {
+  .deep-ocean .jobs-listing-body { padding: 24px 16px 56px; }
+}
 .deep-ocean .eyebrow { display:inline-flex; align-items:center; gap:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--fg-4); }
 
 /* ---------- Buttons ---------- */

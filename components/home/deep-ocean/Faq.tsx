@@ -1,7 +1,7 @@
 const FAQS = [
   {
     q: 'Is it really free to browse?',
-    a: 'Yes. Search all 70,000+ roles, filter by category, salary and region, and save jobs — no card required. You only pay when you’re ready to unlock apply links and contact details.',
+    a: 'Yes. Browse roles and filter by category, location and date without a card. A subscription or eligible free trial may be needed to unlock an application link.',
     open: true,
   },
   {
@@ -9,12 +9,12 @@ const FAQS = [
     a: 'The ₦500 Day Pass unlocks every apply link and email for 24 hours. Pro (₦2,999/mo) adds unlimited unlocks, one-click apply with a saved CV, application tracking, and early access to featured roles.',
   },
   {
-    q: 'How do you verify the jobs are really remote?',
-    a: 'Every listing is checked against the company’s stated remote policy and hiring locations before it goes live. Roles that secretly require on-site work or one specific country are filtered out — what you see is what actually hires remotely.',
+    q: 'Does remote mean I can apply from any country?',
+    a: 'No. Some remote jobs only hire in certain countries. We show the location provided by the job source and flag when the hiring countries are unclear. Always confirm eligibility on the employer posting.',
   },
   {
     q: 'Can I get paid in my local currency?',
-    a: 'Most listed companies pay through global payroll partners like Deel, Remote and Wise, so you can receive USD, EUR or GBP, or convert to your local currency. Each listing notes the payment method where known.',
+    a: 'That depends on the employer and your contract. Check the job description or ask the employer about supported currencies, payroll and your local tax requirements.',
   },
 ];
 

@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { HeroSearch } from './HeroSearch';
-import { CountUp } from './CountUp';
 
 // Hero band (Landing B) — single column over the full-bleed photo background
 // (the directional scrim lets the photo show on the right). Copy + search +
@@ -11,27 +10,27 @@ export function Hero() {
     <section className="hero-b">
       <div className="wrap hb-body">
         <div className="hb-copy">
-          <span className="eyebrow-pill"><span className="dot" />70,000+ live remote roles · 150+ countries hiring</span>
-          <h1>The world&apos;s <em className="flip-word">remote</em> jobs.<br />One search.<br />Apply from anywhere.</h1>
+          <span className="eyebrow-pill"><span className="dot" />Employer boards and external job feeds</span>
+          <h1>Find <em className="flip-word">remote</em> jobs.<br />Check the location.<br />Apply with confidence.</h1>
           <p className="lede">
-            Every remote opening worth applying to — customer service, virtual assistance, marketing,
-            data &amp; software — <b>verified remote-friendly</b> and searchable in <b>one place</b>.
+            Explore roles across customer service, marketing, data and software.
+            See the <b>listed location and source</b> before deciding where to apply.
           </p>
 
           <HeroSearch />
 
           <div className="hb-stats">
             <div className="hb-stat">
-              <CountUp className="n" target={70} suffix="k+" loop holdMs={2600} />
-              <div className="l">Jobs indexed</div>
+              <span className="n">01</span>
+              <div className="l">Search roles</div>
             </div>
             <div className="hb-stat">
-              <CountUp className="n" target={150} suffix="+" loop holdMs={3000} />
-              <div className="l">Countries hiring</div>
+              <span className="n">02</span>
+              <div className="l">Review locations</div>
             </div>
             <div className="hb-stat">
-              <CountUp className="n" target={10} suffix="+" loop holdMs={3400} />
-              <div className="l">Job categories</div>
+              <span className="n">03</span>
+              <div className="l">Apply and track</div>
             </div>
           </div>
 

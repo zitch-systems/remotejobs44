@@ -1,6 +1,6 @@
 // components/jobs/SourceTrustBadge.tsx
 //
-// Tiny pill rendering the source-trust tier (Verified ATS / Aggregator /
+// Tiny pill rendering the source-trust tier (Direct ATS / External feed /
 // Unverified). Server-renderable; no client state. Tooltip via `title=`
 // so it works without JS — full description on hover.
 import { CheckCircle2, Globe2, AlertTriangle } from 'lucide-react';

@@ -35,8 +35,8 @@ export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
       <div className="wrap live-feed-wrap">
         <div className="section-head">
           <span className="section-kicker">Live right now</span>
-          <h2>Fresh remote roles, posted every minute</h2>
-          <p>A live look at what&apos;s going up on RemoteJobs44 as you read this.</p>
+          <h2>Explore recent job listings</h2>
+          <p>A selection of roles from the job board. Check each posting for its current availability.</p>
         </div>
 
         <div className="preview-wrap">
@@ -55,7 +55,7 @@ export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
                   <circle cx="11" cy="11" r="8" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
-                <span>Remote · Worldwide · All categories</span>
+                <span>Remote jobs · All locations · All categories</span>
               </div>
             </div>
             <div className="preview-viewport">
@@ -73,7 +73,7 @@ export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
               height={204}
               sizes="172px"
             />
-            <figcaption><span className="hp-pulse" />Hired remotely this week</figcaption>
+            <figcaption><span className="hp-pulse" />Explore remote opportunities</figcaption>
           </figure>
         </div>
       </div>

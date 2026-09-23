@@ -17,9 +17,8 @@
 //   1. Trust signal — the audit flagged the absence of any verification UI
 //      as a top reputational risk for a Paystack-billed platform.
 //   2. Honest expectations — we DON'T do per-company verification, and
-//      claiming "Verified Employer" would be a lie. "Verified ATS" is
-//      directionally accurate: the publishing channel is verified, not
-//      the company.
+//      claiming "Verified Employer" would be a lie. The user-facing badge
+//      describes the source channel, not a manual employer verification.
 
 export type SourceTrust = 'verified' | 'aggregator' | 'unverified';
 
@@ -47,14 +46,14 @@ export function describeSourceTrust(trust: SourceTrust): SourceTrustDisplay {
   switch (trust) {
     case 'verified':
       return {
-        label:   'Verified ATS',
-        tooltip: 'Published directly through the employer\'s applicant tracking system (Greenhouse, Lever, Ashby or Workable).',
+        label:   'Direct ATS source',
+        tooltip: 'Fetched from a public Greenhouse, Lever, Ashby or Workable board. Country eligibility and availability still need confirmation.',
         tone:    'green',
       };
     case 'aggregator':
       return {
-        label:   'Aggregator',
-        tooltip: 'Re-published from a third-party remote-jobs board. The original employer didn\'t list it on RemoteJobs44 directly.',
+        label:   'External feed',
+        tooltip: 'Imported from an API or external job feed. Confirm the employer listing and hiring country before applying.',
         tone:    'blue',
       };
     case 'unverified':

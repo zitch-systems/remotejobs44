@@ -93,7 +93,7 @@ const REGIONS = [
   { value:'canada',       label:'🇨🇦 Canada'           },
   { value:'latam',        label:'🌎 Latin America'     },
   { value:'asia',         label:'🌏 Asia'             },
-  { value:'worldwide',    label:'🌐 Worldwide / Global'},
+  { value:'worldwide',    label:'🌐 Worldwide mentioned'},
 ];
 const COUNTRIES: { value: string; label: string; group: string }[] = [
   { value: 'nigeria',      label: '🇳🇬 Nigeria',             group: 'Africa'       },
@@ -126,7 +126,7 @@ const COUNTRIES: { value: string; label: string; group: string }[] = [
   { value: 'indonesia',    label: '🇮🇩 Indonesia',           group: 'Asia-Pacific' },
   { value: 'philippines',  label: '🇵🇭 Philippines',         group: 'Asia-Pacific' },
   { value: 'uae',          label: '🇦🇪 UAE',                 group: 'Middle East'  },
-  { value: 'worldwide',    label: '🌐 Worldwide / Global',   group: 'Global'       },
+  { value: 'worldwide',    label: '🌐 Worldwide mentioned',   group: 'Global'       },
 ];
 const COUNTRY_GROUPS = Array.from(new Set(COUNTRIES.map(c => c.group)));
 
@@ -248,6 +248,10 @@ export function JobsFiltersBar() {
   function setParam(key: string, value: string) {
     const p = new URLSearchParams(searchParams.toString());
     if (value && value !== 'all') p.set(key, value); else p.delete(key);
+    // The backend uses country before region. Prevent a visible region chip
+    // from implying it is also applied when a country filter is selected.
+    if (key === 'country' && value) p.delete('region');
+    if (key === 'region' && value) p.delete('country');
     p.delete('page');
     startTransition(() => { router.push(`/jobs?${p.toString()}`); });
   }
@@ -405,6 +409,7 @@ export function JobsFiltersBar() {
       {/* Advanced filters panel */}
       {showFilters && (
         <div id="advanced-filters-panel" className="mt-3 p-5 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl shadow-sm">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">Location filters match text in the job listing. Confirm eligible hiring countries with the employer.</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="col-span-1 sm:col-span-2 lg:col-span-2">
               <CountrySelect value={country} onChange={v => setParam('country', v)} />

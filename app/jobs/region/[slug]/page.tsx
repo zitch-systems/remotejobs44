@@ -15,7 +15,7 @@ const REGION_KEYWORDS: Record<string, string[]> = {
   americas:     ['united states', 'us', 'usa', 'canada', 'mexico', 'brazil', 'argentina', 'latam'],
   asia:         ['asia', 'india', 'philippines', 'singapore', 'japan', 'pakistan', 'vietnam', 'indonesia'],
   'middle-east':['middle east', 'uae', 'dubai', 'saudi', 'qatar', 'israel', 'turkey'],
-  worldwide:    ['worldwide', 'anywhere', 'global', 'remote'],
+  worldwide:    ['worldwide', 'work from anywhere'],
 };
 
 export const dynamic = 'force-static';
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const region = findRegion((await params).slug);
   if (!region) return {};
   const title = `Remote Jobs in ${region.label} | RemoteJobs44`;
-  const description = `${region.blurb} Browse and apply — updated daily.`;
+  const description = `Jobs with ${region.label} in the listed location. Check the employer posting for hiring restrictions.`;
   // /jobs/region/worldwide and /jobs/country/worldwide are the same query
   // (fully-remote, open to anyone) and shipped identical titles/H1s, competing
   // for the same term. Point this one's canonical at the country variant so the
@@ -49,6 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function RegionPage({ params }: { params: Promise<{ slug: string }> }) {
   const region = findRegion((await params).slug);
   if (!region) notFound();
+  const blurb = `Jobs with ${region.label} in the listed location. Confirm work eligibility on the employer posting.`;
 
   let jobs: any[] = [];
   let total = 0;
@@ -81,10 +82,10 @@ export default async function RegionPage({ params }: { params: Promise<{ slug: s
   return (
     <SliceListing
       title={`Remote Jobs in ${region.label}`}
-      blurb={region.blurb}
+      blurb={blurb}
       jobs={jobs}
       total={total}
-      browseHref={`/jobs?q=${encodeURIComponent(region.label)}`}
+      browseHref={`/jobs?region=${encodeURIComponent(region.slug)}`}
       breadcrumbs={[
         { name: 'Home',        href: '/'     },
         { name: 'Jobs',        href: '/jobs' },

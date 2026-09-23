@@ -162,5 +162,23 @@ const TEMPLATES: Record<SliceType, (label: string) => Faq[]> = {
 };
 
 export function buildSliceFaqs(type: SliceType, label: string): Faq[] {
+  if (type === 'country' || type === 'region') return [
+    {
+      q: `Can I apply from ${label}?`,
+      a: `A location match is not proof of eligibility. Read the employer posting for allowed hiring countries and any local requirements before applying from ${label}.`,
+    },
+    {
+      q: `Does remote mean worldwide for ${label} roles?`,
+      a: 'No. Remote roles may restrict applicants to specific countries or timezones. The job detail shows the listed location and flags missing hiring-country information.',
+    },
+    {
+      q: 'Where do the listings come from?',
+      a: 'Listings come from employer ATS boards and external feeds. Each job detail shows its source category so you can check the original posting.',
+    },
+    {
+      q: 'How can I check if a role is still open?',
+      a: 'Open the employer application posting to confirm that the role is still accepting applications. Feed updates can lag changes on employer sites.',
+    },
+  ];
   return TEMPLATES[type](label);
 }

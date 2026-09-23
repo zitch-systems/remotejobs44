@@ -21,7 +21,7 @@ const TIERS: Tier[] = [
     per: 'forever',
     tag: 'Find, track and get alerted to roles.',
     features: [
-      'Browse 70,000+ verified remote roles',
+      'Browse and filter remote roles',
       'Daily job alerts & saved searches',
       'Filter by role, level & region',
     ],
