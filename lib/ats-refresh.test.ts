@@ -8,6 +8,7 @@ describe('parseATSApiUrl', () => {
     ['https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true', 'greenhouse', 'stripe'],
     ['https://api.lever.co/v0/postings/gopuff?mode=json', 'lever', 'gopuff'],
     ['https://api.ashbyhq.com/posting-api/job-board/deliveroo?includeCompensation=true', 'ashby', 'deliveroo'],
+    ['https://api.ashbyhq.com/posting-api/job-board/scale%20army%20careers?includeCompensation=true', 'ashby', 'scale%20army%20careers'],
     ['https://apply.workable.com/api/v3/accounts/acme/jobs', 'workable', 'acme'],
     ['https://api.smartrecruiters.com/v1/companies/AcmeInc/postings?limit=100', 'smartrecruiters', 'AcmeInc'],
     ['https://acme.recruitee.com/api/offers', 'recruitee', 'acme'],
@@ -35,6 +36,7 @@ describe('parseATSApiUrl', () => {
   it('rejects a slug with path-traversal / unsafe characters', () => {
     // A host we recognise but a slug we can't trust must be skipped, not fetched.
     expect(parseATSApiUrl('https://api.lever.co/v0/postings/..%2f..%2fetc?mode=json')).toBeNull();
+    expect(parseATSApiUrl('https://api.ashbyhq.com/posting-api/job-board/scale%2Farmy')).toBeNull();
   });
 
   it('does not confuse the greenhouse public board host with the api host', () => {

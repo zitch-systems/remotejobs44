@@ -22,7 +22,7 @@
 // budget keeps it comfortably inside the caller's maxDuration.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { fetchATSJobs } from '@/lib/ats-engine';
-import { isValidATSPlatform, type ATSPlatform } from '@/lib/ats-detect';
+import { isValidATSPlatform, normaliseAshbyBoardSlug, type ATSPlatform } from '@/lib/ats-detect';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { detectScam } from '@/lib/scam-detect';
 import { markSeenAndReactivate } from '@/lib/jobs-last-seen';
@@ -82,7 +82,12 @@ export function parseATSApiUrl(
   if (!platform || !slug) return null;
   // slug is spliced into an outbound URL by fetchATSJobs — constrain it to the
   // same safe charset /api/admin/companies/refresh enforces.
-  if (!/^[a-z0-9._-]{1,80}$/i.test(slug)) return null;
+  if (platform === 'ashby') {
+    slug = normaliseAshbyBoardSlug(slug);
+  } else if (!/^[a-z0-9._-]{1,80}$/i.test(slug)) {
+    return null;
+  }
+  if (!slug) return null;
   if (!isValidATSPlatform(platform)) return null;
   return { platform, slug };
 }

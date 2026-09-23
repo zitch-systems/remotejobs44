@@ -6,7 +6,7 @@
 // pulling puppeteer-core / @sparticuz/chromium into the browser bundle.
 import type { Job, JobCategory, JobLevel } from './types';
 import { uid } from './utils';
-import { detectATSFromUrl, detectATSFromHtml, type ATSPlatform, type ATSDetectResult } from './ats-detect';
+import { detectATSFromUrl, detectATSFromHtml, normaliseAshbyBoardSlug, type ATSPlatform, type ATSDetectResult } from './ats-detect';
 import { validateExternalUrlAndResolve } from './ssrf-guard';
 import { logInfo, logError } from './log';
 
@@ -246,24 +246,29 @@ async function fetchLever(slug: string, sourceUrl: string): Promise<ATSFetchResu
 
 // ── Ashby ──────────────────────────────────────────────────────────────────
 async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
-  const url = `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`;
+  const boardSlug = normaliseAshbyBoardSlug(slug);
+  if (!boardSlug) throw new Error('Invalid Ashby board name');
+  const url = `https://api.ashbyhq.com/posting-api/job-board/${boardSlug}?includeCompensation=true`;
   const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Ashby ${res.status}: ${slug} not found`);
   const data = await res.json();
   // Ashby's posting-api now returns `data.jobs` (it was `jobPostings` in
   // an older version). Accept both so we keep working if they rename
   // either field later.
-  const postings = data.jobs ?? data.jobPostings ?? [];
+  const postings = (data.jobs ?? data.jobPostings ?? []).filter((j: any) => j.isListed !== false);
   const jobs: Partial<Job>[] = postings.map((j: any) => ({
     id: `ash_${j.id ?? uid()}`,
     title: j.title,
-    company: data.organization?.name ?? data.name ?? slug,
+    company: data.organization?.name ?? data.name ?? decodeURIComponent(boardSlug),
     description: stripHtml(j.descriptionHtml ?? j.description ?? ''),
     // Ashby exposes per-job urls under several names depending on the API
     // version: jobUrl (new), applyUrl, hostedUrl, or you have to construct
     // from /<slug>/<job-id>.
-    applyUrl: j.jobUrl ?? j.applyUrl ?? j.hostedUrl ?? `https://jobs.ashbyhq.com/${slug}/${j.id}`,
-    location: j.isRemote ? 'Remote' : (j.locationName ?? j.location ?? 'Unknown'),
+    applyUrl: j.jobUrl ?? j.applyUrl ?? j.hostedUrl ?? `https://jobs.ashbyhq.com/${boardSlug}/${j.id}`,
+    // Remote describes the work arrangement, not worldwide eligibility.
+    // Preserve the employer's location instead of flattening US-only roles
+    // to the misleading value "Remote".
+    location: j.locationName ?? j.location ?? (j.isRemote ? 'Remote' : 'Unknown'),
     posted: j.publishedAt ?? j.publishedDate ?? new Date().toISOString(),
     remote: j.isRemote === true || j.workplaceType === 'Remote',
     type: mapAshbyType(j.employmentType),

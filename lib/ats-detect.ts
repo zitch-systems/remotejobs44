@@ -98,6 +98,20 @@ const RESERVED_SLUGS = new Set([
   'static', 'assets', 'images', 'css', 'js', 'fonts', 'public', 'company',
 ]);
 
+// Ashby board names can contain spaces (for example the published board at
+// jobs.ashbyhq.com/scale%20army%20careers). Keep one canonical encoded path
+// segment so detection, manual import and the recurring refresh agree on the
+// same board. Reject encoded slashes, delimiters and double-encoded input.
+export function normaliseAshbyBoardSlug(raw: string): string | null {
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded !== decoded.trim() || !/^[a-z0-9][a-z0-9 ._-]{0,79}$/i.test(decoded)) return null;
+    return encodeURIComponent(decoded);
+  } catch {
+    return null;
+  }
+}
+
 // ── ATS URL patterns (slug + API URL builders) ────────────────────────────
 export const ATS_URL_PATTERNS: Array<{
   platform: ATSPlatform;
@@ -122,7 +136,7 @@ export const ATS_URL_PATTERNS: Array<{
   // Ashby
   {
     platform: 'ashby',
-    regex: /jobs\.ashbyhq\.com\/([a-z0-9_-]+)/i,
+    regex: /jobs\.ashbyhq\.com\/([a-z0-9._%-]+)(?=[/?#\s"'<>]|$)/i,
     extractSlug: m => m[1],
     buildApi: slug => `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`,
   },
@@ -559,7 +573,9 @@ function tryAllPatterns(text: string, baseConfidence: 'high' | 'medium'): ATSDet
   for (const p of ATS_URL_PATTERNS) {
     const m = text.match(p.regex);
     if (!m) continue;
-    const slug = p.extractSlug(m);
+    const extracted = p.extractSlug(m);
+    const slug = p.platform === 'ashby' ? normaliseAshbyBoardSlug(extracted) : extracted;
+    if (!slug) continue;
     // Skip false positives like /embed, /api, /careers used as path segments.
     // Workday slugs are "tenant|shard|site" — they can never collide with the
     // single-token reserved list, so the check still applies safely.
