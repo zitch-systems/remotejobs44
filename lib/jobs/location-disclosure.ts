@@ -2,7 +2,7 @@
 // alone does not establish that an employer can hire in every country.
 export function hiringLocationDisclosure(location: string | null | undefined, remote: boolean) {
   const stated = location?.trim() ?? '';
-  const unspecified = !stated || /^(remote|hybrid|unknown|not specified|n\/a)$/i.test(stated);
+  const unspecified = !stated || /^(remote|hybrid|unknown|(?:location )?not specified|n\/a)$/i.test(stated);
   if (unspecified) return {
     label: 'Hiring countries not stated',
     detail: remote

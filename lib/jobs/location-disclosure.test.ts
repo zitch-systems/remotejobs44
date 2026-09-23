@@ -6,6 +6,7 @@ describe('hiring location disclosure', () => {
   it('does not equate remote work with worldwide eligibility', () => {
     expect(hiringLocationDisclosure('Remote', true).uncertain).toBe(true);
     expect(hiringLocationDisclosure('Remote', true).label).toBe('Hiring countries not stated');
+    expect(hiringLocationDisclosure('Location not specified', true).uncertain).toBe(true);
     expect(hiringLocationDisclosure('Remote - US only', true).label).toBe('Employer-listed location');
     expect(hiringLocationDisclosure('Nigeria, South Africa', true).detail).toContain('Nigeria, South Africa');
   });
