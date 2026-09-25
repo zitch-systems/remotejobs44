@@ -129,7 +129,7 @@ export const SAFE_JOB_COLUMNS =
   'id, title, company, company_id, logo,' +
   ' category, type, level, location, timezone,' +
   ' description, requirements, skills, benefits,' +
-  ' salary_min, salary_max, currency,' +
+  ' salary_min, salary_max, currency, salary_text, workplace_type, relocation_supported, visa_sponsorship,' +
   ' remote, featured, is_new, is_active,' +
   ' source, source_url, views, applications,' +
   ' posted_at, expires_at, created_at,' +

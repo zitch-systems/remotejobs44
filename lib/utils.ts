@@ -26,23 +26,32 @@ export function formatDate(dateStr: string, fmt = 'MMM d, yyyy'): string {
 }
 
 export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
-  // Product decision: only surface pay when it's quoted in US dollars. Non-USD
-  // ranges (NGN/GBP/EUR/…) are hidden — every consumer already guards on the
-  // empty string, so returning '' here removes them at the single chokepoint.
-  // null / undefined / '' currency is treated as USD (the platform default and
-  // what the vast majority of rows carry), so we don't drop legit dollar jobs
-  // that simply never set the column.
-  if ((currency || 'USD') !== 'USD') return '';
-  // Null/undefined checks rather than truthiness so a legitimate $0 floor
-  // isn't treated as "absent" — previously {min:0,max:50000} rendered as
-  // "Up to $50k", silently dropping the explicit 0 lower bound.
   if (min == null && max == null) return '';
-  const sym: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$' };
-  const s = sym[currency] ?? currency + ' ';
-  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-  if (min != null && max != null) return `${s}${fmt(min)}–${fmt(max)}/yr`;
-  if (min != null) return `${s}${fmt(min)}+/yr`;
-  return `Up to ${s}${fmt(max!)}/yr`;
+  if ((min ?? 0) <= 0 && (max ?? 0) <= 0) return '';
+  const code = currency || 'USD';
+  // Legacy aggregator rows sometimes store hourly figures in the numeric
+  // columns without a period. Avoid claiming those are annual. Structured ATS
+  // annual ranges are always four figures or more; provider text remains the
+  // preferred display whenever it is available.
+  const positiveBounds = [min, max].filter((n): n is number => n != null && n > 0);
+  const period = positiveBounds.length > 0 && positiveBounds.every(n => n >= 1000) ? '/yr' : '';
+  const fmt = (n: number) => {
+    const scaled = n >= 1000;
+    const amount = scaled ? n / 1000 : n;
+    try {
+      const formatted = new Intl.NumberFormat(undefined, {
+        style: 'currency', currency: code, minimumFractionDigits: scaled ? 1 : 0,
+        maximumFractionDigits: scaled ? 1 : 0,
+      }).format(amount);
+      return scaled ? `${formatted}k` : formatted;
+    } catch {
+      const formatted = new Intl.NumberFormat(undefined, { minimumFractionDigits: scaled ? 1 : 0, maximumFractionDigits: scaled ? 1 : 0 }).format(amount);
+      return scaled ? `${code} ${formatted}k` : `${code} ${formatted}`;
+    }
+  };
+  if (min != null && max != null) return `${fmt(min)}–${fmt(max)}${period}`;
+  if (min != null) return `${fmt(min)}+${period}`;
+  return `Up to ${fmt(max!)}${period}`;
 }
 
 export function formatNumber(n: number): string {

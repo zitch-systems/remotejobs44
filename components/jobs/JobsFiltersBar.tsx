@@ -8,13 +8,14 @@
 //
 // State lives in the URL — each control updates the querystring via
 // router.push, which re-runs the server component's data fetch.
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, SlidersHorizontal, X, MapPin, Banknote, Briefcase, TrendingUp,
   Clock, Globe2, Timer, Flag, Code2, Palette, BarChart2,
   DollarSign, Handshake, Database, Users, Package, Scale, Settings2, Sparkles,
 } from 'lucide-react';
+import { parseWorkplace, WORKPLACE_OPTIONS } from '@/lib/jobs/workplace-filter';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import type { JobCategory, JobType, JobLevel } from '@/lib/types';
 
@@ -49,9 +50,9 @@ const LEVELS: { value: JobLevel|''; label: string }[] = [
   { value:'executive', label:'Executive / VP'},
 ];
 // Flip to true once enough jobs in the DB publish salary info (currently ~0%).
-const SALARY_FILTER_ENABLED = false;
+const SALARY_FILTER_ENABLED = true;
 const SALARY_RANGES = [
-  { value:'',        label:'Any salary'    },
+  { value:'',        label:'Any salary (USD/year)'    },
   { value:'0-30',    label:'Under $30k'   },
   { value:'30-60',   label:'$30k – $60k'  },
   { value:'60-100',  label:'$60k – $100k' },
@@ -202,7 +203,7 @@ export function JobsFiltersBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(searchParams.get('q') ?? '');
   // useTransition surfaces the in-flight SSR navigation so the search
   // input can spin and the Search button can show "Searching…" while
   // the new /jobs?q=... route is rendered. Without this the user sees
@@ -210,13 +211,14 @@ export function JobsFiltersBar() {
   const [isPending, startTransition] = useTransition();
 
   const q           = searchParams.get('q')           ?? '';
+  const previousQ = useRef(q);
   const category    = (searchParams.get('category')   ?? 'all') as JobCategory | 'all';
   const type        = searchParams.get('type')        ?? '';
   const level       = searchParams.get('level')       ?? '';
   const salary      = searchParams.get('salary')      ?? '';
   const timezone    = searchParams.get('timezone')    ?? '';
   const posted      = searchParams.get('posted')      ?? '';
-  const remoteOnly  = (searchParams.get('remote') ?? 'true') !== 'false';
+  const workplace = parseWorkplace(searchParams.get('workplace'), searchParams.get('remote') === 'false' ? 'all' : 'remote');
   const region      = searchParams.get('region')      ?? '';
   const country     = searchParams.get('country')     ?? '';
   const sort        = searchParams.get('sort')        ?? 'newest';
@@ -225,29 +227,26 @@ export function JobsFiltersBar() {
   // region + timezone were counted toward the "Filters" badge but had no
   // removable chip, so the only way to clear them was re-opening the panel.
   // Include them here so they get a chip like every other active filter.
-  const hasActiveChips = category !== 'all' || type || level || country || posted || region || timezone;
+  const hasActiveChips = category !== 'all' || type || level || country || posted || region || timezone || salary;
 
-  // Only offer sort options the backend actually honours for the current
-  // mode — never let the <select> display an option that silently no-ops:
-  //   • With a query: results come from the search_jobs FTS RPC, which always
-  //     orders by ts_rank and has NO sort parameter, so "Highest salary" is
-  //     ignored. Offer newest + relevant only (drop salary).
-  //   • Without a query: relevance has nothing to rank (no FTS), so it silently
-  //     fell back to newest. Offer newest + salary only (drop relevant).
-  //   • With a query: search_jobs orders by ts_rank and takes NO sort argument,
-  //     so BOTH "Newest" and "Highest salary" silently no-op. Offer only
-  //     "Most relevant" so the control never claims an ordering it can't honour.
-  //   • Without a query: relevance has nothing to rank, so offer newest + salary.
-  const sortOptions = q
-    ? SORTS.filter(s => s.value === 'relevant')
-    : SORTS.filter(s => s.value !== 'relevant');
-  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : (q ? 'relevant' : 'newest');
+  // Text search and filters now share the same listing query, so newest and
+  // salary order work consistently in both modes. Relevance is intentionally
+  // hidden until the combined query exposes a stable rank expression.
+  const sortOptions = SORTS.filter(s => s.value !== 'relevant');
+  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
 
-  useEffect(() => { setSearchInput(q); }, [q]);
+  // The initial state already comes from q. Skipping the redundant first
+  // sync prevents hydration from erasing text a user enters immediately.
+  useEffect(() => {
+    if (q === previousQ.current) return;
+    previousQ.current = q;
+    setSearchInput(q);
+  }, [q]);
 
   function setParam(key: string, value: string) {
     const p = new URLSearchParams(searchParams.toString());
-    if (value && value !== 'all') p.set(key, value); else p.delete(key);
+    if (value && (value !== 'all' || key === 'workplace')) p.set(key, value); else p.delete(key);
+    if (key === 'workplace') p.delete('remote');
     // The backend uses country before region. Prevent a visible region chip
     // from implying it is also applied when a country filter is selected.
     if (key === 'country' && value) p.delete('region');
@@ -268,6 +267,22 @@ export function JobsFiltersBar() {
 
   return (
     <div className="mb-4">
+      <div role="group" aria-label="Work arrangement and relocation" className="grid grid-cols-6 sm:grid-cols-5 gap-2 mb-4">
+        {WORKPLACE_OPTIONS.map((option, index) => (
+          <button key={option.value} type="button" aria-pressed={workplace === option.value}
+            disabled={isPending} onClick={() => setParam('workplace', option.value)}
+            className={cn(index < 3 ? 'col-span-2' : 'col-span-3', 'sm:col-span-1 min-h-14 rounded-xl border-2 px-2 sm:px-4 py-3 text-sm sm:text-base font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-60',
+              workplace === option.value
+                ? 'bg-brand-700 border-brand-700 text-white shadow-md dark:bg-brand-600 dark:border-brand-600'
+                : 'bg-white dark:bg-[#0a1628] border-stone-200 dark:border-[#1e3a5f] text-stone-700 dark:text-stone-200 hover:border-brand-500')}
+          >{option.label}</button>
+        ))}
+      </div>
+      <p className="mb-4 text-xs sm:text-sm text-stone-500 dark:text-stone-400" aria-live="polite">
+        {workplace === 'relocation'
+          ? 'Roles that explicitly mention relocation assistance or visa sponsorship. Check the employer’s terms.'
+          : 'Choose where you work, then narrow by role and hiring location. Remote does not always mean worldwide.'}
+      </p>
       {/* Search row */}
       <div className="flex gap-2 flex-col sm:flex-row">
         <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0a1628] border border-stone-200 dark:border-[#1e3a5f] rounded-xl focus-within:border-brand-600 dark:focus-within:border-brand-500 focus-within:shadow-glow transition-all shadow-sm">
@@ -337,27 +352,6 @@ export function JobsFiltersBar() {
 
       {/* Quick filter pill row */}
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        {/* Remote-only toggle — first slot, ON by default. */}
-        <button
-          onClick={() => setParam('remote', remoteOnly ? 'false' : 'true')}
-          aria-pressed={remoteOnly}
-          className={cn(
-            'min-h-11 sm:min-h-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all shadow-sm',
-            remoteOnly
-              ? 'bg-brand-700 dark:bg-brand-600 text-white border-brand-700 dark:border-brand-600 hover:bg-brand-800'
-              : 'bg-white dark:bg-[#0a1628] text-stone-600 dark:text-stone-300 border-stone-200 dark:border-[#1e3a5f] hover:border-brand-600 dark:hover:border-brand-500'
-          )}
-          title={remoteOnly ? 'Showing remote-only roles — click to include on-site jobs' : 'Click to filter to remote-only roles'}
-        >
-          <Globe2 className="w-3.5 h-3.5" />
-          {remoteOnly ? 'Remote only · ON' : 'Remote only · OFF'}
-          {remoteOnly && (
-            <span className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-white/25">
-              <X className="w-2.5 h-2.5" />
-            </span>
-          )}
-        </button>
-
         {/* Job Type / Level / Posted Within are exact duplicates of fields already
             inside the "Filters" panel below (same setParam calls, same option
             lists). On desktop the extra horizontal room makes the quick-access
@@ -401,8 +395,8 @@ export function JobsFiltersBar() {
           {country && <FilterChip label={COUNTRIES.find(c => c.value === country)?.label?.replace(/^\S+\s/, '')} onRemove={() => setParam('country', '')} />}
           {region  && <FilterChip label={REGIONS.find(r => r.value === region)?.label} onRemove={() => setParam('region', '')} />}
           {timezone && <FilterChip label={TIMEZONES.find(t => t.value === timezone)?.label} onRemove={() => setParam('timezone', '')} />}
+          {salary && <FilterChip label={SALARY_RANGES.find(r => r.value === salary)?.label} onRemove={() => setParam('salary', '')} />}
           {posted  && <FilterChip label={POSTED_WITHIN.find(p => p.value === posted)?.label} onRemove={() => setParam('posted', '')} />}
-          {remoteOnly && <FilterChip label="Remote only" onRemove={() => setParam('remote', 'false')} />}
         </div>
       )}
 

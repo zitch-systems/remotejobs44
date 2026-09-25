@@ -28,6 +28,7 @@ import { normalizeJobDescription, jobDescriptionToHtml } from '@/lib/job-descrip
 import { skillSlug } from '@/lib/seo-slices';
 import { JobActionsCard } from '@/components/jobs/JobActionsCard';
 import { SourceTrustBadge } from '@/components/jobs/SourceTrustBadge';
+import { CompanyLogo } from '@/components/jobs/CompanyLogo';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { companySlug } from '@/lib/company-slug';
 import { hiringLocationDisclosure } from '@/lib/jobs/location-disclosure';
@@ -94,6 +95,10 @@ async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } 
       category:      data.category ?? 'other',
       type:          data.type ?? 'full-time',
       level:         data.level ?? 'mid',
+      salaryText: data.salary_text ?? undefined,
+      workplaceType: data.workplace_type ?? 'unknown',
+      relocationSupported: data.relocation_supported === true,
+      visaSponsorship: data.visa_sponsorship === true,
       salaryMin:     data.salary_min ?? undefined,
       salaryMax:     data.salary_max ?? undefined,
       currency:      data.currency ?? 'USD',
@@ -287,7 +292,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const { job, showCompany } = result;
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
-  const salary = formatSalary(job.salaryMin, job.salaryMax, job.currency);
+  const salary = job.salaryText || formatSalary(job.salaryMin, job.salaryMax, job.currency) || 'Salary not listed';
   const locationInfo = hiringLocationDisclosure(job.location, job.remote);
 
   // JSON-LD structured data — server-rendered so AI/non-JS crawlers (Bing,
@@ -426,9 +431,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <span>{job.title}</span>
           </div>
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 shrink-0 rounded-xl bg-white flex items-center justify-center text-2xl font-black text-brand-700">
-              {job.logo}
-            </div>
+            <CompanyLogo src={showCompany ? job.logo : undefined} company={showCompany ? job.company : 'Company'} size={64} className="rounded-xl bg-white text-2xl" />
             <div className="flex-1 min-w-0">
               <h1>{job.title}</h1>
               {/* Server-decided employer mask: entitled requesters get the
@@ -453,6 +456,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 {job.timezone && <span className="metachip"><Clock className="w-3.5 h-3.5" />{job.timezone}</span>}
                 <span className="metachip capitalize">{job.type}</span>
                 {job.level && <span className="metachip capitalize">{job.level}</span>}
+                {job.workplaceType && job.workplaceType !== 'unknown' && <span className="metachip capitalize">{job.workplaceType}</span>}
+                {job.relocationSupported && <span className="metachip">Relocation support</span>}
+                {job.visaSponsorship && <span className="metachip">Visa sponsorship</span>}
                 <span className="metachip">{catMeta.label}</span>
                 {job.featured && <span className="metachip job-flag">Featured</span>}
                 <span className="metachip">{formatRelativeDate(job.posted)}</span>
@@ -475,12 +481,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <p className="text-sm text-stone-600 dark:text-stone-300 !mb-0 break-words">{locationInfo.detail}</p>
             </section>
 
-            {salary && (
-              <div className="mb-6 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-0.5">Salary</p>
-                <p className="font-display font-extrabold text-xl text-brand-700 dark:text-brand-400">{salary}</p>
-              </div>
-            )}
+            <div className="mb-6 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-0.5">Salary</p>
+              <p className={cn('font-display font-extrabold text-xl', salary === 'Salary not listed' ? 'text-stone-500 dark:text-stone-400' : 'text-brand-700 dark:text-brand-400')}>{salary}</p>
+            </div>
 
             <div className="flex flex-wrap gap-2 mb-6">
               {job.isNew && <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">New</span>}

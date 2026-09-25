@@ -33,6 +33,10 @@ export interface Job {
   category: JobCategory;
   type: JobType;
   level?: JobLevel;
+  salaryText?: string;
+  workplaceType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
+  relocationSupported?: boolean;
+  visaSponsorship?: boolean;
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
@@ -154,6 +158,7 @@ export interface SearchFilters {
   page?: number;
   perPage?: number;
   remote?: boolean;
+  workplace?: 'all' | 'remote' | 'hybrid' | 'onsite' | 'relocation';
   // Optional advanced filters — forwarded to /api/jobs and applied server-side.
   salary?: string;     // range key like "60-100" (means salary_max between 60k–100k)
   timezone?: string;   // matches jobs.timezone column substring

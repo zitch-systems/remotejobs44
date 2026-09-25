@@ -12,6 +12,7 @@ import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
 import { evaluateFreeTrial } from '@/lib/auth/free-trial';
 import { hiringLocationDisclosure } from '@/lib/jobs/location-disclosure';
 import { SourceTrustBadge } from './SourceTrustBadge';
+import { CompanyLogo } from './CompanyLogo';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -67,7 +68,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   const applyingRef = useRef(false);
 
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
-  const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
+  const salary  = job.salaryText || formatSalary(job.salaryMin, job.salaryMax, job.currency) || 'Salary not listed';
   const locationInfo = hiringLocationDisclosure(job.location, job.remote);
   // Day pass users also see company blurred — revealed when they click Apply
   const hideCompany = isFree || isDaily;
@@ -178,9 +179,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           'border-stone-200 dark:border-[#1e3a5f]',
         )}
       >
-        <div className="w-9 h-9 shrink-0 rounded-lg bg-stone-100 dark:bg-[#0f1e38] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-sm font-black text-brand-700 dark:text-brand-400 overflow-hidden">
-          {job.logo}
-        </div>
+        <CompanyLogo src={hideCompany ? undefined : job.logo} company={hideCompany ? 'Company' : job.company} size={36} className="text-sm" />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors truncate">{job.title}</p>
           <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
@@ -191,8 +190,11 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           <span className={cn('badge text-[10px]', catMeta.color)}>{catMeta.label}</span>
           <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px]">{capitalize(job.type.replace('-', ' '))}</span>
+          {job.workplaceType && job.workplaceType !== 'unknown' && <span className="badge bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 text-[10px] capitalize">{job.workplaceType}</span>}
+          {job.relocationSupported && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px]">Relocation</span>}
+          {job.visaSponsorship && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px]">Visa sponsorship</span>}
         </div>
-        {salary && <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>}
+        <span className="hidden md:block font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">{salary}</span>
         <span className="text-xs text-stone-500 dark:text-stone-500 shrink-0 hidden sm:block">{formatRelativeDate(job.posted)}</span>
         <button onClick={handleApply} onAuxClick={cancelAux}
           aria-label={applied ? 'Already applied' : canApplyNow ? 'Apply to this job' : 'Subscribe to apply'}
@@ -230,9 +232,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
 
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 shrink-0 rounded-lg bg-stone-100 dark:bg-[#0f1e38] border border-stone-200 dark:border-[#1e3a5f] flex items-center justify-center text-base font-black text-brand-700 dark:text-brand-400 overflow-hidden">
-          {job.logo}
-        </div>
+        <CompanyLogo src={hideCompany ? undefined : job.logo} company={hideCompany ? 'Company' : job.company} size={40} className="text-base" />
         <div className="flex-1 min-w-0">
           <h3 className="font-display font-bold text-base text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors line-clamp-2 leading-snug">
             {job.title}
@@ -270,6 +270,9 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
             {capitalize(job.level)}
           </span>
         )}
+        {job.workplaceType && job.workplaceType !== 'unknown' && <span className="badge bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 capitalize">{job.workplaceType}</span>}
+        {job.relocationSupported && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">Relocation support</span>}
+        {job.visaSponsorship && <span className="badge bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">Visa sponsorship</span>}
       </div>
 
       {/* Meta */}
@@ -289,9 +292,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-stone-100 dark:border-[#1e3a5f] flex-wrap gap-2 mt-auto">
         <div>
-          {salary && (
-            <span className="font-display font-bold text-sm text-brand-700 dark:text-brand-400 flex items-center gap-1"><Banknote className="w-3.5 h-3.5" />{salary}</span>
-          )}
+          <span className={cn('font-display font-bold text-sm flex items-center gap-1', salary === 'Salary not listed' ? 'text-stone-500 dark:text-stone-400' : 'text-brand-700 dark:text-brand-400')}><Banknote className="w-3.5 h-3.5" />{salary}</span>
           <p className="text-xs text-stone-500 dark:text-stone-500 mt-0.5">{formatRelativeDate(job.posted)}</p>
         </div>
         <button onClick={handleApply} onAuxClick={cancelAux}

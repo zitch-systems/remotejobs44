@@ -1,3 +1,4 @@
+import { applyWorkplaceFilter, parseWorkplace, WORKPLACE_OPTIONS, type WorkplaceFilter } from '@/lib/jobs/workplace-filter';
 // app/jobs/page.tsx — Jobs listing (Server Component).
 //
 // Previously the entire page was `'use client'`, which meant AI/non-JS
@@ -18,7 +19,7 @@ import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { cn, CATEGORY_META } from '@/lib/utils';
 import { JobCard } from '@/components/jobs/JobCard';
-import { JobsFiltersBar, ClearAllButton, RemoteToggleLink } from '@/components/jobs/JobsFiltersBar';
+import { JobsFiltersBar, ClearAllButton } from '@/components/jobs/JobsFiltersBar';
 import type { Job, JobCategory } from '@/lib/types';
 
 // This page renders dynamically (the plan check reads cookies, and
@@ -70,6 +71,7 @@ interface SearchParams {
   timezone?:    string;
   posted?:      string;
   remote?:      string;
+  workplace?:   string;
   region?:      string;
   country?:     string;
   sort?:        string;
@@ -88,6 +90,10 @@ function transform(j: any, seePaid: boolean, seeCompany: boolean): Job {
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? 'mid',
+    salaryText: j.salary_text ?? undefined,
+    workplaceType: j.workplace_type ?? 'unknown',
+    relocationSupported: j.relocation_supported === true,
+    visaSponsorship: j.visa_sponsorship === true,
     salaryMin:    j.salary_min ?? undefined,
     salaryMax:    j.salary_max ?? undefined,
     currency:     j.currency ?? 'USD',
@@ -117,7 +123,6 @@ interface FetchJobsResult {
   total: number;
   page:  number;
   pages: number;
-  fuzzy?: boolean;
   error?: boolean;
   outOfRange?: boolean;
 }
@@ -128,7 +133,7 @@ interface FetchJobsResult {
 interface ListingParams {
   q: string; category: string; type: string; level: string;
   salary: string; timezone: string; posted: string;
-  remoteOnly: boolean; region: string; country: string;
+  workplace: WorkplaceFilter; region: string; country: string;
   sort: string; page: number;
 }
 
@@ -141,7 +146,7 @@ function normalizeParams(sp: SearchParams): ListingParams {
     salary:     sp.salary   ?? '',
     timezone:   sp.timezone ?? '',
     posted:     sp.posted   ?? '',
-    remoteOnly: (sp.remote  ?? 'true') !== 'false',
+    workplace: parseWorkplace(sp.workplace, sp.remote === 'false' ? 'all' : 'remote'),
     region:     sp.region   ?? '',
     country:    sp.country  ?? '',
     sort:       sp.sort     ?? 'newest',
@@ -167,103 +172,12 @@ class ListingQueryError extends Error {
 // apply_email), paid get '*' — `seePaid` is part of the cache key, so the
 // two variants never cross.
 async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: boolean): Promise<FetchJobsResult> {
-  const { q, category, type, level, salary, timezone, posted, remoteOnly, region, country, sort, page } = p;
+  const { q, category, type, level, salary, timezone, posted, workplace, region, country, sort, page } = p;
   const supabase = createAdminSupabaseClient();
   const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
 
-  // Q-PRESENT PATH: relevance-ranked FTS via the search_jobs() RPC
-  // (migration v17). Returns SETOF jobs ordered by ts_rank desc, so the
-  // FIRST hit is the best match — not the newest job mentioning the
-  // term. Mirrors the /api/jobs route path; see that file for details.
+  // Use one indexed query for search, workplace filters, count and pagination.
   const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
-  if (safeQ) {
-    const locTerm = (() => {
-      if (country && REGION_TERMS[country]) return REGION_TERMS[country][0];
-      if (region  && REGION_TERMS[region])  return REGION_TERMS[region][0];
-      return country || region || null;
-    })();
-    const postedDays = (posted && /^\d+$/.test(posted)) ? Math.min(365, parseInt(posted, 10)) : null;
-    let salMin: number | null = null;
-    let salMax: number | null = null;
-    if (salary && /^\d+-\d+$/.test(salary)) {
-      const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
-      if (Number.isFinite(lo) && Number.isFinite(hi)) { salMin = lo; salMax = hi; }
-    }
-    // search_jobs RPC interpolates these into ilike '%' || param || '%'.
-    // Parameter binding stops SQL injection but doesn't escape LIKE
-    // wildcards — a crafted `?timezone=_` would otherwise match every
-    // row. Mirror the escape from /api/jobs.
-    const escapeLike = (s: string | null): string | null =>
-      s == null ? null : s.replace(/[\\%_]/g, '\\$&').slice(0, 100);
-    const offset = (page - 1) * JOBS_PER_PAGE;
-    const args = {
-      q:             safeQ,
-      v_category:    (category && category !== 'all') ? category : null,
-      v_type:        type     || null,
-      v_level:       level    || null,
-      v_remote_only: remoteOnly,
-      v_location:    escapeLike(locTerm),
-      v_timezone:    escapeLike(timezone || null),
-      v_salary_min:  salMin,
-      v_salary_max:  salMax,
-      v_posted_days: postedDays,
-    };
-    const [rowsRes, countRes] = await Promise.all([
-      supabase.rpc('search_jobs', { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
-      supabase.rpc('search_jobs_count', args),
-    ]);
-    // Same "0 looks identical to error" footgun as the no-q branch —
-    // if the FTS RPC bombs (statement_timeout, schema cache drift,
-    // etc.) we'd render "No jobs found" and pretend nothing was wrong.
-    // Log so Vercel can surface it, set rpcError so the page can show
-    // a real error UI instead.
-    const rpcError = !!(rowsRes.error || countRes.error);
-    if (rpcError) {
-      console.error('[fetchJobs] search_jobs RPC failed:', rowsRes.error?.message ?? countRes.error?.message);
-    }
-    let total = Number(countRes.data ?? 0);
-    let jobs  = (rowsRes.data ?? []).map((j: any) => transform(j, seePaid, seeCompany));
-    let fuzzy = false;
-
-    // Trigram typo fallback (search_jobs_trgm) — fires only when strict
-    // FTS returns nothing. Catches "reactt" → React, "pythn" → Python
-    // etc. The flag bubbles up so the listing header can show a
-    // "Showing results for…" hint.
-    if (total === 0 && safeQ.length >= 3) {
-      const [fRowsRes, fCountRes] = await Promise.all([
-        supabase.rpc('search_jobs_trgm',       { ...args, v_offset: offset, v_limit: JOBS_PER_PAGE }),
-        supabase.rpc('search_jobs_trgm_count', args),
-      ]);
-      if (!fRowsRes.error) {
-        total = Number(fCountRes.data ?? 0);
-        jobs  = (fRowsRes.data ?? []).map((j: any) => transform(j, seePaid, seeCompany));
-        fuzzy = total > 0;
-      }
-    }
-
-    const result: FetchJobsResult = {
-      jobs,
-      total,
-      page,
-      pages: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
-      fuzzy,
-      error: rpcError,
-    };
-    // Render the same degraded result as before, but keep it out of the
-    // cache (see ListingQueryError).
-    if (rpcError) throw new ListingQueryError(result);
-    return result;
-  }
-
-  // NO-Q PATH: filter-only browsing.
-  //
-  // count: 'exact' on the same query that fetches rows. The earlier
-  // split-count version traded correctness for speed — counting only
-  // `is_active = true` meant the "X jobs found" header didn't change
-  // when the user toggled the Remote pill or any other filter (the
-  // filtered listing changed but the count stayed at 81k). With
-  // maxDuration = 30 on the API route and admin_client's 60s
-  // statement_timeout, the visibility-OR seq-scan fits in budget.
   let query = supabase
     .from('jobs')
     .select(cols, { count: 'exact' })
@@ -273,19 +187,8 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
   if (category && category !== 'all') query = query.eq('category', category);
   if (type)  query = query.eq('type', type);
   if (level) query = query.eq('level', level);
-  if (remoteOnly) {
-    // is_remote_compat is a STORED GENERATED column in prod:
-    //   COALESCE(remote, false) OR location ~* '(remote|worldwide|anywhere|global|distributed|wfh)'
-    // i.e. exactly the `remote.eq.true,location.imatch.…` OR chain this
-    // used to send — Postgres keeps it in sync on every write, and the
-    // partial index jobs_is_remote_compat_idx serves it. EXPLAIN ANALYZE
-    // on prod (84k rows, identical 16,435-row result set): regex chain
-    // 203ms / 57,967 buffers for the LIMIT-50 page and 189ms for the
-    // count; generated column 36ms / 15,151 buffers and 34ms. The win is
-    // bigger cold — 4× fewer pages to fault in. Recorded in
-    // supabase/migration_v32.sql; mirrors the /api/jobs route.
-    query = query.eq('is_remote_compat', true);
-  }
+  query = applyWorkplaceFilter(query, workplace);
+  if (safeQ) query = query.textSearch('search_vector', safeQ, { type: 'websearch', config: 'english' });
   const locFilter = country || region;
   if (locFilter && REGION_TERMS[locFilter]) {
     query = query.or(REGION_TERMS[locFilter].map(t => `location.ilike.%${t}%`).join(','));
@@ -294,6 +197,8 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
     query = query.ilike('location', `%${safe}%`);
   }
   if (salary && /^\d+-\d+$/.test(salary)) {
+    query = query.eq('currency', 'USD');
+    query = query.or('salary_min.gte.1000,salary_max.gte.1000');
     const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
     if (Number.isFinite(lo) && Number.isFinite(hi)) {
       query = query.or([
@@ -314,8 +219,9 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
       query = query.gte('posted_at', since);
     }
   }
-  if (sort === 'salary') query = query.order('salary_max', { ascending: false, nullsFirst: false });
-  else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });
+  if (sort === 'salary') {
+    query = query.order('salary_max', { ascending: false, nullsFirst: false });
+  } else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });
 
   const from = (page - 1) * JOBS_PER_PAGE;
   query = query.range(from, from + JOBS_PER_PAGE - 1);
@@ -350,12 +256,12 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
 }
 
 // 60s shared cache over the listing queries — the count('exact') +
-// filtered SELECT (or FTS RPC pair) run at most once per minute per
+// filtered SELECT run at most once per minute per
 // distinct filter combination + column variant, instead of on every
 // request. Tagged so /api/jobs admin mutations can flush instantly.
 const queryJobsListingCached = unstable_cache(
   queryJobsListing,
-  ['jobs-listing-v1'],
+  ['jobs-listing-discovery-v1'],
   { revalidate: 60, tags: ['jobs', 'jobs-listing'] },
 );
 
@@ -410,7 +316,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   // (`paginationHref(sp, …)` is functionally identical to passing the
   // raw object that previously came in synchronously).
   const sp = await searchParams;
-  const { jobs, total, page, pages, fuzzy, error: fetchError, outOfRange } = await fetchJobs(sp);
+  const { jobs, total, page, pages, error: fetchError, outOfRange } = await fetchJobs(sp);
 
   // PostgREST returns PGRST103 before it gives us a count when an offset is
   // beyond the result set. Recover to page one instead of presenting a fake
@@ -430,11 +336,12 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   const category   = (sp.category ?? 'all') as JobCategory | 'all';
   const q          = sp.q ?? '';
-  const remoteOnly = (sp.remote ?? 'true') !== 'false';
+  const workplace = parseWorkplace(sp.workplace, sp.remote === 'false' ? 'all' : 'remote');
+  const workplaceLabel = WORKPLACE_OPTIONS.find(o => o.value === workplace)!.label;
   const salary     = sp.salary ?? '';
   const activeFilterCount = ['type','level','salary','timezone','posted','region','country']
     .filter(k => sp[k as keyof SearchParams]).length;
-  const hasActive = !!(q || (category && category !== 'all') || activeFilterCount > 0);
+  const hasActive = !!(q || workplace !== 'remote' || (category && category !== 'all') || activeFilterCount > 0);
   const catMeta = CATEGORY_META[category as keyof typeof CATEGORY_META] ?? CATEGORY_META['all'];
 
   // JSON-LD ItemList of JobPostings — gives Google + AI engines a clean
@@ -445,7 +352,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const itemList = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Remote Jobs on RemoteJobs44',
+    name: `${workplaceLabel} jobs on RemoteJobs44`,
     // The full size of the live result set for this view, not just the
     // current page slice — previously this reported `jobs.length` (≤ one
     // page), understating the feed and undercutting the "fresh, large job
@@ -475,8 +382,8 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <ChevronRight aria-hidden />
             <span>Browse jobs</span>
           </div>
-          <h1>Find your next remote role</h1>
-          <p className="sub">Browse remote roles by category, location and type. Check each employer&rsquo;s hiring countries before applying.</p>
+          <h1>Find your next opportunity</h1>
+          <p className="sub">Explore remote, on-site and relocation opportunities. Check each employer&rsquo;s hiring countries before applying.</p>
           <div className="bandstats">
             <span><span className="pulse" />{total.toLocaleString()} live roles</span>
             <span>Employer location shown when available</span>
@@ -492,22 +399,17 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         <div className="toolbar">
           <div>
             <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100">
-              {q ? `Results for "${q}"` : category === 'all' ? 'All Remote Jobs' : `${catMeta.label} Jobs`}
+              {q ? `Results for "${q}"` : category === 'all' ? `${workplaceLabel} opportunities` : `${catMeta.label} Jobs`}
             </h2>
-            {fuzzy && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                No exact matches — showing similar results
-              </p>
-            )}
             <div className="count mt-0.5">
               <span className="pulse" /><b>{total.toLocaleString()}</b> matching jobs
               {total > 0 && (
                 <span className="ml-1.5 inline-flex items-center gap-1 text-brand-700 dark:text-brand-400">
                   <Zap className="w-3 h-3" />
-                  {remoteOnly ? 'Remote only' : 'All locations'}
+                  {workplaceLabel}
                 </span>
               )}
-              <RemoteToggleLink />
+
             </div>
           </div>
           <div className="flex items-center gap-2">

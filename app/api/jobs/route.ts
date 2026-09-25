@@ -1,3 +1,4 @@
+import { applyWorkplaceFilter, parseWorkplace } from '@/lib/jobs/workplace-filter';
 // app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
@@ -89,6 +90,8 @@ export async function GET(req: NextRequest) {
   // remote=true (string from URL) → filter to remote-only roles.
   // Anything else (including unset) means "don't filter on remote".
   const remote   = searchParams.get('remote') === 'true';
+  const workplaceParam = searchParams.get('workplace');
+  const workplace = workplaceParam ? parseWorkplace(workplaceParam, 'all') : null;
   // Advanced filters — previously parsed by the page but never sent.
   const salary   = searchParams.get('salary') ?? '';
   const timezone = searchParams.get('timezone') ?? '';
@@ -238,7 +241,7 @@ export async function GET(req: NextRequest) {
     // don't have to ship ranking columns over the wire. Falls back to
     // the listing path below when q is empty.
     const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
-    if (safeQ) {
+    if (safeQ && !workplace) {
       // Reuse REGION_TERMS to map a region/country slug to a single
       // location keyword for the RPC's ILIKE filter. The first term is
       // usually the most specific (e.g. region=africa → 'africa').
@@ -328,7 +331,7 @@ export async function GET(req: NextRequest) {
     if (category) query = query.eq('category', category);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
-    if (remote) {
+    if (remote && !workplace) {
       // Match remote=true OR a remote-keyword somewhere in location —
       // via the STORED GENERATED column is_remote_compat, whose
       // expression is exactly that OR chain (COALESCE(remote,false) OR
@@ -345,6 +348,8 @@ export async function GET(req: NextRequest) {
     }
     // Country takes priority over region (more specific). Both fall through
     // to a location ILIKE substring match if not in the REGION_TERMS map.
+    if (workplace) query = applyWorkplaceFilter(query, workplace);
+    if (workplace && safeQ) query = query.textSearch('search_vector', safeQ, { type: 'websearch', config: 'english' });
     const locFilter = country || region;
     // Array.isArray guards against user-supplied `locFilter` values that name an
     // inherited Object.prototype member ('constructor', 'toString', …): bare
@@ -373,6 +378,8 @@ export async function GET(req: NextRequest) {
     // truthfully reflects how little of our data has salary info; the
     // empty state nudges them to clear the filter.
     if (salary && /^\d+-\d+$/.test(salary)) {
+      query = query.eq('currency', 'USD');
+      query = query.or('salary_min.gte.1000,salary_max.gte.1000');
       const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
       if (Number.isFinite(lo) && Number.isFinite(hi)) {
         query = query.or([
@@ -393,8 +400,9 @@ export async function GET(req: NextRequest) {
         query = query.gte('posted_at', since);
       }
     }
-    if (sort === 'salary') query = query.order('salary_max', { ascending: false, nullsFirst: false });
-    else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });
+    if (sort === 'salary') {
+      query = query.order('salary_max', { ascending: false, nullsFirst: false });
+    } else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });
 
     const from = (page - 1) * perPage;
     query = query.range(from, from + perPage - 1);
@@ -715,6 +723,10 @@ function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = tru
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? 'mid',
+    salaryText: j.salary_text ?? undefined,
+    workplaceType: j.workplace_type ?? 'unknown',
+    relocationSupported: j.relocation_supported === true,
+    visaSponsorship: j.visa_sponsorship === true,
     salaryMin:    j.salary_min ?? null,
     salaryMax:    j.salary_max ?? null,
     currency:     j.currency ?? 'USD',
