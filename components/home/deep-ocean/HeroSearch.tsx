@@ -25,7 +25,7 @@ export function HeroSearch() {
         </svg>
         <input
           type="text"
-          placeholder="Search 70,000+ remote jobs…"
+          placeholder="Search remote jobs by role or skill…"
           aria-label="Search jobs"
           value={q}
           onChange={e => setQ(e.target.value)}

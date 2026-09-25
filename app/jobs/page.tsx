@@ -91,7 +91,7 @@ function transform(j: any, seePaid: boolean, seeCompany: boolean): Job {
     salaryMin:    j.salary_min ?? undefined,
     salaryMax:    j.salary_max ?? undefined,
     currency:     j.currency ?? 'USD',
-    location:     j.location ?? 'Worldwide',
+    location:     j.location ?? 'Location not specified',
     timezone:     j.timezone ?? undefined,
     description:  scrub(j.description ?? ''),
     requirements: Array.isArray(j.requirements) ? j.requirements.map((r: unknown) => scrub(String(r))) : undefined,
@@ -476,16 +476,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <span>Browse jobs</span>
           </div>
           <h1>Find your next remote role</h1>
-          <p className="sub">Every role verified remote — filter by category, region and type.</p>
+          <p className="sub">Browse remote roles by category, location and type. Check each employer&rsquo;s hiring countries before applying.</p>
           <div className="bandstats">
             <span><span className="pulse" />{total.toLocaleString()} live roles</span>
-            <span>150+ countries hiring</span>
-            <span>Updated daily</span>
+            <span>Employer location shown when available</span>
           </div>
         </div>
       </section>
 
-      <div className="wrap wrap--wide" style={{ padding: '32px 28px 72px' }}>
+      <div className="wrap wrap--wide jobs-listing-body">
         {/* Filter UI — client island. URL changes re-run the server fetch above. */}
         <JobsFiltersBar />
 

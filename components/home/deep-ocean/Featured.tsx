@@ -15,7 +15,7 @@ export function Featured({ jobs }: { jobs: LandingJob[] }) {
         <div className="section-head">
           <span className="section-kicker">Featured this week</span>
           <h2>Roles our team is excited about</h2>
-          <p>Verified companies, transparent pay, direct apply links.</p>
+          <p>Review the employer-listed location and available salary before applying.</p>
         </div>
         <div className="fcard-grid">
           {cards.map(job => {

@@ -18,7 +18,9 @@ export const REGION_TERMS: Record<string, string[]> = {
   europe:        ['europe','uk','germany','france','netherlands','spain','italy','sweden','poland','portugal'],
   latam:         ['latin america','latam','brazil','mexico','colombia','argentina','chile'],
   asia:          ['asia','india','singapore','japan','china','korea','indonesia','vietnam','philippines'],
-  worldwide:     ['worldwide','global','remote','anywhere'],
+  // "Remote" alone says nothing about eligible countries. A US-only remote
+  // opening must not appear in the worldwide filter.
+  worldwide:     ['worldwide','work from anywhere'],
 
   // ── Africa ───────────────────────────────────────────────────────────
   nigeria:       ['nigeria','lagos','abuja','port harcourt'],
@@ -33,7 +35,7 @@ export const REGION_TERMS: Record<string, string[]> = {
   cameroon:      ['cameroon','douala','yaounde','yaoundé'],
 
   // ── Americas ─────────────────────────────────────────────────────────
-  us:            ['us','usa','united states','new york','san francisco','los angeles','chicago','austin'],
+  us:            ['united states','usa','us only','new york','san francisco','los angeles','chicago','austin'],
   canada:        ['canada','toronto','vancouver','montreal','ottawa'],
   brazil:        ['brazil','brasil','são paulo','sao paulo','rio de janeiro'],
   mexico:        ['mexico','méxico','mexico city','guadalajara','monterrey'],

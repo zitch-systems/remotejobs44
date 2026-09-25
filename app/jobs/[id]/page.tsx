@@ -30,6 +30,7 @@ import { JobActionsCard } from '@/components/jobs/JobActionsCard';
 import { SourceTrustBadge } from '@/components/jobs/SourceTrustBadge';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { companySlug } from '@/lib/company-slug';
+import { hiringLocationDisclosure } from '@/lib/jobs/location-disclosure';
 import type { Job } from '@/lib/types';
 
 // NOTE: this route renders dynamically (the plan check reads cookies), so a
@@ -96,7 +97,7 @@ async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } 
       salaryMin:     data.salary_min ?? undefined,
       salaryMax:     data.salary_max ?? undefined,
       currency:      data.currency ?? 'USD',
-      location:      data.location ?? 'Worldwide',
+      location:      data.location ?? 'Location not specified',
       timezone:      data.timezone ?? undefined,
       description:   scrub(data.description ?? ''),
       requirements:  Array.isArray(data.requirements) ? data.requirements.map((r: any) => scrub(String(r))) : undefined,
@@ -146,7 +147,12 @@ function inferApplicantLocations(location: string | undefined): Array<{ '@type':
   const seen = new Set<string>();
   const hits: Array<{ '@type': string; name: string }> = [];
   for (const [needle, name] of KNOWN_COUNTRIES) {
-    if (l.includes(needle) && !seen.has(name)) { seen.add(name); hits.push({ '@type': 'Country', name }); }
+    // Short country codes must match whole words: "us" in "Australia" is not
+    // United States, and "uk" in "Ukraine" is not United Kingdom.
+    const matches = needle === 'us' || needle === 'uk'
+      ? new RegExp(`(^|[^a-z])${needle}([^a-z]|$)`).test(l)
+      : l.includes(needle);
+    if (matches && !seen.has(name)) { seen.add(name); hits.push({ '@type': 'Country', name }); }
   }
   // No specific country recognised (incl. "remote"/"worldwide"/"anywhere"
   // and multi-country regions like EMEA/LATAM/APAC) → omit the field.
@@ -282,6 +288,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const catMeta = CATEGORY_META[job.category] ?? CATEGORY_META.other;
   const salary = formatSalary(job.salaryMin, job.salaryMax, job.currency);
+  const locationInfo = hiringLocationDisclosure(job.location, job.remote);
 
   // JSON-LD structured data — server-rendered so AI/non-JS crawlers (Bing,
   // Perplexity, ClaudeBot, GPTBot) actually receive it. Schema reference:
@@ -348,11 +355,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   : job.type === 'contract'  ? 'CONTRACTOR'
                   : job.type === 'freelance' ? 'TEMPORARY'
                   : 'OTHER',
-    jobLocationType: 'TELECOMMUTE',
+    ...(job.remote ? { jobLocationType: 'TELECOMMUTE' } : {}),
     // Only emit when we resolved real Country values; omitting it for a
     // global-remote role is the correct, penalty-free signal (see
     // inferApplicantLocations).
-    ...(applicantLocations ? { applicantLocationRequirements: applicantLocations } : {}),
+    ...(job.remote && applicantLocations ? { applicantLocationRequirements: applicantLocations } : {}),
     directApply: false,
     // For masked requesters job.company is already the placeholder label
     // (see fetchJob) and the hub links are dropped — /companies/hidden-company
@@ -462,6 +469,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <Link href="/jobs" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 mb-6 transition-colors no-underline">
               <ArrowLeft className="w-4 h-4" /> Back to Jobs
             </Link>
+
+            <section aria-label="Hiring location" className="rounded-xl border border-stone-200 dark:border-[#1e3a5f] bg-stone-50 dark:bg-[#101e32] p-4 sm:p-5 mb-7">
+              <h2 className="!mt-0 !mb-2 text-base">{locationInfo.label}</h2>
+              <p className="text-sm text-stone-600 dark:text-stone-300 !mb-0 break-words">{locationInfo.detail}</p>
+            </section>
 
             {salary && (
               <div className="mb-6 pb-5 border-b border-stone-100 dark:border-[#1e3a5f]">

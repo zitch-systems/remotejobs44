@@ -91,7 +91,7 @@ export function CompanyMarquee() {
   return (
     <section className="band">
       <div className="band-label">
-        70,000+ roles from the companies defining remote work — indexed in one place
+        Explore remote opportunities from employer boards and other sources
       </div>
       <div className="marquee">
         <div className="marquee-row">

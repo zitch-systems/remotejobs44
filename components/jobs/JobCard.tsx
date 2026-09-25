@@ -10,6 +10,8 @@ import { PaywallModal } from '@/components/jobs/PaywallModal';
 import { isSafeOpenUrl, safeWindowOpen } from '@/lib/safe-url';
 import { saveJobRemote, unsaveJobRemote } from '@/lib/saved-jobs-sync';
 import { evaluateFreeTrial } from '@/lib/auth/free-trial';
+import { hiringLocationDisclosure } from '@/lib/jobs/location-disclosure';
+import { SourceTrustBadge } from './SourceTrustBadge';
 import type { Job } from '@/lib/types';
 
 // Check if a string looks like a real UUID (Supabase ID)
@@ -66,6 +68,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
 
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
   const salary  = formatSalary(job.salaryMin, job.salaryMax, job.currency);
+  const locationInfo = hiringLocationDisclosure(job.location, job.remote);
   // Day pass users also see company blurred — revealed when they click Apply
   const hideCompany = isFree || isDaily;
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
@@ -180,9 +183,9 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors truncate">{job.title}</p>
-          <p className="text-xs text-stone-500 dark:text-stone-500 truncate">
+          <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
             {hideCompany ? <span className="blur-[2px] select-none">Company</span> : job.company}
-            {' · '}{job.location}{job.timezone ? ` · ${job.timezone}` : ''}
+            {' · '}{locationInfo.uncertain ? locationInfo.label : job.location}{job.timezone ? ` · ${job.timezone}` : ''}
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -270,9 +273,17 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       </div>
 
       {/* Meta */}
-      <div className="flex flex-wrap gap-3 text-xs text-stone-500 dark:text-stone-500">
-        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+        <span className="inline-flex items-start gap-1 min-w-0 break-words" title={locationInfo.detail}>
+          <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          {locationInfo.uncertain ? locationInfo.label : job.location}
+        </span>
         {job.timezone && <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{job.timezone}</span>}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <SourceTrustBadge source={job.source} size="sm" />
+        {locationInfo.uncertain && <span className="text-amber-700 dark:text-amber-300">Check country eligibility</span>}
       </div>
 
       {/* Footer */}

@@ -12,6 +12,12 @@ import { SliceListing } from '@/components/jobs/SliceListing';
 
 const BASE = 'https://remotejobs44.com';
 
+function countryBlurb(label: string, worldwide: boolean) {
+  return worldwide
+    ? 'Remote roles whose listed location mentions worldwide work. The wording may contain exceptions; confirm restrictions with the employer.'
+    : `Roles whose listed location mentions ${label} or worldwide work. Confirm hiring eligibility with the employer.`;
+}
+
 export const dynamic = 'force-static';
 export const revalidate = 3600;
 
@@ -23,9 +29,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const country = findCountry((await params).slug);
   if (!country) return {};
   const title = `Remote Jobs in ${country.label} | RemoteJobs44`;
-  const description = `${country.blurb} Updated daily — apply from ${country.label} to global companies.`;
+  const description = countryBlurb(country.label, country.slug === 'worldwide');
   const url = `${BASE}/jobs/country/${country.slug}`;
-  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${country.label}`)}&subtitle=${encodeURIComponent('Apply from anywhere · RemoteJobs44')}`;
+  const ogImage = `${BASE}/api/og?title=${encodeURIComponent(`Remote Jobs in ${country.label}`)}&subtitle=${encodeURIComponent('Review location details · RemoteJobs44')}`;
   return {
     title, description,
     alternates: { canonical: url },
@@ -37,6 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CountryPage({ params }: { params: Promise<{ slug: string }> }) {
   const country = findCountry((await params).slug);
   if (!country) notFound();
+  const worldwide = country.slug === 'worldwide';
 
   let jobs: any[] = [];
   let total = 0;
@@ -48,7 +55,9 @@ export default async function CountryPage({ params }: { params: Promise<{ slug: 
       .eq('is_active', true)
       .or(notExpired())
       .or(NOT_FLAGGED)
-      .or(`location.ilike.%${country.label}%,location.ilike.%worldwide%,location.ilike.%anywhere%,location.ilike.%global%`)
+      .or(worldwide
+        ? 'location.ilike.%worldwide%,location.ilike.%work from anywhere%'
+        : `location.ilike.%${country.label}%,location.ilike.%worldwide%,location.ilike.%work from anywhere%`)
       .order('posted_at', { ascending: false })
       .limit(30);
     jobs = data ?? [];
@@ -67,10 +76,10 @@ export default async function CountryPage({ params }: { params: Promise<{ slug: 
   return (
     <SliceListing
       title={`Remote Jobs in ${country.label}`}
-      blurb={country.blurb}
+      blurb={countryBlurb(country.label, worldwide)}
       jobs={jobs}
       total={total}
-      browseHref={`/jobs?q=${encodeURIComponent(country.label)}`}
+      browseHref={`/jobs?country=${encodeURIComponent(country.slug === 'usa' ? 'us' : country.slug)}`}
       breadcrumbs={[
         { name: 'Home',         href: '/'     },
         { name: 'Jobs',         href: '/jobs' },

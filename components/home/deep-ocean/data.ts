@@ -30,7 +30,7 @@ function toLandingJob(j: any): LandingJob {
     logo:      company?.[0]?.toUpperCase() ?? '?',
     category:  j.category ?? 'other',
     type:      j.type ?? 'full-time',
-    location:  j.location ?? 'Worldwide',
+    location:  j.location ?? 'Location not specified',
     salaryMin: j.salary_min ?? undefined,
     salaryMax: j.salary_max ?? undefined,
     currency:  j.currency ?? 'USD',

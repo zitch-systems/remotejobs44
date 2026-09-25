@@ -14,8 +14,8 @@ const CAPS: Cap[] = [
     icon: <><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></>,
   },
   {
-    title: 'One-click apply',
-    body: 'Send your saved CV straight to the employer — no re-typing the same form ten times.',
+    title: 'Application links',
+    body: 'Open an available employer application link after reviewing the role and its location requirements.',
     icon: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></>,
   },
   {
@@ -25,12 +25,12 @@ const CAPS: Cap[] = [
   },
   {
     title: 'Salary insights',
-    body: 'See real pay bands in USD for every role and level so you negotiate from a position of knowledge.',
+    body: 'Compare published pay ranges where employers provide salary information.',
     icon: <><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></>,
   },
   {
-    title: 'Verified employers',
-    body: 'Every company is checked to actually hire remotely — no ghost listings, no dead ends.',
+    title: 'Source transparency',
+    body: 'See whether a role came from a direct ATS, an external feed, or another source.',
     icon: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></>,
   },
 ];
@@ -58,9 +58,9 @@ export function Capabilities() {
           ))}
         </div>
         <div className="statline">
-          <div className="si"><div className="n">70,000+</div><div className="l">Live roles indexed and refreshed every day</div></div>
-          <div className="si"><div className="n">100% verified</div><div className="l">Every listing checked to actually hire remotely</div></div>
-          <div className="si"><div className="n">Free forever</div><div className="l">Browse and save at no cost — pay only when you apply</div></div>
+          <div className="si"><div className="n">Search</div><div className="l">Explore jobs by role, category and location</div></div>
+          <div className="si"><div className="n">Review</div><div className="l">Check the stated location and source before applying</div></div>
+          <div className="si"><div className="n">Track</div><div className="l">Save roles and manage your applications</div></div>
         </div>
       </div>
     </section>

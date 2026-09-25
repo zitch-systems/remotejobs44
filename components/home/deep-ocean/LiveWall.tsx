@@ -43,8 +43,8 @@ export function LiveWall({ jobs }: { jobs: LandingJob[] }) {
     <section className="livewall">
       <div className="lw-head">
         <span className="lw-kicker"><span className="lw-dot" />Live market</span>
-        <h2>Thousands of roles, moving in real time</h2>
-        <p>New remote jobs land every minute, across every timezone. Here&apos;s the market right now.</p>
+        <h2>Recent roles from the job board</h2>
+        <p>Review each listing&apos;s date, location and application details before you apply.</p>
       </div>
       <div className="lw-stage">
         {cols.map((col, ci) => (

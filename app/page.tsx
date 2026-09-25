@@ -20,7 +20,7 @@ import { LiveFeed }        from '@/components/home/deep-ocean/LiveFeed';
 export const metadata: Metadata = {
   title: 'RemoteJobs44 – Global Remote Jobs',
   description:
-    'Search over 70,000+ remote jobs from top companies worldwide. Engineering, design, marketing, finance and more.',
+    'Browse remote jobs from employer boards and external feeds. Review each role’s listed location, source and application details.',
 };
 
 // Re-fetch hourly — the landing's live feel comes from the CSS animations,
