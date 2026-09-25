@@ -11,7 +11,7 @@ const { GET } = await import('./route');
 
 beforeEach(() => {
   result = { boardsConsidered: 300, boardsRefreshed: 60, added: 0,
-    reactivated: 0, errors: 0, timedOut: false };
+    reactivated: 0, removed: 0, errors: 0, timedOut: false };
 });
 
 describe('ATS cron result', () => {

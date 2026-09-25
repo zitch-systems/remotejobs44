@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
     // Flush the public listings only when something actually changed, so a
     // no-op run leaves the warm cache alone.
-    if (result.added > 0 || result.reactivated > 0) {
+    if (result.added > 0 || result.reactivated > 0 || result.removed > 0) {
       try {
         const { revalidatePath } = await import('next/cache');
         revalidatePath('/jobs');

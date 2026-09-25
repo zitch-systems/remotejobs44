@@ -1,3 +1,4 @@
+import { safeLogoUrl } from '@/lib/jobs/source-logo';
 // lib/ingest-pipeline.ts
 // Pulls remote jobs from every active source in the in-code SOURCES list
 // (Remotive, Jobicy, RemoteOK, Arbeitnow, WorkingNomads, Himalayas, Findwork
@@ -130,7 +131,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.title ?? 'Untitled', company: j.company_name ?? 'Unknown',
-      logo: firstChar(j.company_name),
+      logo: safeLogoUrl(j.company_logo) ?? firstChar(j.company_name),
       category: mapCat(j.category ?? j.title ?? ''), type: 'full-time',
       level: mapLevel(j.title ?? ''), location: j.candidate_required_location ?? 'Worldwide',
       description: (j.description ?? '').slice(0, 5000),
@@ -149,7 +150,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.jobTitle ?? j.title ?? 'Untitled', company: j.companyName ?? j.company ?? 'Unknown',
-      logo: firstChar(j.companyName ?? j.company),
+      logo: safeLogoUrl(j.companyLogo) ?? firstChar(j.companyName ?? j.company),
       category: mapCat(j.jobIndustry ?? j.title ?? ''), type: mapType(j.jobType ?? ''),
       level: mapLevel(j.jobTitle ?? j.title ?? ''), location: j.jobGeo ?? 'Worldwide',
       description: (j.jobExcerpt ?? j.jobDescription ?? '').slice(0, 5000),
@@ -172,7 +173,7 @@ const SOURCES: Source[] = [
     },
     normalise: (j) => ({
       title: j.position ?? j.title ?? 'Untitled', company: j.company ?? 'Unknown',
-      logo: firstChar(j.company),
+      logo: safeLogoUrl(j.company_logo ?? j.logo) ?? firstChar(j.company),
       category: mapCat(Array.isArray(j.tags) ? j.tags.join(' ') : (j.tags ?? '')),
       type: 'full-time', level: mapLevel(j.position ?? j.title ?? ''),
       location: j.location ?? 'Worldwide',

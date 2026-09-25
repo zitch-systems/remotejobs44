@@ -9,6 +9,7 @@ import { uid } from './utils';
 import { detectATSFromUrl, detectATSFromHtml, normaliseAshbyBoardSlug, type ATSPlatform, type ATSDetectResult } from './ats-detect';
 import { validateExternalUrlAndResolve } from './ssrf-guard';
 import { logInfo, logError } from './log';
+import { ashbyCompensation, greenhouseCompensation, leverCompensation } from './jobs/ats-compensation';
 
 // Fetch a user-supplied URL while validating EVERY URL it touches against the
 // SSRF guard — the initial URL AND every redirect hop. Native `fetch` follows
@@ -51,6 +52,7 @@ export type { ATSPlatform, ATSDetectResult };
 export interface ATSFetchResult {
   jobs: Partial<Job>[];
   total: number;
+  complete?: boolean;
   platform: ATSPlatform;
   slug: string;
   error?: string;
@@ -197,10 +199,13 @@ async function fetchGreenhouse(slug: string, sourceUrl: string): Promise<ATSFetc
   const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Greenhouse ${res.status}: ${slug} not found`);
   const data = await res.json();
-  const jobs: Partial<Job>[] = (data.jobs ?? []).map((j: any) => ({
+  if (!Array.isArray(data.jobs)) throw new Error('Greenhouse returned no jobs array');
+  const board = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}`,
+    { signal: AbortSignal.timeout(2000), next: { revalidate: 300 } }).then(r => r.ok ? r.json() : null).catch(() => null);
+  const jobs: Partial<Job>[] = data.jobs.map((j: any) => ({
     id: `gh_${j.id}`,
     title: j.title,
-    company: data.company?.name ?? slug,
+    company: board?.name ?? data.company?.name ?? slug,
     description: stripHtml(j.content ?? ''),
     applyUrl: j.absolute_url,
     location: j.location?.name ?? 'Remote',
@@ -210,11 +215,13 @@ async function fetchGreenhouse(slug: string, sourceUrl: string): Promise<ATSFetc
     level: guessLevel(j.title),
     category: guessCategory(j.title, j.content ?? ''),
     skills: extractSkills(j.title + ' ' + (j.content ?? '')),
+    ...greenhouseCompensation(j),
+    workplaceType: isRemoteLocation(j.location?.name) ? 'remote' as const : 'unknown' as const,
     source: 'api',
     sourceUrl: url,
     featured: false, isNew: true,
   }));
-  return { jobs, total: jobs.length, platform: 'greenhouse', slug };
+  return { jobs, total: jobs.length, platform: 'greenhouse', slug, complete: true };
 }
 
 // ── Lever ──────────────────────────────────────────────────────────────────
@@ -224,19 +231,25 @@ async function fetchLever(slug: string, sourceUrl: string): Promise<ATSFetchResu
   if (!res.ok) throw new Error(`Lever ${res.status}: ${slug} not found`);
   const data = await res.json();
   const postings = Array.isArray(data) ? data : data.postings ?? [];
+  if (!Array.isArray(postings)) throw new Error('Lever returned no postings array');
   const jobs: Partial<Job>[] = postings.map((j: any) => ({
     id: `lv_${j.id}`,
     title: j.text,
     company: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    description: stripHtml(j.description ?? j.descriptionPlain ?? ''),
+    description: stripHtml([j.description ?? j.descriptionPlain, ...(j.lists ?? []).map((list: any) =>
+      `${list.text ?? ''}: ${list.content ?? ''}`), j.additional ?? j.additionalPlain,
+      j.salaryDescription ?? j.salaryDescriptionPlain].filter(Boolean).join(' '), 6000),
     applyUrl: j.hostedUrl,
     location: j.categories?.location ?? j.workplaceType ?? 'Remote',
     posted: j.createdAt ? new Date(j.createdAt).toISOString() : new Date().toISOString(),
-    remote: isRemoteLocation(j.categories?.location ?? j.workplaceType ?? ''),
+    remote: j.workplaceType === 'remote' || isRemoteLocation(j.categories?.location ?? ''),
     type: mapLeverType(j.categories?.commitment),
     level: guessLevel(j.text),
     category: guessCategory(j.text, j.description ?? ''),
     skills: extractSkills(j.text + ' ' + (j.description ?? '')),
+    ...leverCompensation(j),
+    workplaceType: ({ remote: 'remote', hybrid: 'hybrid', 'on-site': 'onsite' } as Record<string, Job['workplaceType']>)[j.workplaceType] ??
+      (isRemoteLocation(j.categories?.location) ? 'remote' : 'unknown'),
     source: 'api',
     sourceUrl: url,
     featured: false, isNew: true,
@@ -252,6 +265,7 @@ async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResu
   const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Ashby ${res.status}: ${slug} not found`);
   const data = await res.json();
+  if (!Array.isArray(data.jobs ?? data.jobPostings)) throw new Error('Ashby returned no jobs array');
   // Ashby's posting-api now returns `data.jobs` (it was `jobPostings` in
   // an older version). Accept both so we keep working if they rename
   // either field later.
@@ -275,14 +289,14 @@ async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResu
     level: guessLevel(j.title),
     category: guessCategory(j.title, j.description ?? ''),
     skills: extractSkills(j.title + ' ' + (j.description ?? '')),
-    salaryMin: j.compensation?.minValue ?? j.compensation?.compensationTierSummary?.minValue ?? undefined,
-    salaryMax: j.compensation?.maxValue ?? j.compensation?.compensationTierSummary?.maxValue ?? undefined,
-    currency: j.compensation?.currency ?? 'USD',
+    ...ashbyCompensation(j.compensation),
+    workplaceType: ({ Remote: 'remote', Hybrid: 'hybrid', OnSite: 'onsite' } as Record<string, Job['workplaceType']>)[j.workplaceType] ??
+      (j.isRemote === true ? 'remote' : 'unknown'),
     source: 'api',
     sourceUrl: url,
     featured: false, isNew: true,
   }));
-  return { jobs, total: jobs.length, platform: 'ashby', slug };
+  return { jobs, total: jobs.length, platform: 'ashby', slug, complete: true };
 }
 
 function mapAshbyType(raw: string | undefined): 'full-time' | 'part-time' | 'contract' | 'freelance' {
@@ -620,8 +634,8 @@ export function isRemoteLocation(loc: string | null | undefined): boolean {
   return /\b(remote|worldwide|anywhere|global|distributed|wfh|work.?from.?home)\b/i.test(loc);
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1200);
+function stripHtml(html: string, limit = 1200): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
 }
 
 function mapLeverType(commitment?: string): any {

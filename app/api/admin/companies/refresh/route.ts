@@ -14,7 +14,7 @@ import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
-import { touchLastSeen } from '@/lib/jobs-last-seen';
+import { syncATSSnapshot } from '@/lib/jobs/ats-snapshot';
 
 // Same statement_timeout issue as /api/ats/save — see comment
 // there. The search_vector trigger + GIN index on the 180k-row
@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? null,
+    salary_text: j.salaryText ?? null,
+    workplace_hint: j.workplaceType ?? null,
     salary_min:   j.salaryMin ?? null,
     salary_max:   j.salaryMax ?? null,
     currency:     j.currency ?? 'USD',
@@ -140,12 +142,15 @@ export async function POST(req: NextRequest) {
     added += data?.length ?? 0;
   }
 
-  // Keep every still-listed posting alive. The ON CONFLICT DO NOTHING upsert
-  // above only stamps last_seen_at on genuinely-new rows, so without this the
-  // company's existing postings would still age out of the 60-day staleness
-  // sweep 60 days after we first inserted them — even though this very refresh
-  // just confirmed the company still lists them. Best-effort; never blocks.
-  await touchLastSeen(admin, deduped.map(r => r.apply_url));
+  // Refresh metadata on existing rows and, for providers that returned a
+  // guaranteed complete snapshot, retire postings that disappeared upstream.
+  // New rows were already inserted above; including them here is harmless and
+  // makes last_seen_at consistent across the entire board.
+  const snapshotSource = deduped.find(row => row.source_url)?.source_url as string | undefined;
+  const snapshot = snapshotSource
+    ? await syncATSSnapshot(admin, snapshotSource, deduped, fetched.complete === true,
+      `admin:${platform}/${slug}`)
+    : { updated: 0, reactivated: 0, removed: 0, errors: 0 };
 
   // Surface a 502 only when a chunk actually errored at the DB and nothing
   // new was added. All-duplicates (added 0, no error) is the normal result
@@ -167,10 +172,8 @@ export async function POST(req: NextRequest) {
 
   // Postings already in the DB that the upsert skipped on conflict.
   const kept = Math.max(0, deduped.length - added);
-  // No expire / reactivate phases in this route — the daily staleness
-  // sweep handles rows that fall off a board.
-  const removed = 0;
-  const reactivated = 0;
+  const removed = snapshot.removed;
+  const reactivated = snapshot.reactivated;
 
   // ── Revalidate the public jobs pages so users see the changes ───────
   try {
@@ -185,8 +188,8 @@ export async function POST(req: NextRequest) {
     platform,
     slug,
     added,
-    removed,        // always 0 — staleness sweep handles board drop-off
-    reactivated,    // always 0 — no reactivate phase in this route
+    removed,
+    reactivated,
     kept,           // existing postings skipped on apply_url conflict
     total_fetched:  fetched.total,
   };

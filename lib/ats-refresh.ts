@@ -25,7 +25,7 @@ import { fetchATSJobs } from '@/lib/ats-engine';
 import { isValidATSPlatform, normaliseAshbyBoardSlug, type ATSPlatform } from '@/lib/ats-detect';
 import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { detectScam } from '@/lib/scam-detect';
-import { markSeenAndReactivate } from '@/lib/jobs-last-seen';
+import { syncATSSnapshot } from '@/lib/jobs/ats-snapshot';
 import { logInfo, logWarn, logError } from '@/lib/log';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
@@ -39,6 +39,7 @@ export interface ATSRefreshResult {
   boardsRefreshed: number;
   added: number;
   reactivated: number;
+  removed: number;
   errors: number;
   timedOut: boolean;
   /**
@@ -103,6 +104,8 @@ function toJobRow(j: any): Record<string, any> {
     category:     j.category ?? 'other',
     type:         j.type ?? 'full-time',
     level:        j.level ?? null,
+    salary_text: j.salaryText ?? null,
+    workplace_hint: j.workplaceType ?? null,
     salary_min:   j.salaryMin ?? null,
     salary_max:   j.salaryMax ?? null,
     currency:     j.currency ?? 'USD',
@@ -148,7 +151,7 @@ export async function refreshStaleATSBoards(
   const maxBoards = opts.maxBoards ?? 150;
   const startedAt = Date.now();
   const res: ATSRefreshResult = {
-    boardsConsidered: 0, boardsRefreshed: 0, added: 0, reactivated: 0, errors: 0, timedOut: false,
+    boardsConsidered: 0, boardsRefreshed: 0, added: 0, reactivated: 0, removed: 0, errors: 0, timedOut: false,
   };
   const removedBoards: Array<{ source_url: string; retry_after: string; last_error: string }> = [];
 
@@ -188,19 +191,18 @@ export async function refreshStaleATSBoards(
       }
 
       const rows = dedupeByApplyUrl(fetched.jobs.map(toJobRow).filter(r => !!r.apply_url));
-      if (rows.length === 0) { res.boardsRefreshed++; continue; }
-
-      // 1) Keep still-listed postings alive + recover any the sweep retired.
-      //    Batched by request size in lib/jobs-last-seen — a board with a few
-      //    hundred postings used to overrun the PostgREST request line and the
-      //    returned error was discarded, so the bump silently did nothing.
-      res.reactivated += await markSeenAndReactivate(
+      const snapshot = await syncATSSnapshot(
         supabase,
-        rows.map(r => r.apply_url as string),
+        board.source_url,
+        rows,
+        fetched.complete === true,
         `ats:${parsed.platform}/${parsed.slug}`,
       );
+      res.reactivated += snapshot.reactivated;
+      res.removed += snapshot.removed;
+      res.errors += snapshot.errors;
 
-      // 2) Insert genuinely-new postings (ON CONFLICT DO NOTHING).
+      // Insert genuinely-new postings (ON CONFLICT DO NOTHING).
       for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
         const { data, error: insErr } = await supabase
           .from('jobs')
