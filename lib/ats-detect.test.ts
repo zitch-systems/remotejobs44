@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ATS_PLATFORMS, isValidATSPlatform, detectATSFromUrl } from './ats-detect';
+import { ATS_PLATFORMS, isValidATSPlatform, detectATSFromUrl, normaliseAshbyBoardSlug } from './ats-detect';
 
 // The /api/ats GET handler accepts a `platform=<x>` query param and
 // builds an upstream URL from it. Without this allow-list it would have
@@ -76,6 +76,21 @@ describe('detectATSFromUrl — high-traffic platforms', () => {
     const r = detectATSFromUrl('https://jobs.ashbyhq.com/openai');
     expect(r?.platform).toBe('ashby');
     expect(r?.slug).toBe('openai');
+  });
+
+  it('keeps an encoded Ashby board name intact', () => {
+    const r = detectATSFromUrl('https://jobs.ashbyhq.com/scale%20army%20careers/16907f84-05a5-4c06-98f5-eeceef3d1512');
+    expect(r).toMatchObject({
+      platform: 'ashby',
+      slug: 'scale%20army%20careers',
+      apiEndpoint: 'https://api.ashbyhq.com/posting-api/job-board/scale%20army%20careers?includeCompensation=true',
+    });
+    expect(normaliseAshbyBoardSlug('scale army careers')).toBe('scale%20army%20careers');
+  });
+
+  it('rejects encoded path delimiters instead of importing a different board', () => {
+    expect(detectATSFromUrl('https://jobs.ashbyhq.com/scale%2Farmy/jobs')).toBeNull();
+    expect(normaliseAshbyBoardSlug('scale%252Farmy')).toBeNull();
   });
 
   it('detects Workable URLs', () => {

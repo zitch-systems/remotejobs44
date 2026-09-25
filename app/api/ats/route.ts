@@ -1,7 +1,7 @@
 // app/api/ats/route.ts — Unified ATS fetcher: Greenhouse, Lever, Ashby, Workable, Recruitee
 import { NextRequest, NextResponse } from 'next/server';
 import { autoFetchFromCareerUrl, fetchATSJobs } from '@/lib/ats-engine';
-import { isValidATSPlatform } from '@/lib/ats-detect';
+import { isValidATSPlatform, normaliseAshbyBoardSlug } from '@/lib/ats-detect';
 import { requireAdmin } from '@/lib/admin/auth';
 import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { logError } from '@/lib/log';
@@ -46,10 +46,13 @@ export async function GET(req: NextRequest) {
       }
       // Slug also gets a minimal shape check — letters/numbers/dot/dash/
       // underscore only, so `slug=evil.com?` can't introduce a new host.
-      if (!/^[a-z0-9._-]{1,100}$/i.test(slug)) {
+      const safeSlug = platformRaw === 'ashby'
+        ? normaliseAshbyBoardSlug(slug)
+        : (/^[a-z0-9._-]{1,100}$/i.test(slug) ? slug : null);
+      if (!safeSlug) {
         return NextResponse.json({ error: 'Invalid slug shape' }, { status: 400 });
       }
-      const result = await fetchATSJobs(platformRaw, slug, `https://${platformRaw}/${slug}`);
+      const result = await fetchATSJobs(platformRaw, safeSlug, `https://${platformRaw}/${safeSlug}`);
       return NextResponse.json(result);
     }
     const result = await autoFetchFromCareerUrl(url!);

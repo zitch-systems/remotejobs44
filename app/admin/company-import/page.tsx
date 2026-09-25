@@ -311,7 +311,10 @@ export default function CompanyImportPage() {
 
     const detected: CompanyEntry[] = urls.map(url => {
       const d = detectATSFromUrl(url);
-      const name = url.split('/').slice(-1)[0] || url.split('/').slice(-2)[0];
+      // A pasted job detail URL ends in a posting ID. Show the detected board
+      // instead so an admin can see which employer's full feed will be read.
+      const name = d?.slug ? (d.platform === 'ashby' ? decodeURIComponent(d.slug) : d.slug) :
+        (url.split('/').slice(-1)[0] || url.split('/').slice(-2)[0]);
       return {
         id: Math.random().toString(36).slice(2),
         url,
@@ -629,7 +632,7 @@ export default function CompanyImportPage() {
             Bulk Company Import
           </h1>
           <p className="text-sm text-stone-400 dark:text-stone-500">
-            Paste up to {URL_LIMIT.toLocaleString()} career page URLs — auto-detects 52 ATS platforms and pulls all jobs in parallel.
+            Paste direct employer career pages or ATS job links to import their public board listings.
           </p>
         </div>
         {/* Tab switcher */}
@@ -739,11 +742,15 @@ export default function CompanyImportPage() {
               {parseUrls(rawInput).length} URLs parsed
             </span>
           </div>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-2">
+            A Greenhouse, Lever or Ashby job link can identify its employer board. Check each role&apos;s
+            hiring location before importing: remote does not always mean worldwide.
+          </p>
           <textarea
             value={rawInput}
             onChange={e => setRawInput(e.target.value)}
             rows={12}
-            placeholder={`Paste any mix of career page URLs, one per line:\n\nhttps://boards.greenhouse.io/stripe\nhttps://jobs.lever.co/netflix\nhttps://jobs.ashbyhq.com/cohere\nhttps://apply.workable.com/algolia\nhttps://www.anthropic.com/careers\nhttps://linear.app/careers\n...(up to ${URL_LIMIT.toLocaleString()} at a time)`}
+            placeholder={`Paste employer career pages or ATS job links, one per line:\n\nhttps://boards.greenhouse.io/stripe\nhttps://jobs.lever.co/netflix\nhttps://jobs.ashbyhq.com/scale%20army%20careers/16907f84-05a5-4c06-98f5-eeceef3d1512\nhttps://apply.workable.com/algolia\nhttps://www.anthropic.com/careers\n...(up to ${URL_LIMIT.toLocaleString()} at a time)`}
             className="input text-xs font-mono leading-relaxed resize-y min-h-[200px] mb-4"
           />
           <div className="flex gap-3 flex-wrap">

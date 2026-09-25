@@ -9,7 +9,7 @@
 // blowing them away would corrupt their dashboards.
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { detectATSFromUrl, isValidATSPlatform, type ATSPlatform } from '@/lib/ats-detect';
+import { detectATSFromUrl, isValidATSPlatform, normaliseAshbyBoardSlug, type ATSPlatform } from '@/lib/ats-detect';
 import { fetchATSJobs } from '@/lib/ats-engine';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { requireAdmin } from '@/lib/admin/auth';
@@ -65,9 +65,13 @@ export async function POST(req: NextRequest) {
   // Slug becomes part of an outbound URL fetched by fetchATSJobs. Constrain
   // it to safe filename-ish characters so an admin (or compromised admin
   // session) can't pass `..` segments or other path-traversal payloads.
-  if (!/^[a-z0-9._-]{1,80}$/i.test(slug)) {
-    return NextResponse.json({ error: 'Invalid slug — must be 1-80 chars [a-z0-9._-]' }, { status: 400 });
+  const safeSlug = platform === 'ashby'
+    ? normaliseAshbyBoardSlug(slug)
+    : (/^[a-z0-9._-]{1,80}$/i.test(slug) ? slug : null);
+  if (!safeSlug) {
+    return NextResponse.json({ error: 'Invalid ATS board name' }, { status: 400 });
   }
+  slug = safeSlug;
 
   // ── 1. Pull fresh jobs from the ATS ───────────────────────────────────
   const fetched = await fetchATSJobs(platform, slug, '');
