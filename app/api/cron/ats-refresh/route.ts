@@ -44,7 +44,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, ...result });
+    // A time-budget stop leaves most boards untouched. Surface it as an HTTP
+    // failure as well as a structured result so platform health checks see it.
+    return NextResponse.json(
+      { success: !result.timedOut, ...result },
+      { status: result.timedOut ? 503 : 200 },
+    );
   } catch (err: any) {
     logError({ event: 'cron.ats_refresh.failed', error: err?.message ?? String(err) });
     return NextResponse.json({ success: false, error: 'ats refresh failed' }, { status: 500 });

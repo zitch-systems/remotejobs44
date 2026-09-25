@@ -145,6 +145,7 @@ export async function refreshStaleATSBoards(
   const res: ATSRefreshResult = {
     boardsConsidered: 0, boardsRefreshed: 0, added: 0, reactivated: 0, errors: 0, timedOut: false,
   };
+  const removedBoards: Array<{ source_url: string; retry_after: string; last_error: string }> = [];
 
   const { data: boards, error } = await supabase.rpc('stale_ats_boards', { p_limit: maxBoards });
   if (error) {
@@ -167,6 +168,17 @@ export async function refreshStaleATSBoards(
       if (fetched.error) {
         res.errors++;
         logWarn({ event: 'ats_refresh.board_fetch_failed', platform: parsed.platform, slug: parsed.slug, error: fetched.error });
+        // A removed board often remains the oldest in the database. Without
+        // a retry delay it consumes the same slice of every daily run. Only
+        // 404/410 are treated as confirmed removal; transient failures retry
+        // on the next run.
+        if (/\b(?:404|410)\b/.test(fetched.error)) {
+          removedBoards.push({
+            source_url: board.source_url,
+            retry_after: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+            last_error: fetched.error.slice(0, 500),
+          });
+        }
         continue;
       }
 
@@ -196,6 +208,16 @@ export async function refreshStaleATSBoards(
     } catch (err: any) {
       res.errors++;
       logWarn({ event: 'ats_refresh.board_failed', source_url: board.source_url, error: err?.message ?? String(err) });
+    }
+  }
+
+  if (removedBoards.length > 0) {
+    const { error: backoffError } = await supabase
+      .from('ats_board_backoff')
+      .upsert(removedBoards, { onConflict: 'source_url' });
+    if (backoffError) {
+      res.errors++;
+      logWarn({ event: 'ats_refresh.backoff_failed', error: backoffError.message });
     }
   }
 

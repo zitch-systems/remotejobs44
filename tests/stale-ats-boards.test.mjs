@@ -9,6 +9,10 @@ const migration = await readFile(
   new URL('../supabase/migration_v72_stale_ats_boards_skip_scan.sql', import.meta.url),
   'utf8',
 );
+const backoffMigration = await readFile(
+  new URL('../supabase/migrations/20260923073827_ats_board_backoff.sql', import.meta.url),
+  'utf8',
+);
 const db = new PGlite();
 
 await db.exec(`
@@ -85,6 +89,25 @@ test('keeps RPC execution service-role only', async () => {
       await db.exec('reset role');
     }
   }
+});
+
+test('removed boards are skipped until retry time without deleting jobs', async () => {
+  await db.exec(backoffMigration);
+  await db.query(
+    `insert into public.ats_board_backoff(source_url, retry_after, last_error)
+     values ($1, now() + interval '7 days', '404')`,
+    [lever],
+  );
+  assert.deepEqual((await asServiceRole(10)).map(row => row.source_url),
+    [workable, ashby, greenhouse]);
+  assert.equal((await db.query('select count(*)::int as n from public.jobs where source_url = $1', [lever])).rows[0].n, 1);
+
+  await db.query(
+    `update public.ats_board_backoff set retry_after = now() - interval '1 second'
+      where source_url = $1`, [lever],
+  );
+  assert.deepEqual((await asServiceRole(10)).map(row => row.source_url),
+    [workable, lever, ashby, greenhouse]);
 });
 
 test.after(async () => {

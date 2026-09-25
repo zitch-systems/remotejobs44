@@ -370,24 +370,36 @@ export async function runIngest(): Promise<IngestResult> {
   // Wrap the rest in try/finally so the lock always releases.
   try {
 
-  // Read paused sources from job_sources. Admin can pause a misbehaving
-  // source (e.g. ATS upstream that's been returning spam) by setting
-  // its row's `status = 'paused'`. URL match is canonical because a
-  // single source may have multiple aliases in the in-code SOURCES list.
+  // Read the last attempt for each hardcoded source, including failed runs.
+  // Prioritise the ones that have waited longest: a slow feed or costly
+  // freshness update must not starve the same sources at the end every day.
+  // Admin pauses still take precedence, matched by canonical URL.
   let pausedUrls = new Set<string>();
+  const lastAttemptByUrl = new Map<string, number>();
   try {
-    const { data: paused } = await supabase
+    const { data: sourceRows, error: sourcesErr } = await supabase
       .from('job_sources')
-      .select('url')
-      .eq('status', 'paused');
-    pausedUrls = new Set((paused ?? []).map((r: { url: string }) => r.url));
+      .select('url, status, last_sync_at');
+    if (sourcesErr) throw sourcesErr;
+    for (const row of sourceRows ?? []) {
+      if (row.status === 'paused') pausedUrls.add(row.url);
+      if (row.last_sync_at) {
+        const lastAttempt = Date.parse(row.last_sync_at);
+        if (Number.isFinite(lastAttempt)) {
+          lastAttemptByUrl.set(row.url, Math.max(lastAttemptByUrl.get(row.url) ?? 0, lastAttempt));
+        }
+      }
+    }
   } catch (err: any) {
-    // Don't block the run if job_sources is unreadable for any reason.
-    logWarn({ event: 'ingest.paused_sources_read_failed', error: err.message });
+    // Preserve the previous order if bookkeeping is temporarily unavailable.
+    logWarn({ event: 'ingest.source_schedule_read_failed', error: err.message });
   }
   const pausedNames: string[] = [];
 
-  for (const source of SOURCES) {
+  const sourcesByAge = [...SOURCES].sort((a, b) =>
+    (lastAttemptByUrl.get(a.sourceUrl) ?? 0) - (lastAttemptByUrl.get(b.sourceUrl) ?? 0)
+  );
+  for (const source of sourcesByAge) {
     if (pausedUrls.has(source.sourceUrl)) {
       pausedNames.push(source.name);
       results[source.name] = 'paused';
