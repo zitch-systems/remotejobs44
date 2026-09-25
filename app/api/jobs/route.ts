@@ -401,8 +401,7 @@ export async function GET(req: NextRequest) {
       }
     }
     if (sort === 'salary') {
-      query = query.or('salary_min.gte.1000,salary_max.gte.1000')
-        .order('salary_max', { ascending: false, nullsFirst: false });
+      query = query.order('salary_max', { ascending: false, nullsFirst: false });
     } else query = query.order('featured', { ascending: false }).order('posted_at', { ascending: false });
 
     const from = (page - 1) * perPage;
