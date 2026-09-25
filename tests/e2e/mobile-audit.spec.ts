@@ -20,7 +20,7 @@ test.describe('320px mobile audit', () => {
       page.getByRole('combobox', { name: 'Sort jobs' }),
       page.getByRole('button', { name: 'Filters' }),
       page.getByRole('button', { name: 'Remote', exact: true }),
-      page.getByRole('button', { name: 'All Jobs' }),
+      page.getByRole('button', { name: 'All Jobs' }).last(),
     ];
 
     for (const control of controls) {
