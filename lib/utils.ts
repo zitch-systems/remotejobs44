@@ -27,6 +27,7 @@ export function formatDate(dateStr: string, fmt = 'MMM d, yyyy'): string {
 
 export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
   if (min == null && max == null) return '';
+  if ((min ?? 0) <= 0 && (max ?? 0) <= 0) return '';
   const code = currency || 'USD';
   // Legacy aggregator rows sometimes store hourly figures in the numeric
   // columns without a period. Avoid claiming those are annual. Structured ATS

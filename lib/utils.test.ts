@@ -18,6 +18,7 @@ describe('formatSalary', () => {
 
   it('does not invent salary details when both bounds are missing', () => {
     expect(formatSalary(undefined, undefined, 'GBP')).toBe('');
+    expect(formatSalary(0, 0, 'USD')).toBe('');
   });
 
   it('does not label ambiguous legacy low-rate values as annual salary', () => {
