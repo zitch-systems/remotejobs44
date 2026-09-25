@@ -8,7 +8,7 @@
 //
 // State lives in the URL — each control updates the querystring via
 // router.push, which re-runs the server component's data fetch.
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, SlidersHorizontal, X, MapPin, Banknote, Briefcase, TrendingUp,
@@ -211,6 +211,7 @@ export function JobsFiltersBar() {
   const [isPending, startTransition] = useTransition();
 
   const q           = searchParams.get('q')           ?? '';
+  const previousQ = useRef(q);
   const category    = (searchParams.get('category')   ?? 'all') as JobCategory | 'all';
   const type        = searchParams.get('type')        ?? '';
   const level       = searchParams.get('level')       ?? '';
@@ -234,7 +235,13 @@ export function JobsFiltersBar() {
   const sortOptions = SORTS.filter(s => s.value !== 'relevant');
   const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
 
-  useEffect(() => { setSearchInput(q); }, [q]);
+  // The initial state already comes from q. Skipping the redundant first
+  // sync prevents hydration from erasing text a user enters immediately.
+  useEffect(() => {
+    if (q === previousQ.current) return;
+    previousQ.current = q;
+    setSearchInput(q);
+  }, [q]);
 
   function setParam(key: string, value: string) {
     const p = new URLSearchParams(searchParams.toString());

@@ -19,7 +19,7 @@ test.describe('320px mobile audit', () => {
     const controls = [
       page.getByRole('combobox', { name: 'Sort jobs' }),
       page.getByRole('button', { name: 'Filters' }),
-      page.getByRole('button', { name: /Remote only/ }),
+      page.getByRole('button', { name: 'Remote', exact: true }),
       page.getByRole('button', { name: 'All Jobs' }),
     ];
 
