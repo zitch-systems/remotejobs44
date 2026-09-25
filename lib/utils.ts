@@ -28,6 +28,12 @@ export function formatDate(dateStr: string, fmt = 'MMM d, yyyy'): string {
 export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
   if (min == null && max == null) return '';
   const code = currency || 'USD';
+  // Legacy aggregator rows sometimes store hourly figures in the numeric
+  // columns without a period. Avoid claiming those are annual. Structured ATS
+  // annual ranges are always four figures or more; provider text remains the
+  // preferred display whenever it is available.
+  const positiveBounds = [min, max].filter((n): n is number => n != null && n > 0);
+  const period = positiveBounds.length > 0 && positiveBounds.every(n => n >= 1000) ? '/yr' : '';
   const fmt = (n: number) => {
     const scaled = n >= 1000;
     const amount = scaled ? n / 1000 : n;
@@ -42,9 +48,9 @@ export function formatSalary(min?: number, max?: number, currency = 'USD'): stri
       return scaled ? `${code} ${formatted}k` : `${code} ${formatted}`;
     }
   };
-  if (min != null && max != null) return `${fmt(min)}–${fmt(max)}/yr`;
-  if (min != null) return `${fmt(min)}+/yr`;
-  return `Up to ${fmt(max!)}/yr`;
+  if (min != null && max != null) return `${fmt(min)}–${fmt(max)}${period}`;
+  if (min != null) return `${fmt(min)}+${period}`;
+  return `Up to ${fmt(max!)}${period}`;
 }
 
 export function formatNumber(n: number): string {

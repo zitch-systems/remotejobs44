@@ -198,6 +198,7 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
   }
   if (salary && /^\d+-\d+$/.test(salary)) {
     query = query.eq('currency', 'USD');
+    query = query.or('salary_min.gte.1000,salary_max.gte.1000');
     const [lo, hi] = salary.split('-').map(n => parseInt(n, 10) * 1000);
     if (Number.isFinite(lo) && Number.isFinite(hi)) {
       query = query.or([
