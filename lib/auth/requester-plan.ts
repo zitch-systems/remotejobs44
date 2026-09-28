@@ -75,16 +75,14 @@ export function canSeePaidFields(plan: RequesterPlan): boolean {
 }
 
 /**
- * True when the requester may see WHO the employer is on the job detail
- * page. Stricter than canSeePaidFields: employer identity is a subscription
- * perk — Pro monthly and Pro annual both resolve to plan 'pro' (see
- * getPlanTier in lib/paystack/plans.ts) — plus staff admins. Day Pass
- * deliberately does NOT qualify: it buys apply access (canSeePaidFields),
- * not the employer reveal, matching the listing UI which blurs the company
- * for daily users too (JobCard's hideCompany).
+ * Employer identity is public discovery metadata. Hiding it made the listing
+ * less trustworthy, removed useful company logos, and weakened JobPosting SEO.
+ * Paid access still gates the off-site application channel through
+ * canSeePaidFields; this helper remains explicit so every listing/detail/API
+ * surface makes the same public-company decision.
  */
-export function canSeeCompanyName(plan: RequesterPlan): boolean {
-  return plan === 'pro' || plan === 'admin';
+export function canSeeCompanyName(_plan: RequesterPlan): boolean {
+  return true;
 }
 
 /**

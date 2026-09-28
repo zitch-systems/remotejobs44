@@ -52,6 +52,19 @@ test.describe('Jobs Page', () => {
     }
   });
 
+  test('public job cards show employer identity and supplied logo metadata', async ({ page }) => {
+    await page.goto('/jobs');
+    const firstCard = page.locator('main a[href^="/jobs/"]').filter({ has: page.locator('h3') }).first();
+
+    await expect(firstCard).toBeVisible();
+    await expect(firstCard).not.toContainText('Company Name');
+    await expect(firstCard).not.toContainText('Hidden Company');
+
+    const logo = firstCard.locator('[aria-label$=" logo"]').first();
+    await expect(logo).toBeVisible();
+    expect(await logo.getAttribute('aria-label')).not.toBe('Company logo');
+  });
+
   test('grid/list toggle works', async ({ page }) => {
     await page.goto('/jobs');
     // Wait for page to fully render

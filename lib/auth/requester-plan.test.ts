@@ -35,15 +35,14 @@ describe('canSeePaidFields', () => {
   });
 });
 
-// Pins the employer-identity gate on /jobs/[id]: the company name is a
-// subscriber (Pro monthly/annual) feature. Day Pass buys apply access but
-// NOT the employer reveal — flipping 'daily' to true here would leak the
-// name to every day-pass user server-side, where no client blur can help.
+// Employer identity is public discovery metadata. Application channels stay
+// separately gated by canSeePaidFields, but every visitor should see who is
+// hiring and any supplied company logo.
 describe('canSeeCompanyName', () => {
   const cases: Array<[RequesterPlan, boolean]> = [
-    ['anon',  false],
-    ['free',  false],
-    ['daily', false],
+    ['anon',  true],
+    ['free',  true],
+    ['daily', true],
     ['pro',   true],
     ['admin', true],
   ];
@@ -54,10 +53,10 @@ describe('canSeeCompanyName', () => {
     });
   }
 
-  it('only the pro/admin allow-list passes', () => {
+  it('is public for every recognized requester plan', () => {
     const allPlans: RequesterPlan[] = ['anon', 'free', 'daily', 'pro', 'admin'];
     const seeing = allPlans.filter(canSeeCompanyName);
-    expect(new Set(seeing)).toEqual(new Set(['pro', 'admin']));
+    expect(new Set(seeing)).toEqual(new Set(allPlans));
   });
 });
 
