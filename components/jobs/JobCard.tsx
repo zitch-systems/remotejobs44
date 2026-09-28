@@ -47,7 +47,6 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   // primitive flips.
   const isPro    = userPlan === 'daily' || userPlan === 'pro' || userPlan === 'admin';
   const isDaily  = userPlan === 'daily';
-  const isFree   = !loggedIn || userPlan === 'free';
   // Registered free-plan users get a few free applies for a week. Server
   // gate is authoritative; this drives the button affordance only.
   const freeTrialActive = loggedIn && userPlan === 'free'
@@ -70,8 +69,6 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   const catMeta = CATEGORY_META[job.category as keyof typeof CATEGORY_META] ?? CATEGORY_META['other'];
   const salary  = job.salaryText || formatSalary(job.salaryMin, job.salaryMax, job.currency) || 'Salary not listed';
   const locationInfo = hiringLocationDisclosure(job.location, job.remote);
-  // Day pass users also see company blurred — revealed when they click Apply
-  const hideCompany = isFree || isDaily;
   const dailyLimitReached = isDaily && dailyAppsUsed >= 10;
   const href = cardHref(job);
   const isExternal = href.startsWith('http');
@@ -179,11 +176,11 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           'border-stone-200 dark:border-[#1e3a5f]',
         )}
       >
-        <CompanyLogo src={hideCompany ? undefined : job.logo} company={hideCompany ? 'Company' : job.company} size={36} className="text-sm" />
+        <CompanyLogo src={job.logo} company={job.company} size={36} className="text-sm" />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors truncate">{job.title}</p>
           <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
-            {hideCompany ? <span className="blur-[2px] select-none">Company</span> : job.company}
+            {job.company}
             {' · '}{locationInfo.uncertain ? locationInfo.label : job.location}{job.timezone ? ` · ${job.timezone}` : ''}
           </p>
         </div>
@@ -232,19 +229,12 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
 
       {/* Header */}
       <div className="flex items-start gap-3">
-        <CompanyLogo src={hideCompany ? undefined : job.logo} company={hideCompany ? 'Company' : job.company} size={40} className="text-base" />
+        <CompanyLogo src={job.logo} company={job.company} size={40} className="text-base" />
         <div className="flex-1 min-w-0">
           <h3 className="font-display font-bold text-base text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors line-clamp-2 leading-snug">
             {job.title}
           </h3>
-          {hideCompany ? (
-            <p className="text-sm font-medium mt-0.5 flex items-center gap-1 text-stone-400">
-              <Lock className="w-3 h-3 shrink-0" />
-              <span className="blur-[3px] select-none pointer-events-none">{isDaily ? 'Click Apply' : 'Company Name'}</span>
-            </p>
-          ) : (
-            <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>
-          )}
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5 font-medium">{job.company}</p>
         </div>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
           className={cn('shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
