@@ -176,6 +176,10 @@ export function JobActionsCard({ job }: { job: Job }) {
         )}
         <div className="flex gap-2 mt-3">
           <button onClick={async () => {
+              if (!isLoggedIn()) {
+                modalService.open(<PaywallModal mode="login" />);
+                return;
+              }
               // Optimistic toggle then mirror to /api/saved-jobs.
               // On error, undo locally so the bookmark icon doesn't
               // lie about the server-side state.

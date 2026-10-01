@@ -41,8 +41,22 @@ export async function POST(req: NextRequest) {
   let started  = false;
 
   try {
-    // Prefer NEXT_PUBLIC_APP_URL to avoid localhost bleed on Paystack callback
-    const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '') || new URL(req.url).origin;
+    // Payment callbacks must always return to the configured canonical origin.
+    // Never derive this from the request Host header: outside a trusted proxy it
+    // is caller-controlled and would be copied into Paystack callback metadata.
+    const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+    let APP_URL: string;
+    try {
+      const canonical = new URL(configuredAppUrl);
+      if (canonical.protocol !== 'https:' || canonical.username || canonical.password
+        || canonical.search || canonical.hash || canonical.pathname !== '/') {
+        throw new Error('invalid canonical URL');
+      }
+      APP_URL = canonical.toString().replace(/\/$/, '');
+    } catch {
+      logError({ event: 'paystack.initialize.misconfigured', detail: 'NEXT_PUBLIC_APP_URL must be an absolute HTTPS origin' });
+      return NextResponse.json({ error: 'Payment service is temporarily unavailable.' }, { status: 500 });
+    }
     // Validate the request body at the boundary. The schema enum is derived
     // from PLAN_AMOUNTS, so this rejects the same inputs the manual
     // `!PLAN_AMOUNTS[plan]` check did — missing, unknown, or wrong-typed plan.

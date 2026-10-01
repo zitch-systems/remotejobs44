@@ -1,4 +1,4 @@
-﻿# Environment variables
+# Environment variables
 .env.local
 .env
 
@@ -41,3 +41,7 @@ supabase/.branches/
 # Claude Code runtime scratch (session lock files, local agent state)
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+
+# Python service test/compiler output
+__pycache__/
+*.pyc

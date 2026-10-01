@@ -39,15 +39,15 @@ export async function getRequesterPlan(supabase: SupabaseClient): Promise<Reques
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return 'anon';
 
-    // Hardcoded admin emails count as admin even before the profiles row
-    // is provisioned — same shortcut middleware + requireAdmin use.
-    if (isHardcodedAdmin(user.email)) return 'admin';
-
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role, plan, plan_expires_at')
+      .select('role, plan, plan_expires_at, suspended')
       .eq('id', user.id)
       .maybeSingle();
+
+    if (profileError || profile?.suspended === true) return 'anon';
+    // Staff overrides must also respect suspension and verified profile state.
+    if (profile && isHardcodedAdmin(user.email)) return 'admin';
 
     return resolvePlan({
       role:          profile?.role,

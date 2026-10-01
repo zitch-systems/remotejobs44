@@ -33,11 +33,9 @@ const DEFAULT_SITES: JobSpySite[] = ['indeed', 'linkedin', 'zip_recruiter', 'goo
 
 // Search terms the daily JobSpy cron works through — one broad query per
 // platform job category (see mapCategory below) so a day's run pulls "all
-// jobs" across the whole taxonomy, not just engineering. The cron rotates
-// its starting point each day and works within a time budget, so if the
-// scraper is slow and not every query fits in one run, coverage still comes
-// round over a couple of days rather than always favouring the top of the
-// list. Add a term here to widen coverage; keep them remote-first.
+// jobs" across the whole taxonomy, not just engineering. The cron orders
+// these by each query's persisted last attempt so a short run always starts
+// with the queries that have waited longest.
 export const JOBSPY_DEFAULT_QUERIES = [
   'remote software engineer',
   'remote frontend developer',
@@ -70,6 +68,15 @@ export interface JobSpySearchOptions {
   isRemote?:      boolean;
   jobType?:       string;
   country?:       string;
+  /** Absolute wall-clock deadline. Retries never sleep or run past it. */
+  deadlineAt?:    number;
+}
+
+export interface JobSpySearchResult {
+  jobs: JobSpyJob[];
+  attemptedSites: string[];
+  succeededSites: string[];
+  errors: Record<string, string>;
 }
 
 // Normalised, camelCase shape — the same field names /api/ats/save and the
@@ -160,7 +167,12 @@ function resolveEndpoint(base: string): string {
 // or upstream error so the ingest pipeline's per-source try/catch can isolate
 // the failure (and the admin route can surface it).
 export async function fetchJobSpyJobs(opts: JobSpySearchOptions): Promise<JobSpyJob[]> {
-  if (!isJobSpyConfigured()) return [];
+  return (await fetchJobSpySearch(opts)).jobs;
+}
+
+/** Detailed variant used by cron health reporting; the array API stays compatible. */
+export async function fetchJobSpySearch(opts: JobSpySearchOptions): Promise<JobSpySearchResult> {
+  if (!isJobSpyConfigured()) return { jobs: [], attemptedSites: [], succeededSites: [], errors: {} };
 
   const sites = (opts.sites && opts.sites.length
     ? opts.sites
@@ -189,12 +201,23 @@ export async function fetchJobSpyJobs(opts: JobSpySearchOptions): Promise<JobSpy
   });
   if (API_KEY) headers.set('x-api-key', API_KEY);
 
-  const raw = await getJson(endpoint.toString(), { headers });
+  const raw = await getJson(endpoint.toString(), { headers }, opts.deadlineAt);
   const list = extractJobArray(raw);
-
-  return list
+  const jobs = list
     .map(normaliseJobSpyJob)
     .filter((j): j is JobSpyJob => j !== null);
+  // Older independently deployed wrappers returned only {jobs}; accepting that
+  // shape preserves compatibility. New wrappers provide proof that at least one
+  // board completed, so a 200+[] cannot hide an all-board scraper outage.
+  const attemptedSites = stringArray(raw?.attempted_sites) ?? sites;
+  const reportedSucceeded = stringArray(raw?.succeeded_sites);
+  // Legacy wrappers have no health envelope. Non-empty jobs prove a scraper
+  // completed; an empty legacy response is ambiguous and must not be recorded
+  // as a healthy zero by cron.
+  const succeededSites = reportedSucceeded ?? (jobs.length > 0 ? sites : []);
+  const errors = stringRecord(raw?.errors);
+  if (succeededSites.length === 0) throw new Error('JobSpy search completed without a successful site');
+  return { jobs, attemptedSites, succeededSites, errors };
 }
 
 export function isPermanentJobSpyHttpStatus(status: number): boolean {
@@ -213,13 +236,24 @@ export class JobSpyHttpError extends Error {
 
 // Shared fetch: browser-ish UA, JSON parse, one retry for transient failures,
 // 25s timeout per attempt. Permanent 4xx configuration failures fail fast.
-async function getJson(url: string, init?: RequestInit): Promise<any> {
+async function getJson(url: string, init?: RequestInit, deadlineAt?: number): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise(res => setTimeout(res, 800 * attempt));
+    if (attempt > 0) {
+      const delay = Math.min(5_000, Math.max(800, retryAfterMs(lastErr)));
+      if (deadlineAt && Date.now() + delay + 250 >= deadlineAt) throw lastErr;
+      await new Promise(res => setTimeout(res, delay));
+    }
     try {
-      const r = await fetch(url, { ...init, signal: AbortSignal.timeout(25000) });
-      if (!r.ok) throw new JobSpyHttpError(r.status, r.statusText);
+      const remaining = deadlineAt ? deadlineAt - Date.now() - 250 : 25_000;
+      if (remaining < 1_000) throw new Error('JobSpy deadline exhausted');
+      const r = await fetch(url, { ...init, signal: AbortSignal.timeout(Math.min(25_000, remaining)) });
+      if (!r.ok) {
+        const error = new JobSpyHttpError(r.status, r.statusText) as JobSpyHttpError & { retryAfterMs?: number };
+        const retryAfter = Number(r.headers.get('retry-after'));
+        if (Number.isFinite(retryAfter) && retryAfter >= 0) error.retryAfterMs = retryAfter * 1000;
+        throw error;
+      }
       return await r.json();
     } catch (err) {
       if (err instanceof JobSpyHttpError && err.permanent) throw err;
@@ -227,6 +261,20 @@ async function getJson(url: string, init?: RequestInit): Promise<any> {
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+function retryAfterMs(error: unknown): number {
+  return (error && typeof error === 'object' && 'retryAfterMs' in error)
+    ? Number((error as any).retryAfterMs) || 0 : 0;
+}
+
+function stringArray(value: unknown): string[] | null {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : null;
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
 }
 
 // JobSpy API wrappers differ in envelope: some return `{ jobs: [...] }`,

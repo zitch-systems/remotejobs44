@@ -25,6 +25,8 @@ import { runIngest } from '@/lib/ingest-pipeline';
 import { reconcilePaystackCharges } from '@/lib/paystack/reconcile';
 import { requireCronSecret } from '@/lib/cron-auth';
 import { logError, logWarn } from '@/lib/log';
+import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
+import { resolvePlan } from '@/lib/auth/plan';
 
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
@@ -123,13 +125,17 @@ export async function GET(req: NextRequest) {
   // table exceeded Supabase's statement timeout and achieved nothing. Each
   // batch is independently committed and small enough to stay below the DB
   // timeout; any remaining backlog drains on the next daily run.
-  const FRESHNESS_BATCH_SIZE = 500;
-  const FRESHNESS_MAX_BATCHES = 20;
+  // Small write batches avoid repeating the observed 500-row statement timeout.
+  // Commit useful progress and resume any backlog on the next run.
+  const FRESHNESS_BATCH_SIZE = 25;
+  const FRESHNESS_MAX_BATCHES = 80;
+  const freshnessDeadline = Date.now() + 20_000;
 
   let unflaggedNew = 0;
   let unflagErr: { message: string } | null = null;
   let unflagCapped = false;
   for (let batch = 0; batch < FRESHNESS_MAX_BATCHES; batch++) {
+    if (Date.now() >= freshnessDeadline) { unflagCapped = true; break; }
     const { data: rows, error: selectErr } = await supabase
       .from('jobs')
       .select('id')
@@ -163,6 +169,7 @@ export async function GET(req: NextRequest) {
   let staleErr: { message: string } | null = null;
   let staleCapped = false;
   for (let batch = 0; batch < FRESHNESS_MAX_BATCHES; batch++) {
+    if (Date.now() >= freshnessDeadline) { staleCapped = true; break; }
     const { data: rows, error: selectErr } = await supabase
       .from('jobs')
       .select('id')
@@ -282,7 +289,7 @@ export async function GET(req: NextRequest) {
     // thing that earns a spam complaint instead of an unsubscribe.
     const { data: alerts, error: alertsErr } = await supabase
       .from('job_alerts')
-      .select('user_id, category, keywords, profiles(name, email, plan, email_prefs, suspended, email_bounced_at, email_complained_at)')
+      .select('user_id, category, keywords, profiles(name, email, role, plan, plan_expires_at, email_prefs, suspended, email_bounced_at, email_complained_at)')
       .eq('active', true)
       .eq('frequency', 'daily');
     if (alertsErr) throw alertsErr;
@@ -297,6 +304,8 @@ export async function GET(req: NextRequest) {
         .from('jobs')
         .select('id, title, company, location, category')
         .eq('is_active', true)
+        .or(notExpired())
+        .or(NOT_FLAGGED)
         // Gate on created_at (when WE ingested the row), not posted_at.
         // Feeds report the upstream publish date, which is routinely days/
         // weeks old, so a job ingested today but published last week never
@@ -311,7 +320,8 @@ export async function GET(req: NextRequest) {
 
       for (const alert of alerts) {
         const profile = (alert as any).profiles;
-        if (!profile?.email || !['pro', 'admin'].includes(profile.plan)) continue;
+        const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+        if (!profile?.email || !['pro', 'admin'].includes(plan)) continue;
         // Respect the user's opt-out. Absent key = opted in (the column
         // default, and the fallback used by /api/profile/email-prefs).
         if (profile.email_prefs?.job_alerts === false) { alertsSkipped += 1; continue; }
@@ -349,13 +359,17 @@ export async function GET(req: NextRequest) {
         // that signup depends on.
         const unsubLink = unsubscribeUrl((alert as any).user_id, 'job_alerts');
         const { subject, html } = jobAlertEmail(profile.name ?? 'there', matched, unsubLink);
-        await sendEmail({
+        const sent = await sendEmail({
           to: profile.email,
           subject,
           html,
           headers: unsubscribeHeaders((alert as any).user_id, 'job_alerts'),
         });
-        alertsSent += 1;
+        if (sent) alertsSent += 1;
+        else {
+          logError({ event: 'cron.daily.alert_delivery_failed' });
+          if (!failures.includes('alerts')) failures.push('alerts');
+        }
       }
     }
   } catch (err: any) {

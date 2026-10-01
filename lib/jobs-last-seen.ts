@@ -12,7 +12,7 @@ type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
 // Hard cap on values per request. The search_vector GIN trigger makes wide
 // UPDATEs heavier, and a long IN list is a slow scan regardless.
-const MAX_URLS_PER_BATCH = 100;
+const MAX_URLS_PER_BATCH = 20;
 
 // Cap on the raw bytes of apply_url the IN list may carry. This is the limit
 // that actually bites: PostgREST takes filters in the QUERY STRING, so

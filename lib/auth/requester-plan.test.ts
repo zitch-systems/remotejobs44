@@ -142,6 +142,23 @@ describe('getRequesterPlan', () => {
     expect(supabase.auth.getUser).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['user@example.com', 'admin@remotejobs44.com'])('treats suspended %s as anonymous', async (email) => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'x' } } }),
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1', email } }, error: null }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'user', plan: 'pro', plan_expires_at: null, suspended: true } }),
+          }),
+        }),
+      }),
+    } as any;
+    await expect(getRequesterPlan(supabase)).resolves.toBe('anon');
+  });
+
   // A session that getUser() then rejects (revoked/garbage token) must
   // land in the most-restricted bucket, same as before the fast path.
   it('invalid session falls back to anon', async () => {

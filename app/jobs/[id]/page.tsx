@@ -41,7 +41,6 @@ import type { Job } from '@/lib/types';
 
 async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } | null> {
   if (!id) return null;
-  try {
     // Row + plan resolve concurrently:
     //   * row — the SAME cached fetch generateMetadata used this request
     //     (React cache() dedupe), so this usually costs nothing; across
@@ -118,10 +117,7 @@ async function fetchJob(id: string): Promise<{ job: Job; showCompany: boolean } 
       sourceUrl:     showCompany ? (data.source_url ?? undefined) : undefined,
       remote:        data.remote ?? true,
     };
-    return { job, showCompany };
-  } catch {
-    return null;
-  }
+  return { job, showCompany };
 }
 
 // applicantLocationRequirements — Google's JobPosting spec REQUIRES that
@@ -401,10 +397,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="deep-ocean">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
-      />
+      {showCompany && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+        />
+      )}
       {/* Breadcrumb: Home › Jobs › <Company> › <Title>. Lets Google
           render sitelinks under the result in SERPs. The company crumb only
           exists for entitled requesters — its name AND href slug would both

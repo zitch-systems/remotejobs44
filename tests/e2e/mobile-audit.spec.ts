@@ -36,4 +36,26 @@ test.describe('320px mobile audit', () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  test('job cards use sibling links and buttons with keyboard-operable anonymous actions', async ({ page }) => {
+    await page.goto('/jobs', { waitUntil: 'domcontentloaded' });
+
+    const firstCard = page.getByRole('article').first();
+    await expect(firstCard).toBeVisible();
+    await expect(firstCard.getByRole('link', { name: /^View / })).toHaveCount(1);
+    await expect(firstCard.locator('a button, button a')).toHaveCount(0);
+
+    const save = firstCard.getByRole('button', { name: /save job/i });
+    await save.focus();
+    await expect(save).toBeFocused();
+    await save.press('Enter');
+    await expect(page.getByRole('dialog')).toContainText('Log in to Apply');
+    await page.getByRole('button', { name: 'Close dialog' }).press('Enter');
+
+    const apply = firstCard.getByRole('button', { name: /subscribe|apply/i });
+    await apply.focus();
+    await expect(apply).toBeFocused();
+    await apply.press('Enter');
+    await expect(page.getByRole('dialog')).toContainText('Log in to Apply');
+  });
 });

@@ -93,18 +93,14 @@ jobs:
 
   # End-to-end smoke suite (hardening: the Playwright suite existed but never
   # ran in CI — docs/TECHNICAL_DEBT.md High #3). Chromium-only for speed.
-  # Env-dependent tests are excluded because CI has no Supabase secrets.
+  # The running app points at a local read-only Supabase HTTP fixture, giving
+  # SSR listing tests deterministic cards without production credentials.
   # The suite covers auth/pricing/SEO plus jobs interactions and a 320px
   # overflow/touch-target regression check.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # These are the project's public, browser-safe Supabase coordinates.
-    # No service-role credential is present: E2E can only perform the same
-    # RLS-limited anonymous reads as a real signed-out visitor.
     env:
-      NEXT_PUBLIC_SUPABASE_URL: 'https://gnyilmahiyddplsrrhoq.supabase.co'
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_Nlou0I27U4KFmppxMN46ow_q_WryHY3'
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
     steps:
       - uses: actions/checkout@v7
@@ -114,10 +110,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - name: Start server and run e2e
+      - name: Build against fixture, start server, and run e2e
         run: |
-          npm run start & 
+          APP_PID=''
+          node tests/e2e/fixtures/supabase-readonly.mjs &
+          FIXTURE_PID=$!
+          cleanup() {
+            if [ -n "$APP_PID" ]; then kill "$APP_PID" 2>/dev/null || true; fi
+            kill "$FIXTURE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          npx wait-on -t 30000 http://127.0.0.1:4800/rest/v1/jobs
+          export NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:4800
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-anon-key
+          export SUPABASE_SERVICE_ROLE_KEY=ci-service-role-key
+          npm run build
+          npm run start &
+          APP_PID=$!
           npx wait-on -t 60000 http://localhost:3000
           BASE_URL=http://localhost:3000 npx playwright test \
             tests/e2e/seo.spec.ts tests/e2e/pricing.spec.ts tests/e2e/auth.spec.ts \

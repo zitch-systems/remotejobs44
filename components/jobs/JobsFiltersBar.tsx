@@ -79,7 +79,6 @@ const POSTED_WITHIN = [
 const SORTS = [
   { value:'newest',   label:'Newest first'   },
   { value:'salary',   label:'Highest salary' },
-  { value:'relevant', label:'Most relevant'  },
 ];
 const REGIONS = [
   { value:'',             label:'Any region'         },
@@ -229,11 +228,7 @@ export function JobsFiltersBar() {
   // Include them here so they get a chip like every other active filter.
   const hasActiveChips = category !== 'all' || type || level || country || posted || region || timezone || salary;
 
-  // Text search and filters now share the same listing query, so newest and
-  // salary order work consistently in both modes. Relevance is intentionally
-  // hidden until the combined query exposes a stable rank expression.
-  const sortOptions = SORTS.filter(s => s.value !== 'relevant');
-  const effectiveSort = sortOptions.some(s => s.value === sort) ? sort : 'newest';
+  const effectiveSort = SORTS.some(s => s.value === sort) ? sort : 'newest';
 
   // The initial state already comes from q. Skipping the redundant first
   // sync prevents hydration from erasing text a user enters immediately.
@@ -323,7 +318,7 @@ export function JobsFiltersBar() {
         <div className="grid grid-cols-2 sm:flex gap-2">
           <select aria-label="Sort jobs" value={effectiveSort} onChange={e => setParam('sort', e.target.value)}
             className="input text-sm py-3 pl-3 pr-8 rounded-xl w-full min-w-0 sm:w-auto sm:min-w-[140px]">
-            {sortOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <button
             onClick={() => setShowFilters(!showFilters)}

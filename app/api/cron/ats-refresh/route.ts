@@ -15,13 +15,15 @@ import { refreshStaleATSBoards } from '@/lib/ats-refresh';
 import { requireCronSecret } from '@/lib/cron-auth';
 import { logError, logWarn } from '@/lib/log';
 
+export const maxDuration = 120;
+
 export async function GET(req: NextRequest) {
   const auth = requireCronSecret(req, 'cron.ats_refresh');
   if (!auth.ok) return auth.res;
 
   try {
     const supabase = createAdminSupabaseClient();
-    const result = await refreshStaleATSBoards(supabase, { budgetMs: 50_000, maxBoards: 300 });
+    const result = await refreshStaleATSBoards(supabase, { budgetMs: 90_000, maxBoards: 300 });
 
     // The sweep couldn't even get its board list (missing/failing
     // stale_ats_boards RPC). Answer 500 rather than dressing an outage up as
@@ -47,8 +49,8 @@ export async function GET(req: NextRequest) {
     // A time-budget stop leaves most boards untouched. Surface it as an HTTP
     // failure as well as a structured result so platform health checks see it.
     return NextResponse.json(
-      { success: !result.timedOut, ...result },
-      { status: result.timedOut ? 503 : 200 },
+      { success: !result.timedOut && result.errors === 0, ...result },
+      { status: result.timedOut ? 503 : result.errors > 0 ? 502 : 200 },
     );
   } catch (err: any) {
     logError({ event: 'cron.ats_refresh.failed', error: err?.message ?? String(err) });

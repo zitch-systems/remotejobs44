@@ -170,9 +170,10 @@ export async function GET(req: NextRequest) {
         const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
         return NextResponse.json({ job: mock ?? null });
       }
-      const { data: job } = await supabase
+      const { data: job, error } = await supabase
         .from('jobs').select(cols).eq('id', id).eq('is_active', true)
-        .or(notExpired).or(notFlagged).single();
+        .or(notExpired).or(notFlagged).maybeSingle();
+      if (error) throw new Error(error.message);
       if (job) return NextResponse.json({ job: transformJob(job, seePaid, seeCompany) });
       const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
       return NextResponse.json({ job: mock ?? null });
@@ -187,9 +188,10 @@ export async function GET(req: NextRequest) {
         idsParam.split(',').map(s => s.trim()).filter(s => UUID_RE.test(s))
       )).slice(0, 10);
       if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
-      const { data: rows } = await supabase
+      const { data: rows, error } = await supabase
         .from('jobs').select(cols).in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
+      if (error) throw new Error(error.message);
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid, seeCompany)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
       return NextResponse.json({ jobs });

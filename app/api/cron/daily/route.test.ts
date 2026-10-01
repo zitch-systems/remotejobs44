@@ -5,6 +5,7 @@ let resolver: QueryResolver = () => ({});
 let ingestResult: any;
 let reconcileResult: any;
 let expiryResult: { data?: unknown; error?: unknown };
+let emailSent = true;
 const rpcCalls: Array<{ name: string; args: unknown }> = [];
 
 vi.mock('@/lib/cron-auth', () => ({
@@ -27,7 +28,7 @@ vi.mock('@/lib/ingest-pipeline', () => ({
 vi.mock('@/lib/paystack/reconcile', () => ({
   reconcilePaystackCharges: async () => reconcileResult,
 }));
-vi.mock('@/lib/email/send', () => ({ sendEmail: async () => true }));
+vi.mock('@/lib/email/send', () => ({ sendEmail: async () => emailSent }));
 vi.mock('@/lib/email/templates', () => ({
   jobAlertEmail: () => ({ subject: 'Jobs', html: '<p>Jobs</p>' }),
 }));
@@ -63,9 +64,29 @@ beforeEach(() => {
   };
   expiryResult = { data: { expiredDayPasses: 4, expiredPro: 6 } };
   rpcCalls.length = 0;
+  emailSent = true;
 });
 
 describe('daily cron failure reporting', () => {
+  it('reports rejected email delivery as a failure without counting it sent', async () => {
+    emailSent = false;
+    resolver = (ctx) => {
+      if (ctx.table === 'job_alerts') return { data: [{
+        user_id: 'user-1', category: 'all', keywords: '',
+        profiles: { name: 'Ada', email: 'ada@example.test', plan: 'pro' },
+      }] };
+      if (ctx.table === 'jobs' && ctx.steps.includes('gte')) return { data: [{
+        id: 'job-1', title: 'Engineer', company: 'Example', category: 'engineering',
+      }] };
+      if (ctx.table === 'jobs') return { data: [] };
+      return { count: 0 };
+    };
+    const response = await GET({} as any);
+    const body = await response.json();
+    expect(response.status).toBe(500);
+    expect(body.failures).toContain('alerts');
+    expect(body.alerts.sent).toBe(0);
+  });
   it('uses atomic expiry and reports its counts in the existing daily shape', async () => {
     const response = await GET({} as any);
     const body = await response.json();

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { normaliseJobSpyJob, jobSpyJobToDbRow, jobSpySourceUrl, isPermanentJobSpyHttpStatus } from './jobspy';
 
 describe('normaliseJobSpyJob', () => {
@@ -124,6 +124,11 @@ describe('jobSpySourceUrl', () => {
 
 
 describe('JobSpy HTTP retries', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
   it('treats missing/auth endpoints as permanent configuration failures', () => {
     expect(isPermanentJobSpyHttpStatus(401)).toBe(true);
     expect(isPermanentJobSpyHttpStatus(404)).toBe(true);
@@ -133,5 +138,27 @@ describe('JobSpy HTTP retries', () => {
     expect(isPermanentJobSpyHttpStatus(408)).toBe(false);
     expect(isPermanentJobSpyHttpStatus(429)).toBe(false);
     expect(isPermanentJobSpyHttpStatus(503)).toBe(false);
+  });
+
+  it('does not start a request when the absolute deadline lacks one second', async () => {
+    vi.stubEnv('JOBSPY_API_URL', 'https://jobspy.example');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.resetModules();
+    const { fetchJobSpySearch } = await import('./jobspy');
+    await expect(fetchJobSpySearch({ searchTerm: 'remote', deadlineAt: Date.now() + 900 }))
+      .rejects.toThrow('deadline exhausted');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an ambiguous legacy 200 with no jobs or health metadata', async () => {
+    vi.stubEnv('JOBSPY_API_URL', 'https://jobspy.example');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ jobs: [] }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })));
+    vi.resetModules();
+    const { fetchJobSpySearch } = await import('./jobspy');
+    await expect(fetchJobSpySearch({ searchTerm: 'remote' }))
+      .rejects.toThrow('without a successful site');
   });
 });

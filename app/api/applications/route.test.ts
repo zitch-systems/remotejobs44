@@ -86,6 +86,18 @@ describe('POST auth & input gates', () => {
 });
 
 describe('POST plan gating', () => {
+  it('403 when the profile is suspended', async () => {
+    authUser = confirmedUser;
+    serverResolver = (ctx) => {
+      if (ctx.table === 'applications') return { data: null };
+      if (ctx.table === 'profiles') return { data: { plan: 'pro', role: 'user', suspended: true } };
+      return {};
+    };
+    const res = await POST(postReq({ jobId: JOB_UUID }));
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/suspended/i);
+  });
+
   it('403 with a renew message when a previously-paid plan has lapsed', async () => {
     authUser = confirmedUser;
     serverResolver = (ctx) => {
@@ -164,12 +176,14 @@ describe('POST daily-pass gating', () => {
 
 describe('POST happy path', () => {
   it('201 and returns the created application for a pro user', async () => {
+    let insertPayload: any;
     authUser = confirmedUser;
     serverResolver = (ctx) => {
       // Insert chain is `insert().select().single()` — check insert BEFORE the
       // generic select branch so the pre-check select and the insert don't collide.
       if (ctx.table === 'applications' && ctx.steps.includes('insert')) {
-        return { data: { id: 'app-new', job_id: JOB_UUID, job_title: 'Engineer', company: 'Acme', status: 'applied' } };
+        insertPayload = ctx.payload;
+        return { data: { id: 'app-new', job_id: JOB_UUID, job_title: 'Engineer', company: null, company_logo: null, status: 'applied' } };
       }
       if (ctx.table === 'applications' && ctx.steps.includes('select')) return { data: null };
       if (ctx.table === 'profiles' && ctx.steps.includes('select')) {
@@ -187,6 +201,31 @@ describe('POST happy path', () => {
     const json = await res.json();
     expect(json.application.id).toBe('app-new');
     expect(json.application.jobTitle).toBe('Engineer');
+    expect(json.application.company).toBe('Acme');
+    expect(insertPayload).toMatchObject({ company: null, company_logo: null });
+  });
+
+  it('does not treat a free profile with a future expiry as Pro for employer reveal', async () => {
+    authUser = confirmedUser;
+    serverResolver = (ctx) => {
+      if (ctx.table === 'applications' && ctx.steps.includes('insert')) {
+        return { data: { id: 'app-new', job_id: JOB_UUID, job_title: 'Engineer', company: null, company_logo: null } };
+      }
+      if (ctx.table === 'applications' && ctx.steps.includes('select')) {
+        if (ctx.args.some(a => a?.[1] && typeof a[1] === 'object' && (a[1] as any).head)) return { count: 0 };
+        return { data: null };
+      }
+      if (ctx.table === 'profiles') return { data: { plan: 'free', role: 'user', plan_expires_at: '2030-01-01T00:00:00.000Z', created_at: '2030-01-01T00:00:00.000Z' } };
+      return {};
+    };
+    adminResolver = (ctx) => ctx.table === 'jobs'
+      ? { data: { id: JOB_UUID, title: 'Engineer', company: 'Acme', logo: 'logo', apply_url: 'https://apply.test' } }
+      : {};
+    rpcResolver = () => ({});
+
+    const json = await (await POST(postReq({ jobId: JOB_UUID }))).json();
+    expect(json.application.company).toBe('Hidden Company');
+    expect(json.application.companyLogo).toBeNull();
   });
 
   it('404 when the target job does not exist', async () => {
@@ -245,5 +284,47 @@ describe('GET', () => {
     const json = await res.json();
     expect(json.applications).toHaveLength(1);
     expect(json.applications[0].jobTitle).toBe('Engineer');
+    expect(json.applications[0].company).toBe('Hidden Company');
+    expect(json.applications[0].companyLogo).toBeNull();
+  });
+
+  it('hydrates employer identity for an active pro user', async () => {
+    authUser = confirmedUser;
+    serverResolver = (ctx) => {
+      if (ctx.table === 'applications') return { data: [{ id: 'a1', job_id: JOB_UUID, job_title: 'Engineer', company: null, company_logo: null }] };
+      if (ctx.table === 'profiles') return { data: { plan: 'pro', role: 'user', plan_expires_at: '2030-01-01T00:00:00.000Z' } };
+      return {};
+    };
+    adminResolver = (ctx) => ctx.table === 'jobs'
+      ? { data: [{ id: JOB_UUID, title: 'Engineer', company: 'Acme', logo: 'https://cdn.test/acme.png' }] }
+      : {};
+
+    const json = await (await GET()).json();
+    expect(json.applications[0]).toMatchObject({ company: 'Acme', companyLogo: 'https://cdn.test/acme.png' });
+  });
+
+  it('requires the tracked job to remain active, unexpired, and unflagged before returning its channel', async () => {
+    authUser = confirmedUser;
+    let jobQuery: any;
+    serverResolver = (ctx) => ctx.table === 'applications' ? { data: { id: 'a1' } } : {};
+    adminResolver = (ctx) => { if (ctx.table === 'jobs') jobQuery = ctx; return { data: null }; };
+
+    const req = { url: `https://example.test/api/applications?channel=${JOB_UUID}` } as any;
+    const res = await GET(req);
+    expect(res.status).toBe(404);
+    expect(jobQuery.eq).toMatchObject({ id: JOB_UUID, is_active: true });
+    expect(jobQuery.steps.filter((s: string) => s === 'or')).toHaveLength(2);
+  });
+
+  it('denies apply-channel access to a suspended user while leaving ordinary tracker reads available', async () => {
+    authUser = confirmedUser;
+    serverResolver = (ctx) => {
+      if (ctx.table === 'profiles') return { data: { suspended: true } };
+      if (ctx.table === 'applications') return { data: [{ id: 'a1', job_id: JOB_UUID, job_title: 'Engineer' }] };
+      return {};
+    };
+    const channelReq = { url: `https://example.test/api/applications?channel=${JOB_UUID}` } as any;
+    expect((await GET(channelReq)).status).toBe(403);
+    expect((await GET()).status).toBe(200);
   });
 });

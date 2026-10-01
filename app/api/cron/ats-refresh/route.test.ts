@@ -29,4 +29,11 @@ describe('ATS cron result', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, timedOut: false });
   });
+
+  it('reports board failures even when the execution budget was sufficient', async () => {
+    result.errors = 2;
+    const response = await GET({} as any);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ success: false, errors: 2, timedOut: false });
+  });
 });
