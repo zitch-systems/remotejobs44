@@ -2,6 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { syncATSSnapshot } from './ats-snapshot';
 
 describe('syncATSSnapshot', () => {
+  it('commits a large metadata snapshot in small writes before retiring missing jobs', async () => {
+    const rpc = vi.fn().mockImplementation(async (name, args) => ({
+      data: name === 'update_ats_metadata' ? { updated: args.p_jobs.length, reactivated: 0 } : 0,
+      error: null,
+    }));
+    const rows = Array.from({ length: 61 }, (_, i) => ({ apply_url: `https://example.test/jobs/${i}` }));
+    const result = await syncATSSnapshot({ rpc } as any, 'https://example.test/board', rows, true);
+    expect(result.updated).toBe(61);
+    expect(rpc.mock.calls.slice(0, -1).map(([, args]) => args.p_jobs.length)).toEqual([25, 25, 11]);
+    expect(rpc.mock.calls.at(-1)?.[0]).toBe('retire_missing_ats_jobs');
+  });
   it('updates metadata and retires missing jobs only for complete snapshots', async () => {
     const rpc = vi.fn()
       .mockResolvedValueOnce({ data: { updated: 2, reactivated: 1 }, error: null })

@@ -22,6 +22,7 @@ import { unstable_cache } from 'next/cache';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { SAFE_JOB_COLUMNS, getRequesterPlan, type RequesterPlan } from '@/lib/auth/requester-plan';
+import { isSafeClosedJobMeta } from '@/lib/jobs/closed-job';
 
 // Raw snake_case row (SAFE columns only). Typed as `any`-ish record for the
 // same reason the page casts: select() with a runtime column string can't
@@ -47,22 +48,19 @@ async function fetchJobRow(id: string): Promise<JobDetailRow | null> {
 
 /**
  * Cached, request-deduped job-detail row (SAFE columns, visibility-filtered).
- * Returns null when the job is absent, expired, flagged, or the DB errored —
- * callers already treat null as notFound(), matching prior behaviour.
+ * Returns null when the job is genuinely absent, expired, or flagged. Query
+ * failures reject so the route error boundary can render a retriable failure
+ * instead of misreporting a transient outage as a permanent 404.
  */
 export const getJobDetailRow = cache(async (id: string): Promise<JobDetailRow | null> => {
-  try {
-    // The id is baked into the key parts AND the tag, so an admin edit can
-    // flush exactly this job via revalidateTag(`job-${id}`) while the bulk
-    // 'jobs' tag covers create/delete sweeps from /api/jobs.
-    return await unstable_cache(
-      () => fetchJobRow(id),
-      ['job-detail-v1', id],
-      { revalidate: 300, tags: ['jobs', `job-${id}`] },
-    )();
-  } catch {
-    return null;
-  }
+  // The id is baked into the key parts AND the tag, so an admin edit can
+  // flush exactly this job via revalidateTag(`job-${id}`) while the bulk
+  // 'jobs' tag covers create/delete sweeps from /api/jobs.
+  return unstable_cache(
+    () => fetchJobRow(id),
+    ['job-detail-v1', id],
+    { revalidate: 300, tags: ['jobs', `job-${id}`] },
+  )();
 });
 
 /**
@@ -95,16 +93,13 @@ export interface ExpiredJobMeta { title: string; company: string }
  */
 export const getExpiredJobMeta = cache(async (id: string): Promise<ExpiredJobMeta | null> => {
   if (!id) return null;
-  try {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('title, company')
-      .eq('id', id)
-      .maybeSingle();
-    if (error || !data) return null;
-    return { title: (data as any).title ?? 'This role', company: (data as any).company ?? '' };
-  } catch {
-    return null;
-  }
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('title, company, flagged')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`closed-job fetch failed: ${error.message}`);
+  if (!data || !isSafeClosedJobMeta(data as any)) return null;
+  return { title: (data as any).title ?? 'This role', company: (data as any).company ?? '' };
 });

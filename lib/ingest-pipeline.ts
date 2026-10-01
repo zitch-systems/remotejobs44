@@ -31,10 +31,11 @@ import { validateExternalUrlAndResolve } from '@/lib/ssrf-guard';
 import { dedupeByApplyUrl, jobIdentityKey, filterByIdentity } from '@/lib/dedupe-jobs';
 import { touchLastSeen, batchByLength } from '@/lib/jobs-last-seen';
 import {
-  isJobSpyConfigured, fetchJobSpyJobs, jobSpyJobToDbRow,
+  isJobSpyConfigured, fetchJobSpySearch, jobSpyJobToDbRow,
   jobSpySourceUrl, JOBSPY_DEFAULT_QUERIES, JobSpyHttpError,
 } from '@/lib/jobspy';
 import { logInfo, logWarn, logError } from '@/lib/log';
+import { acquireCronLock, releaseCronLock, type CronLockHandle } from '@/lib/cron-lock';
 
 const FINDWORK_KEY = process.env.FINDWORK_API_KEY ?? '';
 const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
@@ -342,16 +343,19 @@ export async function runIngest(): Promise<IngestResult> {
   // The lock TTL above provides a self-heal in case a runner crashes;
   // the release at the end of this function is the happy-path cleanup.
   // (migration_v14 adds the cron_locks table + try_acquire_cron_lock fn.)
-  try {
-    const { data: acquired, error: lockErr } = await supabase.rpc('try_acquire_cron_lock', {
-      lock_name:    INGEST_LOCK_NAME,
-      ttl_seconds:  INGEST_LOCK_TTL_SECONDS,
-    });
-    if (lockErr) {
-      // Function missing (migration not applied yet) — log and continue
-      // rather than block ingest entirely. Logged so it's noisy in ops.
-      logWarn({ event: 'ingest.lock_rpc_unavailable', error: lockErr.message });
-    } else if (acquired === false) {
+  let ingestLock: CronLockHandle | null = null;
+  {
+    const lock = await acquireCronLock(supabase, INGEST_LOCK_NAME, INGEST_LOCK_TTL_SECONDS);
+    if (lock.error) {
+      logError({ event: 'ingest.lock_acquire_failed', error: lock.error });
+      return {
+        success: false, totalAdded: 0, results: { Ingest: `error: lock unavailable: ${lock.error}` },
+        paused: [], at: new Date().toISOString(), skipped: true,
+        reason: 'Ingest lock is unavailable; no sources were started.',
+      };
+    }
+    ingestLock = lock.handle;
+    if (!ingestLock) {
       logInfo({ event: 'ingest.skipped', reason: 'lock_held' });
       return {
         success:    true,
@@ -363,8 +367,6 @@ export async function runIngest(): Promise<IngestResult> {
         reason:     'Another ingest is already running. Try again in a few minutes.',
       };
     }
-  } catch (err: any) {
-    logWarn({ event: 'ingest.lock_acquire_threw', error: err.message });
   }
 
   // From here on, we hold the lock (or the lock layer was unavailable).
@@ -508,19 +510,14 @@ export async function runIngest(): Promise<IngestResult> {
       // healthy ones behind it.
       .order('last_sync_at', { ascending: true, nullsFirst: true });
     const customSources = (customRows ?? []).filter(r => !hardcodedUrls.has(r.url));
-    // Budget counts from the start of the whole ingest (the hardcoded
-    // loop eats into it), with a small floor so user sources always get
-    // some window even after a slow hardcoded run.
-    const userLoopDeadline = Math.max(
-      ingestStartedAt + USER_SOURCES_BUDGET_MS,
-      Date.now() + 10_000,
-    );
+    // A slow first phase must not extend the total ingest deadline.
+    const userLoopDeadline = ingestStartedAt + USER_SOURCES_BUDGET_MS;
 
     for (const row of customSources) {
       const label = row.name || row.url;
       // Out of budget: record the skip and leave the source's stored
       // status alone — it runs first thing next cycle.
-      if (Date.now() > userLoopDeadline) {
+      if (userLoopDeadline - Date.now() < 5_000) {
         results[label] = 'skipped: ingest time budget exhausted, runs next cycle';
         continue;
       }
@@ -540,7 +537,7 @@ export async function runIngest(): Promise<IngestResult> {
             'User-Agent': 'Mozilla/5.0 (compatible; RemoteJobs44/1.0; +https://remotejobs44.com)',
             'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, application/json, */*',
           },
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, userLoopDeadline - Date.now()))),
           redirect: 'error',
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
@@ -658,11 +655,7 @@ export async function runIngest(): Promise<IngestResult> {
     // thrown error caught by the route's outer try, normal completion).
     // If the RPC isn't there (pre-v14 envs) this is a no-op; the TTL
     // self-heal kicks in instead.
-    try {
-      await supabase.rpc('release_cron_lock', { lock_name: INGEST_LOCK_NAME });
-    } catch (err: any) {
-      logWarn({ event: 'ingest.lock_release_failed', error: err.message });
-    }
+    await releaseCronLock(supabase, ingestLock);
   }
 }
 
@@ -678,9 +671,8 @@ export async function runIngest(): Promise<IngestResult> {
 // another feed already carries.
 //
 // Coverage over speed: with a broad query set and a slow scraper, not every
-// query fits in one run, so we rotate the starting query by day and work
-// within a time budget — the whole set comes round over a couple of days even
-// if one run only gets partway through.
+// query fits in one run. Persisted last-attempt times put the longest-waiting
+// query first, including previous failures, so a small daily budget remains fair.
 const JOBSPY_LOCK_NAME = 'jobspy';
 const JOBSPY_LOCK_TTL_SECONDS = 10 * 60;
 const JOBSPY_RESULTS_WANTED = 50;         // per-query target handed to the scraper
@@ -706,12 +698,19 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
   // Own lock, separate from the 'ingest' lock, so the JobSpy cron and the feed
   // ingest can run at their own times without blocking each other — while two
   // JobSpy runs still can't overlap and double-scrape.
-  try {
-    const { data: acquired, error } = await supabase.rpc('try_acquire_cron_lock', {
-      lock_name: JOBSPY_LOCK_NAME, ttl_seconds: JOBSPY_LOCK_TTL_SECONDS,
-    });
-    if (error) logWarn({ event: 'jobspy.lock_rpc_unavailable', error: error.message });
-    else if (acquired === false) {
+  let jobSpyLock: CronLockHandle | null = null;
+  {
+    const lock = await acquireCronLock(supabase, JOBSPY_LOCK_NAME, JOBSPY_LOCK_TTL_SECONDS);
+    if (lock.error) {
+      logError({ event: 'jobspy.lock_acquire_failed', error: lock.error });
+      return {
+        success: false, totalAdded: 0, results: { JobSpy: `error: lock unavailable: ${lock.error}` },
+        paused: [], at: new Date().toISOString(), skipped: true,
+        reason: 'JobSpy lock is unavailable; no searches were started.',
+      };
+    }
+    jobSpyLock = lock.handle;
+    if (!jobSpyLock) {
       logInfo({ event: 'jobspy.skipped', reason: 'lock_held' });
       return {
         success: true, totalAdded: 0, results: {}, paused: [],
@@ -719,23 +718,30 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
         reason: 'Another JobSpy run is already in progress.',
       };
     }
-  } catch (err: any) {
-    logWarn({ event: 'jobspy.lock_acquire_threw', error: err.message });
   }
 
   try {
     // Admins can pause a JobSpy query from /admin/sources by its job_sources
     // URL, same as any other source.
     let pausedUrls = new Set<string>();
+    const lastAttemptByUrl = new Map<string, number>();
     try {
-      const { data } = await supabase.from('job_sources').select('url').eq('status', 'paused');
-      pausedUrls = new Set((data ?? []).map((r: { url: string }) => r.url));
+      const { data, error } = await supabase.from('job_sources').select('url, status, last_sync_at');
+      if (error) throw error;
+      for (const row of data ?? []) {
+        if (row.status === 'paused') pausedUrls.add(row.url);
+        const timestamp = row.last_sync_at ? Date.parse(row.last_sync_at) : NaN;
+        if (Number.isFinite(timestamp)) lastAttemptByUrl.set(row.url, timestamp);
+      }
     } catch (err: any) {
       logWarn({ event: 'jobspy.paused_sources_read_failed', error: err.message });
     }
     const pausedNames: string[] = [];
 
-    for (const query of rotateByDay(JOBSPY_DEFAULT_QUERIES)) {
+    const queriesByAge = [...JOBSPY_DEFAULT_QUERIES].sort((a, b) =>
+      (lastAttemptByUrl.get(jobSpySourceUrl(a)) ?? 0) - (lastAttemptByUrl.get(jobSpySourceUrl(b)) ?? 0)
+    );
+    for (const query of queriesByAge) {
       const sourceUrl = jobSpySourceUrl(query);
       const name = `JobSpy:${query.replace(/^remote ?/, '') || 'all'}`;
 
@@ -746,15 +752,26 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
       }
       // Out of budget: skip the rest. The day-rotation means a different slice
       // leads next run, so nothing is permanently starved.
-      if (Date.now() - startedAt > budgetMs) {
+      const deadlineAt = startedAt + budgetMs;
+      // Do not begin a scrape unless it has enough time for the wrapper's 22s
+      // worker deadline plus network/DB cleanup headroom.
+      if (deadlineAt - Date.now() < 25_000) {
         results[name] = 'skipped: JobSpy time budget exhausted, runs earlier next cycle';
         continue;
       }
 
       const source: Source = {
         name, sourceUrl,
-        fetch: (): Promise<RawJob[]> =>
-          fetchJobSpyJobs({ searchTerm: query, resultsWanted: JOBSPY_RESULTS_WANTED, isRemote: true }),
+        fetch: async (): Promise<RawJob[]> => {
+          const search = await fetchJobSpySearch({
+            searchTerm: query, resultsWanted: JOBSPY_RESULTS_WANTED,
+            isRemote: true, deadlineAt,
+          });
+          if (Object.keys(search.errors).length > 0) {
+            logWarn({ event: 'jobspy.partial_site_failure', query, errors: search.errors });
+          }
+          return search.jobs;
+        },
         normalise: (j: RawJob): Record<string, any> | null => jobSpyJobToDbRow(j as any),
       };
 
@@ -826,8 +843,7 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
       paused: pausedNames, at: new Date().toISOString(),
     };
   } finally {
-    try { await supabase.rpc('release_cron_lock', { lock_name: JOBSPY_LOCK_NAME }); }
-    catch (err: any) { logWarn({ event: 'jobspy.lock_release_failed', error: err.message }); }
+    await releaseCronLock(supabase, jobSpyLock);
   }
 }
 
@@ -866,16 +882,6 @@ async function filterExistingOnPlatform(
     return { kept: rows, dropped: 0 };
   }
   return filterByIdentity(rows, existing);
-}
-
-// Rotate an array by the current UTC day so a budget-limited run doesn't always
-// start from the same query. The clock read is deliberate (daily fairness) and
-// isolated here.
-function rotateByDay<T>(arr: T[]): T[] {
-  if (arr.length <= 1) return arr.slice();
-  const dayNumber = Math.floor(Date.now() / 86_400_000); // whole days since epoch (UTC)
-  const offset = dayNumber % arr.length;
-  return [...arr.slice(offset), ...arr.slice(0, offset)];
 }
 
 // last_seen_at bumps go through lib/jobs-last-seen.ts. The local copy that

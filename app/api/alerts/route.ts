@@ -3,13 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { resolvePlan } from '@/lib/auth/plan';
 import { canUseJobAlerts } from '@/lib/auth/requester-plan';
+import { normalizeAlertCategory } from '@/lib/job-alerts';
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data } = await supabase
+  const { data, error: alertsError } = await supabase
     .from('job_alerts')
     .select('*')
     .eq('user_id', user.id)
@@ -20,8 +21,17 @@ export async function GET(req: NextRequest) {
   // rules from the Zustand store — that copy is persisted in localStorage
   // and a user can edit it, and resolvePlan's expiry handling is subtle
   // enough that a second implementation would drift.
-  const { data: profile } = await supabase
+  if (alertsError) {
+    console.error('[alerts.get] alerts read failed:', alertsError.message);
+    return NextResponse.json({ error: 'Could not load alerts. Please try again.' }, { status: 500 });
+  }
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles').select('plan, role, plan_expires_at').eq('id', user.id).maybeSingle();
+  if (profileError) {
+    console.error('[alerts.get] profile read failed:', profileError.message);
+    return NextResponse.json({ error: 'Could not load alerts. Please try again.' }, { status: 500 });
+  }
   const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
 
   return NextResponse.json({
@@ -82,7 +92,10 @@ export async function POST(req: NextRequest) {
 
   // Whitelist + length-cap inputs so a malicious client can't write
   // megabytes of junk into the alerts table.
-  const safeCategory  = category  != null ? String(category).slice(0, 50)  : null;
+  const safeCategory = normalizeAlertCategory(category);
+  if (safeCategory === undefined) {
+    return NextResponse.json({ error: 'Invalid job category.' }, { status: 400 });
+  }
   const safeKeywords  = keywords  != null ? String(keywords).slice(0, 200) : null;
 
   const { data, error } = await supabase

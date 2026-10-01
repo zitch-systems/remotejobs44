@@ -9,10 +9,11 @@
 // Cached at the edge for 5 minutes via revalidate so the next ingest
 // run's additions surface quickly without rebuilding on every request.
 import { NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
+import { getRequesterPlan, canSeeCompanyName } from '@/lib/auth/requester-plan';
 import { logError } from '@/lib/log';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 interface CompanyAggregate {
   name:       string;
@@ -24,6 +25,13 @@ interface CompanyAggregate {
 
 export async function GET() {
   try {
+    const requesterPlan = await getRequesterPlan(await createServerSupabaseClient());
+    if (!canSeeCompanyName(requesterPlan)) {
+      return NextResponse.json(
+        { error: 'A Pro subscription is required to browse employers.' },
+        { status: 403 },
+      );
+    }
     const supabase = createAdminSupabaseClient();
 
     // Server-side GROUP BY via the companies_aggregate() function (added

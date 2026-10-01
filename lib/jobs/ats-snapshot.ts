@@ -4,7 +4,7 @@ import { logWarn } from '@/lib/log';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
-const METADATA_CHUNK = 500;
+const METADATA_CHUNK = 25;
 
 export interface ATSSnapshotResult {
   updated: number;

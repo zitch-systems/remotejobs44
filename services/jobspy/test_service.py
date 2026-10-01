@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -156,10 +157,12 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual([row["title"] for row in result["jobs"]], ["keep"])
         self.assertIsNone(result["jobs"][0]["min_amount"])
         self.assertEqual(result["jobs"][0]["date_posted"], now.isoformat(timespec="milliseconds").replace("+00:00", "Z"))
+        self.assertEqual(result["succeeded_sites"], ["linkedin"])
+        self.assertEqual(result["errors"], {})
 
     def test_indeed_incompatible_hours_old_is_removed_and_arguments_added(self):
         seen = {}
-        frame = pd.DataFrame([{"title": "x", "is_remote": True}])
+        frame = pd.DataFrame([{"title": "x", "is_remote": True, "date_posted": datetime.now(timezone.utc)}])
 
         def fake(**kwargs):
             seen.update(kwargs)
@@ -168,13 +171,13 @@ class WorkerTests(unittest.TestCase):
         options = {"site_name": ["indeed", "linkedin"], "search_term": "x", "is_remote": True,
                    "hours_old": 48, "job_type": "contract"}
         with self.fake_jobspy(fake):
-            worker.scrape(options)
+            worker._scrape_one(options, "indeed")
         self.assertIsNone(seen["hours_old"])
         self.assertEqual(seen["description_format"], "html")
         self.assertTrue(seen["enforce_annual_salary"])
         self.assertEqual(seen["verbose"], 0)
 
-    def test_scraper_error_log_raises_and_handler_is_removed(self):
+    def test_scraper_error_log_fails_single_site_and_handler_is_removed(self):
         frame = pd.DataFrame([{"title": "x", "is_remote": True}])
 
         def fake(**kwargs):
@@ -185,7 +188,7 @@ class WorkerTests(unittest.TestCase):
         options = {"site_name": ["linkedin"], "search_term": "x", "is_remote": False,
                    "hours_old": None, "job_type": None}
         with self.fake_jobspy(fake):
-            with self.assertRaisesRegex(RuntimeError, "scraper error"):
+            with self.assertRaisesRegex(RuntimeError, "All job boards failed"):
                 worker.scrape(options)
         self.assertFalse(any(isinstance(h, worker.ScraperErrors)
                              for h in __import__("logging").getLogger("JobSpy").handlers))
@@ -194,7 +197,40 @@ class WorkerTests(unittest.TestCase):
         options = {"site_name": ["linkedin"], "search_term": "x", "is_remote": True,
                    "hours_old": None, "job_type": None}
         with self.fake_jobspy(lambda **kwargs: pd.DataFrame([{"title": "x"}])):
-            self.assertEqual(worker.scrape(options), {"jobs": []})
+            with self.assertRaisesRegex(RuntimeError, "All job boards failed"):
+                worker.scrape(options)
+
+    def test_one_failed_site_preserves_other_site_results(self):
+        def fake(**kwargs):
+            if kwargs["site_name"] == ["indeed"]:
+                logging = __import__("logging")
+                logging.getLogger("JobSpy:Indeed").error("blocked")
+                return pd.DataFrame()
+            return pd.DataFrame([{"title": "kept", "is_remote": True}])
+
+        options = {"site_name": ["indeed", "linkedin"], "search_term": "x",
+                   "is_remote": True, "hours_old": None, "job_type": None}
+        with self.fake_jobspy(fake):
+            result = worker.scrape(options)
+        self.assertEqual([row["title"] for row in result["jobs"]], ["kept"])
+        self.assertEqual(result["succeeded_sites"], ["linkedin"])
+        self.assertEqual(result["errors"], {"indeed": "RuntimeError"})
+
+    def test_slow_site_is_killed_without_discarding_fast_site(self):
+        def fake(**kwargs):
+            if kwargs["site_name"] == ["indeed"]:
+                time.sleep(5)
+            return pd.DataFrame([{"title": kwargs["site_name"][0], "is_remote": True}])
+
+        options = {"site_name": ["indeed", "linkedin"], "search_term": "x",
+                   "is_remote": True, "hours_old": None, "job_type": None}
+        started = time.monotonic()
+        with self.fake_jobspy(fake), patch.object(worker, "SITE_COLLECTION_TIMEOUT", 0.2):
+            result = worker.scrape(options)
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual([row["title"] for row in result["jobs"]], ["linkedin"])
+        self.assertEqual(result["succeeded_sites"], ["linkedin"])
+        self.assertEqual(result["errors"], {"indeed": "TimeoutError"})
 
 
 if __name__ == "__main__":

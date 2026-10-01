@@ -27,12 +27,16 @@ import { dedupeByApplyUrl } from '@/lib/dedupe-jobs';
 import { detectScam } from '@/lib/scam-detect';
 import { syncATSSnapshot } from '@/lib/jobs/ats-snapshot';
 import { logInfo, logWarn, logError } from '@/lib/log';
+import { acquireCronLock, releaseCronLock } from '@/lib/cron-lock';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
 // Mirrors /api/admin/companies/refresh — the search_vector GIN trigger on the
 // jobs table can't take large INSERT batches reliably.
 const INSERT_CHUNK = 25;
+const ATS_REFRESH_LOCK = 'ats-refresh';
+const ATS_REFRESH_LOCK_TTL_SECONDS = 10 * 60;
+const BOARD_START_HEADROOM_MS = 25_000;
 
 export interface ATSRefreshResult {
   boardsConsidered: number;
@@ -42,6 +46,7 @@ export interface ATSRefreshResult {
   removed: number;
   errors: number;
   timedOut: boolean;
+  skipped?: boolean;
   /**
    * Set when the run could not start at all — the stale_ats_boards() RPC is
    * missing or errored, so there was no board list to walk. Distinguishes
@@ -153,22 +158,33 @@ export async function refreshStaleATSBoards(
   const res: ATSRefreshResult = {
     boardsConsidered: 0, boardsRefreshed: 0, added: 0, reactivated: 0, removed: 0, errors: 0, timedOut: false,
   };
-  const removedBoards: Array<{ source_url: string; retry_after: string; last_error: string }> = [];
+  const lock = await acquireCronLock(supabase, ATS_REFRESH_LOCK, ATS_REFRESH_LOCK_TTL_SECONDS);
+  if (lock.error) {
+    res.error = `ATS refresh lock unavailable: ${lock.error}`;
+    logError({ event: 'ats_refresh.lock_failed', error: lock.error });
+    return res;
+  }
+  if (!lock.handle) {
+    res.skipped = true;
+    logInfo({ event: 'ats_refresh.skipped', reason: 'lock_held' });
+    return res;
+  }
 
-  const { data: boards, error } = await supabase.rpc('stale_ats_boards', { p_limit: maxBoards });
-  if (error) {
+  try {
+    const { data: boards, error } = await supabase.rpc('stale_ats_boards', { p_limit: maxBoards });
+    if (error) {
     // logError, not logWarn: with no board list there is nothing to refresh,
     // so every ATS posting keeps ageing towards the 60-day staleness cliff
     // until this is fixed. That is an outage of the sweep, not a hiccup.
     logError({ event: 'ats_refresh.rpc_failed', error: error.message });
     res.error = `stale_ats_boards RPC failed: ${error.message}`;
-    return res;
-  }
-  const list = (boards ?? []) as Array<{ source_url: string }>;
-  res.boardsConsidered = list.length;
+      return res;
+    }
+    const list = (boards ?? []) as Array<{ source_url: string }>;
+    res.boardsConsidered = list.length;
 
-  for (const board of list) {
-    if (Date.now() - startedAt > budgetMs) { res.timedOut = true; break; }
+    for (const board of list) {
+      if (startedAt + budgetMs - Date.now() < BOARD_START_HEADROOM_MS) { res.timedOut = true; break; }
     const parsed = parseATSApiUrl(board.source_url);
     if (!parsed) continue;
     try {
@@ -180,13 +196,7 @@ export async function refreshStaleATSBoards(
         // a retry delay it consumes the same slice of every daily run. Only
         // 404/410 are treated as confirmed removal; transient failures retry
         // on the next run.
-        if (/\b(?:404|410)\b/.test(fetched.error)) {
-          removedBoards.push({
-            source_url: board.source_url,
-            retry_after: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-            last_error: fetched.error.slice(0, 500),
-          });
-        }
+        await backoffBoard(supabase, board.source_url, fetched.error, /\b(?:404|410)\b/.test(fetched.error) ? 7 : 1);
         continue;
       }
 
@@ -212,22 +222,38 @@ export async function refreshStaleATSBoards(
         res.added += data?.length ?? 0;
       }
       res.boardsRefreshed++;
+      const { error: clearError } = await supabase
+        .from('ats_board_backoff').delete().eq('source_url', board.source_url);
+      if (clearError) {
+        res.errors++;
+        logWarn({ event: 'ats_refresh.backoff_clear_failed', source_url: board.source_url, error: clearError.message });
+      }
     } catch (err: any) {
       res.errors++;
-      logWarn({ event: 'ats_refresh.board_failed', source_url: board.source_url, error: err?.message ?? String(err) });
+      const message = err?.message ?? String(err);
+      logWarn({ event: 'ats_refresh.board_failed', source_url: board.source_url, error: message });
+      await backoffBoard(supabase, board.source_url, message, /\b(?:404|410)\b/.test(message) ? 7 : 1);
     }
-  }
-
-  if (removedBoards.length > 0) {
-    const { error: backoffError } = await supabase
-      .from('ats_board_backoff')
-      .upsert(removedBoards, { onConflict: 'source_url' });
-    if (backoffError) {
-      res.errors++;
-      logWarn({ event: 'ats_refresh.backoff_failed', error: backoffError.message });
     }
-  }
 
-  logInfo({ event: 'ats_refresh.done', ...res, elapsedMs: Date.now() - startedAt });
-  return res;
+    logInfo({ event: 'ats_refresh.done', ...res, elapsedMs: Date.now() - startedAt });
+    return res;
+  } finally {
+    await releaseCronLock(supabase, lock.handle);
+  }
+}
+
+async function backoffBoard(
+  supabase: AdminSupabase,
+  sourceUrl: string,
+  message: string,
+  days: number,
+): Promise<void> {
+  const { error } = await supabase.from('ats_board_backoff').upsert({
+    source_url: sourceUrl,
+    retry_after: new Date(Date.now() + days * 86_400_000).toISOString(),
+    last_failed_at: new Date().toISOString(),
+    last_error: message.slice(0, 500),
+  }, { onConflict: 'source_url' });
+  if (error) logWarn({ event: 'ats_refresh.backoff_failed', source_url: sourceUrl, error: error.message });
 }

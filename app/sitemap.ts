@@ -4,7 +4,6 @@ import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { CATEGORIES, COUNTRIES, SKILLS, TIMEZONES, REGIONS } from '@/lib/seo-slices';
 import { INDUSTRIES, CITIES, SALARY_ROLES, COMPETITORS } from '@/lib/seo-extra';
 import { ARTICLES } from '@/lib/resources';
-import { companySlug } from '@/lib/company-slug';
 import { BASE, JOB_SHARD_SIZE, jobShardCount } from '@/lib/sitemap-shards';
 
 // ── Sharding ────────────────────────────────────────────────────────────
@@ -54,7 +53,6 @@ function staticAndSliceRoutes(now: Date): MetadataRoute.Sitemap {
     { url: `${BASE}/for-employers`,   lastModified: now, changeFrequency: 'monthly', priority: 0.8  },
     { url: `${BASE}/faq`,             lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
     { url: `${BASE}/compare`,         lastModified: now, changeFrequency: 'monthly', priority: 0.7  },
-    { url: `${BASE}/companies`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.65 },
     { url: `${BASE}/about`,           lastModified: now, changeFrequency: 'monthly', priority: 0.7  },
     { url: `${BASE}/blog`,            lastModified: now, changeFrequency: 'daily',   priority: 0.8  },
     { url: `${BASE}/contact`,         lastModified: now, changeFrequency: 'monthly', priority: 0.5  },
@@ -92,47 +90,6 @@ function staticAndSliceRoutes(now: Date): MetadataRoute.Sitemap {
   ];
 
   return [...staticRoutes, ...blogRoutes, ...resourceRoutes, ...sliceRoutes];
-}
-
-// Top company landing pages, aggregated from recent hiring activity. Scans
-// the most-recent slice of jobs (one query) and emits one URL per employer,
-// capped to the 1000 most-active so crawl budget stays on real hiring.
-async function companyRoutes(now: Date): Promise<MetadataRoute.Sitemap> {
-  try {
-    const admin = createAdminSupabaseClient();
-    const { data: jobs } = await admin
-      .from('jobs')
-      .select('company, posted_at')
-      .eq('is_active', true)
-      .or(notExpired())
-      .or(NOT_FLAGGED)
-      .order('posted_at', { ascending: false })
-      .limit(40000);
-    if (!jobs) return [];
-
-    const companyMap = new Map<string, { latest: Date; count: number }>();
-    for (const j of jobs as Array<{ company: string | null; posted_at: string | null }>) {
-      const name = (j.company ?? '').trim();
-      if (!name) continue;
-      const slug = companySlug(name);
-      if (!slug) continue;
-      const posted = j.posted_at ? new Date(j.posted_at) : now;
-      const existing = companyMap.get(slug);
-      if (!existing) companyMap.set(slug, { latest: posted, count: 1 });
-      else { existing.count++; if (posted > existing.latest) existing.latest = posted; }
-    }
-    return Array.from(companyMap.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 1000)
-      .map(([slug, info]) => ({
-        url:             `${BASE}/companies/${slug}`,
-        lastModified:    info.latest,
-        changeFrequency: 'weekly' as const,
-        priority:        0.7,
-      }));
-  } catch {
-    return [];
-  }
 }
 
 // ── Job shards ──────────────────────────────────────────────────────────
@@ -178,8 +135,7 @@ export default async function sitemap({ id }: { id: number | string | Promise<nu
 
   // id 0 → the static/slice/company shard.
   if (shardId === 0) {
-    const [companies] = await Promise.all([companyRoutes(now)]);
-    return [...staticAndSliceRoutes(now), ...companies];
+    return staticAndSliceRoutes(now);
   }
 
   // id ≥ 1 → job-URL shard (zero-based slice index = id - 1).

@@ -4,6 +4,8 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { evaluateFreeTrial, freeTrialBlockedMessage } from '@/lib/auth/free-trial';
 import { resolvePlan } from '@/lib/auth/plan';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
+import { NOT_FLAGGED, notExpired } from '@/lib/jobs-visibility';
 import { applicationCreateSchema } from '@/lib/api-schemas';
 import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
@@ -27,6 +29,13 @@ export async function GET(req?: NextRequest) {
         return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
       }
 
+      const { data: channelProfile, error: channelProfileError } = await supabase.from('profiles')
+        .select('suspended').eq('id', user.id).maybeSingle();
+      if (channelProfileError) throw new Error(channelProfileError.message);
+      if (channelProfile?.suspended === true) {
+        return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+      }
+
       const { data: tracked } = await supabase
         .from('applications')
         .select('id')
@@ -41,6 +50,9 @@ export async function GET(req?: NextRequest) {
         .from('jobs')
         .select('apply_url, apply_email')
         .eq('id', channelJobId)
+        .eq('is_active', true)
+        .or(notExpired())
+        .or(NOT_FLAGGED)
         .maybeSingle();
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -59,8 +71,14 @@ export async function GET(req?: NextRequest) {
       .order('applied_at', { ascending: false });
 
     if (error) throw new Error(error.message);
-
-    return NextResponse.json({ applications: (applications ?? []).map(transformApplication) });
+    const { data: profile, error: profileError } = await supabase.from('profiles')
+      .select('plan, role, plan_expires_at, suspended').eq('id', user.id).maybeSingle();
+    if (profileError) throw new Error(profileError.message);
+    const plan = profile?.suspended ? 'free' : resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
+    const identities = await loadApplicationIdentities(applications ?? [], plan === 'pro' || plan === 'admin');
+    return NextResponse.json({
+      applications: (applications ?? []).map(row => transformApplication(row, identities.get(String(row.job_id)))),
+    });
   } catch (err: any) {
     logError({ event: 'applications.get_failed', error: err?.message ?? String(err) });
     return NextResponse.json({ error: 'Failed to load applications' }, { status: 500 });
@@ -124,9 +142,13 @@ export async function POST(req: NextRequest) {
     // Check user has an active plan (pro, daily, or admin)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, role, plan_expires_at, created_at')
+      .select('plan, role, plan_expires_at, created_at, suspended')
       .eq('id', user.id)
       .maybeSingle();
+
+    if (profile?.suspended === true) {
+      return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+    }
 
     const rawPlan = profile?.plan ?? 'free';
     const role = profile?.role ?? 'user';
@@ -139,15 +161,6 @@ export async function POST(req: NextRequest) {
     // admins unlimited. This replaces a hand-rolled lapsed-pro check that used
     // to live below and could drift out of agreement with the rest of the app.
     let plan = resolvePlan({ role, dbPlan: rawPlan, planExpiresAt });
-    // Webhook race: right after a successful charge the verify route has
-    // already stamped a FUTURE plan_expires_at, but the subscription webhook
-    // that flips profiles.plan can lag a few seconds. A future expiry proves the
-    // payment cleared, so honor it as paid access rather than bouncing a
-    // just-paid user into the free-trial gate. (We can't tell daily vs pro from
-    // the lagging column, so grant the unlimited tier for the brief race.)
-    const hasFutureExpiry = !!planExpiresAt && new Date(planExpiresAt) > new Date();
-    if (plan === 'free' && hasFutureExpiry) plan = 'pro';
-
     // A previously-paid plan whose expiry lapsed resolves to 'free'. Give those
     // users a renew-focused message instead of the new-user free-trial copy.
     if (plan === 'free' && role !== 'admin' && (rawPlan === 'pro' || rawPlan === 'daily')) {
@@ -260,6 +273,9 @@ export async function POST(req: NextRequest) {
       .from('jobs')
       .select('id, title, company, logo, apply_url, apply_email')
       .eq('id', jobId)
+      .eq('is_active', true)
+      .or(notExpired())
+      .or(NOT_FLAGGED)
       .maybeSingle();
 
     if (jobError || !job) {
@@ -278,9 +294,12 @@ export async function POST(req: NextRequest) {
       .insert({
         user_id:      user.id,
         job_id:       job.id,
-        job_title:    job.title,
-        company:      job.company,
-        company_logo: job.logo ?? null,
+        // User-owned application rows are directly readable under own-row RLS.
+        // Keep employer identity out of storage; Pro/admin responses hydrate it
+        // from the job row after checking the caller's current entitlement.
+        job_title:    scrubCompanyIdentity(job.title, job.company),
+        company:      null,
+        company_logo: null,
         status:       'applied',
         auto_applied: autoApplied,
         steps,
@@ -351,7 +370,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       application: {
-        ...transformApplication(application),
+        ...transformApplication(application, (plan === 'pro' || plan === 'admin') ? job : undefined),
         applyUrl: job.apply_url ?? null,
         applyEmail: job.apply_email ?? null,
       },
@@ -362,13 +381,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function transformApplication(row: Record<string, unknown>) {
+type ApplicationIdentity = { title?: string | null; company?: string | null; logo?: string | null };
+
+async function loadApplicationIdentities(rows: any[], allowed: boolean): Promise<Map<string, ApplicationIdentity>> {
+  const result = new Map<string, ApplicationIdentity>();
+  if (!allowed) return result;
+  const ids = [...new Set(rows.map(row => String(row.job_id ?? '')).filter(Boolean))];
+  if (ids.length === 0) return result;
+  const { data, error } = await createAdminSupabaseClient().from('jobs')
+    .select('id, title, company, logo').in('id', ids);
+  if (error) throw new Error(error.message);
+  for (const job of data ?? []) result.set(String(job.id), job);
+  return result;
+}
+
+function transformApplication(row: Record<string, unknown>, identity?: ApplicationIdentity) {
   return {
     id:           row.id,
     jobId:        row.job_id,
-    jobTitle:     row.job_title,
-    company:      row.company,
-    companyLogo:  row.company_logo,
+    jobTitle:     identity?.title ?? row.job_title,
+    company:      identity?.company ?? HIDDEN_COMPANY_LABEL,
+    companyLogo:  identity?.logo ?? null,
     status:       row.status ?? 'applied',
     appliedAt:    row.applied_at,
     updatedAt:    row.updated_at,

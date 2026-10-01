@@ -11,14 +11,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Briefcase, ExternalLink, MapPin } from 'lucide-react';
-import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
+import { getRequesterPlan, canSeeCompanyName } from '@/lib/auth/requester-plan';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { companySlug } from '@/lib/company-slug';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { formatRelativeDate, formatSalary } from '@/lib/utils';
 
 const BASE = 'https://remotejobs44.com';
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 interface JobRow {
@@ -87,6 +88,14 @@ const findCompany = cache(async (slug: string): Promise<{ name: string; jobs: Jo
 });
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const plan = await getRequesterPlan(await createServerSupabaseClient());
+  if (!canSeeCompanyName(plan)) {
+    return {
+      title: 'Employer profile | RemoteJobs44',
+      description: 'Employer profiles are available to RemoteJobs44 Pro subscribers.',
+      robots: { index: false, follow: false },
+    };
+  }
   const found = await findCompany((await params).slug);
   if (!found) {
     return { title: 'Company not found | RemoteJobs44' };
@@ -105,6 +114,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
+  const plan = await getRequesterPlan(await createServerSupabaseClient());
+  if (!canSeeCompanyName(plan)) {
+    return (
+      <div className="max-w-[680px] mx-auto px-5 py-20 text-center">
+        <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 mb-3">Employer profile</h1>
+        <p className="text-stone-500 dark:text-stone-400 mb-7">Employer names and company profiles are available with Pro monthly and annual plans.</p>
+        <Link href="/pricing" className="btn btn-primary">View Pro plans</Link>
+      </div>
+    );
+  }
   const found = await findCompany((await params).slug);
   if (!found) notFound();
 

@@ -7,6 +7,9 @@
 // the initial HTML; the search box is a thin client island over that data.
 import type { Metadata } from 'next';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getRequesterPlan, canSeeCompanyName } from '@/lib/auth/requester-plan';
+import Link from 'next/link';
 import { CompaniesDirectory, type Company } from '@/components/companies/CompaniesDirectory';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
@@ -14,7 +17,7 @@ const BASE = 'https://remotejobs44.com';
 
 // Re-aggregate every 5 minutes (matches the old /api/companies revalidate) so
 // fresh ingests surface without rebuilding on every request.
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Remote Companies Hiring Worldwide',
@@ -49,6 +52,16 @@ async function fetchCompanies(): Promise<Company[]> {
 }
 
 export default async function CompaniesPage() {
+  const plan = await getRequesterPlan(await createServerSupabaseClient());
+  if (!canSeeCompanyName(plan)) {
+    return (
+      <div className="max-w-[680px] mx-auto px-5 py-20 text-center">
+        <h1 className="font-display font-extrabold text-3xl text-stone-900 dark:text-stone-100 mb-3">Employer directory</h1>
+        <p className="text-stone-500 dark:text-stone-400 mb-7">Employer names and company profiles are available with Pro monthly and annual plans.</p>
+        <Link href="/pricing" className="btn btn-primary">View Pro plans</Link>
+      </div>
+    );
+  }
   const companies = await fetchCompanies();
 
   const itemList = {

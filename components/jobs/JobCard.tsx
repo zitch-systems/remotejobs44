@@ -172,13 +172,19 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
   // ── List mode (compact row) ──────────────────────────────────────────────
   if (listMode) {
     return (
-      <Link href={href} {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      <article
         className={cn(
           'group relative flex items-center gap-3 px-4 py-3 rounded-xl border bg-white dark:bg-[#0a1628] cursor-pointer transition-all duration-200',
           'hover:shadow-sm hover:border-brand-400 dark:hover:border-brand-600',
           'border-stone-200 dark:border-[#1e3a5f]',
         )}
       >
+        <Link
+          href={href}
+          {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          aria-label={`View ${job.title}`}
+          className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+        />
         <CompanyLogo src={hideCompany ? undefined : job.logo} company={hideCompany ? 'Company' : job.company} size={36} className="text-sm" />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors truncate">{job.title}</p>
@@ -200,7 +206,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           aria-label={applied ? 'Already applied' : canApplyNow ? 'Apply to this job' : 'Subscribe to apply'}
           title={applied ? 'Already applied' : canApplyNow ? 'Apply' : 'Subscribe to apply'}
           className={cn(
-            'shrink-0 min-h-11 min-w-11 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 inline-flex items-center justify-center',
+            'relative z-10 shrink-0 min-h-11 min-w-11 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 inline-flex items-center justify-center',
             applied ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : canApplyNow ? 'bg-brand-700 dark:bg-brand-600 text-white hover:bg-brand-800'
               : 'border border-brand-600 text-brand-700 dark:text-brand-400 hover:bg-brand-50'
@@ -208,23 +214,29 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           {applied ? '✓' : canApplyNow ? 'Apply' : '🔒'}
         </button>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
-          className={cn('shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
+          className={cn('relative z-10 shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
         </button>
-      </Link>
+      </article>
     );
   }
 
   // ── Grid mode (card) ────────────────────────────────────────────────────
   return (
-    <Link href={href} {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    <article
       className={cn(
         'group relative flex flex-col gap-3 p-4 rounded-xl border bg-white dark:bg-[#0a1628] cursor-pointer transition-all duration-200 overflow-hidden',
         'hover:-translate-y-0.5 hover:shadow-md-brand hover:border-brand-500 dark:hover:border-brand-600',
         'border-stone-200 dark:border-[#1e3a5f]',
       )}
     >
+      <Link
+        href={href}
+        {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        aria-label={`View ${job.title}`}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+      />
       {/* Featured top bar — only rendered on featured jobs, overflow-hidden clips it cleanly */}
       {job.featured && (
         <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px] rounded-t-xl bg-accent" />
@@ -247,7 +259,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
           )}
         </div>
         <button onClick={handleSave} onAuxClick={cancelAux} aria-label={saved ? 'Unsave' : 'Save job'}
-          className={cn('shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
+          className={cn('relative z-10 shrink-0 min-h-11 min-w-11 p-1.5 rounded-lg transition-all duration-150 inline-flex items-center justify-center',
             saved ? 'text-accent' : 'text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#0f1e38]')}>
           {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
         </button>
@@ -297,7 +309,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
         </div>
         <button onClick={handleApply} onAuxClick={cancelAux}
           className={cn(
-            'shrink-0 min-h-11 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1',
+            'relative z-10 shrink-0 min-h-11 px-3.5 py-2 rounded-lg text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1',
             applied
               ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
               : dailyLimitReached
@@ -313,7 +325,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
             : <><Lock className="w-3 h-3" /> Subscribe</>}
         </button>
       </div>
-    </Link>
+    </article>
   );
 }
 
