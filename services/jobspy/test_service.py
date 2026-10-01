@@ -140,6 +140,19 @@ class WorkerTests(unittest.TestCase):
         module.scrape_jobs = scrape
         return patch.dict(sys.modules, {"jobspy": module})
 
+    def test_serverless_without_posix_semaphores_preserves_large_results(self):
+        # Reproduce the missing semaphore resource observed in Vercel. Drain a
+        # payload larger than a pipe buffer before joining its child process.
+        frame = pd.DataFrame([{"title": "x", "is_remote": True,
+                               "description": "content" * 20000}])
+        options = {"site_name": ["linkedin"], "search_term": "x", "is_remote": True,
+                   "hours_old": None, "job_type": None}
+        with self.fake_jobspy(lambda **kwargs: frame), \
+             patch("multiprocessing.synchronize.SemLock", side_effect=FileNotFoundError):
+            result = worker.scrape(options)
+        self.assertEqual(result["jobs"][0]["description"], frame.iloc[0]["description"])
+        self.assertEqual(result["succeeded_sites"], ["linkedin"])
+
     def test_remote_filter_dates_and_json_nulls(self):
         now = datetime.now(timezone.utc).replace(microsecond=0)
         frame = pd.DataFrame([

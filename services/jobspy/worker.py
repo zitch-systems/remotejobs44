@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import logging
 import multiprocessing
-import queue
+from multiprocessing.connection import wait
 import sys
 import time
 
@@ -64,11 +64,15 @@ def _scrape_one(options, site):
             logger.removeHandler(errors)
 
 
-def _site_worker(options, site, results):
+def _site_worker(options, site, result_pipe):
     try:
-        results.put((site, _scrape_one(options, site), None))
+        result = (site, _scrape_one(options, site), None)
     except Exception as error:
-        results.put((site, None, type(error).__name__))
+        result = (site, None, type(error).__name__)
+    try:
+        result_pipe.send(result)
+    finally:
+        result_pipe.close()
 
 
 def scrape(options):
@@ -76,37 +80,45 @@ def scrape(options):
     # scraper socket hangs; processes can, and all descendants are joined before
     # this worker exits.
     context = multiprocessing.get_context("fork")
-    results = context.Queue()
-    processes = {
-        site: context.Process(target=_site_worker, args=(options, site, results), daemon=True)
-        for site in options["site_name"]
-    }
-    for process in processes.values():
-        process.start()
-
+    # Vercel does not provide the filesystem-backed POSIX semaphores used by
+    # multiprocessing.Queue. One-way pipes only need ordinary file descriptors.
+    processes = {}
+    receivers = {}
     jobs = []
     succeeded_sites = []
     site_errors = {}
-    pending = set(processes)
     deadline = time.monotonic() + SITE_COLLECTION_TIMEOUT
     try:
-        while pending:
+        for site in options["site_name"]:
+            receiver, sender = context.Pipe(duplex=False)
+            process = context.Process(target=_site_worker, args=(options, site, sender), daemon=True)
+            receivers[receiver] = site
+            try:
+                process.start()
+                processes[site] = process
+            finally:
+                sender.close()
+        while receivers:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 break
-            try:
-                site, site_jobs, error = results.get(timeout=remaining)
-            except queue.Empty:
+            ready = wait(list(receivers), timeout=remaining)
+            if not ready:
                 break
-            if site not in pending:
-                continue
-            pending.remove(site)
-            if error:
-                site_errors[site] = error
-            else:
-                succeeded_sites.append(site)
-                jobs.extend(site_jobs)
-        for site in pending:
+            for receiver in ready:
+                site = receivers.pop(receiver)
+                try:
+                    _, site_jobs, error = receiver.recv()
+                except EOFError:
+                    site_jobs, error = None, "WorkerExited"
+                finally:
+                    receiver.close()
+                if error:
+                    site_errors[site] = error
+                else:
+                    succeeded_sites.append(site)
+                    jobs.extend(site_jobs)
+        for site in receivers.values():
             site_errors[site] = "TimeoutError"
     finally:
         for process in processes.values():
@@ -117,8 +129,8 @@ def scrape(options):
             if process.is_alive():
                 process.kill()
                 process.join()
-        results.close()
-        results.join_thread()
+        for receiver in receivers:
+            receiver.close()
 
     if not succeeded_sites:
         raise RuntimeError("All job boards failed")
