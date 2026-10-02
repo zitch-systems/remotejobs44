@@ -200,6 +200,7 @@ export async function refreshStaleATSBoards(
         continue;
       }
 
+      const boardErrorsBefore = res.errors;
       const rows = dedupeByApplyUrl(fetched.jobs.map(toJobRow).filter(r => !!r.apply_url));
       const snapshot = await syncATSSnapshot(
         supabase,
@@ -218,10 +219,31 @@ export async function refreshStaleATSBoards(
           .from('jobs')
           .upsert(rows.slice(i, i + INSERT_CHUNK), { onConflict: 'apply_url', ignoreDuplicates: true })
           .select('id');
-        if (insErr) { res.errors++; continue; }
+        if (insErr) {
+          res.errors++;
+          logWarn({ event: 'ats_refresh.insert_failed', source_url: board.source_url, error: insErr.message });
+          continue;
+        }
         res.added += data?.length ?? 0;
       }
       res.boardsRefreshed++;
+      if (res.errors > boardErrorsBefore) {
+        // Partial DB writes get an early retry; they are not a completed board.
+        await backoffBoard(supabase, board.source_url, 'Partial ATS snapshot/database failure', 1 / 24);
+        continue;
+      }
+      const checkedAt = Date.now();
+      const { error: checkpointError } = await supabase.from('ats_board_checks').upsert({
+        source_url: board.source_url,
+        checked_at: new Date(checkedAt).toISOString(),
+        // Partial providers retry sooner; an empty complete board is still a
+        // successful check and must leave the queue for the rest of the day.
+        next_check_at: new Date(checkedAt + (fetched.complete === true ? 24 : 1) * 3_600_000).toISOString(),
+      }, { onConflict: 'source_url' });
+      if (checkpointError) {
+        res.errors++;
+        logWarn({ event: 'ats_refresh.checkpoint_failed', source_url: board.source_url, error: checkpointError.message });
+      }
       const { error: clearError } = await supabase
         .from('ats_board_backoff').delete().eq('source_url', board.source_url);
       if (clearError) {

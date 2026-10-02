@@ -19,5 +19,5 @@ export async function GET(req: NextRequest) {
     try { revalidatePath('/jobs'); }
     catch (err: any) { logWarn({ event: 'cron.ingest.revalidate_failed', error: err?.message ?? String(err) }); }
   }
-  return NextResponse.json(result);
+  return NextResponse.json(result, { status: result.success ? 200 : 502 });
 }

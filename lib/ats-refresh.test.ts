@@ -79,3 +79,24 @@ describe('refreshStaleATSBoards scheduling', () => {
     expect(rpc).toHaveBeenCalledWith('release_owned_cron_lock', expect.anything());
   });
 });
+
+
+describe('ATS board completion checkpoint', () => {
+  it('checkpoints a successful empty board independently of job timestamps', async () => {
+    fetchATSJobs.mockResolvedValueOnce({ jobs: [], total: 0, platform: 'lever', slug: 'empty', complete: true });
+    const checkpoint = vi.fn().mockResolvedValue({ error: null });
+    const clear = vi.fn().mockResolvedValue({ error: null });
+    const rpc = vi.fn(async (name: string) => {
+      if (name === 'acquire_cron_lock') return { data: true, error: null };
+      if (name === 'stale_ats_boards') return { data: [{ source_url: 'https://api.lever.co/v0/postings/empty' }], error: null };
+      return { data: 0, error: null };
+    });
+    const from = (name: string) => name === 'ats_board_checks'
+      ? { upsert: checkpoint } : { delete: () => ({ eq: clear }) };
+    const result = await refreshStaleATSBoards({ rpc, from } as any, { budgetMs: 50_000 });
+    expect(result).toMatchObject({ boardsRefreshed: 1, added: 0, errors: 0, timedOut: false });
+    const payload = checkpoint.mock.calls[0][0];
+    expect(Date.parse(payload.next_check_at) - Date.parse(payload.checked_at)).toBe(86_400_000);
+    expect(rpc).toHaveBeenCalledWith('retire_missing_ats_jobs', expect.objectContaining({ p_seen_urls: [] }));
+  });
+});
