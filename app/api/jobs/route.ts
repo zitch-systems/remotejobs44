@@ -13,6 +13,7 @@ import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { requireAdmin } from '@/lib/admin/auth';
 import { recordAdminAction } from '@/lib/admin/audit';
 import { logError, logWarn } from '@/lib/log';
+import { retryStatementTimeout } from '@/lib/jobs/read-retry';
 
 // /jobs (60s revalidate) and /jobs/[id] (300s revalidate) cache server-
 // rendered HTML at the edge. Without a manual flush, an admin's create /
@@ -423,7 +424,11 @@ export async function GET(req: NextRequest) {
     const from = (page - 1) * perPage;
     query = query.range(from, from + perPage - 1);
 
-    const { data: jobs, count, error } = await query;
+    // Exact counts can transiently hit Postgres statement_timeout when several
+    // filtered listings arrive together. Retry that one database condition
+    // once, with the identical query, so filters, visibility and count remain
+    // exact. Every other error and a second timeout still surface as a 500.
+    const { data: jobs, count, error } = await retryStatementTimeout(() => query);
     if (error || !jobs) throw new Error(error?.message ?? 'Query failed');
     const total = count ?? 0;
 
