@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
   // Commit useful progress and resume any backlog on the next run.
   const FRESHNESS_BATCH_SIZE = 25;
   const FRESHNESS_MAX_BATCHES = 80;
-  const freshnessDeadline = Date.now() + 20_000;
+  const freshnessDeadline = Date.now() + 10_000;
 
   let unflaggedNew = 0;
   let unflagErr: { message: string } | null = null;
@@ -165,11 +165,13 @@ export async function GET(req: NextRequest) {
     logWarn({ event: 'cron.daily.unflag_new_backlog', updated: unflaggedNew });
   }
 
+  // Give the stale sweep its own bounded slot so badge cleanup cannot starve it.
+  const staleDeadline = Date.now() + 10_000;
   let deactivated = 0;
   let staleErr: { message: string } | null = null;
   let staleCapped = false;
   for (let batch = 0; batch < FRESHNESS_MAX_BATCHES; batch++) {
-    if (Date.now() >= freshnessDeadline) { staleCapped = true; break; }
+    if (Date.now() >= staleDeadline) { staleCapped = true; break; }
     const { data: rows, error: selectErr } = await supabase
       .from('jobs')
       .select('id')

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const result = await refreshStaleATSBoards(supabase, { budgetMs: 90_000, maxBoards: 300 });
+    const result = await refreshStaleATSBoards(supabase, { budgetMs: 90_000, maxBoards: 25 });
 
     // The sweep couldn't even get its board list (missing/failing
     // stale_ats_boards RPC). Answer 500 rather than dressing an outage up as
