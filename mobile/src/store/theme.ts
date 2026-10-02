@@ -2,7 +2,7 @@
 // persisted to AsyncStorage. useTheme() (src/theme) reads this.
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistentStorage } from '@/lib/persistent-storage';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -22,6 +22,6 @@ export const useThemeMode = create<ThemeState>()(
       setMode: (mode) => set({ mode }),
       cycle: () => set({ mode: ORDER[(ORDER.indexOf(get().mode) + 1) % ORDER.length] }),
     }),
-    { name: 'rj44-theme', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'rj44-theme', storage: createJSONStorage(() => persistentStorage) },
   ),
 );

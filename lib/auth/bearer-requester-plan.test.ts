@@ -42,4 +42,22 @@ describe('native bearer requester plan', () => {
     maybeSingle.mockResolvedValue({ data: { role: 'user', plan: 'pro', plan_expires_at: '2099-01-01', suspended: false }, error: null });
     expect(await getBearerRequesterPlan(request('Bearer valid'))).toBe('pro');
   });
+
+  it('does not trust an expired paid plan', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    maybeSingle.mockResolvedValue({ data: { role: 'user', plan: 'pro', plan_expires_at: '2020-01-01', suspended: false }, error: null });
+    expect(await getBearerRequesterPlan(request('Bearer valid'))).toBe('free');
+  });
+
+  it('denies suspended users even when their profile has admin privileges', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    maybeSingle.mockResolvedValue({ data: { role: 'admin', plan: 'pro', suspended: true }, error: null });
+    expect(await getBearerRequesterPlan(request('Bearer valid'))).toBe('anon');
+  });
+
+  it('fails closed when profile verification is unavailable', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    maybeSingle.mockResolvedValue({ data: null, error: new Error('database unavailable') });
+    expect(await getBearerRequesterPlan(request('Bearer valid'))).toBe('anon');
+  });
 });

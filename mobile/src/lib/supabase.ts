@@ -7,9 +7,9 @@
 // app/(auth)/sign-in.tsx).
 import 'react-native-url-polyfill/auto';
 import { AppState, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { LargeSecureStore } from './secure-store-adapter';
+import { persistentStorage } from './persistent-storage';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -18,7 +18,7 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
 // Encrypted storage on device; plain AsyncStorage on web (no SecureStore there).
-const storage = Platform.OS === 'web' ? AsyncStorage : LargeSecureStore;
+const storage = Platform.OS === 'web' ? persistentStorage : LargeSecureStore;
 
 // Fall back to harmless placeholders so createClient() doesn't throw at import
 // time when env is missing — the UI gates real calls on isSupabaseConfigured.

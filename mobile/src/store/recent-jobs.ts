@@ -2,7 +2,7 @@
 // persisted. Recorded from the job detail; shown on Home as "Recently viewed".
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistentStorage } from '@/lib/persistent-storage';
 import type { Job } from '@/lib/types';
 import { pushRecent, toRecent, type RecentJob } from '@/lib/recent';
 
@@ -19,6 +19,6 @@ export const useRecentJobs = create<RecentState>()(
       add: (job) => set((s) => ({ items: pushRecent(s.items, toRecent(job)) })),
       clear: () => set({ items: [] }),
     }),
-    { name: 'rj44-recent-jobs', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'rj44-recent-jobs', storage: createJSONStorage(() => persistentStorage) },
   ),
 );

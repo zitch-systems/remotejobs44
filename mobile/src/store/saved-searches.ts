@@ -1,7 +1,7 @@
 // src/store/saved-searches.ts — persisted saved job searches (Jobs tab).
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistentStorage } from '@/lib/persistent-storage';
 import { isEmptySearch, sameCriteria, type SavedSearch, type SearchCriteria } from '@/lib/saved-search';
 
 const MAX = 12;
@@ -32,6 +32,6 @@ export const useSavedSearches = create<SavedSearchState>()(
       },
       remove: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
     }),
-    { name: 'rj44-saved-searches', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'rj44-saved-searches', storage: createJSONStorage(() => persistentStorage) },
   ),
 );

@@ -1,7 +1,7 @@
 // src/store/search.ts — recent feed searches, persisted (most-recent first).
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistentStorage } from '@/lib/persistent-storage';
 
 const MAX = 8;
 
@@ -25,6 +25,6 @@ export const useSearchHistory = create<SearchState>()(
       remove: (q) => set((s) => ({ recent: s.recent.filter((x) => x !== q) })),
       clear: () => set({ recent: [] }),
     }),
-    { name: 'rj44-search', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'rj44-search', storage: createJSONStorage(() => persistentStorage) },
   ),
 );

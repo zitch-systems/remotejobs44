@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { LandingJob, payLabel, ageLabel, tintFor } from './data';
-import { CompanyMask } from '@/components/jobs/CompanyMask';
+import { LandingJob, payLabel, ageLabel, tintFor, workplaceLabel } from './data';
 
 // Featured cards (fcard-grid) from real data. Prefers featured rows;
 // the data fetch already orders featured-first so the first 6 are the
@@ -28,14 +27,16 @@ export function Featured({ jobs }: { jobs: LandingJob[] }) {
                   </span>
                 </div>
                 <h3 className="fcard-title">{job.title}</h3>
-                <p className="fcard-co"><CompanyMask company={job.company} /> · {job.location}</p>
+                <p className="fcard-co">{job.company} · {job.location}</p>
                 <div className="fcard-tags">
                   <span className="fcard-type">
                     {job.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-')}
                   </span>
+                  <span className="fcard-type">{workplaceLabel(job)}</span>
+                  {job.relocationSupported ? <span className="fcard-type">Relocation offered</span> : null}
                 </div>
                 <div className="fcard-foot">
-                  <span className="fcard-pay">{payLabel(job)}</span>
+                  {payLabel(job) ? <span className="fcard-pay">{payLabel(job)}</span> : <span />}
                   <span className="fcard-age">{ageLabel(job)}</span>
                 </div>
               </Link>

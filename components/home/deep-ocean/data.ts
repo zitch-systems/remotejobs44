@@ -12,32 +12,14 @@
 // this server-only module out of the browser bundle.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import type { LandingJob } from './helpers';
+import { toPublicLandingJob, type LandingJob } from './helpers';
 
 export * from './helpers';
 
 // Columns that are safe to ship to the public payload. Deliberately
 // excludes apply_url / apply_email / description.
 const SAFE_COLUMNS =
-  'id,title,company,location,category,type,salary_min,salary_max,currency,posted_at,created_at,featured';
-
-function toLandingJob(j: any): LandingJob {
-  const company = j.company ?? 'Company';
-  return {
-    id:        j.id,
-    title:     j.title ?? 'Remote role',
-    company,
-    logo:      company?.[0]?.toUpperCase() ?? '?',
-    category:  j.category ?? 'other',
-    type:      j.type ?? 'full-time',
-    location:  j.location ?? 'Location not specified',
-    salaryMin: j.salary_min ?? undefined,
-    salaryMax: j.salary_max ?? undefined,
-    currency:  j.currency ?? 'USD',
-    posted:    j.posted_at ?? j.created_at ?? new Date().toISOString(),
-    featured:  j.featured ?? false,
-  };
-}
+  'id,title,company,location,category,type,salary_min,salary_max,currency,posted_at,created_at,featured,workplace_type,remote,relocation_supported';
 
 // Fetch the freshest visible jobs once; all landing sections share the result.
 export async function fetchLandingJobs(limit = 40): Promise<LandingJob[]> {
@@ -52,7 +34,7 @@ export async function fetchLandingJobs(limit = 40): Promise<LandingJob[]> {
       .order('featured', { ascending: false })
       .order('posted_at', { ascending: false })
       .limit(limit);
-    return (data ?? []).map(toLandingJob);
+    return (data ?? []).map(toPublicLandingJob);
   } catch {
     return [];
   }
