@@ -169,11 +169,14 @@ def main() -> None:
         screenshot("jobs-search")
 
         cards = [n for n in hierarchy().iter("node") if re.search(r" at .+, \d+% match", value(n))]
-        if not cards:
-            raise AssertionError("Search produced no tappable job card")
-        selected_card = value(cards[0])
+        engineer_cards = [n for n in cards if "Engineer at " in value(n)]
+        if not engineer_cards:
+            raise AssertionError("Engineer search produced no Engineer job card")
+        if any(value(n).startswith("Product Designer at ") for n in cards):
+            raise AssertionError("Engineer search still displayed the Product Designer job card")
+        selected_card = value(engineer_cards[0])
         selected_job = selected_card.split(" at ", 1)[0]
-        x, y = center(cards[0])
+        x, y = center(engineer_cards[0])
         adb("shell", "input", "tap", str(x), str(y))
         wait_for(selected_job)
         screenshot("job-detail")

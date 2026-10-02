@@ -12,6 +12,7 @@ import { Dialog, type DialogData } from '@/components/Dialog';
 import { useAuth } from '@/lib/auth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { signInWithProvider } from '@/lib/oauth';
+import { useLightStatusBarOnFocus } from '@/lib/status-bar';
 import { SEED_USER } from '@/lib/seed';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -64,6 +65,7 @@ function Segmented({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void
 }
 
 export default function SignIn() {
+  useLightStatusBarOnFocus();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -77,6 +79,7 @@ export default function SignIn() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<DialogData | null>(null);
+  const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   const isSignup = mode === 'signup';
 
@@ -160,27 +163,32 @@ export default function SignIn() {
         >
           {/* Navy hero — gradient + orange glow + logo + headline. */}
           <View
+            onLayout={(event) => {
+              const { width, height } = event.nativeEvent.layout;
+              setHeroSize((current) => (current.width === width && current.height === height ? current : { width, height }));
+            }}
             style={{
               overflow: 'hidden',
+              backgroundColor: '#070f1f',
               paddingTop: insets.top + spacing[8],
               paddingHorizontal: spacing.authX,
               paddingBottom: spacing[10],
             }}
           >
-            <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            {heroSize.width > 0 && heroSize.height > 0 ? <Svg style={StyleSheet.absoluteFill} width={heroSize.width} height={heroSize.height}>
               <Defs>
                 <LinearGradient id="heroBg" x1="0" y1="0" x2="0.7" y2="1">
                   <Stop offset="0" stopColor="#102a52" />
                   <Stop offset="1" stopColor="#070f1f" />
                 </LinearGradient>
                 <RadialGradient id="heroGlow" cx="0.82" cy="0.12" r="0.65">
-                  <Stop offset="0" stopColor="rgba(249,115,22,0.32)" />
-                  <Stop offset="1" stopColor="rgba(249,115,22,0)" />
+                  <Stop offset="0" stopColor="#f97316" stopOpacity={0.32} />
+                  <Stop offset="1" stopColor="#f97316" stopOpacity={0} />
                 </RadialGradient>
               </Defs>
-              <Rect width="100%" height="100%" fill="url(#heroBg)" />
-              <Rect width="100%" height="100%" fill="url(#heroGlow)" />
-            </Svg>
+              <Rect width={heroSize.width} height={heroSize.height} fill="url(#heroBg)" />
+              <Rect width={heroSize.width} height={heroSize.height} fill="url(#heroGlow)" />
+            </Svg> : null}
 
             <HeroLogo />
             <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 26, lineHeight: 31, letterSpacing: -0.6, color: '#fff', marginTop: spacing[5] }}>

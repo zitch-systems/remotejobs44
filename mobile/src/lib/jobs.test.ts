@@ -5,7 +5,8 @@ jest.mock('./supabase', () => ({
   supabase: { auth: { onAuthStateChange: jest.fn(), getSession: jest.fn() }, rpc: jest.fn() },
 }));
 
-import { rowToJob, scheduleAfterAuth } from './jobs';
+import { filterDemoJobs, rowToJob, scheduleAfterAuth } from './jobs';
+import { SEED_JOBS } from './seed';
 
 describe('trusted jobs API adapter', () => {
   it('maps current camelCase API fields and workplace metadata', () => {
@@ -54,5 +55,22 @@ describe('auth refresh scheduling', () => {
     jest.runOnlyPendingTimers();
     expect(work).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+});
+
+describe('demo job filtering', () => {
+  it('applies search and category filters instead of returning every seed job', () => {
+    expect(filterDemoJobs(SEED_JOBS, { text: 'Engineer' }).every((job) => /engineer/i.test(`${job.role} ${job.company}`))).toBe(true);
+    expect(filterDemoJobs(SEED_JOBS, { text: 'Engineer' })).not.toContainEqual(expect.objectContaining({ role: 'Product Designer' }));
+    expect(filterDemoJobs(SEED_JOBS, { categories: ['design'] })).toEqual(
+      SEED_JOBS.filter((job) => job.category.toLowerCase() === 'design'),
+    );
+  });
+
+  it('uses the demo roles explicit remote labels and posted ages', () => {
+    expect(filterDemoJobs(SEED_JOBS, { workplace: 'remote' })).toHaveLength(SEED_JOBS.length);
+    expect(filterDemoJobs(SEED_JOBS, { workplace: 'onsite' })).toEqual([]);
+    expect(filterDemoJobs(SEED_JOBS, { postedWithinDays: 1 })).toEqual([]);
+    expect(filterDemoJobs(SEED_JOBS, { text: 'Engineer', postedWithinDays: 3 }).map((job) => job.id)).toEqual(['1']);
   });
 });

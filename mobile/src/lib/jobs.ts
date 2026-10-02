@@ -9,7 +9,7 @@ import { apiFetch } from './api';
 import { SEED_JOBS } from './seed';
 import { loadFeedCache, saveFeedCache } from './feed-cache';
 import { bulletsFrom, deriveMatch, gradFor, plainJobText, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
-import type { ExperienceLevel, WorkplaceFilter } from './filters';
+import { matchesLevel, type ExperienceLevel, type WorkplaceFilter } from './filters';
 import type { Job } from './types';
 
 // Server-side job query. Every field is optional; an absent field = no filter.
@@ -35,6 +35,36 @@ export function isDefaultQuery(q: JobQuery): boolean {
     !q.location?.trim() &&
     !q.postedWithinDays
   );
+}
+
+/** Filter bundled demo rows using their explicit fixture metadata. */
+export function filterDemoJobs(jobs: Job[], query: JobQuery): Job[] {
+  const text = query.text?.trim().toLowerCase();
+  const location = query.location?.trim().toLowerCase();
+  const categories = query.categories?.map((category) => category.toLowerCase());
+
+  return jobs.filter((job) => {
+    if (text && !job.role.toLowerCase().includes(text) && !job.company.toLowerCase().includes(text)) return false;
+    if (categories?.length && !categories.includes(job.category.toLowerCase())) return false;
+    if (query.type && job.type.toLowerCase() !== query.type.toLowerCase()) return false;
+    if (query.level && !matchesLevel(job.level, query.level)) return false;
+    if (location && !job.location.toLowerCase().includes(location)) return false;
+    if (query.postedWithinDays) {
+      const age = /^(\d+)([hdw]) ago$/.exec(job.time);
+      if (!age) return false;
+      const days = Number(age[1]) * (age[2] === 'w' ? 7 : age[2] === 'h' ? 1 / 24 : 1);
+      if (days > query.postedWithinDays) return false;
+    }
+    if (query.workplace && query.workplace !== 'all') {
+      if (query.workplace === 'relocation') {
+        if (!job.relocationSupported) return false;
+      } else {
+        const workplace = job.workplaceType ?? (/^Remote\s*·/i.test(job.location) ? 'remote' : 'unknown');
+        if (workplace !== query.workplace) return false;
+      }
+    }
+    return true;
+  });
 }
 
 // Re-export so existing importers (the feed) keep their import path.
@@ -224,7 +254,7 @@ export interface JobsFeed {
 export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const queryKey = JSON.stringify(query);
   const isDefault = isDefaultQuery(query);
-  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : SEED_JOBS);
+  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : filterDemoJobs(SEED_JOBS, query));
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +262,10 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const busy = useRef(false);
   const gotFresh = useRef(false);
   const reqRef = useRef(0); // "latest wins" token so query changes can't be dropped
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) setJobs(filterDemoJobs(SEED_JOBS, query));
+  }, [queryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(
     async (offset: number, mode: 'initial' | 'refresh' | 'more') => {
