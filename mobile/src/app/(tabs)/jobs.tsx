@@ -11,7 +11,7 @@ import { JobListSkeleton } from '@/components/JobCardSkeleton';
 import { SearchSuggestions } from '@/components/SearchSuggestions';
 import { FilterSheet, type JobType, type SortBy } from '@/components/FilterSheet';
 import { useJobs, type JobQuery } from '@/lib/jobs';
-import { activeFilterCount, CATEGORY_OPTIONS, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
+import { activeFilterCount, CATEGORY_OPTIONS, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel, type WorkplaceFilter } from '@/lib/filters';
 import { isEmptySearch, sameCriteria, searchLabel, type SearchCriteria } from '@/lib/saved-search';
 import { useSearchHistory } from '@/store/search';
 import { useSavedSearches } from '@/store/saved-searches';
@@ -29,7 +29,7 @@ const CATEGORY_LABELS = CATEGORY_OPTIONS.map((o) => o.label);
 export default function Jobs() {
   const { colors } = useTheme();
 
-  // Multi-select category labels (empty = "All"). Stored as labels; mapped to
+  // One category label (empty = "All"). Stored as an array to retain saved
   // lowercase DB values when building the query.
   const [categories, setCategories] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -37,7 +37,7 @@ export default function Jobs() {
   const [type, setType] = useState<JobType>('Any');
   const [level, setLevel] = useState<ExperienceLevel>('Any');
   const [sort, setSort] = useState<SortBy>('recent');
-  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [workplace, setWorkplace] = useState<WorkplaceFilter>('all');
   const [dateLabel, setDateLabel] = useState('Any time');
   const [location, setLocation] = useState('');
   const [debouncedLocation, setDebouncedLocation] = useState('');
@@ -59,7 +59,7 @@ export default function Jobs() {
   }, [location]);
 
   const toggleCategory = (label: string) =>
-    setCategories((prev) => (prev.includes(label) ? prev.filter((c) => c !== label) : [...prev, label]));
+    setCategories((prev) => (prev.includes(label) ? [] : [label]));
 
   const postedWithinDays = DATE_OPTIONS.find((o) => o.label === dateLabel)?.days;
   const categoryValues = useMemo(
@@ -74,11 +74,11 @@ export default function Jobs() {
       categories: categoryValues.length ? categoryValues : undefined,
       type: TYPE_OPTIONS.find((o) => o.label === type)?.value,
       level: level === 'Any' ? undefined : level,
-      remoteOnly: remoteOnly || undefined,
+      workplace,
       location: debouncedLocation || undefined,
       postedWithinDays,
     }),
-    [debouncedQuery, categoryValues, type, level, remoteOnly, debouncedLocation, postedWithinDays],
+    [debouncedQuery, categoryValues, type, level, workplace, debouncedLocation, postedWithinDays],
   );
 
   const feed = useJobs(20, jobQuery);
@@ -91,12 +91,12 @@ export default function Jobs() {
   }, [feed.jobs, sort]);
 
   const fCount =
-    activeFilterCount(type, level, remoteOnly, postedWithinDays) + (debouncedLocation.trim() ? 1 : 0) + categories.length;
+    activeFilterCount(type, level, workplace !== 'all', postedWithinDays) + (debouncedLocation.trim() ? 1 : 0) + categories.length;
   const resetSheet = () => {
     setType('Any');
     setLevel('Any');
     setSort('recent');
-    setRemoteOnly(false);
+    setWorkplace('all');
     setDateLabel('Any time');
     setLocation('');
   };
@@ -115,7 +115,7 @@ export default function Jobs() {
     setType(s.type as JobType);
     setLevel(s.level as ExperienceLevel);
     setSort(s.sort as SortBy);
-    setRemoteOnly(false);
+    setWorkplace('all');
     setDateLabel('Any time');
     setLocation('');
   };
@@ -327,8 +327,8 @@ export default function Jobs() {
         setLevel={setLevel}
         sort={sort}
         setSort={setSort}
-        remoteOnly={remoteOnly}
-        setRemoteOnly={setRemoteOnly}
+        workplace={workplace}
+        setWorkplace={setWorkplace}
         dateLabel={dateLabel}
         setDateLabel={setDateLabel}
         location={location}

@@ -3,7 +3,7 @@
 // pipeline (applied → screening → interview → offer / rejected / withdrawn).
 // The store's `applied` map is the source of truth (optimistic + write-through);
 // job objects are resolved from the user's fetched applications (or the seed).
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,7 +15,8 @@ import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_FLOW, STATUS_LABEL, type AppStatus } from '@/lib/types';
 import { applicationStats, inStatusFilter, STATUS_FILTERS, type StatusFilter } from '@/lib/stats';
 import { appliedDateLabel } from '@/lib/format';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { scheduleAfterAuth } from '@/lib/jobs';
 import { fetchApplicationItems, updateApplicationNote } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
 import { toast } from '@/store/toast';
@@ -38,23 +39,31 @@ function useApplicationJobs(appliedKey: string): {
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
   const [refreshing, setRefreshing] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [fetchedFor, setFetchedFor] = useState<string | null>(null);
+  const reqRef = useRef(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) {
       const map: Record<string, Job> = {};
-      for (const j of SEED_JOBS) map[j.id] = j;
+      if (!isSupabaseConfigured) for (const j of SEED_JOBS) map[j.id] = j;
+      ++reqRef.current;
       setJobsById(map);
+      setFetchedFor(isSupabaseConfigured ? null : 'demo');
       setNotesById({});
       setAppliedAtById({});
       setLoading(false);
       setRefreshing(false);
       return;
     }
-    let active = true;
-    if (nonce === 0) setLoading(true);
+    const reqId = ++reqRef.current;
+    setJobsById({});
+    setNotesById({});
+    setAppliedAtById({});
+    setFetchedFor(null);
+    setLoading(true);
     fetchApplicationItems(userId)
       .then((items) => {
-        if (!active) return;
+        if (reqId !== reqRef.current) return;
         const map: Record<string, Job> = {};
         const notes: Record<string, string> = {};
         const appliedAt: Record<string, string> = {};
@@ -66,25 +75,46 @@ function useApplicationJobs(appliedKey: string): {
         setJobsById(map);
         setNotesById(notes);
         setAppliedAtById(appliedAt);
+        setFetchedFor(userId);
       })
       .catch(() => {})
       .finally(() => {
-        if (active) {
+        if (reqId === reqRef.current) {
           setLoading(false);
           setRefreshing(false);
         }
       });
     return () => {
-      active = false;
+      ++reqRef.current;
     };
     // appliedKey re-fetches when the *set* of applications changes (new apply),
     // not on every status edit.
   }, [userId, appliedKey, nonce]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      ++reqRef.current;
+      setJobsById({});
+      setNotesById({});
+      setAppliedAtById({});
+      setFetchedFor(null);
+      setLoading(true);
+      setRefreshing(false);
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => setNonce((n) => n + 1));
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
   return {
-    jobsById,
-    notesById,
-    appliedAtById,
+    jobsById: !isSupabaseConfigured || fetchedFor === userId ? jobsById : {},
+    notesById: !isSupabaseConfigured || fetchedFor === userId ? notesById : {},
+    appliedAtById: !isSupabaseConfigured || fetchedFor === userId ? appliedAtById : {},
     loading,
     refreshing,
     refresh: () => {
@@ -289,9 +319,9 @@ export default function Applications() {
                 return (
                   <Pressable
                     key={job.id}
-                    onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
+                    onPress={job.unavailable ? undefined : () => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
                     accessibilityRole="button"
-                    accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}`}
+                    accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}${job.unavailable ? ', listing unavailable' : ''}`}
                     style={({ pressed }) => [
                       {
                         flexDirection: 'row',
@@ -317,6 +347,11 @@ export default function Applications() {
                       {appliedDateLabel(appliedAtById[job.id] ?? null) ? (
                         <Txt variant="meta" color={colors.fg4} numberOfLines={1} style={{ marginTop: 1 }}>
                           Applied {appliedDateLabel(appliedAtById[job.id] ?? null)}
+                        </Txt>
+                      ) : null}
+                      {job.unavailable ? (
+                        <Txt variant="meta" color={colors.warnText} numberOfLines={1} style={{ marginTop: 1 }}>
+                          Original listing unavailable
                         </Txt>
                       ) : null}
                       {noteFor(job.id) ? (

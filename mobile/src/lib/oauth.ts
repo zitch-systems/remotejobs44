@@ -23,9 +23,10 @@
 // fail fast with a clear message rather than opening a browser that can't return.
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
-import { supabase } from './supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+import { parseAuthCallbackUrl } from './auth-callback';
+import { getOAuthAvailability } from './oauth-availability';
 
 // Lets the in-app browser settle any pending auth session on cold start.
 WebBrowser.maybeCompleteAuthSession();
@@ -58,6 +59,12 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<void>
     );
   }
 
+  const availability = await getOAuthAvailability(supabaseUrl, supabaseAnonKey);
+  if (!availability[provider]) {
+    const label = provider === 'linkedin_oidc' ? 'LinkedIn' : 'Google';
+    throw new Error(`${label} sign-in is not available right now. Use email and password instead.`);
+  }
+
   // Surface the exact value to allow-list — copy this into the Supabase dashboard
   // if social sign-in doesn't return to the app.
   if (__DEV__) console.log('[oauth] redirectTo =', oauthRedirectUri);
@@ -83,10 +90,10 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<void>
     );
   }
 
-  const { params, errorCode } = QueryParams.getQueryParams(result.url);
-  if (errorCode) throw new Error(errorCode);
-  if (!params.code) throw new Error('No authorization code returned from the provider.');
+  const callback = parseAuthCallbackUrl(result.url);
+  if (callback.error) throw new Error(callback.error);
+  if (!callback.code) throw new Error('No authorization code returned from the provider.');
 
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(callback.code);
   if (exchangeError) throw exchangeError;
 }

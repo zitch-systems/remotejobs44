@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ChevronRight, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
-import { Avatar, Card, Txt } from '@/components/ui';
+import { Avatar, Card, ResponsiveGradientBackground, Txt } from '@/components/ui';
 import { JobCard } from '@/components/JobCard';
 import { JobListSkeleton } from '@/components/JobCardSkeleton';
 import { RecentlyViewed } from '@/components/RecentlyViewed';
@@ -20,6 +20,7 @@ import { personalizeJobs, useJobs, type JobQuery } from '@/lib/jobs';
 import { activeFilterCount, DATE_OPTIONS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
 import { fetchPreferences, useProfile } from '@/lib/profile';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { useLightStatusBarOnFocus } from '@/lib/status-bar';
 import { useAppStore } from '@/store/app';
 import { useSearchHistory } from '@/store/search';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
@@ -84,6 +85,7 @@ function Promo() {
 }
 
 export default function Feed() {
+  useLightStatusBarOnFocus();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -197,25 +199,17 @@ export default function Feed() {
           gap: spacing[4],
         }}
       >
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="feedHero" x1="0" y1="0" x2="0.85" y2="1">
-              <Stop offset="0" stopColor="#102a52" />
-              <Stop offset="1" stopColor="#0a1730" />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#feedHero)" />
-        </Svg>
+        <ResponsiveGradientBackground start="#102a52" end="#0a1730" />
 
         {/* greeting */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Txt style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.72)' }}>{greeting} 👋</Txt>
             <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 20, color: '#ffffff', marginTop: 1 }}>
               Hi, <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 20, color: palette.accentLight }}>{firstName}</Txt>
             </Txt>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], flexShrink: 0 }}>
             <NotificationBell hero />
             <Avatar initial={(profile.name || profile.email || 'U').charAt(0).toUpperCase()} size={38} online uri={profile.avatarUrl} />
           </View>

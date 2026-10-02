@@ -36,9 +36,26 @@ export function money(n: number, currency: string): string {
 
 export function salaryLabel(min: number | null, max: number | null, currency: string): string {
   const cur = currency || 'USD';
+  if (min && max && min !== max) return `${money(min, cur)}–${money(max, cur)}`;
   if (max) return money(max, cur);
   if (min) return money(min, cur);
-  return 'Competitive';
+  return 'Salary not listed';
+}
+
+/** Readable native text from employer-provided HTML; never executes markup. */
+export function plainJobText(value: string): string {
+  return value
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<\/(p|div|li|h[1-6])\s*>|<br\s*\/?\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(?:nbsp|amp|lt|gt|quot|apos);|&#(?:x[0-9a-f]+|\d+);/gi, (entity) => {
+      const named: Record<string, string> = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" };
+      if (named[entity.toLowerCase()] !== undefined) return named[entity.toLowerCase()];
+      const hex = entity.slice(2, 3).toLowerCase() === 'x';
+      const code = parseInt(entity.slice(hex ? 3 : 2, -1), hex ? 16 : 10);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+    })
+    .replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
 }
 
 // Product rule: pay is only surfaced on cards when it's quoted in US dollars.
@@ -86,11 +103,11 @@ export function tagsFrom(skills: string[] | null, category: string | null): JobT
 export function bulletsFrom(requirements: string[] | string | null, description: string | null): string[] {
   // Live `requirements` is a text[]; use its items directly when present.
   if (Array.isArray(requirements)) {
-    const items = requirements.map((s) => String(s).trim()).filter((s) => s.length > 0);
+    const items = requirements.map((s) => plainJobText(String(s))).filter((s) => s.length > 0);
     if (items.length) return items.slice(0, 4);
   }
-  const src = ((typeof requirements === 'string' ? requirements : '') || description || '').trim();
-  if (!src) return ['Collaborate with a distributed team to ship meaningful work.'];
+  const src = plainJobText((typeof requirements === 'string' ? requirements : '') || description || '');
+  if (!src) return [];
   const parts = src
     .split(/\n|•|·|;|(?<=\.)\s+(?=[A-Z])/)
     .map((s) => s.replace(/^[\s\-*•]+/, '').trim())

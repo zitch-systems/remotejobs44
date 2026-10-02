@@ -1,7 +1,7 @@
 // src/app/(auth)/sign-in.tsx — Auth front door (handoff §1).
 // Segmented Sign in / Create account, email+password (real Supabase auth when
 // configured, demo otherwise), social placeholders, footer toggle + trust line.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,8 +10,10 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, User } from 'lucide-r
 import { Button, Divider, Field, Txt } from '@/components/ui';
 import { Dialog, type DialogData } from '@/components/Dialog';
 import { useAuth } from '@/lib/auth';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { signInWithProvider } from '@/lib/oauth';
+import { getOAuthAvailability, type OAuthAvailability } from '@/lib/oauth-availability';
+import { useLightStatusBarOnFocus } from '@/lib/status-bar';
 import { SEED_USER } from '@/lib/seed';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -64,6 +66,7 @@ function Segmented({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void
 }
 
 export default function SignIn() {
+  useLightStatusBarOnFocus();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -77,8 +80,23 @@ export default function SignIn() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<DialogData | null>(null);
+  const [providers, setProviders] = useState<OAuthAvailability>(
+    configured ? { google: true, linkedin_oidc: false } : { google: true, linkedin_oidc: true },
+  );
+  const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   const isSignup = mode === 'signup';
+
+  useEffect(() => {
+    if (!configured) return;
+    let active = true;
+    getOAuthAvailability(supabaseUrl, supabaseAnonKey).then((next) => {
+      if (active) setProviders(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [configured]);
 
   async function submit() {
     // No backend wired → demo straight into the app (handoff behavior).
@@ -86,14 +104,23 @@ export default function SignIn() {
       enterDemo();
       return;
     }
-    if (!email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       setDialog({ title: 'Missing details', message: 'Enter your email and password to continue.', tone: 'info' });
+      return;
+    }
+    if (isSignup && !name.trim()) {
+      setDialog({ title: 'Missing details', message: 'Enter your full name to create an account.', tone: 'info' });
+      return;
+    }
+    if (isSignup && password.length < 8) {
+      setDialog({ title: 'Password too short', message: 'Use at least 8 characters.', tone: 'info' });
       return;
     }
     setBusy(true);
     try {
       if (isSignup) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const { data, error } = await supabase.auth.signUp({ email: normalizedEmail, password, options: { data: { full_name: name.trim() } } });
         if (error) throw error;
         if (!data.session) {
           setDialog({
@@ -104,7 +131,7 @@ export default function SignIn() {
           setMode('signin');
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (error) throw error;
       }
       // On success the auth listener flips `authed` and (auth)/_layout redirects.
@@ -151,27 +178,32 @@ export default function SignIn() {
         >
           {/* Navy hero — gradient + orange glow + logo + headline. */}
           <View
+            onLayout={(event) => {
+              const { width, height } = event.nativeEvent.layout;
+              setHeroSize((current) => (current.width === width && current.height === height ? current : { width, height }));
+            }}
             style={{
               overflow: 'hidden',
+              backgroundColor: '#070f1f',
               paddingTop: insets.top + spacing[8],
               paddingHorizontal: spacing.authX,
               paddingBottom: spacing[10],
             }}
           >
-            <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            {heroSize.width > 0 && heroSize.height > 0 ? <Svg style={StyleSheet.absoluteFill} width={heroSize.width} height={heroSize.height}>
               <Defs>
                 <LinearGradient id="heroBg" x1="0" y1="0" x2="0.7" y2="1">
                   <Stop offset="0" stopColor="#102a52" />
                   <Stop offset="1" stopColor="#070f1f" />
                 </LinearGradient>
                 <RadialGradient id="heroGlow" cx="0.82" cy="0.12" r="0.65">
-                  <Stop offset="0" stopColor="rgba(249,115,22,0.32)" />
-                  <Stop offset="1" stopColor="rgba(249,115,22,0)" />
+                  <Stop offset="0" stopColor="#f97316" stopOpacity={0.32} />
+                  <Stop offset="1" stopColor="#f97316" stopOpacity={0} />
                 </RadialGradient>
               </Defs>
-              <Rect width="100%" height="100%" fill="url(#heroBg)" />
-              <Rect width="100%" height="100%" fill="url(#heroGlow)" />
-            </Svg>
+              <Rect width={heroSize.width} height={heroSize.height} fill="url(#heroBg)" />
+              <Rect width={heroSize.width} height={heroSize.height} fill="url(#heroGlow)" />
+            </Svg> : null}
 
             <HeroLogo />
             <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 26, lineHeight: 31, letterSpacing: -0.6, color: '#fff', marginTop: spacing[5] }}>
@@ -245,6 +277,7 @@ export default function SignIn() {
               />
             </View>
 
+            {providers.google || providers.linkedin_oidc ? <>
             {/* divider */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginVertical: spacing[5] }}>
               <Divider style={{ flex: 1 }} />
@@ -256,9 +289,10 @@ export default function SignIn() {
 
             {/* social */}
             <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-              <SocialButton label="Google" tile="#fff" tileBorder mark="G" markColor="#4285f4" onPress={() => social('google')} />
-              <SocialButton label="LinkedIn" tile="#0a66c2" mark="in" markColor="#fff" onPress={() => social('linkedin')} />
+              {providers.google ? <SocialButton label="Google" tile="#fff" tileBorder mark="G" markColor="#4285f4" onPress={() => social('google')} /> : null}
+              {providers.linkedin_oidc ? <SocialButton label="LinkedIn" tile="#0a66c2" mark="in" markColor="#fff" onPress={() => social('linkedin')} /> : null}
             </View>
+            </> : null}
 
             {/* footer toggle + trust line */}
             <View style={{ marginTop: spacing[6], alignItems: 'center', gap: spacing[3] }}>

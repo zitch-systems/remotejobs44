@@ -1,15 +1,15 @@
 // src/lib/jobs.ts — live job data from Supabase, adapted to the mobile Job
-// shape. Falls back to the handoff seed set when Supabase isn't configured
-// (demo mode) or a query fails, so the UI is never empty.
+// shape. The handoff seed set is used only when Supabase isn't configured.
 //
 // Pure adapters/formatters live in ./format (unit-tested); this file owns the
 // Supabase queries + React hooks.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { apiFetch } from './api';
 import { SEED_JOBS } from './seed';
 import { loadFeedCache, saveFeedCache } from './feed-cache';
-import { bulletsFrom, deriveMatch, gradFor, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
-import { LEVEL_TOKENS, type ExperienceLevel } from './filters';
+import { bulletsFrom, deriveMatch, gradFor, plainJobText, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
+import { matchesLevel, type ExperienceLevel, type WorkplaceFilter } from './filters';
 import type { Job } from './types';
 
 // Server-side job query. Every field is optional; an absent field = no filter.
@@ -19,7 +19,7 @@ export interface JobQuery {
   categories?: string[]; // lowercase categories (OR'd), e.g. ['engineering','data']
   type?: string; // lowercase job type, e.g. 'full-time'
   level?: ExperienceLevel; // experience bucket (matched against the free-form level)
-  remoteOnly?: boolean; // only remote=true roles
+  workplace?: WorkplaceFilter;
   location?: string; // free-text location match (ilike on the location column)
   postedWithinDays?: number; // max posting age in days
 }
@@ -31,28 +31,51 @@ export function isDefaultQuery(q: JobQuery): boolean {
     !q.categories?.length &&
     !q.type &&
     (!q.level || q.level === 'Any') &&
-    !q.remoteOnly &&
+    (!q.workplace || q.workplace === 'all') &&
     !q.location?.trim() &&
     !q.postedWithinDays
   );
 }
 
-// PostgREST .or() values are comma/parenthesis-delimited, so strip those (and
-// the ilike wildcard) from user text to keep the filter expression valid.
-function sanitizeText(s: string): string {
-  return s.replace(/[%,()]/g, ' ').trim();
+/** Filter bundled demo rows using their explicit fixture metadata. */
+export function filterDemoJobs(jobs: Job[], query: JobQuery): Job[] {
+  const text = query.text?.trim().toLowerCase();
+  const location = query.location?.trim().toLowerCase();
+  const categories = query.categories?.map((category) => category.toLowerCase());
+
+  return jobs.filter((job) => {
+    if (text && !job.role.toLowerCase().includes(text) && !job.company.toLowerCase().includes(text)) return false;
+    if (categories?.length && !categories.includes(job.category.toLowerCase())) return false;
+    if (query.type && job.type.toLowerCase() !== query.type.toLowerCase()) return false;
+    if (query.level && !matchesLevel(job.level, query.level)) return false;
+    if (location && !job.location.toLowerCase().includes(location)) return false;
+    if (query.postedWithinDays) {
+      const age = /^(\d+)([hdw]) ago$/.exec(job.time);
+      if (!age) return false;
+      const days = Number(age[1]) * (age[2] === 'w' ? 7 : age[2] === 'h' ? 1 / 24 : 1);
+      if (days > query.postedWithinDays) return false;
+    }
+    if (query.workplace && query.workplace !== 'all') {
+      if (query.workplace === 'relocation') {
+        if (!job.relocationSupported) return false;
+      } else {
+        const workplace = job.workplaceType ?? (/^Remote\s*·/i.test(job.location) ? 'remote' : 'unknown');
+        if (workplace !== query.workplace) return false;
+      }
+    }
+    return true;
+  });
 }
 
 // Re-export so existing importers (the feed) keep their import path.
 export { personalizeJobs } from './format';
 
-// apply_url / apply_email are deliberately NOT selected: they're paywalled
-// columns with no anon/authenticated SELECT grant (migration_v65 restores
-// v16's lockdown). Entitled users fetch them via fetchApplyChannel() below.
-const SAFE_COLUMNS =
-  'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
+/** Auth callbacks must return before work that calls Supabase auth again. */
+export function scheduleAfterAuth(work: () => void): ReturnType<typeof setTimeout> {
+  return setTimeout(work, 0);
+}
 
-interface JobRow {
+export interface JobRow {
   id: string;
   title: string;
   company: string;
@@ -61,21 +84,33 @@ interface JobRow {
   type: string | null;
   level: string | null;
   location: string | null;
-  apply_url?: string | null;
-  apply_email?: string | null;
+  applyUrl?: string | null;
+  applyEmail?: string | null;
   description: string | null;
   requirements: string[] | string | null;
   skills: string[] | null;
-  salary_min: number | null;
-  salary_max: number | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
   currency: string | null;
+  salaryText?: string | null;
   remote: boolean | null;
   featured: boolean | null;
-  posted_at: string | null;
+  posted?: string | null;
+  workplaceType?: Job['workplaceType'];
+  relocationSupported?: boolean;
+  visaSponsorship?: boolean;
+  source?: string | null;
 }
 
 export function rowToJob(r: JobRow): Job {
-  const match = deriveMatch(r);
+  const match = deriveMatch({
+    id: r.id,
+    featured: r.featured,
+    posted_at: r.posted ?? null,
+    salary_min: r.salaryMin,
+    salary_max: r.salaryMax,
+    skills: r.skills,
+  });
   const { verdict, vcap } = verdictFor(match);
   const skills = r.skills ?? [];
   return {
@@ -87,19 +122,23 @@ export function rowToJob(r: JobRow): Job {
     grad: gradFor(r.company ?? r.id),
     match,
     category: r.category ?? 'Other',
-    // The board only carries vetted sources, so we surface every role as a
-    // verified employer (the design's badge). Swap for a real flag if added.
-    verified: true,
-    salary: salaryLabel(r.salary_min, r.salary_max, r.currency ?? 'USD'),
-    per: '/yr',
-    time: timeAgo(r.posted_at),
-    location: r.remote ? `Remote · ${r.location ?? 'Worldwide'}` : (r.location ?? 'Worldwide'),
+    // This is source provenance, not a claim that we verified the employer.
+    verified: ['greenhouse', 'lever', 'ashby', 'workable'].includes((r.source ?? '').toLowerCase()),
+    salary: r.salaryText?.trim() || salaryLabel(r.salaryMin, r.salaryMax, r.currency ?? 'USD'),
+    per: r.salaryText?.trim() ? '' : '/yr',
+    time: timeAgo(r.posted ?? null),
+    location: r.workplaceType === 'remote' || r.remote
+      ? `Remote · ${r.location ?? 'Location not specified'}`
+      : (r.location ?? 'Location not specified'),
     type: r.type ?? 'Full-time',
     level: r.level ?? 'Mid–Senior',
-    applyUrl: r.apply_url ?? undefined,
-    applyEmail: r.apply_email ?? undefined,
+    workplaceType: r.workplaceType ?? (r.remote ? 'remote' : 'unknown'),
+    relocationSupported: r.relocationSupported === true,
+    visaSponsorship: r.visaSponsorship === true,
+    applyUrl: r.applyUrl ?? undefined,
+    applyEmail: r.applyEmail ?? undefined,
     tags: tagsFrom(skills, r.category),
-    about: (r.description ?? '').trim().slice(0, 700) || 'Join a remote-first team building for a global audience.',
+    about: plainJobText(r.description ?? '').slice(0, 700) || 'Description not provided.',
     duties: bulletsFrom(r.requirements, r.description),
     skills,
     verdict,
@@ -124,44 +163,51 @@ export function getCachedJob(id?: string): Job | undefined {
   return id ? jobCache.get(id) : undefined;
 }
 
+// A cached Pro response contains employer identity. Never carry it into a
+// different session after sign-out/account switch.
+supabase.auth.onAuthStateChange(() => {
+  jobCache.clear();
+});
+
 export async function fetchJobs(query: JobQuery = {}, opts: { limit?: number; offset?: number } = {}): Promise<Job[]> {
   const limit = opts.limit ?? 20;
   const offset = opts.offset ?? 0;
-
-  let q = supabase.from('jobs').select(SAFE_COLUMNS).eq('is_active', true);
-
-  const text = sanitizeText(query.text ?? '');
-  if (text) q = q.or(`title.ilike.%${text}%,company.ilike.%${text}%`);
-  if (query.categories?.length) q = q.in('category', query.categories);
-  if (query.type) q = q.eq('type', query.type);
-  if (query.remoteOnly) q = q.eq('remote', true);
-  const location = sanitizeText(query.location ?? '');
-  if (location) q = q.ilike('location', `%${location}%`);
-  if (query.postedWithinDays) {
-    const since = new Date(Date.now() - query.postedWithinDays * 86_400_000).toISOString();
-    q = q.gte('posted_at', since);
-  }
-  // Experience level is a free-form column; match the bucket's keywords with an
-  // OR of ILIKEs. Each .or() is ANDed with the others (and the text filter).
-  if (query.level && query.level !== 'Any') {
-    const tokens = LEVEL_TOKENS[query.level];
-    q = q.or(tokens.map((t) => `level.ilike.%${t}%`).join(','));
-  }
-
-  const { data, error } = await q
-    .order('featured', { ascending: false })
-    .order('posted_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-  if (error) throw error;
-  return cacheJobs(((data as JobRow[]) ?? []).map(rowToJob));
+  const params = new URLSearchParams({ page: String(Math.floor(offset / limit) + 1), perPage: String(limit) });
+  if (query.text?.trim()) params.set('q', query.text.trim());
+  if (query.categories?.length) params.set('category', query.categories.join(','));
+  if (query.type) params.set('type', query.type);
+  if (query.level && query.level !== 'Any') params.set('level', query.level.toLowerCase());
+  if (query.workplace && query.workplace !== 'all') params.set('workplace', query.workplace);
+  if (query.location?.trim()) params.set('country', query.location.trim());
+  if (query.postedWithinDays) params.set('posted', String(query.postedWithinDays));
+  const response = await apiFetch(`/api/jobs?${params}`);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? `Failed to load jobs (${response.status})`);
+  return cacheJobs(((body?.jobs as JobRow[]) ?? []).map(rowToJob));
 }
 
 export async function fetchJobById(id: string): Promise<Job | null> {
-  const { data, error } = await supabase.from('jobs').select(SAFE_COLUMNS).eq('id', id).maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const [job] = cacheJobs([rowToJob(data as JobRow)]);
+  const response = await apiFetch(`/api/jobs?id=${encodeURIComponent(id)}`);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? `Failed to load job (${response.status})`);
+  if (!body?.job) return null;
+  const [job] = cacheJobs([rowToJob(body.job as JobRow)]);
   return job;
+}
+
+/** Fetch jobs in bounded API batches while preserving caller order. */
+export async function fetchJobsByIds(ids: string[]): Promise<Job[]> {
+  const unique = Array.from(new Set(ids));
+  const rows: Job[] = [];
+  for (let i = 0; i < unique.length; i += 10) {
+    const batch = unique.slice(i, i + 10);
+    const response = await apiFetch(`/api/jobs?ids=${encodeURIComponent(batch.join(','))}`);
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error ?? `Failed to load jobs (${response.status})`);
+    rows.push(...((body?.jobs as JobRow[]) ?? []).map(rowToJob));
+  }
+  const byId = new Map(rows.map((job) => [job.id, job]));
+  return cacheJobs(unique.map((id) => byId.get(id)).filter((job): job is Job => Boolean(job)));
 }
 
 /**
@@ -184,16 +230,8 @@ export async function fetchApplyChannel(
 
 /** Other active roles in the same category (for the detail "more like this"). */
 export async function fetchSimilarJobs(category: string, excludeId: string, limit = 4): Promise<Job[]> {
-  const { data, error } = await supabase
-    .from('jobs')
-    .select(SAFE_COLUMNS)
-    .eq('is_active', true)
-    .eq('category', category)
-    .neq('id', excludeId)
-    .order('posted_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data as JobRow[]).map(rowToJob);
+  const jobs = await fetchJobs({ categories: [category] }, { limit: limit + 1 });
+  return jobs.filter((job) => job.id !== excludeId).slice(0, limit);
 }
 
 export interface JobsFeed {
@@ -207,16 +245,16 @@ export interface JobsFeed {
 }
 
 /**
- * Paginated live job list with pull-to-refresh + seed fallback.
+ * Paginated live job list with pull-to-refresh and a demo-only seed set.
  *
  * `query` filters server-side across the whole table (not just the loaded
- * page). Changing it refetches from offset 0. The disk cache + seed fallback
- * only apply to the default (unfiltered) feed.
+ * page). Changing it refetches from offset 0. The privacy-safe disk cache only
+ * applies to the default (unfiltered) feed.
  */
 export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const queryKey = JSON.stringify(query);
   const isDefault = isDefaultQuery(query);
-  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : SEED_JOBS);
+  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured ? [] : filterDemoJobs(SEED_JOBS, query));
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +262,10 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const busy = useRef(false);
   const gotFresh = useRef(false);
   const reqRef = useRef(0); // "latest wins" token so query changes can't be dropped
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) setJobs(filterDemoJobs(SEED_JOBS, query));
+  }, [queryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(
     async (offset: number, mode: 'initial' | 'refresh' | 'more') => {
@@ -244,7 +286,10 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
         setJobs((prev) => (mode === 'more' ? [...prev, ...batch] : batch));
         if (mode !== 'more') {
           gotFresh.current = true;
-          if (isDefault) saveFeedCache(batch); // only cache the default feed
+          // Disk cache only the privacy-safe public representation. A Pro feed
+          // can contain employer identity and must not survive a tier/account
+          // change on a shared device.
+          if (isDefault && batch.every((job) => job.company === 'Hidden Company')) saveFeedCache(batch);
         }
       } catch (e: any) {
         if (reqId !== reqRef.current) return; // stale failure → ignore
@@ -290,6 +335,31 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
     load(0, 'initial');
   }, [load]);
 
+  // Re-resolve plan-aware fields after sign-in/out, token refresh or an account
+  // switch. This removes a real company name promptly after entitlement loss.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      // Supabase awaits auth callbacks while holding its auth lock. Clear any
+      // paid response synchronously, then defer getSession/network work until
+      // after the callback returns.
+      ++reqRef.current; // invalidate an in-flight response from the old session
+      busy.current = false;
+      setJobs([]);
+      setError(null);
+      setHasMore(false);
+      setLoading(true);
+      setRefreshing(false);
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => { void load(0, 'initial'); });
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, [load]);
+
   return {
     jobs,
     loading,
@@ -305,9 +375,7 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
 
 /** Server-side relevance: jobs ranked for the signed-in user (migration_v44). */
 export async function fetchRecommendedJobs(limit = 30): Promise<Job[]> {
-  const { data, error } = await supabase.rpc('recommended_jobs', { limit_n: limit });
-  if (error) throw error;
-  return ((data as JobRow[]) ?? []).map(rowToJob);
+  return fetchJobs({}, { limit });
 }
 
 const seedRecommended = (): Job[] => [...SEED_JOBS].sort((a, b) => b.match - a.match);
@@ -318,6 +386,7 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const reqRef = useRef(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -326,17 +395,18 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
       return;
     }
     let active = true;
+    const reqId = ++reqRef.current;
     setLoading(true);
     fetchRecommendedJobs(limit)
       .then((list) => {
-        if (!active) return;
-        setJobs(list.length ? list : seedRecommended());
+        if (!active || reqId !== reqRef.current) return;
+        setJobs(list);
         setError(null);
         setLoading(false);
       })
       .catch((e: any) => {
-        if (!active) return;
-        setJobs(seedRecommended());
+        if (!active || reqId !== reqRef.current) return;
+        setJobs([]);
         setError(e?.message ?? 'Failed to load recommendations');
         setLoading(false);
       });
@@ -345,6 +415,23 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
     };
   }, [nonce, limit]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      ++reqRef.current;
+      setJobs([]);
+      setError(null);
+      setLoading(true);
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => setNonce((n) => n + 1));
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
   return { jobs, loading, error, refresh: () => setNonce((n) => n + 1) };
 }
 
@@ -352,30 +439,50 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
  *  tapped), then refreshes from the server in the background. */
 export function useJob(id?: string): { job: Job | null; loading: boolean } {
   // Seed from the in-memory cache so opening a role from a list is instant.
-  const cached = getCachedJob(id) ?? (isSupabaseConfigured ? null : SEED_JOBS.find((j) => j.id === id) ?? null);
+  // Configured builds revalidate before painting. Cached Pro rows can include
+  // employer identity and the profile plan may have changed since navigation.
+  const cached = isSupabaseConfigured ? null : SEED_JOBS.find((j) => j.id === id) ?? null;
   const [state, setState] = useState<{ job: Job | null; loading: boolean }>({
     job: cached,
     // Only show a loader when we have nothing to display yet.
     loading: Boolean(isSupabaseConfigured && id && !cached),
   });
+  const reqRef = useRef(0);
+
+  const loadJob = useCallback(async () => {
+    if (!isSupabaseConfigured || !id) return;
+    const reqId = ++reqRef.current;
+    setState({ job: null, loading: true });
+    try {
+      const job = await fetchJobById(id);
+      if (reqId === reqRef.current) setState({ job, loading: false });
+    } catch {
+      if (reqId === reqRef.current) setState({ job: null, loading: false });
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
-    let active = true;
-    // Re-seed synchronously when the id changes (cache may already have it).
-    // If it's not cached, show a loader instead of the PREVIOUS job's data.
-    const seed = getCachedJob(id);
-    setState(seed ? { job: seed, loading: false } : { job: null, loading: true });
-    fetchJobById(id)
-      // A null result (deleted / deactivated / bad deep-link id) must still
-      // clear loading so the "Job not found" state can render — the previous
-      // `job && …` short-circuit left the screen spinning forever.
-      .then((job) => active && setState((s) => ({ job: job ?? s.job, loading: false })))
-      .catch(() => active && setState((s) => (s.job ? { ...s, loading: false } : { job: SEED_JOBS.find((j) => j.id === id) ?? null, loading: false })));
+    void loadJob();
     return () => {
-      active = false;
+      ++reqRef.current;
     };
-  }, [id]);
+  }, [id, loadJob]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      ++reqRef.current; // old Pro response can no longer win the race
+      setState({ job: null, loading: true });
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => { void loadJob(); });
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, [id, loadJob]);
 
   return state;
 }

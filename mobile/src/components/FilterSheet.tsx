@@ -8,7 +8,7 @@ import { Modal, Pressable, ScrollView, Switch, TextInput, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, MapPin } from 'lucide-react-native';
 import { Button, Txt } from './ui';
-import { DATE_OPTIONS, EXPERIENCE_LEVELS, TYPE_OPTIONS, type ExperienceLevel } from '@/lib/filters';
+import { DATE_OPTIONS, EXPERIENCE_LEVELS, TYPE_OPTIONS, WORKPLACE_OPTIONS, type ExperienceLevel, type WorkplaceFilter } from '@/lib/filters';
 import { fonts, radii, spacing, useTheme } from '@/theme';
 
 // Labels mirror TYPE_OPTIONS in lib/filters (values are the lowercase DB types).
@@ -36,6 +36,8 @@ export function FilterSheet({
   setDateLabel,
   location,
   setLocation,
+  workplace,
+  setWorkplace,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -53,6 +55,8 @@ export function FilterSheet({
   setDateLabel?: (l: string) => void;
   location?: string;
   setLocation?: (l: string) => void;
+  workplace?: WorkplaceFilter;
+  setWorkplace?: (value: WorkplaceFilter) => void;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -160,7 +164,16 @@ export function FilterSheet({
             </>
           ) : null}
 
-          {setRemoteOnly ? (
+          {setWorkplace ? (
+            <>
+              <Heading>Workplace</Heading>
+              {WORKPLACE_OPTIONS.map((option) => (
+                <OptionRow key={option.value} label={option.label} selected={(workplace ?? 'all') === option.value} onPress={() => setWorkplace(option.value)} />
+              ))}
+            </>
+          ) : null}
+
+          {setRemoteOnly && !setWorkplace ? (
             <View
               style={{
                 flexDirection: 'row',

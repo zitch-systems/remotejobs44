@@ -4,11 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, BadgeCheck, Bookmark, Check, Clock, ExternalLink, MapPin, Share2, Zap } from 'lucide-react-native';
-import { Txt } from '@/components/ui';
+import { ResponsiveGradientBackground, Txt } from '@/components/ui';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
@@ -19,6 +18,7 @@ import { useProfile } from '@/lib/profile';
 import { canApply, freeTrialBlockedMessage, isPaid } from '@/lib/entitlements';
 import { evaluateFreeTrial } from '@/lib/free-trial';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { useLightStatusBarOnFocus } from '@/lib/status-bar';
 import { useAppStore } from '@/store/app';
 import { useRecentJobs } from '@/store/recent-jobs';
 import { toast } from '@/store/toast';
@@ -61,6 +61,7 @@ function HeroMeta({ icon, label }: { icon?: React.ReactNode; label: string }) {
 }
 
 export default function JobDetail() {
+  useLightStatusBarOnFocus();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -199,15 +200,7 @@ export default function JobDetail() {
             gap: spacing[4],
           }}
         >
-          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-            <Defs>
-              <LinearGradient id="jdHero" x1="0" y1="0" x2="0.85" y2="1">
-                <Stop offset="0" stopColor="#102a52" />
-                <Stop offset="1" stopColor="#0a1730" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#jdHero)" />
-          </Svg>
+          <ResponsiveGradientBackground start="#102a52" end="#0a1730" />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <HeroIcon onPress={() => router.back()} label="Back">
@@ -225,14 +218,17 @@ export default function JobDetail() {
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
             <CompanyLogo job={job} size={56} radius={radii.lg} />
-            <View style={{ flex: 1 }}>
-              <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 22, lineHeight: 27, letterSpacing: -0.4, color: '#fff' }} numberOfLines={3}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ flexShrink: 1, fontFamily: fonts.displayExtrabold, fontSize: 22, lineHeight: 27, letterSpacing: -0.4, color: '#fff' }} numberOfLines={3}>
                 {job.role}
+              </Txt>
+              <Txt numberOfLines={1} style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 5 }}>
+                {job.company}
               </Txt>
               {job.verified ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.32)' }}>
                   <BadgeCheck size={13} color="#4ade80" />
-                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>Verified employer</Txt>
+                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>Direct ATS source</Txt>
                 </View>
               ) : null}
             </View>

@@ -2,7 +2,7 @@
 // helpers; no React/store imports so the store can depend on it cleanly).
 // RLS scopes every row to auth.uid(); we still pass user_id explicitly.
 import { supabase } from './supabase';
-import { rowToJob } from './jobs';
+import { fetchJobsByIds } from './jobs';
 import { dbToStatus } from './format';
 import type { AppStatus, Job } from './types';
 
@@ -16,9 +16,6 @@ export { dbToStatus } from './format';
 // optimistic local state still updates).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s: string): boolean => UUID_RE.test(s);
-
-const JOB_COLUMNS =
-  'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
 
 export async function fetchSavedIds(userId: string): Promise<string[]> {
   const { data, error } = await supabase.from('saved_jobs').select('job_id').eq('user_id', userId);
@@ -51,8 +48,6 @@ export async function applyRemote(userId: string, job: Job): Promise<void> {
   const { error } = await supabase.from('applications').insert({
     user_id: userId,
     job_id: job.id,
-    job_title: job.role,
-    company: job.company,
     status: 'applied',
   });
   if (error) throw error;
@@ -78,36 +73,52 @@ export interface ApplicationItem {
   appliedAt: string | null;
 }
 
+type ApplicationRow = { job_id: string; job_title: string | null; status: string; notes: string | null; applied_at: string | null };
+
+export function unavailableApplicationJob(jobId: string, storedTitle: string | null | undefined): Job {
+  const candidate = storedTitle?.trim() ?? '';
+  const role = candidate && !/https?:\/\/|www\.|\S+@\S+/i.test(candidate) ? candidate : 'Archived role';
+  return {
+    id: jobId, role, company: 'Hidden Company', logo: '?', grad: ['#475569', '#64748b'],
+    match: 0, category: 'Archived', verified: false, salary: 'Unavailable', per: '/yr',
+    time: 'unavailable', location: 'Listing unavailable', type: 'Archived', level: 'Not specified',
+    workplaceType: 'unknown', relocationSupported: false, visaSponsorship: false,
+    tags: [], about: 'This job is no longer available, but your application remains in the tracker.',
+    duties: [], skills: [], verdict: 'Historical application', vcap: 'The original listing is unavailable.',
+    breakdown: [], unavailable: true,
+  };
+}
+
+export function mergeApplicationRows(rows: ApplicationRow[], jobs: Job[]): ApplicationItem[] {
+  const byId = new Map(jobs.map((job) => [job.id, job]));
+  return rows.map((row) => ({
+    job: byId.get(row.job_id) ?? unavailableApplicationJob(row.job_id, row.job_title),
+    status: dbToStatus(row.status),
+    notes: row.notes ?? null,
+    appliedAt: row.applied_at ?? null,
+  }));
+}
+
 /** Authoritative tracker data: applications joined to their jobs. */
 export async function fetchApplicationItems(userId: string): Promise<ApplicationItem[]> {
   const { data, error } = await supabase
     .from('applications')
-    .select(`status, notes, applied_at, jobs(${JOB_COLUMNS})`)
+    .select('job_id,job_title,status,notes,applied_at')
     .eq('user_id', userId)
     .order('applied_at', { ascending: false });
   if (error) throw error;
-  const items: ApplicationItem[] = [];
-  for (const row of (data ?? []) as any[]) {
-    if (!row.jobs) continue;
-    items.push({
-      job: rowToJob(row.jobs),
-      status: dbToStatus(row.status),
-      notes: (row.notes as string | null) ?? null,
-      appliedAt: (row.applied_at as string | null) ?? null,
-    });
-  }
-  return items;
+  const rows = (data ?? []) as ApplicationRow[];
+  const jobs = await fetchJobsByIds(rows.map((row) => row.job_id));
+  return mergeApplicationRows(rows, jobs);
 }
 
 /** The user's saved jobs, newest first. */
 export async function fetchSavedJobs(userId: string): Promise<Job[]> {
   const { data, error } = await supabase
     .from('saved_jobs')
-    .select(`jobs(${JOB_COLUMNS})`)
+    .select('job_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  const jobs: Job[] = [];
-  for (const row of (data ?? []) as any[]) if (row.jobs) jobs.push(rowToJob(row.jobs));
-  return jobs;
+  return fetchJobsByIds((data ?? []).map((row: { job_id: string }) => row.job_id));
 }

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { batchByLength } from './jobs-last-seen';
+import { describe, it, expect, vi } from 'vitest';
+import { batchByLength, LastSeenUpdateError, touchLastSeen } from './jobs-last-seen';
 
 describe('batchByLength', () => {
   it('returns no batches for an empty list', () => {
@@ -56,5 +56,51 @@ describe('batchByLength', () => {
   it('preserves order and loses nothing', () => {
     const urls = Array.from({ length: 137 }, (_, i) => `https://a.example/${i}`);
     expect(batchByLength(urls, 10, 200).flat()).toEqual(urls);
+  });
+});
+
+describe('touchLastSeen', () => {
+  function clientFor(write: (urls: string[]) => Promise<any>) {
+    return {
+      from: () => ({
+        update: () => ({ in: (_column: string, urls: string[]) => write(urls) }),
+      }),
+    } as any;
+  }
+
+  it('splits a timed-out batch and succeeds on smaller writes', async () => {
+    const writes: string[][] = [];
+    const client = clientFor(async urls => {
+      writes.push(urls);
+      return urls.length > 2
+        ? { count: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } }
+        : { count: urls.length, error: null };
+    });
+
+    await expect(touchLastSeen(client, ['1', '2', '3', '4', '5'], 'test')).resolves.toBe(5);
+    expect(writes.map(batch => batch.length)).toEqual([5, 2, 3, 1, 2]);
+  });
+
+  it('does not exhaust the retry cap on a healthy large source', async () => {
+    const write = vi.fn(async (urls: string[]) => ({ count: urls.length, error: null }));
+    const urls = Array.from({ length: 100 }, (_, i) => `https://example.test/${i}`);
+    await expect(touchLastSeen(clientFor(write), urls, 'large')).resolves.toBe(100);
+    expect(write).toHaveBeenCalledTimes(20);
+  });
+
+  it('surfaces a leaf failure instead of reporting freshness success', async () => {
+    const client = clientFor(async () => ({
+      count: null,
+      error: { code: '57014', message: 'canceling statement due to statement timeout' },
+    }));
+
+    const update = touchLastSeen(client, ['1'], 'RemoteOK');
+    await expect(update).rejects.toEqual(
+      expect.objectContaining({
+        name: 'LastSeenUpdateError',
+        message: expect.stringContaining('RemoteOK'),
+      }),
+    );
+    expect(LastSeenUpdateError).toBeTypeOf('function');
   });
 });

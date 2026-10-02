@@ -25,7 +25,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 initSentry();
 
 function RootLayout() {
-  const [loaded] = useFonts({
+  const [loaded, fontError] = useFonts({
     Sora_400Regular,
     Sora_500Medium,
     Sora_600SemiBold,
@@ -37,10 +37,10 @@ function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync().catch(() => {});
-  }, [loaded]);
+    if (loaded || fontError) SplashScreen.hideAsync().catch(() => {});
+  }, [loaded, fontError]);
 
-  if (!loaded) return null;
+  if (!loaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

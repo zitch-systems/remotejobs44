@@ -30,7 +30,7 @@ export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
 
   async function submit() {
-    const trimmed = email.trim();
+    const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
       toast('Enter your email address.', 'error');
       return;

@@ -17,13 +17,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { useRouter } from 'expo-router';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { ArrowLeft, Check, Eye, EyeOff, Lock, ShieldAlert } from 'lucide-react-native';
 import { Button, Field, Txt } from '@/components/ui';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { parseAuthCallbackUrl, recoveryCallback } from '@/lib/auth-callback';
 import { toast } from '@/store/toast';
 import { fonts, spacing, useTheme } from '@/theme';
 
@@ -36,6 +36,7 @@ export default function ResetPassword() {
 
   const url = Linking.useURL();
   const processed = useRef<Set<string>>(new Set());
+  const [initialUrl, setInitialUrl] = useState<string | null | undefined>(undefined);
 
   const [phase, setPhase] = useState<Phase>(isSupabaseConfigured ? 'verifying' : 'error');
   const [errMsg, setErrMsg] = useState(
@@ -47,75 +48,96 @@ export default function ResetPassword() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Backup path: Supabase emits PASSWORD_RECOVERY once a recovery session is
-  // established. If we already hold a session when the screen mounts (e.g. the
-  // exchange landed before render), reveal the form straight away.
+  // Supabase may also emit PASSWORD_RECOVERY while exchanging the link.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setPhase((p) => (p === 'error' ? p : 'ready'));
-    });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setPhase('ready');
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // useURL can be null when this route is opened without a link. Resolve the
+  // cold-start URL as a fallback, then fail closed instead of spinning forever.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    Linking.getInitialURL()
+      .then((value) => {
+        if (active) setInitialUrl(value);
+      })
+      .catch(() => {
+        if (active) setInitialUrl(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'verifying' || url || initialUrl !== null) return;
+    const timer = setTimeout(() => {
+      setErrMsg('Open the reset link from your email to continue.');
+      setPhase('error');
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [initialUrl, phase, url]);
+
   // Exchange the token carried by the deep link for a recovery session.
   useEffect(() => {
-    if (!url || !isSupabaseConfigured) return;
-    if (processed.current.has(url)) return;
-    processed.current.add(url);
+    const callbackUrl = url ?? initialUrl;
+    if (!callbackUrl || !isSupabaseConfigured) return;
+    if (processed.current.has(callbackUrl)) return;
+    processed.current.add(callbackUrl);
 
     (async () => {
-      // QueryParams reads BOTH the query string and the URL fragment, so we
-      // catch errors Supabase returns either way (e.g. #error=access_denied).
-      const { params, errorCode } = QueryParams.getQueryParams(url);
-      const linkError = params.error_description ?? params.error ?? params.error_code ?? errorCode;
-      if (linkError) {
+      // Supabase can return values in either the query string or URL fragment.
+      const callback = recoveryCallback(parseAuthCallbackUrl(callbackUrl));
+      if (callback.kind === 'error' || callback.kind === 'invalid') {
         setErrMsg('This reset link is invalid or has expired. Request a new one.');
         setPhase('error');
         return;
       }
       try {
-        if (params.code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(params.code);
+        if (callback.kind === 'code') {
+          const { error } = await supabase.auth.exchangeCodeForSession(callback.code);
           if (error) throw error;
           setPhase('ready');
-        } else if (params.token_hash && params.type) {
+        } else if (callback.kind === 'otp') {
           const { error } = await supabase.auth.verifyOtp({
-            token_hash: params.token_hash,
-            type: params.type as EmailOtpType,
+            token_hash: callback.tokenHash,
+            type: 'recovery' as EmailOtpType,
+          });
+          if (error) throw error;
+          setPhase('ready');
+        } else if (callback.kind === 'session') {
+          const { error } = await supabase.auth.setSession({
+            access_token: callback.accessToken,
+            refresh_token: callback.refreshToken,
           });
           if (error) throw error;
           setPhase('ready');
         }
-        // No recognizable token → leave the loader up; getSession / the
-        // PASSWORD_RECOVERY listener above may still flip us to 'ready'.
       } catch (e: any) {
         console.warn('[reset-password] exchange failed:', e?.message ?? e);
         setErrMsg('This reset link is invalid or has expired. Request a new one.');
         setPhase('error');
       }
     })();
-  }, [url]);
+  }, [initialUrl, url]);
 
   async function submit() {
-    // Trim BEFORE validation so length checks match what sign-in stores and a
-    // stray trailing space can't lock the user out on their next sign-in.
-    const trimmed = password.trim();
-    const trimmedConfirm = confirm.trim();
-    if (trimmed.length < 8) {
+    if (password.length < 8) {
       toast('Password must be at least 8 characters.', 'error');
       return;
     }
-    if (trimmed !== trimmedConfirm) {
+    if (password !== confirm) {
       toast('Passwords do not match.', 'error');
       return;
     }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: trimmed });
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       toast('Password updated.', 'success');
       // The recovery session is now a full session — drop the user into the app.

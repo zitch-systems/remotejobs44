@@ -417,6 +417,39 @@ export function LogoTile({ initial, grad, size = 40, radius = radii.logo }: { in
   );
 }
 
+// Android can retain the first layout size of a percentage-sized SVG when its
+// parent grows after text measurement. Measure the surface and draw in pixels;
+// the solid base keeps white-on-hero content readable on the first pass.
+export function ResponsiveGradientBackground({ start, end }: { start: string; end: string }) {
+  const gid = React.useId();
+  const [size, setSize] = React.useState({ width: 0, height: 0 });
+
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setSize((current) => (current.width === width && current.height === height ? current : { width, height }));
+      }}
+      style={[StyleSheet.absoluteFill, { backgroundColor: end }]}
+    >
+      {size.width > 0 && size.height > 0 ? (
+        <Svg width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id={gid} x1="0" y1="0" x2="0.85" y2="1">
+              <Stop offset="0" stopColor={start} />
+              <Stop offset="1" stopColor={end} />
+            </LinearGradient>
+          </Defs>
+          <Rect width={size.width} height={size.height} fill={`url(#${gid})`} />
+        </Svg>
+      ) : null}
+    </View>
+  );
+}
+
 /* --------------------------------------------------------------- Avatar -- */
 export function Avatar({ initial, size = 38, online, uri }: { initial: string; size?: number; online?: boolean; uri?: string | null }) {
   const { colors } = useTheme();

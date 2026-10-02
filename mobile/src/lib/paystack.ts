@@ -25,18 +25,29 @@ export class PaymentsNotConfiguredError extends Error {
 
 export async function startSubscription(plan: PaystackPlan): Promise<CheckoutResult> {
   const init = await supabase.functions.invoke('paystack-initialize', { body: { plan } });
-  // Functions not deployed → invoke errors; treat that as "not configured" too.
-  if (init.error) throw new PaymentsNotConfiguredError();
+  if (init.error) throw new Error('Could not start checkout. Please try again.');
   if (init.data?.configured === false) throw new PaymentsNotConfiguredError();
   const authorizationUrl: string | undefined = init.data?.authorization_url;
   const reference: string | undefined = init.data?.reference;
   if (!authorizationUrl || !reference) throw new Error('Could not start payment.');
+  try {
+    if (new URL(authorizationUrl).protocol !== 'https:') throw new Error();
+  } catch {
+    throw new Error('Checkout returned an invalid payment URL.');
+  }
 
   await WebBrowser.openAuthSessionAsync(authorizationUrl, 'remotejobs44://paystack-return');
 
   // Verify regardless of how the browser closed — the reference is the source of
   // truth. A genuine cancel just verifies as "not completed" → cancelled.
   const verify = await supabase.functions.invoke('paystack-verify', { body: { reference } });
-  if (verify.error || !verify.data?.ok) return { status: 'cancelled' };
+  if (verify.error) throw new Error('Could not verify payment. Please try again; you will not be charged twice.');
+  if (!verify.data?.ok) {
+    if (verify.data?.error === 'Payment not completed.') return { status: 'cancelled' };
+    throw new Error(verify.data?.error ?? 'Could not verify payment. Please try again.');
+  }
+  if (verify.data.plan !== 'daily' && verify.data.plan !== 'pro') {
+    throw new Error('Payment was verified, but the plan response was invalid. Contact support.');
+  }
   return { status: 'success', plan: verify.data.plan };
 }

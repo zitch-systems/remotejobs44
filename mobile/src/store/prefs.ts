@@ -3,7 +3,7 @@
 // persisted values have loaded from AsyncStorage, so routing can wait for it.
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistentStorage } from '@/lib/persistent-storage';
 
 interface PrefsState {
   hydrated: boolean;
@@ -28,7 +28,7 @@ export const usePrefs = create<PrefsState>()(
     }),
     {
       name: 'rj44-prefs',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => persistentStorage),
       // Persist only the data fields (not the runtime `hydrated` flag/actions).
       partialize: (s) => ({ onboarded: s.onboarded, alertsMatches: s.alertsMatches, alertsApplications: s.alertsApplications }),
       onRehydrateStorage: () => () => {

@@ -1,10 +1,13 @@
 // src/lib/account.ts — account actions: password reset + account deletion.
 // Thin wrappers over Supabase; the screen (app/profile/settings.tsx) handles UX.
 import { supabase } from './supabase';
+import { resetPasswordRedirectUri } from './auth-links';
 
 /** Email the signed-in user a password-reset link. */
 export async function sendPasswordReset(email: string): Promise<void> {
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: resetPasswordRedirectUri,
+  });
   if (error) throw error;
 }
 

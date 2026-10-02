@@ -26,11 +26,16 @@ export interface Job {
   category: string;
   verified: boolean;
   salary: string; // "$140k" / "₦18m"
-  per: '/yr' | '/mo';
+  per: '/yr' | '/mo' | '';
   time: string; // "2d ago"
   location: string;
   type: string; // Full-time / Contract
   level: string; // Senior / Mid
+  workplaceType?: 'remote' | 'onsite' | 'hybrid' | 'unknown';
+  relocationSupported?: boolean;
+  visaSponsorship?: boolean;
+  /** Historical tracker row whose source job is no longer publicly available. */
+  unavailable?: boolean;
   applyUrl?: string; // external apply link (company site), when available
   applyEmail?: string; // apply-by-email address, when available
   tags: JobTag[];

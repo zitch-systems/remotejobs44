@@ -5,13 +5,16 @@
 // server-only transitive import would pull `next/headers` into the browser
 // bundle and break the build. Server-side data fetching lives in ./data.
 import { formatSalary, formatRelativeDate } from '@/lib/utils';
+import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
+
+export type LandingWorkplace = 'remote' | 'onsite' | 'hybrid' | 'unknown';
 
 // Minimal, paywall-safe shape passed to all landing sections.
 export interface LandingJob {
   id: string;
   title: string;
   company: string;
-  logo: string;        // monogram (first letter)
+  logo: string;        // generic public fallback; never employer-derived
   category: string;
   type: string;        // e.g. "full-time"
   location: string;
@@ -20,25 +23,60 @@ export interface LandingJob {
   currency: string;
   posted: string;      // ISO
   featured: boolean;
+  workplaceType: LandingWorkplace;
+  relocationSupported: boolean;
 }
 
-// Pay label: only when a real range exists (salary is ~0% populated and
-// formatSalary already hides non-USD). Falls back to job type, never an
-// invented number.
-export function payLabel(job: LandingJob): string {
+function publicTitle(title: string, company: string): string {
+  const scrubbed = scrubCompanyIdentity(title, company);
+  const name = company.trim();
+  if (!name || name.length >= 3) return scrubbed;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return scrubbed.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), 'the company');
+}
+
+/** Convert a trusted DB row to the anonymous homepage payload. */
+export function toPublicLandingJob(j: any): LandingJob {
+  const realCompany = j.company ?? '';
+  const workplaceType: LandingWorkplace = ['remote', 'onsite', 'hybrid'].includes(j.workplace_type)
+    ? j.workplace_type
+    : j.remote === true ? 'remote' : 'unknown';
+  return {
+    id: j.id,
+    title: publicTitle(j.title ?? 'Open role', realCompany),
+    company: HIDDEN_COMPANY_LABEL,
+    logo: 'RJ',
+    category: j.category ?? 'other',
+    type: j.type ?? 'full-time',
+    location: j.location ?? 'Location not specified',
+    salaryMin: j.salary_min ?? undefined,
+    salaryMax: j.salary_max ?? undefined,
+    currency: j.currency ?? 'USD',
+    posted: j.posted_at ?? j.created_at ?? new Date().toISOString(),
+    featured: j.featured ?? false,
+    workplaceType,
+    relocationSupported: j.relocation_supported === true,
+  };
+}
+
+// Render published salary only; job type has its own badge.
+export function payLabel(job: LandingJob): string | null {
   const s = formatSalary(job.salaryMin, job.salaryMax, job.currency);
-  if (s) return s;
-  return job.type
-    .split('-')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('-');
+  return s || null;
 }
 
 // Compact pay used in the hero preview rows ("$90k+" style) — same guard.
 export function payCompact(job: LandingJob): string {
   const s = formatSalary(job.salaryMin, job.salaryMax, job.currency);
   if (s) return s.split('–')[0].replace('/yr', '');
-  return 'Remote';
+  return workplaceLabel(job);
+}
+
+export function workplaceLabel(job: Pick<LandingJob, 'workplaceType'>): string {
+  if (job.workplaceType === 'remote') return 'Remote';
+  if (job.workplaceType === 'onsite') return 'On-site';
+  if (job.workplaceType === 'hybrid') return 'Hybrid';
+  return 'Workplace not specified';
 }
 
 export function ageLabel(job: LandingJob): string {
