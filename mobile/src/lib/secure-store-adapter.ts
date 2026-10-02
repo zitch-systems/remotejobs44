@@ -69,11 +69,8 @@ export const LargeSecureStore = {
   },
   async removeItem(key: string): Promise<void> {
     volatileItems.delete(key);
-    await AsyncStorage.removeItem(key);
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {
-      /* ignore */
-    }
+    // Attempt both independently: an AsyncStorage failure must not leave the
+    // keystore secret behind (and vice versa).
+    await Promise.allSettled([AsyncStorage.removeItem(key), SecureStore.deleteItemAsync(key)]);
   },
 };

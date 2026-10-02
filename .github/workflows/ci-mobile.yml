@@ -62,23 +62,72 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Hash QA APK build inputs
+        id: qa-apk-key
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          files = []
+          for tree in (Path('src'), Path('assets')):
+              files.extend(path for path in tree.rglob('*') if path.is_file())
+          files.extend(
+              path for path in (
+                  Path('app.json'), Path('package.json'), Path('package-lock.json'),
+                  Path('eas.json'), Path('tsconfig.json'), Path('babel.config.js'),
+                  Path('metro.config.js'),
+              )
+              if path.is_file()
+          )
+          for pattern in ('app.config.*', 'babel.config.*', 'metro.config.*'):
+              files.extend(path for path in Path('.').glob(pattern) if path.is_file())
+          files = [
+              path for path in files
+              if '__tests__' not in path.parts
+              and '.test.' not in path.name
+              and '.spec.' not in path.name
+          ]
+          digest = hashlib.sha256()
+          digest.update(b'remotejobs44-qa-apk-recipe-v2\nrelease;x86_64;applicationIdSuffix=.qa;appName=RemoteJobs44 QA\n')
+          for path in sorted(files, key=lambda item: item.as_posix()):
+              digest.update(path.as_posix().encode())
+              digest.update(b'\0')
+              digest.update(path.read_bytes())
+              digest.update(b'\0')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'digest={digest.hexdigest()}\n')
+          PY
+
+      - name: Restore QA APK
+        id: qa-apk-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          key: qa-apk-v2-${{ runner.os }}-${{ steps.qa-apk-key.outputs.digest }}
+
       - uses: actions/setup-node@v7
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - uses: actions/setup-java@v5
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         with:
           distribution: temurin
           java-version: 17
 
       - name: Install and generate Android project
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         run: |
           npm ci
           npx expo prebuild --platform android --clean --no-install
 
       - name: Mark build as QA demo
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -94,11 +143,24 @@ jobs:
           PY
 
       - name: Setup Gradle cache
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         uses: gradle/actions/setup-gradle@v6
+        with:
+          # Pull requests from this repository may populate the cache. Forks
+          # remain read-only because their code is untrusted in our cache scope.
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Build standalone QA APK
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true'
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
         working-directory: mobile/android
+
+      - name: Save QA APK
+        if: steps.qa-apk-cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/cache/save@v6
+        with:
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          key: qa-apk-v2-${{ runner.os }}-${{ steps.qa-apk-key.outputs.digest }}
 
       - name: Enable Android emulator acceleration
         run: |

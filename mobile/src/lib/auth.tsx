@@ -6,11 +6,13 @@
 // explorable — exactly the handoff's "no real auth in the prototype" behavior.
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, supabaseAuthStorage, supabaseAuthStorageKey } from './supabase';
 import { fetchAppliedMap, fetchSavedIds } from './user-state';
 import { registerMobileDevice } from './telemetry';
 import { clearPushTokens } from './push';
 import { captureError } from './sentry';
+import { settleWithin } from './promise-timeout';
+import { clearAuthSession } from './auth-signout';
 import { useAppStore } from '@/store/app';
 
 interface AuthValue {
@@ -96,26 +98,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Remove this user's push tokens while still authenticated (RLS),
           // so a shared device stops delivering their alerts after sign-out.
           const uid = session?.user?.id;
-          try {
-            if (uid) await clearPushTokens(uid);
-          } catch {
-            /* token cleanup is best-effort and must never block sign-out */
-          }
-          try {
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-              captureError(error, { scope: 'sign-out' });
-              await supabase.auth.signOut({ scope: 'local' });
-            }
-          } catch (error) {
-            captureError(error, { scope: 'sign-out' });
-            try {
-              await supabase.auth.signOut({ scope: 'local' });
-            } catch {
-              /* local UI/store state is still cleared below */
-            }
-          }
+          if (uid) await settleWithin(clearPushTokens(uid), 2000);
+          await clearAuthSession({
+            signOut: (options) => supabase.auth.signOut(options),
+            removeItem: (key) => supabaseAuthStorage.removeItem(key),
+            storageKey: supabaseAuthStorageKey,
+          });
         }
+        // Signing out must immediately leave the authenticated UI even when
+        // the network and Supabase's local cleanup both fail.
+        setSession(null);
         setDemo(false);
         useAppStore.getState().reset();
       },

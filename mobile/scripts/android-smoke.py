@@ -103,10 +103,26 @@ def logcat() -> str:
 
 
 def assert_healthy() -> None:
-    foreground = adb("shell", "dumpsys", "activity", "activities", check=False)
-    resumed = next((line for line in foreground.splitlines() if "mResumedActivity" in line), "")
-    if f"{PACKAGE}/" not in resumed:
-        raise AssertionError(f"{PACKAGE} is no longer the foreground activity")
+    activities = adb("shell", "dumpsys", "activity", "activities", check=False)
+    windows = adb("shell", "dumpsys", "window", "windows", check=False)
+    focus_markers = (
+        "topResumedActivity",
+        "mResumedActivity",
+        "ResumedActivity",
+        "mCurrentFocus",
+        "mFocusedApp",
+    )
+    focus_lines = [
+        line.strip()
+        for line in (activities + "\n" + windows).splitlines()
+        if any(marker in line for marker in focus_markers)
+    ]
+    (ARTIFACTS / "foreground.txt").write_text(
+        "\n".join(focus_lines) + "\n", encoding="utf-8",
+    )
+    if not any(PACKAGE in line for line in focus_lines):
+        observed = "\n".join(focus_lines) or "No focus markers returned by dumpsys"
+        raise AssertionError(f"{PACKAGE} is no longer foreground:\n{observed}")
     output = logcat()
     crashes = re.findall(
         r"FATAL EXCEPTION[\s\S]{0,1200}?Process: " + re.escape(PACKAGE) + r"[^\n]*"
