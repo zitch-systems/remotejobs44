@@ -13,6 +13,10 @@ const backoffMigration = await readFile(
   new URL('../supabase/migrations/20260923073827_ats_board_backoff.sql', import.meta.url),
   'utf8',
 );
+const progressMigration = await readFile(
+  new URL('../supabase/migrations/20261002095938_ats_board_check_progress.sql', import.meta.url),
+  'utf8',
+);
 const db = new PGlite();
 
 await db.exec(`
@@ -108,6 +112,29 @@ test('removed boards are skipped until retry time without deleting jobs', async 
   );
   assert.deepEqual((await asServiceRole(10)).map(row => row.source_url),
     [workable, lever, ashby, greenhouse]);
+});
+
+test('successful empty boards leave the queue without falsifying job freshness', async () => {
+  await db.exec(progressMigration);
+  const before = (await db.query('select last_seen_at from public.jobs where source_url = $1', [workable])).rows;
+  await db.query(
+    `insert into public.ats_board_checks(source_url, checked_at, next_check_at)
+     values ($1, now(), now() + interval '24 hours')`, [workable],
+  );
+  assert.equal((await asServiceRole(1))[0].source_url, lever);
+  assert.deepEqual((await db.query('select last_seen_at from public.jobs where source_url = $1', [workable])).rows, before);
+  await db.query('update public.ats_board_checks set next_check_at = now() - interval \'1 second\' where source_url = $1', [workable]);
+  assert.equal((await asServiceRole(1))[0].source_url, workable);
+});
+
+test('browser roles cannot read or write board checkpoints', async () => {
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`);
+    try {
+      await assert.rejects(db.query('select * from public.ats_board_checks'), error => error?.code === '42501');
+      await assert.rejects(db.query("insert into public.ats_board_checks values ('x', now(), now())"), error => error?.code === '42501');
+    } finally { await db.exec('reset role'); }
+  }
 });
 
 test.after(async () => {

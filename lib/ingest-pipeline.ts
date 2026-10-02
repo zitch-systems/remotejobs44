@@ -1,3 +1,5 @@
+import { upsertJobsChunked } from '@/lib/jobs/ingest-upsert';
+import { ingestFailureEntries } from '@/lib/jobs/ingest-outcome';
 import { safeLogoUrl } from '@/lib/jobs/source-logo';
 // lib/ingest-pipeline.ts
 // Pulls remote jobs from every active source in the in-code SOURCES list
@@ -46,12 +48,9 @@ const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
 // their whole board, so for them this is the real limiter.
 const MAX_JOBS_PER_SOURCE = 200;
 
-// Soft time budget for the user-added-sources loop. The cron route runs
-// with maxDuration 60s and ingest shares it with other daily tasks; when
-// the budget is gone we record the remaining sources as skipped instead
-// of letting the platform kill the function mid-pipeline (which would
-// leave sources unmarked and the lock held until TTL).
-const USER_SOURCES_BUDGET_MS = 45_000;
+// Give custom sources a separate 15-second slot on 120-second routes.
+// The feed loop must not consume their entire opportunity to retry.
+const USER_SOURCES_BUDGET_MS = 15_000;
 
 // Wall-clock cap for the hardcoded SOURCES loop. Each source can burn ~40s in
 // the worst case (getJson's 20s timeout × 2 attempts + backoff), so a couple of
@@ -72,10 +71,6 @@ const MAX_FEED_BYTES = 5 * 1024 * 1024;
 // so a backlog drains over a few days and every stored job ends up with
 // a direct link rather than a permanent board link.
 const WPJM_ENRICH_MAX = 10;
-
-// The search_vector GIN trigger on jobs can't take large INSERT batches
-// reliably (same limit as /api/ats/save and ats-refresh).
-const JOBS_INSERT_CHUNK = 25;
 
 // Shared fetch helper — throws on non-2xx so we don't try to .json() a 404 HTML
 // page or 500 error body. The per-source try/catch in runIngest catches the
@@ -467,7 +462,7 @@ export async function runIngest(): Promise<IngestResult> {
         // deliberately don't flip is_active, so an admin soft-delete
         // (companies/remove) isn't undone.
         await touchLastSeen(supabase, deduped.map(r => r.apply_url), source.name);
-        await recordSourceRun(supabase, source, up.inserted, 'ok');
+        await recordSourceRun(supabase, source, up.inserted, up.failed > 0 ? 'error' : 'ok', up.firstError);
       }
     } catch (err: any) {
       logError({ event: 'ingest.source_failed', source: source.name, error: err.message });
@@ -500,7 +495,7 @@ export async function runIngest(): Promise<IngestResult> {
     // failure removed a source from every subsequent run, permanently, with
     // nothing in the pipeline to ever retry it. Only an explicit
     // status='paused' — an admin decision — keeps a source out of the run.
-    const { data: customRows } = await supabase
+    const { data: customRows, error: customReadError } = await supabase
       .from('job_sources')
       .select('id, name, url, method')
       .in('status', ['active', 'error'])
@@ -509,9 +504,10 @@ export async function runIngest(): Promise<IngestResult> {
       // instead of eating the front of the budget every run and starving the
       // healthy ones behind it.
       .order('last_sync_at', { ascending: true, nullsFirst: true });
+    if (customReadError) throw customReadError;
     const customSources = (customRows ?? []).filter(r => !hardcodedUrls.has(r.url));
-    // A slow first phase must not extend the total ingest deadline.
-    const userLoopDeadline = ingestStartedAt + USER_SOURCES_BUDGET_MS;
+    // Reserve custom sources their own bounded slot after feed processing.
+    const userLoopDeadline = Date.now() + USER_SOURCES_BUDGET_MS;
 
     for (const row of customSources) {
       const label = row.name || row.url;
@@ -631,7 +627,7 @@ export async function runIngest(): Promise<IngestResult> {
           if (knownSeenUrls.length) {
             await touchLastSeen(supabase, knownSeenUrls, label);
           }
-          await markSourceStatus(supabase, row.id, 'active', up.inserted);
+          await markSourceStatus(supabase, row.id, up.failed > 0 ? 'error' : 'active', up.inserted, up.firstError);
         }
       } catch (err: any) {
         logError({ event: 'ingest.user_source_failed', source: label, error: err.message });
@@ -640,11 +636,12 @@ export async function runIngest(): Promise<IngestResult> {
       }
     }
   } catch (err: any) {
+    results['Custom source catalogue'] = `error: ${err?.message ?? String(err)}`;
     logWarn({ event: 'ingest.user_sources_read_failed', error: err.message });
   }
 
     return {
-      success:    true,
+      success: ingestFailureEntries(results).length === 0,
       totalAdded,
       results,
       paused:     pausedNames,
@@ -814,7 +811,7 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
           // skipped: the platform's existing copy of a still-listed role must
           // stay fresh so it doesn't age out just because JobSpy deferred to it.
           await touchLastSeen(supabase, deduped.map(r => r.apply_url), source.name);
-          await recordSourceRun(supabase, source, up.inserted, 'ok');
+          await recordSourceRun(supabase, source, up.inserted, up.failed > 0 ? 'error' : 'ok', up.firstError);
         }
       } catch (err: any) {
         logError({ event: 'jobspy.query_failed', query, error: err.message });
@@ -838,8 +835,12 @@ export async function runJobSpyIngest(opts?: { budgetMs?: number }): Promise<Ing
       }
     }
 
+    const failures = ingestFailureEntries(results);
+    logInfo({ event: 'jobspy.done', totalAdded, errors: failures.length,
+      deferred: Object.values(results).filter(value => typeof value === 'string' && value.startsWith('skipped:')).length,
+      elapsedMs: Date.now() - startedAt });
     return {
-      success: true, totalAdded, results,
+      success: failures.length === 0, totalAdded, results,
       paused: pausedNames, at: new Date().toISOString(),
     };
   } finally {
@@ -890,44 +891,6 @@ async function filterExistingOnPlatform(
 // silently and the postings it covered aged out of the 60-day staleness sweep
 // while their feeds were still listing them. The shared helper batches by
 // request size and logs what fails.
-
-// Chunked upsert with row-level isolation. The search_vector GIN trigger
-// can't take big INSERT batches reliably, and a single bad row in a
-// 200-row statement used to zero the entire source's run (the whole
-// statement fails). Chunks of 25; a failing chunk retries row-by-row so
-// one bad row costs exactly one row, reported instead of swallowed.
-async function upsertJobsChunked(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  rows: Array<Record<string, any>>,
-): Promise<{ inserted: number; failed: number; firstError: string | null }> {
-  let inserted = 0;
-  let failed = 0;
-  let firstError: string | null = null;
-  for (let i = 0; i < rows.length; i += JOBS_INSERT_CHUNK) {
-    const chunk = rows.slice(i, i + JOBS_INSERT_CHUNK);
-    const { data, error } = await supabase
-      .from('jobs')
-      .upsert(chunk, { onConflict: 'apply_url', ignoreDuplicates: true })
-      .select('id');
-    if (!error) {
-      inserted += data?.length ?? 0;
-      continue;
-    }
-    for (const r of chunk) {
-      const { data: one, error: rowErr } = await supabase
-        .from('jobs')
-        .upsert(r, { onConflict: 'apply_url', ignoreDuplicates: true })
-        .select('id');
-      if (rowErr) {
-        failed++;
-        if (!firstError) firstError = rowErr.message;
-      } else {
-        inserted += one?.length ?? 0;
-      }
-    }
-  }
-  return { inserted, failed, firstError };
-}
 
 // WP Job Manager feeds: make the board's /job/... page each row's
 // source_url — a stable per-item key that keeps provenance for admins
@@ -997,7 +960,7 @@ async function markSourceStatus(
   errorMessage: string | null = null,
 ) {
   try {
-    await supabase
+    const { error } = await supabase
       .from('job_sources')
       .update({
         status,
@@ -1006,7 +969,10 @@ async function markSourceStatus(
         error_message: status === 'active' ? null : (errorMessage ?? null),
       })
       .eq('id', id);
-  } catch {}
+    if (error) throw error;
+  } catch (err: any) {
+    logWarn({ event: 'ingest.source_status_write_failed', error: err?.message ?? String(err) });
+  }
 }
 
 async function recordSourceRun(
@@ -1017,7 +983,7 @@ async function recordSourceRun(
   errorMessage: string | null = null,
 ) {
   try {
-    await supabase.from('job_sources').upsert({
+    const { error } = await supabase.from('job_sources').upsert({
       name: source.name,
       url:  source.sourceUrl,
       method: 'json-api',
@@ -1029,7 +995,10 @@ async function recordSourceRun(
       // healthy again rather than carrying a stale error forever.
       error_message: status === 'ok' ? null : (errorMessage ?? null),
     }, { onConflict: 'url' });
-  } catch {}
+    if (error) throw error;
+  } catch (err: any) {
+    logWarn({ event: 'ingest.source_status_write_failed', source: source.name, error: err?.message ?? String(err) });
+  }
 }
 
 function parseSerpDate(relative: string): string {
