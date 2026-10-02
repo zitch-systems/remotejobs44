@@ -2,8 +2,8 @@
   "regions": ["dub1"],
   "crons": [
     { "path": "/api/cron/daily", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/jobspy", "schedule": "0 12 * * *" },
-    { "path": "/api/cron/ats-refresh", "schedule": "0 18 * * *" }
+    { "path": "/api/cron/jobspy", "schedule": "0 * * * *" },
+    { "path": "/api/cron/ats-refresh", "schedule": "*/15 * * * *" }
   ],
   "functions": {
     "app/api/cron/daily/route.ts":        { "maxDuration": 120 },
