@@ -7,10 +7,12 @@ on:
     branches: [main]
     paths:
       - 'mobile/**'
+      - '.github/workflows/ci-mobile.yml'
   pull_request:
     branches: [main]
     paths:
       - 'mobile/**'
+      - '.github/workflows/ci-mobile.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -91,9 +93,18 @@ jobs:
           strings.write_text(text.replace('RemoteJobs44', 'RemoteJobs44 QA', 1))
           PY
 
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Build standalone QA APK
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
         working-directory: mobile/android
+
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       - name: Run emulator journey
         uses: reactivecircus/android-emulator-runner@v2

@@ -5,6 +5,7 @@ import {
   gradFor,
   money,
   personalizeJobs,
+  plainJobText,
   referralLink,
   rewardProgress,
   salaryLabel,
@@ -27,11 +28,16 @@ describe('money', () => {
 });
 
 describe('salaryLabel', () => {
-  it('prefers max, then min, else Competitive', () => {
-    expect(salaryLabel(100000, 160000, 'USD')).toBe('$160k');
+  it('preserves the published range and honestly labels missing pay', () => {
+    expect(salaryLabel(100000, 160000, 'USD')).toBe('$100k–$160k');
     expect(salaryLabel(90000, null, 'USD')).toBe('$90k');
-    expect(salaryLabel(null, null, 'USD')).toBe('Competitive');
+    expect(salaryLabel(null, null, 'USD')).toBe('Salary not listed');
   });
+});
+
+it('renders employer HTML and entities as readable native text', () => {
+  expect(plainJobText('<p>Build &amp; learn</p><ul><li>Team &#x1F680;</li></ul><script>bad()</script>'))
+    .toBe('Build & learn\nTeam 🚀');
 });
 
 describe('timeAgo', () => {
@@ -127,8 +133,8 @@ describe('tagsFrom / gradFor / bulletsFrom', () => {
     expect(gradFor('Vercel')).toEqual(gradFor('Vercel'));
     expect(gradFor('Vercel')).toHaveLength(2);
   });
-  it('bulletsFrom splits text and falls back when empty', () => {
-    expect(bulletsFrom(null, null)).toHaveLength(1);
+  it('bulletsFrom splits text and stays honest when empty', () => {
+    expect(bulletsFrom(null, null)).toEqual([]);
     expect(bulletsFrom('Own the roadmap.\nShip reliable services.', null).length).toBeGreaterThanOrEqual(2);
   });
   it('bulletsFrom uses a string[] (live requirements) directly', () => {

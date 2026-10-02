@@ -5,7 +5,7 @@ jest.mock('./supabase', () => ({
   supabase: { auth: { onAuthStateChange: jest.fn(), getSession: jest.fn() }, rpc: jest.fn() },
 }));
 
-import { rowToJob } from './jobs';
+import { rowToJob, scheduleAfterAuth } from './jobs';
 
 describe('trusted jobs API adapter', () => {
   it('maps current camelCase API fields and workplace metadata', () => {
@@ -19,13 +19,15 @@ describe('trusted jobs API adapter', () => {
       salaryMin: 100000, salaryMax: 140000, currency: 'USD', remote: false,
       featured: true, posted: '2026-10-01T00:00:00.000Z',
       workplaceType: 'onsite', relocationSupported: true, visaSponsorship: true,
+      source: 'greenhouse',
     });
 
-    expect(job.salary).toBe('$140k');
+    expect(job.salary).toBe('$100k–$140k');
     expect(job.location).toBe('Berlin');
     expect(job.workplaceType).toBe('onsite');
     expect(job.relocationSupported).toBe(true);
     expect(job.visaSponsorship).toBe(true);
+    expect(job.verified).toBe(true);
     expect(job.company).toBe('Hidden Company');
   });
 
@@ -35,8 +37,22 @@ describe('trusted jobs API adapter', () => {
       category: null, type: null, level: null, location: 'Worldwide', description: null,
       requirements: null, skills: null, salaryMin: null, salaryMax: null, currency: null,
       remote: true, featured: false, posted: null, workplaceType: 'remote',
+      source: 'manual',
     });
     expect(job.location).toBe('Remote · Worldwide');
     expect(job.applyUrl).toBeUndefined();
+    expect(job.verified).toBe(false);
+  });
+});
+
+describe('auth refresh scheduling', () => {
+  it('does not run Supabase-dependent refresh work inside the auth callback', () => {
+    jest.useFakeTimers();
+    const work = jest.fn();
+    scheduleAfterAuth(work);
+    expect(work).not.toHaveBeenCalled();
+    jest.runOnlyPendingTimers();
+    expect(work).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 });

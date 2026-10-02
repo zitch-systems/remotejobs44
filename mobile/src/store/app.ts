@@ -44,7 +44,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   isSaved: (id) => get().saved.includes(id),
   isApplied: (id) => id in get().applied,
 
-  setUserId: (id) => set({ userId: id }),
+  setUserId: (id) => set((state) => {
+    // Auth events can sign a user out remotely or replace the current account
+    // without going through signOut(). Clear account-owned state before the new
+    // user's rows hydrate so it can never bleed across that transition. Demo
+    // mode keeps its seeded state because it has no real account boundary.
+    if (state.userId === id) return state;
+    if (!isSupabaseConfigured) return { userId: id };
+    return { userId: id, saved: [], applied: {}, hydrated: false };
+  }),
   hydrate: ({ saved, applied }) => set({ saved, applied, hydrated: true }),
 
   toggleSaved: (id) => {
@@ -57,6 +65,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && userId) {
       setSavedRemote(userId, id, willSave).catch((e) => {
         captureError(e, { scope: 'toggleSaved', id });
+        // The request belongs to the account captured above. A late failure
+        // after sign-out/account switch must not mutate the next user's state.
+        if (get().userId !== userId) return;
         // Roll back on failure.
         set((s) => ({ saved: willSave ? s.saved.filter((x) => x !== id) : [...s.saved, id] }));
       });
@@ -75,6 +86,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && userId) {
       applyRemote(userId, job).catch((e) => {
         captureError(e, { scope: 'applyTo', id: job.id });
+        if (get().userId !== userId) return;
         // Roll back the optimistic apply, and tell the user it didn't go
         // through (otherwise "Application sent" shows, then vanishes).
         set((s) => {
@@ -97,6 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && userId) {
       updateApplicationStatus(userId, jobId, status).catch((e) => {
         captureError(e, { scope: 'updateStatus', id: jobId });
+        if (get().userId !== userId) return;
         // Roll back on failure.
         set((s) => ({ applied: { ...s.applied, [jobId]: prev } }));
       });

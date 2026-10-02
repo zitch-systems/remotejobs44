@@ -229,10 +229,13 @@ export default function JobDetail() {
               <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 22, lineHeight: 27, letterSpacing: -0.4, color: '#fff' }} numberOfLines={3}>
                 {job.role}
               </Txt>
+              <Txt style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 5 }}>
+                {job.company}
+              </Txt>
               {job.verified ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.32)' }}>
                   <BadgeCheck size={13} color="#4ade80" />
-                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>{job.company} · Verified</Txt>
+                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>Direct ATS source</Txt>
                 </View>
               ) : null}
             </View>

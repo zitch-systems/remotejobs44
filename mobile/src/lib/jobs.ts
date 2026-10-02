@@ -1,6 +1,5 @@
 // src/lib/jobs.ts — live job data from Supabase, adapted to the mobile Job
-// shape. Falls back to the handoff seed set when Supabase isn't configured
-// (demo mode) or a query fails, so the UI is never empty.
+// shape. The handoff seed set is used only when Supabase isn't configured.
 //
 // Pure adapters/formatters live in ./format (unit-tested); this file owns the
 // Supabase queries + React hooks.
@@ -9,7 +8,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { apiFetch } from './api';
 import { SEED_JOBS } from './seed';
 import { loadFeedCache, saveFeedCache } from './feed-cache';
-import { bulletsFrom, deriveMatch, gradFor, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
+import { bulletsFrom, deriveMatch, gradFor, plainJobText, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
 import type { ExperienceLevel, WorkplaceFilter } from './filters';
 import type { Job } from './types';
 
@@ -41,6 +40,11 @@ export function isDefaultQuery(q: JobQuery): boolean {
 // Re-export so existing importers (the feed) keep their import path.
 export { personalizeJobs } from './format';
 
+/** Auth callbacks must return before work that calls Supabase auth again. */
+export function scheduleAfterAuth(work: () => void): ReturnType<typeof setTimeout> {
+  return setTimeout(work, 0);
+}
+
 export interface JobRow {
   id: string;
   title: string;
@@ -65,6 +69,7 @@ export interface JobRow {
   workplaceType?: Job['workplaceType'];
   relocationSupported?: boolean;
   visaSponsorship?: boolean;
+  source?: string | null;
 }
 
 export function rowToJob(r: JobRow): Job {
@@ -87,13 +92,14 @@ export function rowToJob(r: JobRow): Job {
     grad: gradFor(r.company ?? r.id),
     match,
     category: r.category ?? 'Other',
-    // The board only carries vetted sources, so we surface every role as a
-    // verified employer (the design's badge). Swap for a real flag if added.
-    verified: true,
+    // This is source provenance, not a claim that we verified the employer.
+    verified: ['greenhouse', 'lever', 'ashby', 'workable'].includes((r.source ?? '').toLowerCase()),
     salary: r.salaryText?.trim() || salaryLabel(r.salaryMin, r.salaryMax, r.currency ?? 'USD'),
-    per: '/yr',
+    per: r.salaryText?.trim() ? '' : '/yr',
     time: timeAgo(r.posted ?? null),
-    location: r.workplaceType === 'remote' || r.remote ? `Remote · ${r.location ?? 'Worldwide'}` : (r.location ?? 'Worldwide'),
+    location: r.workplaceType === 'remote' || r.remote
+      ? `Remote · ${r.location ?? 'Location not specified'}`
+      : (r.location ?? 'Location not specified'),
     type: r.type ?? 'Full-time',
     level: r.level ?? 'Mid–Senior',
     workplaceType: r.workplaceType ?? (r.remote ? 'remote' : 'unknown'),
@@ -102,7 +108,7 @@ export function rowToJob(r: JobRow): Job {
     applyUrl: r.applyUrl ?? undefined,
     applyEmail: r.applyEmail ?? undefined,
     tags: tagsFrom(skills, r.category),
-    about: (r.description ?? '').trim().slice(0, 700) || 'Join a remote-first team building for a global audience.',
+    about: plainJobText(r.description ?? '').slice(0, 700) || 'Description not provided.',
     duties: bulletsFrom(r.requirements, r.description),
     skills,
     verdict,
@@ -209,11 +215,11 @@ export interface JobsFeed {
 }
 
 /**
- * Paginated live job list with pull-to-refresh + seed fallback.
+ * Paginated live job list with pull-to-refresh and a demo-only seed set.
  *
  * `query` filters server-side across the whole table (not just the loaded
- * page). Changing it refetches from offset 0. The disk cache + seed fallback
- * only apply to the default (unfiltered) feed.
+ * page). Changing it refetches from offset 0. The privacy-safe disk cache only
+ * applies to the default (unfiltered) feed.
  */
 export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   const queryKey = JSON.stringify(query);
@@ -299,8 +305,25 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   // switch. This removes a real company name promptly after entitlement loss.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    const { data } = supabase.auth.onAuthStateChange(() => load(0, 'refresh'));
-    return () => data.subscription.unsubscribe();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      // Supabase awaits auth callbacks while holding its auth lock. Clear any
+      // paid response synchronously, then defer getSession/network work until
+      // after the callback returns.
+      ++reqRef.current; // invalidate an in-flight response from the old session
+      busy.current = false;
+      setJobs([]);
+      setError(null);
+      setHasMore(false);
+      setLoading(true);
+      setRefreshing(false);
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => { void load(0, 'initial'); });
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
   }, [load]);
 
   return {
@@ -329,6 +352,7 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const reqRef = useRef(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -337,17 +361,18 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
       return;
     }
     let active = true;
+    const reqId = ++reqRef.current;
     setLoading(true);
     fetchRecommendedJobs(limit)
       .then((list) => {
-        if (!active) return;
-        setJobs(list.length ? list : seedRecommended());
+        if (!active || reqId !== reqRef.current) return;
+        setJobs(list);
         setError(null);
         setLoading(false);
       })
       .catch((e: any) => {
-        if (!active) return;
-        setJobs(seedRecommended());
+        if (!active || reqId !== reqRef.current) return;
+        setJobs([]);
         setError(e?.message ?? 'Failed to load recommendations');
         setLoading(false);
       });
@@ -355,6 +380,23 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
       active = false;
     };
   }, [nonce, limit]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      ++reqRef.current;
+      setJobs([]);
+      setError(null);
+      setLoading(true);
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => setNonce((n) => n + 1));
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   return { jobs, loading, error, refresh: () => setNonce((n) => n + 1) };
 }
@@ -371,34 +413,42 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
     // Only show a loader when we have nothing to display yet.
     loading: Boolean(isSupabaseConfigured && id && !cached),
   });
+  const reqRef = useRef(0);
 
-  useEffect(() => {
+  const loadJob = useCallback(async () => {
     if (!isSupabaseConfigured || !id) return;
-    let active = true;
-    // Re-seed synchronously when the id changes (cache may already have it).
-    // If it's not cached, show a loader instead of the PREVIOUS job's data.
+    const reqId = ++reqRef.current;
     setState({ job: null, loading: true });
-    fetchJobById(id)
-      // A null result (deleted / deactivated / bad deep-link id) must still
-      // clear loading so the "Job not found" state can render — the previous
-      // `job && …` short-circuit left the screen spinning forever.
-      .then((job) => active && setState((s) => ({ job: job ?? s.job, loading: false })))
-      .catch(() => active && setState({ job: null, loading: false }));
-    return () => {
-      active = false;
-    };
+    try {
+      const job = await fetchJobById(id);
+      if (reqId === reqRef.current) setState({ job, loading: false });
+    } catch {
+      if (reqId === reqRef.current) setState({ job: null, loading: false });
+    }
   }, [id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
+    void loadJob();
+    return () => {
+      ++reqRef.current;
+    };
+  }, [id, loadJob]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const { data } = supabase.auth.onAuthStateChange(() => {
+      ++reqRef.current; // old Pro response can no longer win the race
       setState({ job: null, loading: true });
-      fetchJobById(id)
-        .then((job) => setState({ job, loading: false }))
-        .catch(() => setState({ job: null, loading: false }));
+      if (timer) clearTimeout(timer);
+      timer = scheduleAfterAuth(() => { void loadJob(); });
     });
-    return () => data.subscription.unsubscribe();
-  }, [id]);
+    return () => {
+      if (timer) clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, [id, loadJob]);
 
   return state;
 }

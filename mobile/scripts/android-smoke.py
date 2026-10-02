@@ -21,10 +21,13 @@ step_number = 0
 
 
 def adb(*args: str, check: bool = True, capture: bool = True) -> str:
-    result = subprocess.run(
-        ["adb", *args], text=True, stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.STDOUT if capture else None,
-    )
+    try:
+        result = subprocess.run(
+            ["adb", *args], text=True, stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.STDOUT if capture else None, timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"adb {' '.join(args)} timed out after 60s") from exc
     if check and result.returncode:
         raise RuntimeError(f"adb {' '.join(args)} failed:\n{result.stdout}")
     return result.stdout or ""
@@ -83,7 +86,12 @@ def screenshot(name: str) -> None:
     step_number += 1
     target = ARTIFACTS / f"{step_number:02d}-{name}.png"
     with target.open("wb") as output:
-        result = subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=output)
+        try:
+            result = subprocess.run(
+                ["adb", "exec-out", "screencap", "-p"], stdout=output, timeout=60,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"Could not capture {target}: adb timed out after 60s") from exc
     if result.returncode:
         raise RuntimeError(f"Could not capture {target}")
 
@@ -147,7 +155,8 @@ def main() -> None:
         cards = [n for n in hierarchy().iter("node") if re.search(r" at .+, \d+% match", value(n))]
         if not cards:
             raise AssertionError("Search produced no tappable job card")
-        selected_job = value(cards[0]).split(" at ", 1)[0]
+        selected_card = value(cards[0])
+        selected_job = selected_card.split(" at ", 1)[0]
         x, y = center(cards[0])
         adb("shell", "input", "tap", str(x), str(y))
         wait_for(selected_job)
@@ -157,7 +166,11 @@ def main() -> None:
         tap("Back")
         wait_for("Search")
         tap("Saved")
-        wait_for("1 job saved")
+        # Demo state begins with Backend Engineer saved. Saving the selected
+        # Frontend Engineer must add a second distinct card, not just update a
+        # counter or navigate successfully.
+        wait_for("2 jobs saved")
+        wait_for(selected_card)
         screenshot("saved")
         tap("Profile")
         wait_for("Profile strength")
@@ -174,7 +187,11 @@ def main() -> None:
         print(f"ANDROID SMOKE FAILED: {exc}", file=sys.stderr)
         return 1
     finally:
-        logcat()
+        # Evidence collection must never replace the original test failure.
+        try:
+            logcat()
+        except Exception as exc:
+            print(f"Could not collect final logcat: {exc}", file=sys.stderr)
     return 0
 
 

@@ -289,9 +289,9 @@ export default function Applications() {
                 return (
                   <Pressable
                     key={job.id}
-                    onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
+                    onPress={job.unavailable ? undefined : () => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
                     accessibilityRole="button"
-                    accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}`}
+                    accessibilityLabel={`${job.role} at ${job.company}, ${STATUS_LABEL[status]}${job.unavailable ? ', listing unavailable' : ''}`}
                     style={({ pressed }) => [
                       {
                         flexDirection: 'row',
@@ -317,6 +317,11 @@ export default function Applications() {
                       {appliedDateLabel(appliedAtById[job.id] ?? null) ? (
                         <Txt variant="meta" color={colors.fg4} numberOfLines={1} style={{ marginTop: 1 }}>
                           Applied {appliedDateLabel(appliedAtById[job.id] ?? null)}
+                        </Txt>
+                      ) : null}
+                      {job.unavailable ? (
+                        <Txt variant="meta" color={colors.warnText} numberOfLines={1} style={{ marginTop: 1 }}>
+                          Original listing unavailable
                         </Txt>
                       ) : null}
                       {noteFor(job.id) ? (

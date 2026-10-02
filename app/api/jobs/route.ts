@@ -59,6 +59,13 @@ export const revalidate = 60;
 // gives us 30 s of budget for cold-lambda + count + select.
 export const maxDuration = 30;
 
+function jobsJson(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Vary', 'Authorization, Cookie');
+  return NextResponse.json(body, { ...init, headers });
+}
+
 export async function GET(req: NextRequest) {
   // Per-IP rate-limit to slow bulk-scraping of the public jobs feed.
   // 120/minute is well above any human-driven page interaction
@@ -71,7 +78,7 @@ export async function GET(req: NextRequest) {
   const rl = rateLimit(`jobs:${ip}`, 120, 60_000);
   if (!rl.success) {
     const retryAfter = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
-    return NextResponse.json(
+    return jobsJson(
       { error: 'Too many requests. Slow down.' },
       { status: 429, headers: { 'Retry-After': String(retryAfter) } },
     );
@@ -84,6 +91,9 @@ export async function GET(req: NextRequest) {
   const idsParam = searchParams.get('ids');
   const q        = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
+  // Mobile saved searches can carry multiple categories. Keep this bounded and
+  // token-only before handing values to PostgREST.
+  const categories = Array.from(new Set(category.split(',').map(v => v.trim()).filter(v => /^[a-z-]{1,40}$/.test(v)))).slice(0, 10);
   const type     = searchParams.get('type') ?? '';
   const level    = searchParams.get('level') ?? '';
   const region   = searchParams.get('region') ?? '';
@@ -170,15 +180,15 @@ export async function GET(req: NextRequest) {
       // production where ALLOW_MOCKS is true.
       if (!UUID_RE.test(id)) {
         const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
-        return NextResponse.json({ job: mock ?? null });
+        return jobsJson({ job: mock ?? null });
       }
       const { data: job, error } = await supabase
         .from('jobs').select(cols).eq('id', id).eq('is_active', true)
         .or(notExpired).or(notFlagged).maybeSingle();
       if (error) throw new Error(error.message);
-      if (job) return NextResponse.json({ job: transformJob(job, seePaid, seeCompany) });
+      if (job) return jobsJson({ job: transformJob(job, seePaid, seeCompany) });
       const mock = ALLOW_MOCKS ? MOCK_JOBS.find(j => j.id === id) : undefined;
-      return NextResponse.json({ job: mock ?? null });
+      return jobsJson({ job: mock ?? null });
     }
 
     if (idsParam) {
@@ -189,14 +199,14 @@ export async function GET(req: NextRequest) {
       const wantedIds = Array.from(new Set(
         idsParam.split(',').map(s => s.trim()).filter(s => UUID_RE.test(s))
       )).slice(0, 10);
-      if (wantedIds.length === 0) return NextResponse.json({ jobs: [] });
+      if (wantedIds.length === 0) return jobsJson({ jobs: [] });
       const { data: rows, error } = await supabase
         .from('jobs').select(cols).in('id', wantedIds).eq('is_active', true)
         .or(notExpired).or(notFlagged);
       if (error) throw new Error(error.message);
       const byId = new Map((rows ?? []).map((r: any) => [r.id as string, transformJob(r, seePaid, seeCompany)]));
       const jobs = wantedIds.map(id => byId.get(id) ?? null).filter(Boolean);
-      return NextResponse.json({ jobs });
+      return jobsJson({ jobs });
     }
 
     // ── ADMIN PATH: moderation view over the unfiltered table ─────────
@@ -221,7 +231,8 @@ export async function GET(req: NextRequest) {
       if (adminQ) {
         aq = aq.or(`title.ilike."%${adminQ}%",company.ilike."%${adminQ}%"`);
       }
-      if (category) aq = aq.eq('category', category);
+      if (categories.length === 1) aq = aq.eq('category', categories[0]);
+      else if (categories.length > 1) aq = aq.in('category', categories);
       if (type)     aq = aq.eq('type', type);
       if (level)    aq = aq.eq('level', level);
       const aFrom = (page - 1) * perPage;
@@ -230,7 +241,7 @@ export async function GET(req: NextRequest) {
         .range(aFrom, aFrom + perPage - 1);
       if (error) throw new Error(error.message);
       const total = count ?? 0;
-      return NextResponse.json({
+      return jobsJson({
         jobs: (rows ?? []).map((j: any) => transformJob(j, true, true)),
         total, page, perPage,
         pages: Math.max(1, Math.ceil(total / perPage)),
@@ -245,7 +256,7 @@ export async function GET(req: NextRequest) {
     // don't have to ship ranking columns over the wire. Falls back to
     // the listing path below when q is empty.
     const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
-    if (safeQ && !workplace) {
+    if (safeQ && !workplace && categories.length <= 1) {
       // Reuse REGION_TERMS to map a region/country slug to a single
       // location keyword for the RPC's ILIKE filter. The first term is
       // usually the most specific (e.g. region=africa → 'africa').
@@ -276,7 +287,7 @@ export async function GET(req: NextRequest) {
       const offset = (page - 1) * perPage;
       const args = {
         q:             safeQ,
-        v_category:    category || null,
+        v_category:    categories[0] || null,
         v_type:        type     || null,
         v_level:       level    || null,
         v_remote_only: remote,
@@ -312,7 +323,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({
+      return jobsJson({
         jobs, total, page, perPage,
         pages: Math.max(1, Math.ceil(total / perPage)),
         ...(fuzzy ? { fuzzy: true } : {}),
@@ -332,7 +343,8 @@ export async function GET(req: NextRequest) {
       .eq('is_active', true)
       .or(notExpired)
       .or(notFlagged);
-    if (category) query = query.eq('category', category);
+    if (categories.length === 1) query = query.eq('category', categories[0]);
+    else if (categories.length > 1) query = query.in('category', categories);
     if (type)     query = query.eq('type', type);
     if (level)    query = query.eq('level', level);
     if (remote && !workplace) {
@@ -353,7 +365,7 @@ export async function GET(req: NextRequest) {
     // Country takes priority over region (more specific). Both fall through
     // to a location ILIKE substring match if not in the REGION_TERMS map.
     if (workplace) query = applyWorkplaceFilter(query, workplace);
-    if (workplace && safeQ) query = query.textSearch('search_vector', safeQ, { type: 'websearch', config: 'english' });
+    if ((workplace || categories.length > 1) && safeQ) query = query.textSearch('search_vector', safeQ, { type: 'websearch', config: 'english' });
     const locFilter = country || region;
     // Array.isArray guards against user-supplied `locFilter` values that name an
     // inherited Object.prototype member ('constructor', 'toString', …): bare
@@ -416,7 +428,7 @@ export async function GET(req: NextRequest) {
     const total = count ?? 0;
 
     if (jobs.length > 0) {
-      return NextResponse.json({
+      return jobsJson({
         jobs: jobs.map((j: any) => transformJob(j, seePaid, seeCompany)),
         total,
         page, perPage,
@@ -424,7 +436,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ jobs: [], total, page, perPage, pages: Math.max(1, Math.ceil(total / perPage)) });
+    return jobsJson({ jobs: [], total, page, perPage, pages: Math.max(1, Math.ceil(total / perPage)) });
   } catch (err: any) {
     // Previously returned an empty `{ jobs: [] }` on any thrown error,
     // which made a real DB outage look identical to "your filters
@@ -432,7 +444,7 @@ export async function GET(req: NextRequest) {
     // report. Return a 500 with a structured shape so the client can
     // render a real error state, and log so ops sees it.
     logError({ event: 'jobs.get_failed', error: err?.message ?? String(err) });
-    return NextResponse.json(
+    return jobsJson(
       { error: 'Failed to load jobs', jobs: [], total: 0, page, perPage, pages: 0 },
       { status: 500 },
     );
@@ -734,7 +746,7 @@ function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = tru
     salaryMin:    j.salary_min ?? null,
     salaryMax:    j.salary_max ?? null,
     currency:     j.currency ?? 'USD',
-    location:     j.location ?? 'Worldwide',
+    location:     j.location ?? 'Location not specified',
     timezone:     j.timezone ?? null,
     description:  scrub(j.description ?? ''),
     requirements: Array.isArray(j.requirements) ? j.requirements.map((r: any) => scrub(String(r))) : (j.requirements ?? null),
@@ -758,7 +770,7 @@ function transformJob(j: any, seePaid: boolean = true, seeCompany: boolean = tru
     isNew:        j.is_new ?? false,
     source:       j.source ?? 'manual',
     sourceUrl:    seeCompany ? (j.source_url ?? null) : null,
-    remote:       j.remote ?? true,
+    remote:       j.remote === true,
     isActive:     j.is_active ?? true,
     // Moderation state, for the admin views. Public responses never carry a
     // flagged row (the listing filters them out), so this reads false there.
