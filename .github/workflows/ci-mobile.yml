@@ -45,3 +45,80 @@ jobs:
 
       - name: Unit tests (mobile)
         run: npm test
+
+  android-smoke:
+    name: mobile · Android native smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      # A deterministic demo build: no hosted auth, payments, or production data.
+      EXPO_PUBLIC_SUPABASE_URL: ''
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ''
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install and generate Android project
+        run: |
+          npm ci
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Mark build as QA demo
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path('android/app/build.gradle')
+          text = gradle.read_text()
+          needle = 'release {\n'
+          if needle not in text:
+              raise SystemExit('Could not locate Android release build type')
+          gradle.write_text(text.replace(needle, 'release {\n            applicationIdSuffix ".qa"\n', 1))
+          strings = Path('android/app/src/main/res/values/strings.xml')
+          text = strings.read_text()
+          strings.write_text(text.replace('RemoteJobs44', 'RemoteJobs44 QA', 1))
+          PY
+
+      - name: Build standalone QA APK
+        run: ./gradlew assembleRelease --no-daemon
+        working-directory: mobile/android
+
+      - name: Run emulator journey
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: cd mobile && python3 scripts/android-smoke.py
+
+      - name: Upload Android evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-smoke-evidence
+          path: android-smoke-artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload QA demo APK
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: remotejobs44-qa-demo-apk
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14

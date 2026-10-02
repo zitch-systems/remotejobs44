@@ -12,7 +12,9 @@ type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
 // Hard cap on values per request. The search_vector GIN trigger makes wide
 // UPDATEs heavier, and a long IN list is a slow scan regardless.
-const MAX_URLS_PER_BATCH = 20;
+const MAX_URLS_PER_BATCH = 5;
+const MAX_WRITE_ATTEMPTS = 12;
+const WRITE_BUDGET_MS = 20_000;
 
 // Cap on the raw bytes of apply_url the IN list may carry. This is the limit
 // that actually bites: PostgREST takes filters in the QUERY STRING, so
@@ -67,9 +69,53 @@ function toUrlList(urls: Array<string | null | undefined>): string[] {
   return Array.from(new Set(urls.filter((u): u is string => !!u)));
 }
 
+type SupabaseError = { message: string; code?: string | null };
+
+function isStatementTimeout(error: SupabaseError): boolean {
+  return error.code === '57014' || /statement timeout|canceling statement/i.test(error.message);
+}
+
+export class LastSeenUpdateError extends Error {
+  constructor(context: string | undefined, failures: SupabaseError[]) {
+    const first = failures[0];
+    super(`last_seen_at update failed${context ? ` for ${context}` : ''}: ${first?.message ?? 'unknown error'}`);
+    this.name = 'LastSeenUpdateError';
+  }
+}
+
+async function runSplitWrites(
+  batches: string[][],
+  write: (batch: string[]) => Promise<SupabaseError | null>,
+): Promise<SupabaseError[]> {
+  const failures: SupabaseError[] = [];
+  const queue = [...batches];
+  // Every healthy initial batch must get one attempt. The extra allowance is
+  // only for timeout splits; the wall-clock budget remains the hard stop.
+  const maxAttempts = Math.max(MAX_WRITE_ATTEMPTS, batches.length * 3);
+  const deadline = Date.now() + WRITE_BUDGET_MS;
+  let attempts = 0;
+  while (queue.length > 0) {
+    const batch = queue.shift()!;
+    if (attempts >= maxAttempts || Date.now() >= deadline) {
+      failures.push({ message: 'freshness write retry budget exhausted' });
+      break;
+    }
+    attempts++;
+    const error = await write(batch);
+    if (!error) continue;
+    if (isStatementTimeout(error) && batch.length > 1) {
+      const middle = Math.ceil(batch.length / 2);
+      queue.unshift(batch.slice(middle), batch.slice(0, middle));
+    } else {
+      failures.push(error);
+    }
+  }
+  return failures;
+}
+
 // Bump last_seen_at for the given apply_urls. Never flips is_active — an admin
-// soft-delete must stay deleted. Best-effort: a failure here must not fail the
-// caller's primary work, but it IS logged (per batch) rather than discarded.
+// soft-delete must stay deleted. A failed freshness write is surfaced so the
+// caller cannot record the source run as successful and let jobs silently age.
 // Returns the number of rows touched.
 export async function touchLastSeen(
   supabase: AdminSupabase,
@@ -80,7 +126,7 @@ export async function touchLastSeen(
   if (list.length === 0) return 0;
   const now = new Date().toISOString();
   let touched = 0;
-  for (const batch of batchByLength(list)) {
+  const failures = await runSplitWrites(batchByLength(list), async batch => {
     try {
       const { count, error } = await supabase
         .from('jobs')
@@ -95,9 +141,10 @@ export async function touchLastSeen(
           batch: batch.length,
           error: error.message,
         });
-        continue;
+        return error;
       }
       touched += count ?? 0;
+      return null;
     } catch (err: any) {
       logWarn({
         event: 'jobs.touch_last_seen_threw',
@@ -105,8 +152,10 @@ export async function touchLastSeen(
         batch: batch.length,
         error: err?.message ?? String(err),
       });
+      return { message: err?.message ?? String(err), code: err?.code };
     }
-  }
+  });
+  if (failures.length > 0) throw new LastSeenUpdateError(context, failures);
   return touched;
 }
 
@@ -125,31 +174,30 @@ export async function markSeenAndReactivate(
   if (list.length === 0) return 0;
   const now = new Date().toISOString();
   let reactivated = 0;
-  for (const batch of batchByLength(list)) {
+  const failures = await runSplitWrites(batchByLength(list), async batch => {
     try {
-      // Reactivate the retired ones first so the count is exact…
-      const { data, error: reErr } = await supabase
+      // Count retired rows before the write, then update the batch once. The
+      // old two-UPDATE fallback rewrote reactivated rows twice and doubled
+      // trigger/index maintenance during an already degraded database path.
+      const { data, error: readErr } = await supabase
         .from('jobs')
-        .update({ is_active: true, last_seen_at: now })
+        .select('id')
         .in('apply_url', batch)
-        .eq('is_active', false)
-        .select('id');
-      if (reErr) {
+        .eq('is_active', false);
+      if (readErr) {
         logWarn({
-          event: 'jobs.mark_seen_reactivate_failed',
+          event: 'jobs.mark_seen_reactivate_read_failed',
           context: context ?? null,
           batch: batch.length,
-          error: reErr.message,
+          error: readErr.message,
         });
-      } else {
-        reactivated += data?.length ?? 0;
+        return readErr;
       }
-      // …then keep the already-active ones fresh.
+      const inactive = data?.length ?? 0;
       const { error: freshErr } = await supabase
         .from('jobs')
-        .update({ last_seen_at: now })
-        .in('apply_url', batch)
-        .eq('is_active', true);
+        .update({ is_active: true, last_seen_at: now })
+        .in('apply_url', batch);
       if (freshErr) {
         logWarn({
           event: 'jobs.mark_seen_touch_failed',
@@ -157,7 +205,10 @@ export async function markSeenAndReactivate(
           batch: batch.length,
           error: freshErr.message,
         });
+        return freshErr;
       }
+      reactivated += inactive;
+      return null;
     } catch (err: any) {
       logWarn({
         event: 'jobs.mark_seen_threw',
@@ -165,7 +216,9 @@ export async function markSeenAndReactivate(
         batch: batch.length,
         error: err?.message ?? String(err),
       });
+      return { message: err?.message ?? String(err), code: err?.code };
     }
-  }
+  });
+  if (failures.length > 0) throw new LastSeenUpdateError(context, failures);
   return reactivated;
 }

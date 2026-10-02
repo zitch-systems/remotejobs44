@@ -66,7 +66,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   applyTo: (job) => {
     if (job.id in get().applied) return; // already applied — don't double-count
     notifySuccess();
-    toast('Application sent', 'success');
+    toast('Application tracked', 'success');
     // The free-trial allowance is measured against the size of `applied`, so
     // optimistically adding the row here both updates the tracker and consumes
     // one trial slot; a rollback below frees it again. No separate counter.

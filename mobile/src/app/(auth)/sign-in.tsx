@@ -86,14 +86,23 @@ export default function SignIn() {
       enterDemo();
       return;
     }
-    if (!email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       setDialog({ title: 'Missing details', message: 'Enter your email and password to continue.', tone: 'info' });
+      return;
+    }
+    if (isSignup && !name.trim()) {
+      setDialog({ title: 'Missing details', message: 'Enter your full name to create an account.', tone: 'info' });
+      return;
+    }
+    if (isSignup && password.length < 8) {
+      setDialog({ title: 'Password too short', message: 'Use at least 8 characters.', tone: 'info' });
       return;
     }
     setBusy(true);
     try {
       if (isSignup) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const { data, error } = await supabase.auth.signUp({ email: normalizedEmail, password, options: { data: { full_name: name.trim() } } });
         if (error) throw error;
         if (!data.session) {
           setDialog({
@@ -104,7 +113,7 @@ export default function SignIn() {
           setMode('signin');
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (error) throw error;
       }
       // On success the auth listener flips `authed` and (auth)/_layout redirects.

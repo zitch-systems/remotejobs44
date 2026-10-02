@@ -3,6 +3,15 @@
 // directly (see filters.test.ts).
 import type { Job } from './types';
 
+export type WorkplaceFilter = 'all' | 'remote' | 'onsite' | 'hybrid' | 'relocation';
+export const WORKPLACE_OPTIONS: { label: string; value: WorkplaceFilter }[] = [
+  { label: 'All jobs', value: 'all' },
+  { label: 'Remote', value: 'remote' },
+  { label: 'On-site', value: 'onsite' },
+  { label: 'Hybrid', value: 'hybrid' },
+  { label: 'Relocation', value: 'relocation' },
+];
+
 export type ExperienceLevel = 'Any' | 'Entry' | 'Mid' | 'Senior' | 'Lead';
 
 export const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Any', 'Entry', 'Mid', 'Senior', 'Lead'];

@@ -31,6 +31,9 @@ export interface Job {
   location: string;
   type: string; // Full-time / Contract
   level: string; // Senior / Mid
+  workplaceType?: 'remote' | 'onsite' | 'hybrid' | 'unknown';
+  relocationSupported?: boolean;
+  visaSponsorship?: boolean;
   applyUrl?: string; // external apply link (company site), when available
   applyEmail?: string; // apply-by-email address, when available
   tags: JobTag[];

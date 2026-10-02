@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Dependency-free Android UI smoke test for the demo/QA APK.
+
+Uses only adb and Android's bundled UIAutomator. Artifacts are intentionally
+written outside the source tree so CI can upload them even after a failure.
+"""
+
+import os
+import re
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+PACKAGE = os.environ.get("ANDROID_SMOKE_PACKAGE", "com.remotejobs44.app.qa")
+APK = os.environ.get("ANDROID_SMOKE_APK", "android/app/build/outputs/apk/release/app-release.apk")
+ARTIFACTS = Path(os.environ.get("ANDROID_SMOKE_ARTIFACTS", "../android-smoke-artifacts"))
+ARTIFACTS.mkdir(parents=True, exist_ok=True)
+step_number = 0
+
+
+def adb(*args: str, check: bool = True, capture: bool = True) -> str:
+    result = subprocess.run(
+        ["adb", *args], text=True, stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.STDOUT if capture else None,
+    )
+    if check and result.returncode:
+        raise RuntimeError(f"adb {' '.join(args)} failed:\n{result.stdout}")
+    return result.stdout or ""
+
+
+def hierarchy() -> ET.Element:
+    adb("shell", "uiautomator", "dump", "/sdcard/window.xml")
+    xml = adb("shell", "cat", "/sdcard/window.xml")
+    (ARTIFACTS / "last-window.xml").write_text(xml, encoding="utf-8")
+    return ET.fromstring(xml)
+
+
+def value(node: ET.Element) -> str:
+    return node.attrib.get("content-desc") or node.attrib.get("text") or ""
+
+
+def nodes_matching(label: str, contains: bool = False) -> list[ET.Element]:
+    nodes = []
+    for node in hierarchy().iter("node"):
+        candidate = value(node)
+        if (label in candidate) if contains else (candidate == label):
+            nodes.append(node)
+    return nodes
+
+
+def wait_for(label: str, contains: bool = False, timeout: int = 30) -> list[ET.Element]:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        found = nodes_matching(label, contains)
+        if found:
+            return found
+        assert_healthy()
+        time.sleep(1)
+    raise AssertionError(f"Timed out waiting for {'text containing' if contains else 'text'} {label!r}")
+
+
+def center(node: ET.Element) -> tuple[int, int]:
+    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.attrib["bounds"])
+    if not match:
+        raise AssertionError(f"Missing bounds on {value(node)!r}")
+    x1, y1, x2, y2 = map(int, match.groups())
+    return (x1 + x2) // 2, (y1 + y2) // 2
+
+
+def tap(label: str, *, contains: bool = False, last: bool = False) -> None:
+    found = wait_for(label, contains)
+    node = found[-1] if last else found[0]
+    x, y = center(node)
+    adb("shell", "input", "tap", str(x), str(y))
+    time.sleep(1)
+    assert_healthy()
+
+
+def screenshot(name: str) -> None:
+    global step_number
+    step_number += 1
+    target = ARTIFACTS / f"{step_number:02d}-{name}.png"
+    with target.open("wb") as output:
+        result = subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=output)
+    if result.returncode:
+        raise RuntimeError(f"Could not capture {target}")
+
+
+def logcat() -> str:
+    output = adb("logcat", "-d", "-v", "threadtime", check=False)
+    (ARTIFACTS / "logcat.txt").write_text(output, encoding="utf-8")
+    return output
+
+
+def assert_healthy() -> None:
+    foreground = adb("shell", "dumpsys", "activity", "activities", check=False)
+    resumed = next((line for line in foreground.splitlines() if "mResumedActivity" in line), "")
+    if f"{PACKAGE}/" not in resumed:
+        raise AssertionError(f"{PACKAGE} is no longer the foreground activity")
+    output = logcat()
+    crashes = re.findall(
+        r"FATAL EXCEPTION[\s\S]{0,1200}?Process: " + re.escape(PACKAGE) + r"[^\n]*"
+        r"|Fatal signal[^\n]*(?:\(" + re.escape(PACKAGE) + r"\)|" + re.escape(PACKAGE) + r")",
+        output,
+    )
+    crashes += re.findall(r"ReactNativeJS[^\n]*(?:Unhandled JS Exception|Error:)", output)
+    crashes += re.findall(r"ANR in " + re.escape(PACKAGE) + r"[^\n]*", output)
+    if crashes:
+        raise AssertionError("Native crash detected:\n" + "\n".join(crashes[-8:]))
+
+
+def main() -> None:
+    try:
+        adb("wait-for-device")
+        adb("install", "-r", APK)
+        adb("shell", "pm", "clear", PACKAGE)
+        adb("logcat", "-c")
+        adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
+        time.sleep(2)
+
+        wait_for("70,000+ remote jobs")
+        screenshot("onboarding")
+        tap("Next")
+        wait_for("Matches that fit you")
+        tap("Next")
+        wait_for("Never miss a role")
+        tap("Get started")
+
+        wait_for("The world's remote jobs,", contains=True)
+        screenshot("sign-in")
+        # The QA APK deliberately has no backend environment, so this exercises
+        # the sign-in affordance and enters the app's built-in demo session.
+        tap("Sign in", last=True)
+        wait_for("Home")
+        screenshot("feed")
+
+        tap("Search")
+        wait_for("Search remote jobs…")
+        tap("Search remote jobs…")
+        adb("shell", "input", "text", "Engineer")
+        adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+        time.sleep(2)
+        screenshot("jobs-search")
+
+        cards = [n for n in hierarchy().iter("node") if re.search(r" at .+, \d+% match", value(n))]
+        if not cards:
+            raise AssertionError("Search produced no tappable job card")
+        selected_job = value(cards[0]).split(" at ", 1)[0]
+        x, y = center(cards[0])
+        adb("shell", "input", "tap", str(x), str(y))
+        wait_for(selected_job)
+        screenshot("job-detail")
+        tap("Save")
+
+        tap("Back")
+        wait_for("Search")
+        tap("Saved")
+        wait_for("1 job saved")
+        screenshot("saved")
+        tap("Profile")
+        wait_for("Profile strength")
+        screenshot("profile")
+        assert_healthy()
+        print("Android smoke journey passed: onboarding, demo sign-in, feed, search, detail, saved, profile")
+    except Exception as exc:
+        try:
+            screenshot("failure")
+            logcat()
+            hierarchy()
+        except Exception:
+            pass
+        print(f"ANDROID SMOKE FAILED: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        logcat()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

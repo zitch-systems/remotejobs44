@@ -10,7 +10,9 @@ describe('syncATSSnapshot', () => {
     const rows = Array.from({ length: 61 }, (_, i) => ({ apply_url: `https://example.test/jobs/${i}` }));
     const result = await syncATSSnapshot({ rpc } as any, 'https://example.test/board', rows, true);
     expect(result.updated).toBe(61);
-    expect(rpc.mock.calls.slice(0, -1).map(([, args]) => args.p_jobs.length)).toEqual([25, 25, 11]);
+    expect(rpc.mock.calls.slice(0, -1).map(([, args]) => args.p_jobs.length)).toEqual([
+      ...Array(12).fill(5), 1,
+    ]);
     expect(rpc.mock.calls.at(-1)?.[0]).toBe('retire_missing_ats_jobs');
   });
   it('updates metadata and retires missing jobs only for complete snapshots', async () => {

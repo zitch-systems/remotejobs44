@@ -232,7 +232,7 @@ export default function JobDetail() {
               {job.verified ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.32)' }}>
                   <BadgeCheck size={13} color="#4ade80" />
-                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>Verified employer</Txt>
+                  <Txt style={{ fontFamily: fonts.displayBold, fontSize: 11, color: '#86efac' }}>{job.company} · Verified</Txt>
                 </View>
               ) : null}
             </View>

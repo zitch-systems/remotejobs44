@@ -13,15 +13,18 @@ import aesjs from 'aes-js';
 
 // 256-bit key, AES-CTR.
 const KEY_BYTES = 256 / 8;
+// A device with an unavailable keystore may keep the current login in memory,
+// but must never persist its refresh token in plaintext.
+const volatileItems = new Map<string, string>();
 
 /**
  * Resilient storage: encrypt at rest when the crypto + secure-store native
- * modules are available; otherwise fall back to plain AsyncStorage so a missing
- * keystore / crypto module can NEVER crash auth or lose the session. The
- * presence of a SecureStore key for `key` tells getItem which path was used.
+ * modules are available; otherwise keep only a process-local session. A cold
+ * start then requires sign-in again instead of leaving tokens unencrypted.
  */
 export const LargeSecureStore = {
   async getItem(key: string): Promise<string | null> {
+    if (volatileItems.has(key)) return volatileItems.get(key)!;
     const stored = await AsyncStorage.getItem(key);
     if (stored == null) return null;
     let keyHex: string | null = null;
@@ -30,7 +33,9 @@ export const LargeSecureStore = {
     } catch {
       keyHex = null;
     }
-    if (!keyHex) return stored; // stored as plaintext (no/failed encryption)
+    // Missing keys also occur after an Android backup is restored. Ciphertext
+    // without its key, and legacy plaintext fallback sessions, require sign-in.
+    if (!keyHex) return null;
     try {
       const cipher = new aesjs.ModeOfOperation.ctr(aesjs.utils.hex.toBytes(keyHex), new aesjs.Counter(1));
       return aesjs.utils.utf8.fromBytes(cipher.decrypt(aesjs.utils.hex.toBytes(stored)));
@@ -46,18 +51,24 @@ export const LargeSecureStore = {
       const ciphertext = aesjs.utils.hex.fromBytes(cipher.encrypt(aesjs.utils.utf8.toBytes(value)));
       await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey));
       await AsyncStorage.setItem(key, ciphertext);
+      volatileItems.delete(key);
     } catch {
-      // Crypto / keystore unavailable on this device/build — persist plaintext
-      // so sign-in still works (clear any stale key so getItem reads it raw).
+      volatileItems.set(key, value);
+      // Remove any previous durable value; never write the unencrypted token.
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch {
+        /* an old encrypted value remains unusable once its key is removed */
+      }
       try {
         await SecureStore.deleteItemAsync(key);
       } catch {
         /* ignore */
       }
-      await AsyncStorage.setItem(key, value);
     }
   },
   async removeItem(key: string): Promise<void> {
+    volatileItems.delete(key);
     await AsyncStorage.removeItem(key);
     try {
       await SecureStore.deleteItemAsync(key);

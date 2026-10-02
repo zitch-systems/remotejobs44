@@ -7,6 +7,7 @@ import { notExpired as visibilityNotExpired, NOT_FLAGGED } from '@/lib/jobs-visi
 import { MOCK_JOBS } from '@/lib/mock-data';
 import { rateLimit, getIP } from '@/lib/rate-limit';
 import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getBearerRequesterPlan } from '@/lib/auth/bearer-requester-plan';
 import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { requireAdmin } from '@/lib/admin/auth';
@@ -134,7 +135,8 @@ export async function GET(req: NextRequest) {
     // reads from auth.users + public.profiles, both safe to query as
     // anon/authenticated.
     const sessionClient = await createServerSupabaseClient();
-    const requesterPlan = await getRequesterPlan(sessionClient);
+    const bearerPlan = await getBearerRequesterPlan(req);
+    const requesterPlan = bearerPlan ?? await getRequesterPlan(sessionClient);
     const seePaid = canSeePaidFields(requesterPlan);
     // Employer identity (company/logo/source_url) is Pro-only, mirroring the
     // /jobs/[id] server-side mask — without this, anyone could paginate the

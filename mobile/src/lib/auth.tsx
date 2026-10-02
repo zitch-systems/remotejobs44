@@ -38,11 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) captureError(error, { scope: 'restore-session' });
+        setSession(data.session);
+      })
+      .catch((error) => captureError(error, { scope: 'restore-session' }))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
     });
@@ -90,11 +96,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Remove this user's push tokens while still authenticated (RLS),
           // so a shared device stops delivering their alerts after sign-out.
           const uid = session?.user?.id;
-          if (uid) await clearPushTokens(uid);
           try {
-            await supabase.auth.signOut();
+            if (uid) await clearPushTokens(uid);
           } catch {
-            /* ignore network errors on sign-out */
+            /* token cleanup is best-effort and must never block sign-out */
+          }
+          try {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              captureError(error, { scope: 'sign-out' });
+              await supabase.auth.signOut({ scope: 'local' });
+            }
+          } catch (error) {
+            captureError(error, { scope: 'sign-out' });
+            try {
+              await supabase.auth.signOut({ scope: 'local' });
+            } catch {
+              /* local UI/store state is still cleared below */
+            }
           }
         }
         setDemo(false);

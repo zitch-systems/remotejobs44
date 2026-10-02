@@ -2,7 +2,7 @@
 // helpers; no React/store imports so the store can depend on it cleanly).
 // RLS scopes every row to auth.uid(); we still pass user_id explicitly.
 import { supabase } from './supabase';
-import { rowToJob } from './jobs';
+import { fetchJobsByIds } from './jobs';
 import { dbToStatus } from './format';
 import type { AppStatus, Job } from './types';
 
@@ -16,9 +16,6 @@ export { dbToStatus } from './format';
 // optimistic local state still updates).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s: string): boolean => UUID_RE.test(s);
-
-const JOB_COLUMNS =
-  'id,title,company,logo,category,type,level,location,description,requirements,skills,salary_min,salary_max,currency,remote,featured,posted_at';
 
 export async function fetchSavedIds(userId: string): Promise<string[]> {
   const { data, error } = await supabase.from('saved_jobs').select('job_id').eq('user_id', userId);
@@ -51,8 +48,6 @@ export async function applyRemote(userId: string, job: Job): Promise<void> {
   const { error } = await supabase.from('applications').insert({
     user_id: userId,
     job_id: job.id,
-    job_title: job.role,
-    company: job.company,
     status: 'applied',
   });
   if (error) throw error;
@@ -82,15 +77,19 @@ export interface ApplicationItem {
 export async function fetchApplicationItems(userId: string): Promise<ApplicationItem[]> {
   const { data, error } = await supabase
     .from('applications')
-    .select(`status, notes, applied_at, jobs(${JOB_COLUMNS})`)
+    .select('job_id,status,notes,applied_at')
     .eq('user_id', userId)
     .order('applied_at', { ascending: false });
   if (error) throw error;
+  const rows = (data ?? []) as { job_id: string; status: string; notes: string | null; applied_at: string | null }[];
+  const jobs = await fetchJobsByIds(rows.map((row) => row.job_id));
+  const byId = new Map(jobs.map((job) => [job.id, job]));
   const items: ApplicationItem[] = [];
-  for (const row of (data ?? []) as any[]) {
-    if (!row.jobs) continue;
+  for (const row of rows) {
+    const job = byId.get(row.job_id);
+    if (!job) continue;
     items.push({
-      job: rowToJob(row.jobs),
+      job,
       status: dbToStatus(row.status),
       notes: (row.notes as string | null) ?? null,
       appliedAt: (row.applied_at as string | null) ?? null,
@@ -103,11 +102,9 @@ export async function fetchApplicationItems(userId: string): Promise<Application
 export async function fetchSavedJobs(userId: string): Promise<Job[]> {
   const { data, error } = await supabase
     .from('saved_jobs')
-    .select(`jobs(${JOB_COLUMNS})`)
+    .select('job_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  const jobs: Job[] = [];
-  for (const row of (data ?? []) as any[]) if (row.jobs) jobs.push(rowToJob(row.jobs));
-  return jobs;
+  return fetchJobsByIds((data ?? []).map((row: { job_id: string }) => row.job_id));
 }

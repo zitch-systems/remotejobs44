@@ -23,9 +23,9 @@
 // fail fast with a clear message rather than opening a browser that can't return.
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
+import { parseAuthCallbackUrl } from './auth-callback';
 
 // Lets the in-app browser settle any pending auth session on cold start.
 WebBrowser.maybeCompleteAuthSession();
@@ -83,10 +83,10 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<void>
     );
   }
 
-  const { params, errorCode } = QueryParams.getQueryParams(result.url);
-  if (errorCode) throw new Error(errorCode);
-  if (!params.code) throw new Error('No authorization code returned from the provider.');
+  const callback = parseAuthCallbackUrl(result.url);
+  if (callback.error) throw new Error(callback.error);
+  if (!callback.code) throw new Error('No authorization code returned from the provider.');
 
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(callback.code);
   if (exchangeError) throw exchangeError;
 }

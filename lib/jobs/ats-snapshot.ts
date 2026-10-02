@@ -4,7 +4,7 @@ import { logWarn } from '@/lib/log';
 
 type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 
-const METADATA_CHUNK = 25;
+const METADATA_CHUNK = 5;
 
 export interface ATSSnapshotResult {
   updated: number;
@@ -44,7 +44,15 @@ export async function syncATSSnapshot(
       // Preserve the pre-migration freshness behavior if the metadata RPC is
       // temporarily unavailable. This fallback also keeps deployment ordering
       // safe while the additive migration reaches PostgREST's schema cache.
-      result.reactivated += await markSeenAndReactivate(supabase, payload.map(row => row.apply_url), context);
+      try {
+        result.reactivated += await markSeenAndReactivate(supabase, payload.map(row => row.apply_url), context);
+      } catch (fallbackError: any) {
+        logWarn({
+          event: 'ats_snapshot.freshness_fallback_failed',
+          context: context ?? null,
+          error: fallbackError?.message ?? String(fallbackError),
+        });
+      }
       continue;
     }
     const summary = (data && typeof data === 'object') ? data as Record<string, unknown> : {};

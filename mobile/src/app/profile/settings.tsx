@@ -69,6 +69,7 @@ export default function Settings() {
   const { profile } = useProfile();
   const email = user?.email ?? profile.email ?? '';
   const [deleting, setDeleting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   const changePassword = async () => {
@@ -77,10 +78,13 @@ export default function Settings() {
       return;
     }
     try {
+      setResetting(true);
       await sendPasswordReset(email);
       toast('Password reset link sent to your email.', 'success');
     } catch {
       toast('Could not send the reset link. Try again.', 'error');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -134,7 +138,7 @@ export default function Settings() {
               </Txt>
             </Card>
             <Card style={{ paddingVertical: 2 }}>
-              <Row icon={<KeyRound size={18} color={colors.fg3} />} label="Change password" onPress={changePassword} last />
+              <Row icon={<KeyRound size={18} color={colors.fg3} />} label="Change password" loading={resetting} onPress={changePassword} last />
             </Card>
           </View>
         ) : null}
