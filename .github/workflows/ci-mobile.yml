@@ -70,7 +70,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
 
       - name: Install and generate Android project
         run: |
@@ -93,7 +92,7 @@ jobs:
           PY
 
       - name: Build standalone QA APK
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
         working-directory: mobile/android
 
       - name: Run emulator journey
