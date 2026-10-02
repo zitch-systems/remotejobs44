@@ -12,15 +12,15 @@ import { LargeSecureStore } from './secure-store-adapter';
 import { persistentStorage } from './persistent-storage';
 import { fetchWithTimeout } from './fetch-timeout';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 // Matches @supabase/supabase-js SupabaseClient's documented default key
 // construction (`sb-${projectRef}-auth-token`). Used for fail-closed logout.
-export const supabaseAuthStorageKey = `sb-${new URL(url || 'https://placeholder.supabase.co').hostname.split('.')[0]}-auth-token`;
+export const supabaseAuthStorageKey = `sb-${new URL(supabaseUrl || 'https://placeholder.supabase.co').hostname.split('.')[0]}-auth-token`;
 
 /** True only when both public env vars are present (see .env.example). */
-export const isSupabaseConfigured = Boolean(url && anonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 // Encrypted storage on device; plain AsyncStorage on web (no SecureStore there).
 export const supabaseAuthStorage = Platform.OS === 'web' ? persistentStorage : LargeSecureStore;
@@ -28,8 +28,8 @@ export const supabaseAuthStorage = Platform.OS === 'web' ? persistentStorage : L
 // Fall back to harmless placeholders so createClient() doesn't throw at import
 // time when env is missing — the UI gates real calls on isSupabaseConfigured.
 export const supabase = createClient(
-  url || 'https://placeholder.supabase.co',
-  anonKey || 'placeholder-anon-key',
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key',
   {
     global: { fetch: fetchWithTimeout },
     auth: {

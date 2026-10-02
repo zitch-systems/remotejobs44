@@ -1,7 +1,7 @@
 // src/app/(auth)/sign-in.tsx — Auth front door (handoff §1).
 // Segmented Sign in / Create account, email+password (real Supabase auth when
 // configured, demo otherwise), social placeholders, footer toggle + trust line.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,8 +10,9 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, User } from 'lucide-r
 import { Button, Divider, Field, Txt } from '@/components/ui';
 import { Dialog, type DialogData } from '@/components/Dialog';
 import { useAuth } from '@/lib/auth';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { signInWithProvider } from '@/lib/oauth';
+import { getOAuthAvailability, type OAuthAvailability } from '@/lib/oauth-availability';
 import { useLightStatusBarOnFocus } from '@/lib/status-bar';
 import { SEED_USER } from '@/lib/seed';
 import { fonts, palette, radii, shadows, spacing, useTheme } from '@/theme';
@@ -79,9 +80,23 @@ export default function SignIn() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<DialogData | null>(null);
+  const [providers, setProviders] = useState<OAuthAvailability>(
+    configured ? { google: true, linkedin_oidc: false } : { google: true, linkedin_oidc: true },
+  );
   const [heroSize, setHeroSize] = useState({ width: 0, height: 0 });
 
   const isSignup = mode === 'signup';
+
+  useEffect(() => {
+    if (!configured) return;
+    let active = true;
+    getOAuthAvailability(supabaseUrl, supabaseAnonKey).then((next) => {
+      if (active) setProviders(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [configured]);
 
   async function submit() {
     // No backend wired → demo straight into the app (handoff behavior).
@@ -262,6 +277,7 @@ export default function SignIn() {
               />
             </View>
 
+            {providers.google || providers.linkedin_oidc ? <>
             {/* divider */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginVertical: spacing[5] }}>
               <Divider style={{ flex: 1 }} />
@@ -273,9 +289,10 @@ export default function SignIn() {
 
             {/* social */}
             <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-              <SocialButton label="Google" tile="#fff" tileBorder mark="G" markColor="#4285f4" onPress={() => social('google')} />
-              <SocialButton label="LinkedIn" tile="#0a66c2" mark="in" markColor="#fff" onPress={() => social('linkedin')} />
+              {providers.google ? <SocialButton label="Google" tile="#fff" tileBorder mark="G" markColor="#4285f4" onPress={() => social('google')} /> : null}
+              {providers.linkedin_oidc ? <SocialButton label="LinkedIn" tile="#0a66c2" mark="in" markColor="#fff" onPress={() => social('linkedin')} /> : null}
             </View>
+            </> : null}
 
             {/* footer toggle + trust line */}
             <View style={{ marginTop: spacing[6], alignItems: 'center', gap: spacing[3] }}>

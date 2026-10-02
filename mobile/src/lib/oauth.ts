@@ -24,8 +24,9 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { supabase } from './supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
 import { parseAuthCallbackUrl } from './auth-callback';
+import { getOAuthAvailability } from './oauth-availability';
 
 // Lets the in-app browser settle any pending auth session on cold start.
 WebBrowser.maybeCompleteAuthSession();
@@ -56,6 +57,12 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<void>
         'Expo Go. Use a dev build (eas build --profile development) or sign in with ' +
         'email + password.',
     );
+  }
+
+  const availability = await getOAuthAvailability(supabaseUrl, supabaseAnonKey);
+  if (!availability[provider]) {
+    const label = provider === 'linkedin_oidc' ? 'LinkedIn' : 'Google';
+    throw new Error(`${label} sign-in is not available right now. Use email and password instead.`);
   }
 
   // Surface the exact value to allow-list — copy this into the Supabase dashboard
