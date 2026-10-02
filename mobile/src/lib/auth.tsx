@@ -14,6 +14,7 @@ import { captureError } from './sentry';
 import { settleWithin } from './promise-timeout';
 import { clearAuthSession } from './auth-signout';
 import { useAppStore } from '@/store/app';
+import { useRecentJobs } from '@/store/recent-jobs';
 
 interface AuthValue {
   session: Session | null;
@@ -64,6 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // it on sign-out). Runs whenever the authenticated user id changes.
   const userId = session?.user?.id ?? null;
   useEffect(() => {
+    const previousUserId = useAppStore.getState().userId;
+    if (isSupabaseConfigured && previousUserId !== userId) {
+      useRecentJobs.getState().clear();
+    }
     useAppStore.getState().setUserId(userId);
     if (!isSupabaseConfigured || !userId) return;
     let active = true;
@@ -95,6 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       enterDemo: () => setDemo(true),
       signOut: async () => {
         if (isSupabaseConfigured) {
+          // Recently viewed is device-local and may belong to a different
+          // account even though its employer fields are stored masked.
+          useRecentJobs.getState().clear();
           // Remove this user's push tokens while still authenticated (RLS),
           // so a shared device stops delivering their alerts after sign-out.
           const uid = session?.user?.id;

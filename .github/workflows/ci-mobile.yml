@@ -152,7 +152,7 @@ jobs:
 
       - name: Build standalone QA APK
         if: steps.qa-apk-cache.outputs.cache-hit != 'true'
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+        run: ./gradlew assembleRelease --no-daemon --build-cache -PreactNativeArchitectures=x86_64
         working-directory: mobile/android
 
       - name: Save QA APK
