@@ -5,7 +5,9 @@ icons + plugins, and `eas.json`'s `preview` profile is set to
 `android.buildType: "apk"`). What's left is account-side and can't be done from
 this repo's CI without your Expo credentials.
 
-There are two ways to build. **Path A is the fastest for a first APK.**
+Use **EAS as the canonical production builder** so Android signing credentials
+and the remote `versionCode` counter have one source of truth. Codemagic remains
+available for internal APKs and a manually versioned Play AAB fallback.
 
 ---
 
@@ -36,7 +38,7 @@ eas env:create --name EXPO_PUBLIC_SENTRY_DSN        --value <dsn>               
 
 ---
 
-## Path A — build locally (recommended first time)
+## Path A — EAS build (canonical)
 
 ```bash
 cd mobile
@@ -47,13 +49,24 @@ EAS builds in the cloud (~15–30 min on the free tier; it manages the Android
 keystore for you). When it finishes it prints a URL — download the **`.apk`**
 there and sideload it, or share the internal-distribution link.
 
+Before the first Play build, set EAS's remote Android version to the latest
+`versionCode` already uploaded to Play:
+
+```bash
+eas build:version:set
+eas build --platform android --profile production
+```
+
+The production profile waits for and produces an `.aab`; its remote counter
+auto-increments on later builds. Verify the completed build in EAS before upload.
+
 > Prefer no cloud at all? `npx expo prebuild -p android && cd android &&
 > ./gradlew assembleRelease` produces `app-release.apk` locally — but you need
 > the Android SDK + JDK installed and you manage signing yourself.
 
 ---
 
-## Path B — build from GitHub ("push/click → APK")
+## Path B — build from GitHub ("tag/click → artifact")
 
 A workflow is wired at `.github/workflows/eas-build-android.yml`. To enable it:
 
@@ -64,12 +77,16 @@ A workflow is wired at `.github/workflows/eas-build-android.yml`. To enable it:
 
 Then trigger a build either way:
 
-- **Actions tab → "EAS Build (Android APK)" → Run workflow** (pick `preview`), or
+- **Actions tab → "EAS Build (Android)" → Run workflow** (pick `preview` or `production`), or
 - push a tag: `git tag mobile-v1 && git push origin mobile-v1`.
 
-The job queues an EAS build and prints the build URL in its logs; download the
-`.apk` from there or the EAS dashboard. (It does **not** build on every push —
-that would burn build minutes.)
+The job waits for EAS to finish, so its result reflects the remote build. Preview
+produces an installable `.apk`; production produces a Play `.aab`. It does **not**
+build on every push.
+
+Keep one Android upload key across every builder. If Codemagic is used for an
+internal APK, configure it with the same EAS keystore so it can update an EAS
+install in place.
 
 ---
 

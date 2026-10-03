@@ -10,8 +10,15 @@ export interface ATSCompensation {
 const currency = (value: unknown): string | undefined =>
   typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase())
     ? value.trim().toUpperCase() : undefined;
-const amount = (value: unknown): number | undefined =>
+const INT4_MAX = 2_147_483_647;
+const rawAmount = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+const integerAmount = (value: unknown): number | undefined => {
+  const raw = rawAmount(value);
+  if (raw === undefined) return undefined;
+  const rounded = Math.round(raw);
+  return rounded <= INT4_MAX ? rounded : undefined;
+};
 const plain = (value: unknown, maxLength = 20_000): string | undefined => {
   if (typeof value !== 'string') return undefined;
   const text = value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ')
@@ -27,7 +34,7 @@ export function leverCompensation(posting: any): ATSCompensation {
   if (!range || !annual(range.interval)) return base;
   const code = currency(range.currency);
   if (!code) return base;
-  const min = amount(range.min), max = amount(range.max);
+  const min = integerAmount(range.min), max = integerAmount(range.max);
   if (min === undefined && max === undefined) return base;
   if (min !== undefined && max !== undefined && min > max) return base;
   return { ...base, salaryMin: min, salaryMax: max, currency: code };
@@ -45,13 +52,13 @@ export function ashbyCompensation(compensation: any): ATSCompensation {
   const salaries = components.filter((component: any) =>
     /^(salary|base)$/i.test(String(component.compensationType ?? '')) &&
     annual(component.interval) && currency(component.currencyCode) &&
-    (amount(component.minValue) !== undefined || amount(component.maxValue) !== undefined) &&
-    (amount(component.minValue) === undefined || amount(component.maxValue) === undefined ||
+    (integerAmount(component.minValue) !== undefined || integerAmount(component.maxValue) !== undefined) &&
+    (integerAmount(component.minValue) === undefined || integerAmount(component.maxValue) === undefined ||
       component.minValue <= component.maxValue));
   // Multiple location tiers or currencies cannot be collapsed to one honest range.
   if (salaries.length !== 1) return base;
   const salary = salaries[0];
-  return { ...base, salaryMin: amount(salary.minValue), salaryMax: amount(salary.maxValue),
+  return { ...base, salaryMin: integerAmount(salary.minValue), salaryMax: integerAmount(salary.maxValue),
     currency: currency(salary.currencyCode) };
 }
 
@@ -61,7 +68,7 @@ export function greenhouseCompensation(job: any): ATSCompensation {
   const annualRanges: ATSCompensation[] = [];
   for (const range of ranges) {
     const code = currency(range.currency_type);
-    const min = amount(range.min_cents), max = amount(range.max_cents);
+    const min = rawAmount(range.min_cents), max = rawAmount(range.max_cents);
     const description = [plain(range.title), plain(range.blurb)].filter(Boolean).join(' — ');
     const values = [min, max].filter((v): v is number => v !== undefined)
       .map(v => (v / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }));
@@ -73,8 +80,11 @@ export function greenhouseCompensation(job: any): ATSCompensation {
         !/\b(annual|annually|yearly|per year)\b|\/yr\b/i.test(description) ||
         /\b(hourly|per hour|per month|monthly|weekly)\b/i.test(description) ||
         !code || (!values.length) || (min !== undefined && max !== undefined && min > max)) continue;
-    annualRanges.push({ salaryMin: min === undefined ? undefined : min / 100,
-      salaryMax: max === undefined ? undefined : max / 100, currency: code });
+    const salaryMin = min === undefined ? undefined : integerAmount(min / 100);
+    const salaryMax = max === undefined ? undefined : integerAmount(max / 100);
+    if ((salaryMin === undefined && salaryMax === undefined) ||
+        (salaryMin !== undefined && salaryMax !== undefined && salaryMin > salaryMax)) continue;
+    annualRanges.push({ salaryMin, salaryMax, currency: code });
   }
   const salaryText = texts.length ? texts.join(' • ').slice(0, 240) : undefined;
   if (annualRanges.length === 1) return { ...annualRanges[0], salaryText };
@@ -82,13 +92,15 @@ export function greenhouseCompensation(job: any): ATSCompensation {
   // Some boards put pay in the post body instead of publishing pay inputs.
   // Only parse a labeled, explicitly annual range with an ISO currency code.
   const description = plain(job.content);
-  const match = description?.match(/\b(?:salary|base pay|base compensation)\b[^.;\n]{0,70}\b([A-Z]{3})\s+([\d,]{4,})(?:\s*(?:-|–|—|to)\s*(?:[A-Z]{3}\s+)?([\d,]{4,}))?[^.;\n]{0,30}\b(?:per year|annually|annual|yearly)\b/i);
+  const match = description?.match(/\b(?:base salary|salary|base pay|base compensation)\b[^.;\n]{0,70}\b([A-Z]{3})\s+([\d,]{4,})(?:\s*(?:-|–|—|to)\s*(?:[A-Z]{3}\s+)?([\d,]{4,}))?[^.;\n]{0,30}\b(?:per year|annually|annual|yearly)\b/i);
   if (!match) return {};
   const min = Number(match[2].replaceAll(',', ''));
   const max = match[3] ? Number(match[3].replaceAll(',', '')) : undefined;
+  const salaryMin = integerAmount(min);
+  const salaryMax = max === undefined ? undefined : integerAmount(max);
   const code = currency(match[1]);
   const text = match[0].trim();
-  if (!/^[A-Z]{3}$/.test(match[1]) || !code || min < 1000 ||
-      (max !== undefined && (max < min || !Number.isFinite(max)))) return { salaryText: text };
-  return { salaryMin: min, salaryMax: max, currency: code, salaryText: text };
+  if (!/^[A-Z]{3}$/.test(match[1]) || !code || salaryMin === undefined || salaryMin < 1000 ||
+      (max !== undefined && (salaryMax === undefined || max < min))) return { salaryText: text };
+  return { salaryMin, salaryMax, currency: code, salaryText: text };
 }

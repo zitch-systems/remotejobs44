@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { batchByLength, LastSeenUpdateError, touchLastSeen } from './jobs-last-seen';
+import { batchByLength, LastSeenUpdateError, markSeenAndReactivate, touchLastSeen } from './jobs-last-seen';
 
 describe('batchByLength', () => {
   it('returns no batches for an empty list', () => {
@@ -60,10 +60,14 @@ describe('batchByLength', () => {
 });
 
 describe('touchLastSeen', () => {
-  function clientFor(write: (urls: string[]) => Promise<any>) {
+  function clientFor(write: (urls: string[], freshnessFilter?: string) => Promise<any>) {
     return {
       from: () => ({
-        update: () => ({ in: (_column: string, urls: string[]) => write(urls) }),
+        update: () => ({
+          in: (_column: string, urls: string[]) => ({
+            or: (filter: string) => write(urls, filter),
+          }),
+        }),
       }),
     } as any;
   }
@@ -86,6 +90,45 @@ describe('touchLastSeen', () => {
     const urls = Array.from({ length: 100 }, (_, i) => `https://example.test/${i}`);
     await expect(touchLastSeen(clientFor(write), urls, 'large')).resolves.toBe(100);
     expect(write).toHaveBeenCalledTimes(20);
+  });
+
+  it('only writes active freshness when last_seen_at is older than six hours', async () => {
+    const write = vi.fn(async (urls: string[], filter?: string) => ({ count: urls.length, error: null }));
+    await touchLastSeen(clientFor(write), ['https://example.test/1'], 'age-gate');
+    const filter = write.mock.calls[0][1];
+    expect(filter).toMatch(/^last_seen_at\.is\.null,last_seen_at\.lt\./);
+    const cutoff = Date.parse(filter!.split('last_seen_at.lt.')[1]);
+    expect(cutoff).toBeGreaterThan(Date.now() - 6 * 60 * 60 * 1000 - 2_000);
+    expect(cutoff).toBeLessThanOrEqual(Date.now() - 6 * 60 * 60 * 1000);
+  });
+
+  it('always reactivates inactive rows but age-gates already-active rows', async () => {
+    const updates: Array<{ payload: Record<string, unknown>; active?: boolean; filter?: string }> = [];
+    const client = {
+      from: () => ({
+        select: () => ({ in: () => ({ eq: async () => ({ data: [{ id: 'retired' }], error: null }) }) }),
+        update: (payload: Record<string, unknown>) => ({
+          in: () => ({
+            eq: (_column: string, active: boolean) => {
+              const entry: { payload: Record<string, unknown>; active?: boolean; filter?: string } = { payload, active };
+              updates.push(entry);
+              const result = Promise.resolve({ error: null }) as Promise<any> & { or(filter: string): Promise<any> };
+              result.or = (filter: string) => {
+                entry.filter = filter;
+                return Promise.resolve({ error: null });
+              };
+              return result;
+            },
+          }),
+        }),
+      }),
+    } as any;
+
+    await expect(markSeenAndReactivate(client, ['https://example.test/retired'], 'reactivate')).resolves.toBe(1);
+    expect(updates).toHaveLength(2);
+    expect(updates[0]).toMatchObject({ payload: { is_active: true }, active: false });
+    expect(updates[1]).toMatchObject({ payload: { last_seen_at: expect.any(String) }, active: true });
+    expect(updates[1].filter).toMatch(/^last_seen_at\.is\.null,last_seen_at\.lt\./);
   });
 
   it('surfaces a leaf failure instead of reporting freshness success', async () => {

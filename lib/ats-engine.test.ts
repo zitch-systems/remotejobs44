@@ -33,6 +33,16 @@ describe('Ashby public board import', () => {
 });
 
 describe('ATS listing metadata', () => {
+  it.each(['greenhouse', 'lever'] as const)('rejects unsafe %s board names before any network call', async (platform) => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    for (const slug of ['../private', 'https://127.0.0.1', 'board?redirect=internal', 'board#fragment', '%2f%2f127.0.0.1', 'board\\private', '']) {
+      const result = await fetchATSJobs(platform, slug, '');
+      expect(result.error).toMatch(/Invalid .* board name/);
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('reads Greenhouse board name and any included pay without per-job requests', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/jobs?content=true')) return Response.json({ jobs: [
@@ -49,6 +59,7 @@ describe('ATS listing metadata', () => {
       salaryMax: 130000, currency: 'EUR', workplaceType: 'remote' });
     expect(result.jobs[0].logo).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ redirect: 'error' }));
   });
 
   it('keeps Lever list, closing text and nonannual salary evidence', async () => {

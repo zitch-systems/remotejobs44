@@ -1,8 +1,16 @@
-# Deploying RemoteJobs44 to the Google Play Store (Codemagic)
+# Deploying RemoteJobs44 to the Google Play Store
 
-The app builds a **signed `.aab`** via the `android-aab` workflow in
-`codemagic.yaml`. Everything below is account/ops work that can't be done from
-the repo. Package id: `com.remotejobs44.app`.
+The canonical production path is the EAS `production` profile, which owns the
+remote Android version counter and signing credentials. Run
+`eas build:version:set` once with the latest version uploaded to Play, then use
+`eas build --platform android --profile production` for signed `.aab` files.
+Package id: `com.remotejobs44.app`.
+
+The `android-aab` workflow in `codemagic.yaml` is a manual fallback. It requires
+the same upload keystore as EAS and an explicit positive `ANDROID_VERSION_CODE`
+that you have verified is greater than the latest code in Play Console. The
+workflow refuses to build when this value or the live public backend variables
+are missing; it never guesses a Play version from an unrelated CI counter.
 
 ---
 
@@ -39,17 +47,20 @@ Register at <https://play.google.com/console> ($25 one-time).
    - `EXPO_PUBLIC_SUPABASE_URL`
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
    - optional `EXPO_PUBLIC_SENTRY_DSN`
+   - `ANDROID_VERSION_CODE` (manual AAB workflow only; must exceed Play's latest)
 
-> `versionCode` is stamped automatically from Codemagic's build number (the
-> `Stamp Android versionCode` step), so you never hit a "duplicate versionCode"
-> rejection. `versionName` stays `1.0.0` in `app.json` — bump it for
-> user-visible releases.
+> Internal Codemagic APKs may use Codemagic's build number. Play AABs require the
+> explicit value above because EAS and Codemagic counters are independent.
+> `versionName` stays `1.0.0` in `app.json`; bump it for user-visible releases.
 
 ## 2. Build the AAB
 
-Run the **`android-aab`** workflow in Codemagic (Start new build → pick it).
-It runs `expo prebuild` → `gradlew bundleRelease` and produces a signed
-`.aab` (emailed + in build artifacts).
+Preferred: run **EAS Build (Android)** with the `production` profile and wait for
+the GitHub job and linked EAS build to succeed.
+
+Fallback: run the **`android-aab`** workflow in Codemagic after setting the
+verified `ANDROID_VERSION_CODE`. It runs `expo prebuild` →
+`gradlew bundleRelease` and produces a signed `.aab` in build artifacts.
 
 ## 3. Create the app + complete the listing in Play Console
 

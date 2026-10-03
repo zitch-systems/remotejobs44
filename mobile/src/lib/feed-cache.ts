@@ -6,6 +6,10 @@ import type { Job } from './types';
 
 const KEY = 'rj44-feed-cache';
 
+export async function clearFeedCache(): Promise<void> {
+  try { await AsyncStorage.removeItem(KEY); } catch { /* best effort */ }
+}
+
 // Old app versions persisted real names and paid apply channels. Never hydrate
 // those rows after an upgrade, sign-out, or subscription change.
 function isPublicCache(value: unknown): value is Job[] {

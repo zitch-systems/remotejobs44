@@ -28,16 +28,22 @@ definitions:
       name: Install JS dependencies
       script: npm ci
     set_version: &set_version
-      name: Stamp native build number from the CI build number
+      name: Stamp internal/iOS build number from the CI build number
       script: |
-        # Google Play AND the App Store both REJECT a duplicate build number, so
-        # every upload must use a higher one. CNG regenerates android/ + ios/
-        # from app.json on each prebuild, so stamp both app.json's
-        # android.versionCode (int) and ios.buildNumber (string) with
-        # Codemagic's monotonic build number BEFORE prebuild runs. versionName
-        # / CFBundleShortVersionString ("1.0.0") is unchanged — only the build
-        # number needs to be unique.
+        # Used by the internal APK and iOS workflows. The Play AAB deliberately
+        # uses an explicit ANDROID_VERSION_CODE because EAS and Codemagic have
+        # independent counters. CNG regenerates native projects after this step.
         node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const n=parseInt(process.env.PROJECT_BUILD_NUMBER||process.env.BUILD_NUMBER||'1',10);j.expo.android=j.expo.android||{};j.expo.ios=j.expo.ios||{};j.expo.android.versionCode=n;j.expo.ios.buildNumber=String(n);fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('versionCode/buildNumber =',n);"
+    validate_android_live: &validate_android_live
+      name: Validate live Android release configuration
+      script: node scripts/release-preflight.mjs --environment
+    validate_android_play: &validate_android_play
+      name: Validate live Play release configuration
+      script: node scripts/release-preflight.mjs --environment --require-android-version-code
+    set_play_version: &set_play_version
+      name: Stamp explicit Play versionCode
+      script: |
+        node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.expo.android=j.expo.android||{};j.expo.android.versionCode=Number(process.env.ANDROID_VERSION_CODE);fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('Stamped explicit Android versionCode.');"
     prebuild: &prebuild
       name: Expo prebuild (Android)
       script: npx expo prebuild --platform android --clean
@@ -71,6 +77,7 @@ workflows:
         - $HOME/.gradle/caches
     scripts:
       - *install
+      - *validate_android_live
       - *set_version
       - *prebuild
       - name: Build signed release APK
@@ -114,7 +121,8 @@ workflows:
         - $HOME/.gradle/caches
     scripts:
       - *install
-      - *set_version
+      - *validate_android_play
+      - *set_play_version
       - *prebuild
       - name: Build signed release AAB
         script: |
