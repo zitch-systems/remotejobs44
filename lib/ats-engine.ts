@@ -196,7 +196,7 @@ export async function fetchATSJobs(platform: ATSPlatform, slug: string, sourceUr
 // ── Greenhouse ─────────────────────────────────────────────────────────────
 async function fetchGreenhouse(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
   const url = `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: 'no-store' });
   if (!res.ok) throw new Error(`Greenhouse ${res.status}: ${slug} not found`);
   const data = await res.json();
   if (!Array.isArray(data.jobs)) throw new Error('Greenhouse returned no jobs array');
@@ -227,7 +227,7 @@ async function fetchGreenhouse(slug: string, sourceUrl: string): Promise<ATSFetc
 // ── Lever ──────────────────────────────────────────────────────────────────
 async function fetchLever(slug: string, sourceUrl: string): Promise<ATSFetchResult> {
   const url = `https://api.lever.co/v0/postings/${slug}?mode=json`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: 'no-store' });
   if (!res.ok) throw new Error(`Lever ${res.status}: ${slug} not found`);
   const data = await res.json();
   const postings = Array.isArray(data) ? data : data.postings ?? [];
@@ -262,7 +262,7 @@ async function fetchAshby(slug: string, sourceUrl: string): Promise<ATSFetchResu
   const boardSlug = normaliseAshbyBoardSlug(slug);
   if (!boardSlug) throw new Error('Invalid Ashby board name');
   const url = `https://api.ashbyhq.com/posting-api/job-board/${boardSlug}?includeCompensation=true`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10000), next: { revalidate: 300 } });
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000), cache: 'no-store' });
   if (!res.ok) throw new Error(`Ashby ${res.status}: ${slug} not found`);
   const data = await res.json();
   if (!Array.isArray(data.jobs ?? data.jobPostings)) throw new Error('Ashby returned no jobs array');

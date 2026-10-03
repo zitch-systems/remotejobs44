@@ -4,7 +4,7 @@
 // on success, upgrades the plan and refreshes the screen. If payments aren't
 // configured server-side yet (no PAYSTACK_SECRET_KEY / functions undeployed),
 // it falls back to the web pricing page so nothing regresses.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,7 +13,8 @@ import { ArrowLeft, Check, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { Card, IconButton, Pill, Txt } from '@/components/ui';
 import { useProfile } from '@/lib/profile';
 import { isPaid } from '@/lib/entitlements';
-import { PaymentsNotConfiguredError, startSubscription, type PaystackPlan } from '@/lib/paystack';
+import { loadOwnPendingCheckout, PaymentsNotConfiguredError, resumePendingSubscription, startSubscription, type CheckoutResult, type PaystackPlan } from '@/lib/paystack';
+import { canChooseBillingSelection } from '@/lib/plan';
 import { toast } from '@/store/toast';
 import { fonts, radii, shadows, spacing, useTheme } from '@/theme';
 
@@ -28,13 +29,13 @@ const TIERS: {
   recommended?: boolean;
 }[] = [
   { id: 'free', name: 'Free', price: '₦0', period: '', features: ['Browse 70,000+ verified jobs', 'Save favourites', '3 applications in your first week'] },
-  { id: 'daily', name: 'Day Pass', price: '₦500', period: '/ 24h', features: ['Full access for 24 hours', 'Up to 10 job applications'] },
+  { id: 'daily', name: 'Day Pass', price: '₦500', period: '/ 24h', features: ['Job applications for 24 hours', 'Up to 10 job applications'] },
   {
     id: 'pro',
     name: 'Pro Monthly',
     price: '₦2,999',
     period: '/ month',
-    features: ['Unlimited applications', 'Job alerts', 'AI CV review + interview prep'],
+    features: ['Employer names and company logos', 'Unlimited applications', 'Job alerts', 'AI CV review + interview prep'],
     recommended: true,
   },
   { id: 'annual', name: 'Pro Annual', price: '₦29,999', period: '/ year', features: ['Everything in Pro', 'Save ₦5,989 a year'] },
@@ -50,17 +51,35 @@ export default function Plans() {
   const { profile, reload } = useProfile();
   const paid = isPaid(profile.plan);
   const [busy, setBusy] = useState<TierId | null>(null);
+  const [pending, setPending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadOwnPendingCheckout().then((value) => active && setPending(Boolean(value))).catch(() => { /* preserve unknown state */ });
+    return () => { active = false; };
+  }, []);
+
+  function handleResult(result: CheckoutResult) {
+    if (result.status === 'success') {
+      setPending(false);
+      reload();
+      const msg = result.plan === 'daily' ? "Day Pass active — you're all set for 24h! 🎉" : "You're all set — welcome to Pro! 🎉";
+      toast(msg, 'success');
+    } else if (result.status === 'pending') {
+      setPending(true);
+      toast('Payment is still pending. Resume this checkout before starting another.');
+    } else {
+      setPending(false);
+    }
+  }
 
   async function choose(tier: TierId) {
     if (tier === 'free' || busy) return;
     setBusy(tier);
     try {
       const result = await startSubscription(tier as PaystackPlan);
-      if (result.status === 'success') {
-        reload();
-        const msg = result.plan === 'daily' ? "Day Pass active — you're all set for 24h! 🎉" : "You're all set — welcome to Pro! 🎉";
-        toast(msg, 'success');
-      }
+      handleResult(result);
       // 'cancelled' → stay quiet.
     } catch (e) {
       if (e instanceof PaymentsNotConfiguredError) {
@@ -97,11 +116,46 @@ export default function Plans() {
           </Txt>
         </View>
 
+        {profile.billingError ? (
+          <Txt color={colors.danger} style={{ fontSize: 13 }}>
+            We couldn&apos;t load your current billing cycle. Refresh before changing plans.
+          </Txt>
+        ) : null}
+
+        {pending ? (
+          <Pressable
+            disabled={verifying}
+            onPress={async () => {
+              setVerifying(true);
+              try {
+                const result = await resumePendingSubscription();
+                if (result) handleResult(result);
+                else setPending(false);
+              } catch (error) {
+                toast((error as Error)?.message ?? 'Could not verify payment.', 'error');
+              } finally {
+                setVerifying(false);
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Verify pending payment"
+            style={{ height: 48, borderRadius: radii.field, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, borderWidth: 1.5, borderColor: colors.infoBorder }}
+          >
+            {verifying ? <ActivityIndicator color={colors.brand} /> : <Txt style={{ fontFamily: fonts.displayBold, color: colors.brand }}>Verify pending payment</Txt>}
+          </Pressable>
+        ) : null}
+
         {TIERS.map((t) => {
-          const current = t.id === profile.plan || (profile.plan === 'pro' && t.id === 'annual');
+          const current = t.id === 'daily'
+            ? profile.plan === 'daily'
+            : t.id === 'pro'
+              ? profile.plan === 'pro' && profile.billing === 'monthly'
+              : t.id === 'annual'
+                ? profile.plan === 'pro' && profile.billing === 'annually'
+                : profile.plan === 'free';
           // Hide the Day Pass CTA for users already on a higher tier — the
           // backend rejects the purchase (upgrade-only rule) so don't offer it.
-          const downgrade = t.id === 'daily' && (profile.plan === 'pro' || profile.plan === 'admin');
+          const selectable = t.id !== 'free' && canChooseBillingSelection(profile.plan, profile.billing, t.id);
           const rec = Boolean(t.recommended);
           const loading = busy === t.id;
           return (
@@ -148,7 +202,7 @@ export default function Plans() {
                 ))}
               </View>
 
-              {t.id !== 'free' && !current ? (
+              {selectable && !current && !profile.billingError && !pending ? (
                 <Pressable
                   onPress={() => choose(t.id)}
                   disabled={loading}

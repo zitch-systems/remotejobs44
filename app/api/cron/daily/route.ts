@@ -27,6 +27,7 @@ import { requireCronSecret } from '@/lib/cron-auth';
 import { logError, logWarn } from '@/lib/log';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
 import { resolvePlan } from '@/lib/auth/plan';
+import { updateFreshnessIds } from '@/lib/jobs/daily-freshness';
 
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
@@ -127,8 +128,11 @@ export async function GET(req: NextRequest) {
   // timeout; any remaining backlog drains on the next daily run.
   // Small write batches avoid repeating the observed 500-row statement timeout.
   // Commit useful progress and resume any backlog on the next run.
-  const FRESHNESS_BATCH_SIZE = 25;
-  const FRESHNESS_MAX_BATCHES = 80;
+  const FRESHNESS_BATCH_SIZE = 5;
+  // Preserve the prior 2,000-row per-phase ceiling after reducing batches
+  // from 25 to 5; the 10-second deadline remains the normal limiting bound.
+  const FRESHNESS_MAX_ROWS = 2_000;
+  const FRESHNESS_MAX_BATCHES = Math.ceil(FRESHNESS_MAX_ROWS / FRESHNESS_BATCH_SIZE);
   const freshnessDeadline = Date.now() + 10_000;
 
   let unflaggedNew = 0;
@@ -147,14 +151,14 @@ export async function GET(req: NextRequest) {
     const ids = (rows ?? []).map((row: { id: string }) => row.id);
     if (ids.length === 0) break;
 
-    const { error: updateErr } = await supabase
+    const outcome = await updateFreshnessIds(ids, batchIds => supabase
       .from('jobs')
-      .update({ is_new: false })
-      .in('id', ids)
+      .update({ is_new: false }, { count: 'exact' })
+      .in('id', batchIds)
       .eq('is_new', true)
-      .lt('posted_at', sevenDaysAgo);
-    if (updateErr) { unflagErr = updateErr; break; }
-    unflaggedNew += ids.length;
+      .lt('posted_at', sevenDaysAgo), freshnessDeadline);
+    unflaggedNew += outcome.updated;
+    if (outcome.error) { unflagErr = outcome.error; break; }
     if (ids.length < FRESHNESS_BATCH_SIZE) break;
     if (batch === FRESHNESS_MAX_BATCHES - 1) unflagCapped = true;
   }
@@ -183,14 +187,14 @@ export async function GET(req: NextRequest) {
     const ids = (rows ?? []).map((row: { id: string }) => row.id);
     if (ids.length === 0) break;
 
-    const { error: updateErr } = await supabase
+    const outcome = await updateFreshnessIds(ids, batchIds => supabase
       .from('jobs')
-      .update({ is_active: false })
-      .in('id', ids)
+      .update({ is_active: false }, { count: 'exact' })
+      .in('id', batchIds)
       .eq('is_active', true)
-      .lt('last_seen_at', staleCutoff);
-    if (updateErr) { staleErr = updateErr; break; }
-    deactivated += ids.length;
+      .lt('last_seen_at', staleCutoff), staleDeadline);
+    deactivated += outcome.updated;
+    if (outcome.error) { staleErr = outcome.error; break; }
     if (ids.length < FRESHNESS_BATCH_SIZE) break;
     if (batch === FRESHNESS_MAX_BATCHES - 1) staleCapped = true;
   }

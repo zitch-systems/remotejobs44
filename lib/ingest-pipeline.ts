@@ -48,9 +48,9 @@ const SERP_KEY     = process.env.SERPAPI_KEY ?? '';
 // their whole board, so for them this is the real limiter.
 const MAX_JOBS_PER_SOURCE = 200;
 
-// Give custom sources a separate 15-second slot on 120-second routes.
+// Give custom sources a separate 10-second slot on 120-second routes.
 // The feed loop must not consume their entire opportunity to retry.
-const USER_SOURCES_BUDGET_MS = 15_000;
+const USER_SOURCES_BUDGET_MS = 10_000;
 
 // Wall-clock cap for the hardcoded SOURCES loop. Each source can burn ~40s in
 // the worst case (getJson's 20s timeout × 2 attempts + backoff), so a couple of
@@ -60,7 +60,10 @@ const USER_SOURCES_BUDGET_MS = 15_000;
 // alerts) unrun. On a healthy run every source answers in 1–3s and the loop
 // finishes well under this, so no legitimate source is ever skipped; the cap
 // only bites when feeds hang. Skipped sources run first next cycle.
-const HARDCODED_SOURCES_BUDGET_MS = 40_000;
+// Keep the daily route's ingest phase below ~40s in normal operation so its
+// subscription, freshness and alert phases retain at least 20–30s of the
+// 120-second function window even when a source runs near its own timeout.
+const HARDCODED_SOURCES_BUDGET_MS = 30_000;
 
 // Feed bodies larger than this aren't feeds. Mirrors /api/rss's cap.
 const MAX_FEED_BYTES = 5 * 1024 * 1024;

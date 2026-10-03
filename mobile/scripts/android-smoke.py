@@ -135,12 +135,54 @@ def assert_healthy() -> None:
         raise AssertionError("Native crash detected:\n" + "\n".join(crashes[-8:]))
 
 
+def clear_app_data() -> None:
+    adb("shell", "am", "force-stop", PACKAGE, check=False)
+    adb("shell", "pm", "clear", PACKAGE)
+
+
+def cold_launch_deep_link(uri: str) -> None:
+    adb("shell", "am", "force-stop", PACKAGE, check=False)
+    output = adb(
+        "shell", "am", "start", "-W",
+        "-a", "android.intent.action.VIEW",
+        "-d", uri,
+        "-p", PACKAGE,
+    )
+    if "Error:" in output or "unable to resolve Intent" in output:
+        raise AssertionError(f"Could not cold-launch app deep link {uri!r}:\n{output}")
+    time.sleep(2)
+    assert_healthy()
+
+
 def main() -> None:
     try:
         adb("wait-for-device")
         adb("install", "-r", APK)
-        adb("shell", "pm", "clear", PACKAGE)
         adb("logcat", "-c")
+
+        # Exercise callback failures from a fully stopped process before the
+        # regular demo journey. These links contain no authorization code,
+        # session token, or payment reference, so they cannot touch a real
+        # account or charge even if a CI environment is configured.
+        clear_app_data()
+        cold_launch_deep_link("remotejobs44://auth-callback?error=access_denied")
+        wait_for("Sign-in failed")
+        wait_for("Social sign-in was cancelled or denied. Please try again.")
+        screenshot("auth-callback-denied")
+
+        clear_app_data()
+        cold_launch_deep_link("remotejobs44://auth-callback")
+        wait_for("Sign-in failed")
+        wait_for("The sign-in link is incomplete. Return to sign in and try again.")
+        screenshot("auth-callback-missing")
+
+        clear_app_data()
+        cold_launch_deep_link("remotejobs44://paystack-return")
+        wait_for("Payment status")
+        wait_for("There is no payment from this account waiting to be verified.")
+        screenshot("payment-return-missing")
+
+        clear_app_data()
         adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
         time.sleep(2)
 
@@ -195,7 +237,10 @@ def main() -> None:
         wait_for("Profile strength")
         screenshot("profile")
         assert_healthy()
-        print("Android smoke journey passed: onboarding, demo sign-in, feed, search, detail, saved, profile")
+        print(
+            "Android smoke journey passed: callback failures, safe payment return, "
+            "onboarding, demo sign-in, feed, search, detail, saved, profile"
+        )
     except Exception as exc:
         try:
             screenshot("failure")

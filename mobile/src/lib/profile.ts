@@ -8,6 +8,8 @@ import { isSupabaseConfigured, supabase } from './supabase';
 import { useAppStore } from '@/store/app';
 import { SEED_USER } from './seed';
 import { EMPTY_DETAILS, type ExperienceItem, type ProfileDetails, type ProfileLinks } from './profile-details';
+import { subscribeEntitlementInvalidation } from './entitlement-invalidation';
+import { resolveMobilePlan } from './plan';
 
 /**
  * Upload a picked CV file to the `cvs` storage bucket (under the user's folder)
@@ -89,13 +91,13 @@ export type Plan = 'free' | 'daily' | 'pro' | 'admin';
  * expiry; an expiry in the past is the authoritative downgrade signal (mirrors
  * the web app's resolvePlan). Admins never expire.
  */
-export function resolveEffectivePlan(plan: Plan, planExpiresAt: string | null | undefined): Plan {
-  if (plan === 'admin') return 'admin';
-  if (planExpiresAt) {
-    const expiryMs = new Date(planExpiresAt).getTime();
-    if (Number.isFinite(expiryMs) && expiryMs < Date.now()) return 'free';
-  }
-  return plan;
+export function resolveEffectivePlan(
+  plan: Plan,
+  planExpiresAt: string | null | undefined,
+  role: string | null | undefined = 'user',
+  suspended = false,
+): Plan {
+  return resolveMobilePlan({ dbPlan: plan, planExpiresAt, role, suspended });
 }
 
 export interface UserProfile {
@@ -106,6 +108,8 @@ export interface UserProfile {
   cvUrl: string | null;
   /** Effective plan (already downgraded to 'free' if plan_expires_at lapsed). */
   plan: Plan;
+  billing: 'daily' | 'monthly' | 'annually' | null;
+  billingError: boolean;
   /** profiles.created_at — start of the free-trial window (null in demo mode). */
   registeredAt: string | null;
 }
@@ -123,15 +127,16 @@ const SEED_PROFILE: UserProfile = {
   completion: SEED_USER.profileStrength,
   cvUrl: SEED_USER.cvName,
   plan: 'free',
+  billing: null,
+  billingError: false,
   registeredAt: null,
 };
 
 export async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('name,email,avatar_url,profile_completion,cv_url,plan,plan_expires_at,created_at')
-    .eq('id', userId)
-    .maybeSingle();
+  const [{ data, error }, { data: subscription, error: subscriptionError }] = await Promise.all([
+    supabase.from('profiles').select('name,email,avatar_url,profile_completion,cv_url,plan,plan_expires_at,created_at,role,suspended').eq('id', userId).maybeSingle(),
+    supabase.from('subscriptions').select('billing,status,current_period_end').eq('user_id', userId).maybeSingle(),
+  ]);
   if (error) throw error;
   if (!data) return null;
   return {
@@ -141,7 +146,9 @@ export async function fetchProfile(userId: string): Promise<UserProfile | null> 
     completion: data.profile_completion ?? 20,
     cvUrl: data.cv_url ?? null,
     // Honour plan_expires_at so a lapsed Pro/daily user can't keep paid perks.
-    plan: resolveEffectivePlan((data.plan as Plan) ?? 'free', data.plan_expires_at as string | null),
+    plan: resolveEffectivePlan((data.plan as Plan) ?? 'free', data.plan_expires_at as string | null, data.role as string | null, data.suspended === true),
+    billing: !subscriptionError && subscription?.status === 'active' ? (subscription.billing as UserProfile['billing']) : null,
+    billingError: Boolean(subscriptionError),
     registeredAt: (data.created_at as string | null) ?? null,
   };
 }
@@ -204,6 +211,13 @@ export function useProfile(): { profile: UserProfile; loading: boolean; reload: 
   const [profile, setProfile] = useState<UserProfile>(SEED_PROFILE);
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
   const [nonce, setNonce] = useState(0);
+
+  useEffect(() => subscribeEntitlementInvalidation(() => {
+    // Never leave paid state visible while the authoritative refresh runs.
+    setProfile(SEED_PROFILE);
+    setLoading(true);
+    setNonce((n) => n + 1);
+  }), []);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) {

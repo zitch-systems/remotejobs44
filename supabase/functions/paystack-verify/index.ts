@@ -14,11 +14,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.106.1';
 
 // Canonical prices (kobo) + duration. Must match paystack-initialize.
-const PLANS: Record<string, { amount: number; days: number; plan: 'daily' | 'pro' }> = {
+type PlanSelection = 'daily' | 'pro' | 'annual';
+
+const PLANS: Record<PlanSelection, { amount: number; days: number; plan: 'daily' | 'pro' }> = {
   daily: { amount: 50_000, days: 1, plan: 'daily' },
   pro: { amount: 299_900, days: 30, plan: 'pro' },
   annual: { amount: 2_999_900, days: 365, plan: 'pro' },
 };
+
+const INCOMPLETE_STATUSES = new Set([
+  'pending', 'ongoing', 'processing', 'abandoned', 'failed', 'reversed',
+]);
+
+function isPlanSelection(value: unknown): value is PlanSelection {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(PLANS, value);
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
@@ -34,12 +44,19 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
-  const {
-    data: { user },
-  } = await userClient.auth.getUser();
-  if (!user) return Response.json({ error: 'Sign in first.' }, { status: 401 });
+  let authResult;
+  try {
+    authResult = await userClient.auth.getUser();
+  } catch {
+    return Response.json({ ok: false, error: 'Payment verification temporarily unavailable. Please retry.' }, { status: 503 });
+  }
+  const { data: { user }, error: authError } = authResult;
+  if (authError || !user) return Response.json({ error: 'Sign in first.' }, { status: 401 });
 
-  const { reference } = await req.json().catch(() => ({}));
+  const payload: unknown = await req.json().catch(() => null);
+  const reference = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? (payload as Record<string, unknown>).reference
+    : undefined;
   if (typeof reference !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(reference)) return Response.json({ ok: false, error: 'Missing reference.' }, { status: 400 });
 
   try {
@@ -47,10 +64,13 @@ Deno.serve(async (req: Request) => {
     headers: { Authorization: `Bearer ${secret}` },
     signal: AbortSignal.timeout(20_000),
   });
+  if (!res.ok) {
+    return Response.json({ ok: false, error: 'Payment verification temporarily unavailable. Please retry.' }, { status: 503 });
+  }
   const body = await res.json().catch(() => null);
   const tx = body?.data;
-  if (!res.ok || tx?.status !== 'success') {
-    return Response.json({ ok: false, error: 'Payment not completed.' }, { status: 402 });
+  if (body?.status !== true || !tx || typeof tx.status !== 'string') {
+    return Response.json({ ok: false, error: 'Payment verification temporarily unavailable. Please retry.' }, { status: 503 });
   }
 
   // The charge must belong to this user (metadata is server-set at initialize).
@@ -58,9 +78,23 @@ Deno.serve(async (req: Request) => {
   if (meta.user_id !== user.id) {
     return Response.json({ ok: false, error: 'Reference does not match this account.' }, { status: 403 });
   }
+  // Only report provider status after ownership is established. An unknown
+  // status is ambiguous and remains retryable rather than being treated as a
+  // definitive decline by the client.
+  if (tx.status !== 'success') {
+    if (!INCOMPLETE_STATUSES.has(tx.status)) {
+      return Response.json({ ok: false, error: 'Payment verification temporarily unavailable. Please retry.' }, { status: 503 });
+    }
+    return Response.json(
+      { ok: false, error: 'Payment not completed.', transaction_status: tx.status },
+      { status: 402 },
+    );
+  }
   // Resolve the plan and validate the amount actually paid.
-  const cfg = PLANS[meta.selection as string];
-  if (!cfg) return Response.json({ ok: false, error: 'Unknown plan.' }, { status: 400 });
+  if (!isPlanSelection(meta.selection)) {
+    return Response.json({ ok: false, error: 'Unknown plan.' }, { status: 400 });
+  }
+  const cfg = PLANS[meta.selection];
   if (tx.amount !== cfg.amount || tx.currency !== 'NGN') {
     return Response.json({ ok: false, error: 'Payment amount mismatch.' }, { status: 400 });
   }

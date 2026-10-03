@@ -15,6 +15,7 @@ type AdminSupabase = ReturnType<typeof createAdminSupabaseClient>;
 const MAX_URLS_PER_BATCH = 5;
 const MAX_WRITE_ATTEMPTS = 12;
 const WRITE_BUDGET_MS = 20_000;
+const FRESHNESS_WRITE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // Cap on the raw bytes of apply_url the IN list may carry. This is the limit
 // that actually bites: PostgREST takes filters in the QUERY STRING, so
@@ -125,13 +126,15 @@ export async function touchLastSeen(
   const list = toUrlList(urls);
   if (list.length === 0) return 0;
   const now = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - FRESHNESS_WRITE_INTERVAL_MS).toISOString();
   let touched = 0;
   const failures = await runSplitWrites(batchByLength(list), async batch => {
     try {
       const { count, error } = await supabase
         .from('jobs')
         .update({ last_seen_at: now }, { count: 'exact' })
-        .in('apply_url', batch);
+        .in('apply_url', batch)
+        .or(`last_seen_at.is.null,last_seen_at.lt.${staleBefore}`);
       // supabase-js resolves with { error } instead of throwing, so this check
       // — not the catch below — is what catches a 414 / statement timeout.
       if (error) {
@@ -173,12 +176,11 @@ export async function markSeenAndReactivate(
   const list = toUrlList(urls);
   if (list.length === 0) return 0;
   const now = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - FRESHNESS_WRITE_INTERVAL_MS).toISOString();
   let reactivated = 0;
   const failures = await runSplitWrites(batchByLength(list), async batch => {
     try {
-      // Count retired rows before the write, then update the batch once. The
-      // old two-UPDATE fallback rewrote reactivated rows twice and doubled
-      // trigger/index maintenance during an already degraded database path.
+      // Retired rows must always reactivate, even if their timestamp is fresh.
       const { data, error: readErr } = await supabase
         .from('jobs')
         .select('id')
@@ -194,20 +196,35 @@ export async function markSeenAndReactivate(
         return readErr;
       }
       const inactive = data?.length ?? 0;
-      const { error: freshErr } = await supabase
+      if (inactive > 0) {
+        const { error: reactivateErr } = await supabase
+          .from('jobs')
+          .update({ is_active: true, last_seen_at: now })
+          .in('apply_url', batch)
+          .eq('is_active', false);
+        if (reactivateErr) {
+          logWarn({ event: 'jobs.mark_seen_reactivate_failed', context: context ?? null,
+            batch: batch.length, error: reactivateErr.message });
+          return reactivateErr;
+        }
+        reactivated += inactive;
+      }
+      // Already-active rows only need a freshness write every six hours.
+      const { error: touchErr } = await supabase
         .from('jobs')
-        .update({ is_active: true, last_seen_at: now })
-        .in('apply_url', batch);
-      if (freshErr) {
+        .update({ last_seen_at: now })
+        .in('apply_url', batch)
+        .eq('is_active', true)
+        .or(`last_seen_at.is.null,last_seen_at.lt.${staleBefore}`);
+      if (touchErr) {
         logWarn({
           event: 'jobs.mark_seen_touch_failed',
           context: context ?? null,
           batch: batch.length,
-          error: freshErr.message,
+          error: touchErr.message,
         });
-        return freshErr;
+        return touchErr;
       }
-      reactivated += inactive;
       return null;
     } catch (err: any) {
       logWarn({

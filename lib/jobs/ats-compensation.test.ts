@@ -9,6 +9,13 @@ describe('ATS compensation', () => {
       salaryDescriptionPlain: '$45–65 per hour' })).toEqual({ salaryText: '$45–65 per hour' });
     expect(leverCompensation({ salaryRange: { min: 100000, max: 140000, interval: 'per-year-salary' } }))
       .toEqual({ salaryText: undefined });
+    // Provider ranges are occasionally decimal numbers while jobs.salary_*
+    // are integer columns. Preserve the annual amount at unit precision.
+    expect(leverCompensation({ salaryRange: { min: 256.2, max: 300.8, currency: 'USD', interval: 'year' } }))
+      .toMatchObject({ salaryMin: 256, salaryMax: 301, currency: 'USD' });
+    expect(leverCompensation({ salaryRange: { min: 3_000_000_000, max: 4_000_000_000,
+      currency: 'USD', interval: 'year' }, salaryDescriptionPlain: 'Provider supplied range' }))
+      .toEqual({ salaryText: 'Provider supplied range' });
   });
 
   it('selects annual Ashby salary and rejects equity, bonus, and multiple salary tiers', () => {
@@ -34,5 +41,15 @@ describe('ATS compensation', () => {
       .toMatchObject({ salaryMin: 100000, salaryMax: 140000, currency: 'CAD' });
     expect(greenhouseCompensation({ content: '<p>Base salary: $100,000–140,000 per year.</p>' }))
       .not.toHaveProperty('currency');
+    expect(greenhouseCompensation({ pay_input_ranges: [{ title: 'Annual Base Salary', min_cents: 25621,
+      max_cents: 30099, currency_type: 'USD' }] })).toEqual({
+        salaryText: 'Annual Base Salary: USD 256.21–300.99', salaryMin: 256, salaryMax: 301, currency: 'USD',
+      });
+    expect(greenhouseCompensation({ pay_input_ranges: [{ title: 'Annual Base Salary',
+      min_cents: 200_000_000_000, max_cents: 210_000_000_000, currency_type: 'USD' }] }))
+      .toMatchObject({ salaryMin: 2_000_000_000, salaryMax: 2_100_000_000, currency: 'USD' });
+    expect(greenhouseCompensation({ content:
+      '<p>Base salary: USD 3,000,000,000–4,000,000,000 per year.</p>' }))
+      .toEqual({ salaryText: 'Base salary: USD 3,000,000,000–4,000,000,000 per year' });
   });
 });

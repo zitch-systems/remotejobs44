@@ -59,7 +59,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest && npm run test:release-preflight",
+    "test:release-preflight": "node scripts/release-preflight.test.mjs"
   },
   "private": true
 }

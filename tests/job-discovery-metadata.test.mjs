@@ -9,6 +9,10 @@ const migration = await readFile(
   new URL('../supabase/migrations/20260925082127_job_discovery_metadata.sql', import.meta.url),
   'utf8',
 );
+const writeThrottleMigration = await readFile(
+  new URL('../supabase/migration_v79_ats_metadata_write_throttle.sql', import.meta.url),
+  'utf8',
+);
 const db = new PGlite();
 
 await db.exec(`
@@ -38,6 +42,7 @@ await db.exec(`
   grant select, update on public.jobs to service_role;
 `);
 await db.exec(migration);
+await db.exec(writeThrottleMigration);
 
 test('classifies workplace and only explicit relocation or visa support', async () => {
   await db.query(
@@ -86,6 +91,76 @@ test('refreshes existing ATS metadata and reactivates a seen posting', async () 
   assert.equal(updated.visa_sponsorship, true);
   assert.equal(updated.logo, 'https://cdn.example/logo.png');
   assert.equal(updated.is_active, true);
+});
+
+test('v79 skips a fresh unchanged row without fabricating a reactivation', async () => {
+  await db.query(
+    `insert into public.jobs(title, description, location, remote, source, source_url, apply_url,
+       salary_min, salary_max, currency, workplace_hint, salary_text, last_seen_at)
+     values ('Fresh', 'Same', 'Remote', true, 'api', 'throttle-board', 'fresh',
+       100000, 120000, 'USD', 'remote', 'USD 100k-120k', now())`,
+  );
+  await db.exec('set role service_role');
+  try {
+    const { rows } = await db.query(`select public.update_ats_metadata($1,$2::jsonb) result`, [
+      'throttle-board', JSON.stringify([{ apply_url: 'fresh', title: 'Fresh', description: 'Same',
+        location: 'Remote', remote: true, workplace_hint: 'remote', salary_text: 'USD 100k-120k',
+        salary_min: 100000, salary_max: 120000, currency: 'USD', flagged: false }]),
+    ]);
+    assert.deepEqual(rows[0].result, { updated: 0, reactivated: 0 });
+  } finally { await db.exec('reset role'); }
+});
+
+test('v79 applies a metadata change immediately even while freshness is recent', async () => {
+  await db.exec('set role service_role');
+  try {
+    const { rows } = await db.query(`select public.update_ats_metadata($1,$2::jsonb) result`, [
+      'throttle-board', JSON.stringify([{ apply_url: 'fresh', title: 'Changed immediately', description: 'Same',
+        location: 'Remote', remote: true, workplace_hint: 'remote', salary_text: 'USD 100k-120k',
+        salary_min: 100000, salary_max: 120000, currency: 'USD', flagged: false }]),
+    ]);
+    assert.deepEqual(rows[0].result, { updated: 1, reactivated: 0 });
+  } finally { await db.exec('reset role'); }
+  assert.equal((await db.query(`select title from public.jobs where apply_url='fresh'`)).rows[0].title,
+    'Changed immediately');
+});
+
+test('v79 refreshes an unchanged row after six hours', async () => {
+  await db.query(`update public.jobs set last_seen_at=now()-interval '7 hours' where apply_url='fresh'`);
+  const before = (await db.query(`select last_seen_at from public.jobs where apply_url='fresh'`)).rows[0].last_seen_at;
+  await db.exec('set role service_role');
+  try {
+    const { rows } = await db.query(`select public.update_ats_metadata($1,$2::jsonb) result`, [
+      'throttle-board', JSON.stringify([{ apply_url: 'fresh', title: 'Changed immediately', description: 'Same',
+        location: 'Remote', remote: true, workplace_hint: 'remote', salary_text: 'USD 100k-120k',
+        salary_min: 100000, salary_max: 120000, currency: 'USD', flagged: false }]),
+    ]);
+    assert.deepEqual(rows[0].result, { updated: 1, reactivated: 0 });
+  } finally { await db.exec('reset role'); }
+  const after = (await db.query(`select last_seen_at from public.jobs where apply_url='fresh'`)).rows[0].last_seen_at;
+  assert.ok(new Date(after) > new Date(before));
+});
+
+test('v79 immediately reactivates an inactive row even with a fresh timestamp', async () => {
+  await db.query(`update public.jobs set is_active=false,last_seen_at=now() where apply_url='fresh'`);
+  await db.exec('set role service_role');
+  try {
+    const { rows } = await db.query(`select public.update_ats_metadata($1,$2::jsonb) result`, [
+      'throttle-board', JSON.stringify([{ apply_url: 'fresh', title: 'Changed immediately', description: 'Same',
+        location: 'Remote', remote: true, workplace_hint: 'remote', salary_text: 'USD 100k-120k',
+        salary_min: 100000, salary_max: 120000, currency: 'USD', flagged: false }]),
+    ]);
+    assert.deepEqual(rows[0].result, { updated: 1, reactivated: 1 });
+  } finally { await db.exec('reset role'); }
+  assert.equal((await db.query(`select is_active from public.jobs where apply_url='fresh'`)).rows[0].is_active, true);
+});
+
+test('v79 preserves service_role-only execution permission', async () => {
+  const { rows } = await db.query(`select
+    has_function_privilege('service_role','public.update_ats_metadata(text,jsonb)','execute') service_ok,
+    has_function_privilege('anon','public.update_ats_metadata(text,jsonb)','execute') anon_ok,
+    has_function_privilege('authenticated','public.update_ats_metadata(text,jsonb)','execute') authenticated_ok`);
+  assert.deepEqual(rows[0], { service_ok: true, anon_ok: false, authenticated_ok: false });
 });
 
 test('retires only missing jobs from the exact completed board', async () => {

@@ -11,6 +11,7 @@ import { loadFeedCache, saveFeedCache } from './feed-cache';
 import { bulletsFrom, deriveMatch, gradFor, plainJobText, salaryLabel, tagsFrom, timeAgo, verdictFor } from './format';
 import { matchesLevel, type ExperienceLevel, type WorkplaceFilter } from './filters';
 import type { Job } from './types';
+import { subscribeEntitlementInvalidation } from './entitlement-invalidation';
 
 // Server-side job query. Every field is optional; an absent field = no filter.
 // category/type are the lowercase DB values (see CATEGORY_OPTIONS/TYPE_OPTIONS).
@@ -335,6 +336,13 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
     load(0, 'initial');
   }, [load]);
 
+  useEffect(() => subscribeEntitlementInvalidation(() => {
+    ++reqRef.current;
+    setJobs([]);
+    setLoading(true);
+    void load(0, 'initial');
+  }), [load]);
+
   // Re-resolve plan-aware fields after sign-in/out, token refresh or an account
   // switch. This removes a real company name promptly after entitlement loss.
   useEffect(() => {
@@ -432,6 +440,14 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
     };
   }, []);
 
+  useEffect(() => subscribeEntitlementInvalidation(() => {
+    ++reqRef.current;
+    setJobs([]);
+    setError(null);
+    setLoading(true);
+    setNonce((n) => n + 1);
+  }), []);
+
   return { jobs, loading, error, refresh: () => setNonce((n) => n + 1) };
 }
 
@@ -483,6 +499,12 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
       data.subscription.unsubscribe();
     };
   }, [id, loadJob]);
+
+  useEffect(() => subscribeEntitlementInvalidation(() => {
+    ++reqRef.current;
+    setState({ job: null, loading: true });
+    void loadJob();
+  }), [loadJob]);
 
   return state;
 }
