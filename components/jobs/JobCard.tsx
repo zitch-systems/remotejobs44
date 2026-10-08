@@ -181,6 +181,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
       >
         <Link
           href={href}
+          prefetch={false}
           {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           aria-label={`View ${job.title}`}
           className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
@@ -233,6 +234,7 @@ function JobCardImpl({ job, listMode = false }: JobCardProps) {
     >
       <Link
         href={href}
+        prefetch={false}
         {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
         aria-label={`View ${job.title}`}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"

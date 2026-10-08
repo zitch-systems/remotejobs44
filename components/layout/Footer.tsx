@@ -189,7 +189,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {links.map(link => (
                   <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-stone-500 dark:text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors duration-100">
+                    <Link href={link.href} prefetch={false} className="text-sm text-stone-500 dark:text-stone-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors duration-100">
                       {link.label}
                     </Link>
                   </li>

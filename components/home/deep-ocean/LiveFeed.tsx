@@ -16,7 +16,7 @@ export function LiveFeed({ jobs }: { jobs: LandingJob[] }) {
   const PreviewRow = ({ job }: { job: LandingJob }) => {
     const tint = tintFor(job.company);
     return (
-      <Link href={`/jobs/${job.id}`} className="prow">
+      <Link href={`/jobs/${job.id}`} prefetch={false} className="prow">
         <span className="job-logo" style={{ ['--lm-bg' as string]: tint.bg, ['--lm-fg' as string]: tint.fg }}>
           {job.logo}
         </span>

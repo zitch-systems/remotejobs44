@@ -7,7 +7,7 @@ import { LandingJob, payCompact, ageLabel, tintFor } from './data';
 function LwCard({ job }: { job: LandingJob }) {
   const tint = tintFor(job.company);
   return (
-    <Link href={`/jobs/${job.id}`} className="lw-card">
+    <Link href={`/jobs/${job.id}`} prefetch={false} className="lw-card">
       <div className="lw-top">
         <span className="job-logo" style={{ ['--lm-bg' as string]: tint.bg, ['--lm-fg' as string]: tint.fg }}>
           {job.logo}
