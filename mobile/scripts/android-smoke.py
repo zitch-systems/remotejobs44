@@ -210,7 +210,7 @@ def main() -> None:
         time.sleep(2)
         screenshot("jobs-search")
 
-        cards = [n for n in hierarchy().iter("node") if re.search(r" at .+, \d+% match", value(n))]
+        cards = [n for n in hierarchy().iter("node") if re.search(r"^.+ at .+, .+, .+$", value(n))]
         engineer_cards = [n for n in cards if "Engineer at " in value(n)]
         if not engineer_cards:
             raise AssertionError("Engineer search produced no Engineer job card")
