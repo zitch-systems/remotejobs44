@@ -173,7 +173,7 @@ def main() -> None:
         clear_app_data()
         cold_launch_deep_link("remotejobs44://auth-callback")
         wait_for("Sign-in failed")
-        wait_for("The sign-in link is incomplete. Return to sign in and try again.")
+        wait_for("The sign-in callback is missing. Return to sign in and try again.")
         screenshot("auth-callback-missing")
 
         clear_app_data()
