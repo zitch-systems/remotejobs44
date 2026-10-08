@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ShieldAlert } from 'lucide-react-native';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { Button, Txt } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { parseAuthCallbackUrl, routeOAuthCallbackUrl } from '@/lib/auth-callback';
 import { completeOAuthCallback } from '@/lib/oauth-callback';
 import { spacing, useTheme } from '@/theme';
 
@@ -12,9 +14,14 @@ export default function AuthCallback() {
   const { colors } = useTheme();
   const router = useRouter();
   const liveUrl = Linking.useURL();
+  const params = useLocalSearchParams<{ code?: string; error?: string; error_description?: string }>();
+  const { session, loading } = useAuth();
   const [initialUrl, setInitialUrl] = useState<string | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const callbackUrl = liveUrl ?? initialUrl;
+  const routeUrl = routeOAuthCallbackUrl(params);
+  const candidateUrl = liveUrl ?? initialUrl;
+  const candidate = candidateUrl ? parseAuthCallbackUrl(candidateUrl) : {};
+  const callbackUrl = routeUrl ?? (candidate.code || candidate.error ? candidateUrl : null);
 
   useEffect(() => {
     let active = true;
@@ -38,10 +45,11 @@ export default function AuthCallback() {
   }, [callbackUrl, router]);
 
   useEffect(() => {
-    if (liveUrl || initialUrl !== null || error) return;
-    const timer = setTimeout(() => setError('The sign-in callback is missing. Return to sign in and try again.'), 1500);
+    if (callbackUrl || loading || initialUrl === undefined || error) return;
+    if (session) { router.replace('/(tabs)'); return; }
+    const timer = setTimeout(() => setError('The sign-in callback is missing. Return to sign in and try again.'), 5000);
     return () => clearTimeout(timer);
-  }, [error, initialUrl, liveUrl]);
+  }, [callbackUrl, error, initialUrl, loading, router, session]);
 
   if (!error) return <BrandLoaderScreen label="Completing sign-in…" />;
 

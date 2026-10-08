@@ -8,9 +8,8 @@ import { Animated, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BadgeCheck, Bookmark } from 'lucide-react-native';
 import type { Job } from '@/lib/types';
-import { isUsdSalary } from '@/lib/format';
 import { useAppStore } from '@/store/app';
-import { fonts, spacing, useTheme } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 import { Card, Pill, Txt } from './ui';
 import { CompanyLogo } from './CompanyLogo';
 
@@ -31,7 +30,7 @@ function JobCardImpl({ job }: { job: Job }) {
     <Pressable
       onPress={() => router.push({ pathname: '/job/[id]', params: { id: job.id } })}
       accessibilityRole="button"
-      accessibilityLabel={`${job.role} at ${job.company}, ${job.match}% match${isUsdSalary(job.salary) ? `, ${job.salary}${job.per ? ' ' + job.per : ''}` : ''}`}
+      accessibilityLabel={`${job.role} at ${job.company}, ${job.location}, ${job.salary}`}
       accessibilityHint="Opens the job details"
       style={({ pressed }) => [pressed && { transform: [{ scale: 0.985 }] }]}
     >
@@ -40,7 +39,7 @@ function JobCardImpl({ job }: { job: Job }) {
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] }}>
           <CompanyLogo job={job} size={40} />
           <View style={{ flex: 1 }}>
-            <Txt variant="cardTitle" color={colors.fg1} numberOfLines={1}>
+            <Txt variant="cardTitle" color={colors.fg1} numberOfLines={2}>
               {job.role}
             </Txt>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -51,10 +50,6 @@ function JobCardImpl({ job }: { job: Job }) {
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: spacing[2] }}>
-            {/* §6: match % as bold success-coloured figure (Sora 800, 14px). */}
-            <Txt style={{ fontFamily: fonts.displayExtrabold, fontSize: 14, lineHeight: 18, color: colors.success }}>
-              {job.match}%
-            </Txt>
             <Pressable
               hitSlop={8}
               onPress={() => toggleSaved(job.id)}
@@ -72,6 +67,9 @@ function JobCardImpl({ job }: { job: Job }) {
           </View>
         </View>
 
+        <Txt variant="meta" color={colors.fg3}>
+          {[job.location, job.type, job.level].filter(Boolean).join(' · ')}
+        </Txt>
         {/* Tags */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {job.tags.map((t) => (
@@ -96,17 +94,15 @@ function JobCardImpl({ job }: { job: Job }) {
             borderTopColor: colors.border3,
           }}
         >
-          {isUsdSalary(job.salary) ? (
+          {(
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
               <Txt style={{ fontSize: 13 }} variant="cardTitle" color={colors.fg1}>
                 {job.salary}
               </Txt>
               <Txt variant="meta" color={colors.fg4}>
-                {job.per}
+                {job.salary === 'Salary not listed' ? '' : job.per}
               </Txt>
             </View>
-          ) : (
-            <View />
           )}
           <Txt variant="meta" color={colors.fg4}>
             {job.time}

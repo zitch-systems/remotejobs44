@@ -64,10 +64,9 @@ export function SimilarRoles({ job }: { job: Job }) {
               </Txt>
               <Txt variant="meta" color={colors.fg3} numberOfLines={1}>
                 {j.company}
-                {isUsdSalary(j.salary) ? ` · ${j.salary}${j.per}` : ''}
+                {` · ${j.salary}${j.salary === 'Salary not listed' ? '' : j.per}`}
               </Txt>
             </View>
-            <Pill label={`${j.match}%`} bg={colors.successBg} fg={colors.successText} border={colors.successBorder} small />
           </Pressable>
         ))}
       </View>

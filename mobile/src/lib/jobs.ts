@@ -139,7 +139,7 @@ export function rowToJob(r: JobRow): Job {
     applyUrl: r.applyUrl ?? undefined,
     applyEmail: r.applyEmail ?? undefined,
     tags: tagsFrom(skills, r.category),
-    about: plainJobText(r.description ?? '').slice(0, 700) || 'Description not provided.',
+    about: plainJobText(r.description ?? '') || 'Description not provided.',
     duties: bulletsFrom(r.requirements, r.description),
     skills,
     verdict,

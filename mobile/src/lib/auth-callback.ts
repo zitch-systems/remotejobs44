@@ -44,3 +44,14 @@ export function recoveryCallback(params: AuthCallbackParams): RecoveryCallback {
   }
   return { kind: 'invalid' };
 }
+
+/** Router parameters survive warm launches where Linking has consumed the URL. */
+export function routeOAuthCallbackUrl(params: Record<string, string | string[] | undefined>): string | null {
+  const query = new URLSearchParams();
+  for (const key of ['code', 'error', 'error_description']) {
+    const raw = params[key];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value) query.set(key, value);
+  }
+  return query.size ? `remotejobs44://auth-callback?${query.toString()}` : null;
+}
