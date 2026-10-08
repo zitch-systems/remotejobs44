@@ -87,22 +87,6 @@ export function JobDetailBody({
         </View>
       ) : null}
 
-      {/* match band */}
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4], padding: spacing[4] }}>
-        <MatchRing pct={job.match} size={78} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Txt variant="eyebrow" color={colors.success}>
-            {verdictKicker(job.match)}
-          </Txt>
-          <Txt variant="h3" color={colors.fg1}>
-            {job.verdict}
-          </Txt>
-          <Txt variant="meta" color={colors.fg3}>
-            {job.vcap}
-          </Txt>
-        </View>
-      </Card>
-
       <Section title="About the role">
         <Txt color={colors.fg2} style={{ fontSize: 14, lineHeight: 22 }}>
           {job.about}

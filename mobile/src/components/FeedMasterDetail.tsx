@@ -133,7 +133,6 @@ function TabletJobRow({ job, selected, onPress }: { job: Job; selected: boolean;
           {job.verified ? <BadgeCheck size={12} color={colors.success} /> : null}
         </View>
       </View>
-      <Pill label={`${job.match}%`} bg={colors.successBg} fg={colors.successText} border={colors.successBorder} small />
     </Pressable>
   );
 }

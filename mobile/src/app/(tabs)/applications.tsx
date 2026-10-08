@@ -30,6 +30,7 @@ function useApplicationJobs(appliedKey: string): {
   appliedAtById: Record<string, string>;
   loading: boolean;
   refreshing: boolean;
+  error: string | null;
   refresh: () => void;
 } {
   const userId = useAppStore((s) => s.userId);
@@ -38,6 +39,7 @@ function useApplicationJobs(appliedKey: string): {
   const [appliedAtById, setAppliedAtById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(Boolean(isSupabaseConfigured && userId));
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   const [fetchedFor, setFetchedFor] = useState<string | null>(null);
   const reqRef = useRef(0);
@@ -47,6 +49,7 @@ function useApplicationJobs(appliedKey: string): {
       const map: Record<string, Job> = {};
       if (!isSupabaseConfigured) for (const j of SEED_JOBS) map[j.id] = j;
       ++reqRef.current;
+      setError(null);
       setJobsById(map);
       setFetchedFor(isSupabaseConfigured ? null : 'demo');
       setNotesById({});
@@ -56,6 +59,7 @@ function useApplicationJobs(appliedKey: string): {
       return;
     }
     const reqId = ++reqRef.current;
+    setError(null);
     setJobsById({});
     setNotesById({});
     setAppliedAtById({});
@@ -72,12 +76,17 @@ function useApplicationJobs(appliedKey: string): {
           if (it.notes) notes[it.job.id] = it.notes;
           if (it.appliedAt) appliedAt[it.job.id] = it.appliedAt;
         }
+        const current = useAppStore.getState();
+        if (current.userId === userId) {
+          const remote = Object.fromEntries(items.map((it) => [it.job.id, it.status]));
+          useAppStore.setState({ applied: { ...remote, ...current.applied } });
+        }
         setJobsById(map);
         setNotesById(notes);
         setAppliedAtById(appliedAt);
         setFetchedFor(userId);
       })
-      .catch(() => {})
+      .catch(() => { if (reqId === reqRef.current) setError('Could not load applications. Please try again.'); })
       .finally(() => {
         if (reqId === reqRef.current) {
           setLoading(false);
@@ -117,6 +126,7 @@ function useApplicationJobs(appliedKey: string): {
     appliedAtById: !isSupabaseConfigured || fetchedFor === userId ? appliedAtById : {},
     loading,
     refreshing,
+    error,
     refresh: () => {
       setRefreshing(true);
       setNonce((n) => n + 1);
@@ -234,7 +244,7 @@ export default function Applications() {
   const updateStatus = useAppStore((s) => s.updateStatus);
   const userId = useAppStore((s) => s.userId);
   const appliedKey = Object.keys(applied).sort().join(',');
-  const { jobsById, notesById, appliedAtById, loading, refreshing, refresh } = useApplicationJobs(appliedKey);
+  const { jobsById, notesById, appliedAtById, loading, refreshing, error, refresh } = useApplicationJobs(appliedKey);
   const [editing, setEditing] = useState<{ jobId: string; current: AppStatus; note: string } | null>(null);
   const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -279,18 +289,23 @@ export default function Applications() {
         <View style={{ paddingVertical: spacing[16], alignItems: 'center' }}>
           <BrandLoader label="Loading applications…" />
         </View>
+      ) : error ? (
+        <View style={{ alignItems: 'center', gap: spacing[3], paddingVertical: spacing[16] }}>
+          <Txt center color={colors.fg3}>{error}</Txt>
+          <Button label="Try again" full={false} onPress={refresh} style={{ alignSelf: 'center' }} />
+        </View>
       ) : items.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[16], gap: spacing[3] }}>
           <View style={{ width: 60, height: 60, borderRadius: radii.lg, backgroundColor: colors.bgSection, alignItems: 'center', justifyContent: 'center' }}>
             <ClipboardList size={26} color={colors.fg4} />
           </View>
           <Txt variant="h3" color={colors.fg1}>
-            No applications yet
+            {isSupabaseConfigured && !userId ? 'Sign in to track applications' : 'No applications yet'}
           </Txt>
           <Txt center color={colors.fg3} style={{ maxWidth: 260 }}>
-            Apply to a role from the feed and track its progress here.
+            {isSupabaseConfigured && !userId ? 'Sign in to view your saved application history.' : 'Apply to a role from the feed and track its progress here.'}
           </Txt>
-          <Button label="Browse jobs" full={false} onPress={() => router.push('/(tabs)/jobs')} style={{ marginTop: spacing[2] }} />
+          <Button label={isSupabaseConfigured && !userId ? "Sign in" : "Browse jobs"} full={false} onPress={() => router.push(isSupabaseConfigured && !userId ? '/(auth)/sign-in' : '/(tabs)/jobs')} style={{ marginTop: spacing[2], alignSelf: 'center' }} />
         </View>
       ) : (
         <>

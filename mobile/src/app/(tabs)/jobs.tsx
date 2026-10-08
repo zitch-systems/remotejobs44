@@ -125,7 +125,7 @@ export default function Jobs() {
       <View>
         <Txt variant="screenTitle">Jobs</Txt>
         <Txt variant="meta" color={colors.fg3} style={{ marginTop: 2 }}>
-          Browse every verified remote role
+          Browse roles by location and work arrangement
         </Txt>
       </View>
 
