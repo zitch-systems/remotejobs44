@@ -14,7 +14,7 @@ import { unstable_cache } from 'next/cache';
 import { Zap, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { notExpired, NOT_FLAGGED } from '@/lib/jobs-visibility';
-import { getRequesterPlan, canSeePaidFields, canSeeCompanyName, SAFE_JOB_COLUMNS } from '@/lib/auth/requester-plan';
+import { getRequesterPlan, canSeePaidFields, canSeeCompanyName } from '@/lib/auth/requester-plan';
 import { REGION_TERMS } from '@/lib/jobs/region-terms';
 import { HIDDEN_COMPANY_LABEL, scrubCompanyIdentity } from '@/lib/jobs/company-mask';
 import { cn, CATEGORY_META } from '@/lib/utils';
@@ -60,7 +60,14 @@ export const metadata: Metadata = {
   },
 };
 
-const JOBS_PER_PAGE = 50;
+const JOBS_PER_PAGE = 24;
+
+// Cards need summaries, not full descriptions, requirement arrays or search
+// vectors. Those remain on the detail page. Keep paid channels conditional.
+const JOB_CARD_COLUMNS =
+  'id,title,company,company_id,logo,category,type,level,location,timezone,' +
+  'salary_min,salary_max,currency,salary_text,workplace_type,relocation_supported,visa_sponsorship,' +
+  'remote,featured,is_new,source,source_url,posted_at,expires_at,created_at';
 
 interface SearchParams {
   q?:           string;
@@ -99,10 +106,7 @@ function transform(j: any, seePaid: boolean, seeCompany: boolean): Job {
     currency:     j.currency ?? 'USD',
     location:     j.location ?? 'Location not specified',
     timezone:     j.timezone ?? undefined,
-    description:  scrub(j.description ?? ''),
-    requirements: Array.isArray(j.requirements) ? j.requirements.map((r: unknown) => scrub(String(r))) : undefined,
-    skills:       j.skills ?? [],
-    benefits: Array.isArray(j.benefits) ? j.benefits.map((b: unknown) => scrub(String(b))) : undefined,
+    description:  '',
     // Off-site apply channel gated by plan — see lib/auth/requester-plan.
     // Free + anon: stripped (the Apply button on JobCard shows the
     // Subscribe paywall instead of redirecting).
@@ -174,7 +178,7 @@ class ListingQueryError extends Error {
 async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: boolean): Promise<FetchJobsResult> {
   const { q, category, type, level, salary, timezone, posted, workplace, region, country, sort, page } = p;
   const supabase = createAdminSupabaseClient();
-  const cols     = seePaid ? '*' : SAFE_JOB_COLUMNS;
+  const cols = seePaid ? `${JOB_CARD_COLUMNS},apply_url,apply_email` : JOB_CARD_COLUMNS;
 
   // Use one indexed query for search, workplace filters, count and pagination.
   const safeQ = q.replace(/[\\"]/g, ' ').trim().slice(0, 200);
@@ -261,7 +265,7 @@ async function queryJobsListing(p: ListingParams, seePaid: boolean, seeCompany: 
 // request. Tagged so /api/jobs admin mutations can flush instantly.
 const queryJobsListingCached = unstable_cache(
   queryJobsListing,
-  ['jobs-listing-discovery-v1'],
+  ['jobs-listing-summary-v2'],
   { revalidate: 60, tags: ['jobs', 'jobs-listing'] },
 );
 

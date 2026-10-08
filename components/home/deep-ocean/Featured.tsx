@@ -20,7 +20,7 @@ export function Featured({ jobs }: { jobs: LandingJob[] }) {
           {cards.map(job => {
             const tint = tintFor(job.company);
             return (
-              <Link key={job.id} href={`/jobs/${job.id}`} className={`fcard${job.featured ? ' fcard--featured' : ''}`}>
+              <Link key={job.id} href={`/jobs/${job.id}`} prefetch={false} className={`fcard${job.featured ? ' fcard--featured' : ''}`}>
                 <div className="fcard-top">
                   <span className="job-logo" style={{ ['--lm-bg' as string]: tint.bg, ['--lm-fg' as string]: tint.fg }}>
                     {job.logo}
