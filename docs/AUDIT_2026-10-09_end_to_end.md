@@ -69,21 +69,21 @@ local build/test run only.
 
 ## Open findings (not changed — need an owner decision)
 
-**Medium — daily cron alert loop has no time budget.**
-`app/api/cron/daily/route.ts` has `maxDuration: 120` and runs, in order: ingest
-(≤30s hard-coded sources + ≤10s custom sources), two freshness sweeps (10s each),
-webhook purge, Paystack reconcile, dedupe RPC, and then sends alert emails one at a
-time with no deadline. With enough Pro users with active alerts, the function is
-killed mid-loop: remaining users get no alert, and because the process dies there is
-no 500 or `failures` entry — the exact "dies unnoticed" mode the route's comments
-try to prevent. Suggest a deadline check inside the loop (stop at ~100s, log the
-backlog, return a failure), or moving alerts to their own cron.
-
-**Low–medium — alert sends are not idempotent.**
-Alerts select jobs with `created_at >= now() - 24h` and record nothing once sent.
-A manual re-run or a retried invocation the same day re-mails every Pro user. The
-daily route also takes no lock of its own (only ingest does). A `last_alert_sent_at`
-column (or a `cron_locks` entry for the alert phase) would close this.
+**Resolved (follow-up) — daily cron alert loop had no time budget and was not
+idempotent.**
+`app/api/cron/daily/route.ts` now stops *starting* alert sends 85s into its 120s
+window, counts the unsent ones, and fails the run (`failures: ["alerts_deferred"]`,
+HTTP 500, `alerts.deferred` in the body) instead of being killed silently. Alerts are
+read least-recently-sent first so a truncated run cannot starve the same users every
+day. A new nullable `job_alerts.last_sent_at` (migration
+`20261009120000_job_alerts_last_sent.sql`) is stamped after each successful send, and a
+user mailed within the last 20h is skipped (`alerts.already_sent`), so a retried or
+re-run invocation no longer re-mails everyone. **The migration is applied by hand**
+(see the earlier `migration_v63` incident); until it is applied the cron logs
+`cron.daily.alerts_last_sent_missing` and runs as before, without the guard.
+Remaining gap: a run that defers users still only retries them on the next scheduled
+run (alerts use a 24h window), so deferred users can miss that day's mail — the 500 is
+the signal to act on.
 
 **Low — freshness sweep throughput.**
 Batches of 5 rows, capped at 2,000 rows per phase per run, once a day. Fine in
@@ -111,7 +111,8 @@ only so the spec and the site agree.
 
 ## Suggested follow-ups, in order
 
-1. Add a deadline to the alert loop and a sent-marker (medium/low-medium above).
+1. Apply `20261009120000_job_alerts_last_sent.sql` in production and alert on
+   `alerts_deferred` in the daily cron's failures.
 2. Alert on `backlogRemaining: true` for several consecutive daily runs.
 3. Re-run this audit against the live project: Supabase security/performance
    advisors, `scripts/rls-verify.sql`, and the last week of Vercel cron results.
