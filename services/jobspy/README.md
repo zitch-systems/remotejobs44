@@ -66,7 +66,7 @@ Before production cutover:
 4. Set the main project's server environment URL/key and redeploy. Run the
    authenticated admin JobSpy ingest control, then inspect the cron result,
    source statuses, and actual newly inserted jobs in Supabase.
-5. Verify the next 12:00 UTC scheduled run and the existing cron monitor.
+5. Verify the next hourly scheduled run (`0 * * * *`) and the existing cron monitor.
 
 Rollback by restoring the previous main-project URL/key and redeploying.
 Keep the draft unmerged until Vercel deployment and live searches are verified.

@@ -39,13 +39,13 @@ un-configured deploy simply skips it — nothing breaks.
 
 ## How it's wired
 
-- **Daily scrape (its own cron)** — `/api/cron/jobspy` runs at **12:00 UTC** and
+- **Scheduled scrape (its own cron)** — `/api/cron/jobspy` runs **hourly** (`0 * * * *` in `vercel.json`) and
   calls `runJobSpyIngest()` in `lib/ingest-pipeline.ts`. JobSpy has a dedicated
   cron (not the 06:00 feed ingest) because the scraper is slow and used to get
-  starved at the tail of that run's shared budget. Each day it works through
+  starved at the tail of that run's shared budget. Each run works through
   `JOBSPY_DEFAULT_QUERIES` (`lib/jobspy.ts`) — one broad query per job category —
-  rotating the starting query by day and staying inside a time budget, so the
-  whole set is covered over a couple of days even if one run is cut short.
+  starting with the longest-waiting query (persisted `last_sync_at`) and staying inside a
+  time budget, so the whole set is covered over a few runs even if one is cut short.
 - **Posting + dedup** — for each query it fetches, scam-screens, then applies
   **two dedup layers** before insert:
   1. `apply_url` (exact) — collapses in-batch repeats; the unique index +
@@ -71,7 +71,7 @@ un-configured deploy simply skips it — nothing breaks.
 | `lib/jobspy.ts` | API client, normaliser, config helpers, default query set |
 | `lib/ingest-pipeline.ts` | `runJobSpyIngest()` + cross-source platform dedup |
 | `lib/dedupe-jobs.ts` | `jobIdentityKey` / `filterByIdentity` (shared with the nightly RPC's key) |
-| `app/api/cron/jobspy/route.ts` | Dedicated daily JobSpy cron (12:00 UTC) |
+| `app/api/cron/jobspy/route.ts` | Dedicated hourly JobSpy cron |
 | `app/api/admin/jobspy/route.ts` | Config/status for the console |
 | `app/api/admin/jobspy/search/route.ts` | On-demand search (preview, no writes) |
 | `app/admin/jobspy/page.tsx` | Admin JobSpy console |

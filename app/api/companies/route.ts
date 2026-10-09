@@ -6,8 +6,7 @@
 // showed ~150 companies with badly-wrong per-company counts. Now we run
 // the GROUP BY in Postgres and stream a complete, sorted list.
 //
-// Cached at the edge for 5 minutes via revalidate so the next ingest
-// run's additions surface quickly without rebuilding on every request.
+// Pro-only and per-requester (`force-dynamic`), so it is not edge-cached.
 import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { getRequesterPlan, canSeeCompanyName } from '@/lib/auth/requester-plan';
