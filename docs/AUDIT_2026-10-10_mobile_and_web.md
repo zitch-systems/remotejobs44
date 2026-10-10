@@ -41,11 +41,11 @@ Needs an owner decision (nothing below was changed) — the ones to read first:
 
 | # | Sev | Area | Finding |
 |---|---|---|---|
-| D1 | **High** | Mobile + DB | CV upload, avatar, skills/target role/headline and profile details **cannot be saved from the app**: the database only lets signed-in users update `profiles.name` and `updated_at` |
+| D1 | **High** | Mobile + DB | CV upload, avatar, skills/target role/headline and profile details **cannot be saved from the app**: the database only lets signed-in users update `profiles.name` and `updated_at` — **decided and implemented in #251** |
 | D2 | Medium | DB | A bearer secret is stored in plaintext inside a `pg_cron` job; treat it as exposed and rotate |
 | D3 | Medium | DB / data | Nightly `archive-stale-jobs` has not archived anything since 2026-10-02, and its rule fights the ATS keep-alive |
 | D4 | Medium | DB / perf | Listing queries hit the 8 s statement timeout; ingest writes exhaust their retry budget |
-| D5 | Medium | Mobile / product | A free user who tracks an application can't reach the apply link in the app (the web gives it to them) |
+| D5 | Medium | Mobile / product | A free user who tracks an application can't reach the apply link in the app (the web gives it to them) — **implemented in #251** |
 | D6 | Medium | Mobile | Android App Links / iOS universal links can't verify — the `.well-known` files don't exist |
 | D7 | Medium | Mobile / release | No EAS build since 2026-06-18, every listed APK has expired, no production/iOS build, no crash reporting configured |
 
@@ -189,6 +189,13 @@ harmless fields (`skills, target_role, headline, bio, links, experience, avatar_
 route's Pro/validation gate and should move behind the server too. I recommend (a) for `cv_url`
 and (b) for the rest, but that is a product/security call.
 
+**Decision and follow-up.** The call was to take the recommendation, and on reading `/api/profile`
+closely it came out as (a) for *every* field rather than the mixed version above: the route's own
+comment explains that `migration_v9` and the `v62` guard trigger deliberately keep these columns
+server-written, so widening the grants (b) would have gone against the design and needed a manual
+production migration. #251 routes all of the app's profile writes through the existing server
+routes instead (bearer-enabled, validated server-side), with no database change.
+
 ### D2 — Medium — A bearer secret sits in plaintext in a `pg_cron` job
 
 `cron.job` row #2 (the push-notification trigger) embeds its authorization header, including the
@@ -232,6 +239,7 @@ Web free users who track an application can fetch the off-site channel via
 `/api/applications?channel=<jobId>`; the app can't, because that route is cookie-only. In the app
 `fetchApplyChannel` calls the entitled-only RPC `job_apply_channel`, so free users get the in-app
 "track" flow but never the link. Same remedy as D1(a): accept the bearer token on that route.
+Implemented in #251: Apply tracks the application, then fetches and opens the channel.
 
 ### D6 — Medium — App Links / universal links can't verify
 
@@ -312,7 +320,7 @@ store submission.
 
 ## Suggested order
 
-1. **D1** (profile writes) — it silently breaks a visible feature; decide (a)/(b) and ship with D5.
+1. **D1** (profile writes) with D5 — #251 implements both; review and merge it.
 2. **D2** rotate the cron secret; **D3** fix or unschedule the archiver.
 3. **D6** add the `.well-known` files once you have the cert fingerprint and Team ID.
 4. **D7/D8** before any store submission: production build, crash DSN, billing-policy review.
