@@ -14,6 +14,7 @@ test.describe('SEO & Technical', () => {
     { path: '/blog',    name: 'Blog' },
     { path: '/about',   name: 'About' },
     { path: '/contact', name: 'Contact' },
+    { path: '/delete-account', name: 'Delete account' },
   ];
 
   for (const { path, name } of pages) {
