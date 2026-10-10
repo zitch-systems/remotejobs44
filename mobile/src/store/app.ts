@@ -26,7 +26,12 @@ interface AppState {
   setUserId: (id: string | null) => void;
   hydrate: (data: { saved: string[]; applied: Record<string, AppStatus> }) => void;
   toggleSaved: (id: string) => void;
-  applyTo: (job: Job) => void;
+  /**
+   * Track an application (optimistic + write-through). Resolves true once the
+   * application is recorded — immediately in demo mode — and false when it was
+   * already tracked or the write failed (and was rolled back).
+   */
+  applyTo: (job: Job) => Promise<boolean>;
   /** Move an existing application to a new status (optimistic + write-through). */
   updateStatus: (jobId: string, status: AppStatus) => void;
   /** Reset to a clean slate (sign-out). */
@@ -74,8 +79,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyTo: (job) => {
-    if (job.id in get().applied) return; // already applied — don't double-count
+  applyTo: async (job) => {
+    if (job.id in get().applied) return false; // already applied — don't double-count
     notifySuccess();
     toast('Application tracked', 'success');
     // The free-trial allowance is measured against the size of `applied`, so
@@ -84,9 +89,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ applied: { ...s.applied, [job.id]: 'applied' } }));
     const { userId } = get();
     if (isSupabaseConfigured && userId) {
-      applyRemote(userId, job).catch((e) => {
+      try {
+        await applyRemote(userId, job);
+      } catch (e) {
         captureError(e, { scope: 'applyTo', id: job.id });
-        if (get().userId !== userId) return;
+        // A write that fails after sign-out/account switch belongs to the old
+        // account: leave the new user's state alone.
+        if (get().userId !== userId) return false;
         // Roll back the optimistic apply, and tell the user it didn't go
         // through (otherwise "Application sent" shows, then vanishes).
         set((s) => {
@@ -95,8 +104,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           return { applied: next };
         });
         toast("Couldn't send your application. Please try again.", 'error');
-      });
+        return false;
+      }
     }
+    return true;
   },
 
   updateStatus: (jobId, status) => {

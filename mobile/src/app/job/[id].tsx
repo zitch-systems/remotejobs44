@@ -12,8 +12,8 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { BrandLoaderScreen } from '@/components/BrandLoader';
 import { JobDetailBody } from '@/components/JobDetailBody';
 import { SimilarRoles } from '@/components/SimilarRoles';
-import { useJob, fetchApplyChannel } from '@/lib/jobs';
-import { applyTarget } from '@/lib/apply';
+import { useJob, fetchApplyChannel, fetchTrackedApplyChannel } from '@/lib/jobs';
+import { applyTarget, type ApplyTarget } from '@/lib/apply';
 import { useProfile } from '@/lib/profile';
 import { canApply, freeTrialBlockedMessage, isPaid } from '@/lib/entitlements';
 import { evaluateFreeTrial } from '@/lib/free-trial';
@@ -60,6 +60,17 @@ function HeroMeta({ icon, label }: { icon?: React.ReactNode; label: string }) {
   );
 }
 
+// Hand the user to the employer: open the company site, or compose the email.
+// Dismissing the browser (or having no mail app) isn't an error worth surfacing.
+async function openApplyTarget(target: ApplyTarget, role: string): Promise<void> {
+  try {
+    if (target.type === 'url') await WebBrowser.openBrowserAsync(target.value);
+    else await Linking.openURL(`mailto:${target.value}?subject=${encodeURIComponent(`Application: ${role}`)}`);
+  } catch {
+    /* user dismissed / no handler */
+  }
+}
+
 export default function JobDetail() {
   useLightStatusBarOnFocus();
   const { colors } = useTheme();
@@ -85,6 +96,8 @@ export default function JobDetail() {
   const gateLoading = isSupabaseConfigured && (profileLoading || !appliedHydrated);
 
   const [burst, setBurst] = useState(false);
+  // True while an apply that has to track-then-fetch the link is in flight.
+  const [applying, setApplying] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
 
   // Record the view once the role resolves (for Home's "Recently viewed").
@@ -135,7 +148,7 @@ export default function JobDetail() {
   });
 
   async function onApply() {
-    if (applied || !job || gateLoading) return;
+    if (applied || !job || gateLoading || applying) return;
     // Free plan: 3 applications within the first week, then subscribe (paid
     // is unlimited). Mirrors the web free-trial gate.
     const trialCtx = { registeredAt: profile.registeredAt, used: usedApplications };
@@ -153,20 +166,32 @@ export default function JobDetail() {
     }
     if (target) {
       // External application: open the company site / email, then track it.
-      try {
-        if (target.type === 'url') await WebBrowser.openBrowserAsync(target.value);
-        else await Linking.openURL(`mailto:${target.value}?subject=${encodeURIComponent(`Application: ${job.role}`)}`);
-      } catch {
-        /* user dismissed / no handler */
-      }
-      applyTo(job); // applyTo now bumps the daily counter itself (new applies only)
+      await openApplyTarget(target, job.role);
+      void applyTo(job); // applyTo now bumps the daily counter itself (new applies only)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast('Tracked in your applications.', 'success');
       return;
     }
-    applyTo(job);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    setBurst(true);
+    // No link in hand: a free-plan user (the apply channel is a paid field), or
+    // a paid user whose channel hasn't loaded yet. The employer's link is only
+    // released for a job the user has already tracked, so track first, then
+    // ask for it — the order the web uses.
+    setApplying(true);
+    try {
+      const tracked = await applyTo(job);
+      if (!tracked) return; // the store has already told the user why
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const channel = isSupabaseConfigured ? await fetchTrackedApplyChannel(job.id) : null;
+      const next = applyTarget({ applyUrl: channel?.applyUrl, applyEmail: channel?.applyEmail });
+      if (next) {
+        await openApplyTarget(next, job.role);
+        toast('Tracked in your applications.', 'success');
+      } else {
+        setBurst(true);
+      }
+    } finally {
+      setApplying(false);
+    }
   }
 
   async function onShare() {
@@ -283,7 +308,7 @@ export default function JobDetail() {
 
         <Pressable
           onPress={onApply}
-          disabled={applied || gateLoading}
+          disabled={applied || gateLoading || applying}
           style={({ pressed }) => [
             {
               flex: 1,

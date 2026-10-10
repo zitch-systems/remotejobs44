@@ -5,8 +5,12 @@ jest.mock('./supabase', () => ({
   supabase: { auth: { onAuthStateChange: jest.fn(), getSession: jest.fn() }, rpc: jest.fn() },
 }));
 
-import { filterDemoJobs, rowToJob, scheduleAfterAuth } from './jobs';
+import { apiFetch } from './api';
+import { fetchTrackedApplyChannel, filterDemoJobs, rowToJob, scheduleAfterAuth } from './jobs';
 import { SEED_JOBS } from './seed';
+
+const mockApiFetch = apiFetch as jest.MockedFunction<typeof apiFetch>;
+const json = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
 
 describe('trusted jobs API adapter', () => {
   it('maps current camelCase API fields and workplace metadata', () => {
@@ -72,5 +76,38 @@ describe('demo job filtering', () => {
     expect(filterDemoJobs(SEED_JOBS, { workplace: 'onsite' })).toEqual([]);
     expect(filterDemoJobs(SEED_JOBS, { postedWithinDays: 1 })).toEqual([]);
     expect(filterDemoJobs(SEED_JOBS, { text: 'Engineer', postedWithinDays: 3 }).map((job) => job.id)).toEqual(['1']);
+  });
+});
+
+describe('fetchTrackedApplyChannel', () => {
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  beforeEach(() => mockApiFetch.mockReset());
+
+  it('asks the API for the channel of the tracked job', async () => {
+    mockApiFetch.mockResolvedValueOnce(json({ applyUrl: 'https://acme.test/apply', applyEmail: null }));
+
+    await expect(fetchTrackedApplyChannel(jobId)).resolves.toEqual({ applyUrl: 'https://acme.test/apply', applyEmail: undefined });
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/applications?channel=${jobId}`);
+  });
+
+  it('returns an email-only channel', async () => {
+    mockApiFetch.mockResolvedValueOnce(json({ applyUrl: null, applyEmail: 'jobs@acme.test' }));
+    await expect(fetchTrackedApplyChannel(jobId)).resolves.toEqual({ applyUrl: undefined, applyEmail: 'jobs@acme.test' });
+  });
+
+  it.each([
+    ['an empty channel', json({ applyUrl: null, applyEmail: null })],
+    ['a non-text channel', json({ applyUrl: 42, applyEmail: {} })],
+    ['an application that is not tracked yet', json({ error: 'Application not found' }, 404)],
+    ['a suspended account', json({ error: 'Account suspended' }, 403)],
+    ['a server error', json({ error: 'Failed' }, 500)],
+  ])('reads %s as no channel', async (_label, response) => {
+    mockApiFetch.mockResolvedValueOnce(response);
+    await expect(fetchTrackedApplyChannel(jobId)).resolves.toBeNull();
+  });
+
+  it('reads a network failure as no channel instead of throwing', async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error('Network request failed'));
+    await expect(fetchTrackedApplyChannel(jobId)).resolves.toBeNull();
   });
 });

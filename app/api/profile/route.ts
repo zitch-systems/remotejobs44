@@ -11,6 +11,8 @@ import { isHardcodedAdmin } from '@/lib/admin-emails';
 import { sendWelcomeEmailOnce } from '@/lib/email/welcome';
 import { resolvePlan } from '@/lib/auth/plan';
 import { computeProfileCompletion } from '@/lib/auth/profile-completion';
+import { authenticateRequest } from '@/lib/auth/request-auth';
+import { parseProfileFields } from '@/lib/auth/profile-fields';
 import { logError } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
@@ -191,7 +193,9 @@ export async function GET() {
 }
 
 // PATCH /api/profile — update the owning user's editable profile fields
-// (name, target_role, cv_text) and return the refreshed profile.
+// (name, target_role, cv_text, plus the native app's skills, headline, bio,
+// links, experience and avatar_url) and return the refreshed profile. Accepts
+// the web session cookie or the app's `Authorization: Bearer` token.
 //
 // Why a route instead of a client-side supabase.update(): migration_v9
 // revokes UPDATE on profiles from the `authenticated` role for every column
@@ -211,14 +215,14 @@ const MAX_CV_TEXT_LEN = 12000;
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const auth = await authenticateRequest(req);
+    if (!auth.ok) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { user } = auth;
 
     const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
@@ -262,6 +266,18 @@ export async function PATCH(req: NextRequest) {
       }
       updates.cv_text = raw.trim().length > 0 ? raw : null;
     }
+
+    // The native app's extra fields. Whitelisted and bounded in one place (see
+    // lib/auth/profile-fields.ts): nothing else in the body can reach the row,
+    // least of all role / plan / suspended.
+    const extra = parseProfileFields(body, {
+      userId: user.id,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    });
+    if (!extra.ok) {
+      return NextResponse.json({ error: extra.error }, { status: 400 });
+    }
+    Object.assign(updates, extra.updates);
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No changes to save' }, { status: 400 });

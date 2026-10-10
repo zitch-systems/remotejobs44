@@ -116,3 +116,51 @@ it('ignores an old user apply rollback that rejects after an account switch', as
     hydrated: true,
   });
 });
+
+describe('applyTo result', () => {
+  it('resolves true once the application is recorded', async () => {
+    mockApplyRemote.mockResolvedValueOnce(undefined);
+    useAppStore.setState({ userId: 'user-a', applied: {}, hydrated: true });
+
+    await expect(useAppStore.getState().applyTo(job)).resolves.toBe(true);
+
+    expect(mockApplyRemote).toHaveBeenCalledWith('user-a', job);
+    expect(useAppStore.getState().applied).toEqual({ [job.id]: 'applied' });
+  });
+
+  it('tracks optimistically before the write finishes', () => {
+    mockApplyRemote.mockReturnValueOnce(new Promise(() => {}));
+    useAppStore.setState({ userId: 'user-a', applied: {}, hydrated: true });
+
+    void useAppStore.getState().applyTo(job);
+
+    expect(useAppStore.getState().applied).toEqual({ [job.id]: 'applied' });
+  });
+
+  it('resolves false and rolls the application back when the write fails', async () => {
+    mockApplyRemote.mockRejectedValueOnce(new Error('free_trial_exhausted'));
+    useAppStore.setState({ userId: 'user-a', applied: {}, hydrated: true });
+
+    await expect(useAppStore.getState().applyTo(job)).resolves.toBe(false);
+
+    expect(useAppStore.getState().applied).toEqual({});
+  });
+
+  it('resolves false without writing again for a job that is already tracked', async () => {
+    useAppStore.setState({ userId: 'user-a', applied: { [job.id]: 'interview' }, hydrated: true });
+
+    await expect(useAppStore.getState().applyTo(job)).resolves.toBe(false);
+
+    expect(mockApplyRemote).not.toHaveBeenCalled();
+    expect(useAppStore.getState().applied).toEqual({ [job.id]: 'interview' });
+  });
+
+  it('resolves true in demo mode, where there is nothing to persist', async () => {
+    mockSupabaseConfigured = false;
+    useAppStore.setState({ userId: null, applied: {}, hydrated: true });
+
+    await expect(useAppStore.getState().applyTo(job)).resolves.toBe(true);
+
+    expect(mockApplyRemote).not.toHaveBeenCalled();
+  });
+});

@@ -1,6 +1,7 @@
 // app/api/applications/route.ts — Persist job applications to Supabase
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { authenticateRequest } from '@/lib/auth/request-auth';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
 import { evaluateFreeTrial, freeTrialBlockedMessage } from '@/lib/auth/free-trial';
 import { resolvePlan } from '@/lib/auth/plan';
@@ -11,13 +12,16 @@ import { logError, logInfo, logWarn } from '@/lib/log';
 import { waitUntil } from '@vercel/functions';
 
 // ── GET /api/applications — List current user's applications ─────────────
+// Accepts the web session cookie or the native app's `Authorization: Bearer`
+// token — the app needs `?channel=` to reach the apply link of a job it has
+// tracked (free users get no apply link from the job row itself).
 export async function GET(req?: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const auth = await authenticateRequest(req);
+    if (!auth.ok) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { user, supabase } = auth;
 
     // A tracked application is the capability that reveals the off-site
     // channel to free users. This lets them return to an application later
@@ -58,10 +62,12 @@ export async function GET(req?: NextRequest) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
       }
 
+      // The apply channel is a paid field released per user: it must never be
+      // stored by a shared cache, and it varies by credential.
       return NextResponse.json({
         applyUrl: job.apply_url ?? null,
         applyEmail: job.apply_email ?? null,
-      });
+      }, { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' } });
     }
 
     const { data: applications, error } = await supabase

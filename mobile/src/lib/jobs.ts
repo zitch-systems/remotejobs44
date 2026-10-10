@@ -229,6 +229,30 @@ export async function fetchApplyChannel(
   return { applyUrl: row.apply_url ?? undefined, applyEmail: row.apply_email ?? undefined };
 }
 
+/**
+ * Apply channel for a job the signed-in user has already tracked an application
+ * for. Free-plan users can't call job_apply_channel (above); on the web the
+ * tracked application itself is the capability that releases the employer's
+ * link, so the app does the same: track first, then ask the API
+ * (GET /api/applications?channel=). 404 means the application isn't recorded
+ * (yet), and any failure reads as "no channel" rather than blocking the apply.
+ */
+export async function fetchTrackedApplyChannel(
+  jobId: string,
+): Promise<{ applyUrl?: string; applyEmail?: string } | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const res = await apiFetch(`/api/applications?channel=${encodeURIComponent(jobId)}`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { applyUrl?: unknown; applyEmail?: unknown } | null;
+    const applyUrl = typeof body?.applyUrl === 'string' && body.applyUrl ? body.applyUrl : undefined;
+    const applyEmail = typeof body?.applyEmail === 'string' && body.applyEmail ? body.applyEmail : undefined;
+    return applyUrl || applyEmail ? { applyUrl, applyEmail } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Other active roles in the same category (for the detail "more like this"). */
 export async function fetchSimilarJobs(category: string, excludeId: string, limit = 4): Promise<Job[]> {
   const jobs = await fetchJobs({ categories: [category] }, { limit: limit + 1 });
