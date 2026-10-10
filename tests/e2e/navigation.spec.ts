@@ -75,7 +75,13 @@ test.describe('Navigation & Layout', () => {
   test('no console errors on homepage', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
+      // /_vercel/insights and /_vercel/speed-insights are served by Vercel's
+      // edge only; a self-hosted `next start` (CI, local) 404s them. Chromium
+      // reports that as two errors: "Failed to load resource" (URL only in the
+      // message location) and "Refused to execute script from '…'" (URL only in
+      // the text), so look at both.
+      const fromVercelEdge = `${msg.location().url} ${msg.text()}`.includes('/_vercel/');
+      if (msg.type() === 'error' && !fromVercelEdge) errors.push(msg.text());
     });
     await page.goto('/');
     await page.waitForTimeout(2000);

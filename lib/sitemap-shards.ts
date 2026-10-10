@@ -1,8 +1,8 @@
 // lib/sitemap-shards.ts — shared sharding math for the sitemap.
 //
 // Both app/sitemap.ts (which emits the per-shard <urlset> files at
-// /sitemap/<id>.xml via generateSitemaps) and app/sitemap.xml/route.ts (which
-// emits the <sitemapindex> that links them) need the same answer to "how many
+// /sitemap/<id>.xml via generateSitemaps) and app/sitemap-index.xml/route.ts
+// (which emits the <sitemapindex> that links them) need the same answer to "how many
 // shards are there right now". Keeping it in one place stops the two from
 // drifting — a mismatch would either orphan a shard or list a 404 in the index.
 import { createAdminSupabaseClient } from '@/lib/supabase/server';

@@ -29,6 +29,15 @@ import { isSafeClosedJobMeta } from '@/lib/jobs/closed-job';
 // narrow the row type.
 export type JobDetailRow = Record<string, any>;
 
+// jobs.id is a uuid, so anything else can never match a row. Without this
+// guard a non-uuid path segment (/jobs/abc, or the injection probes scanners
+// fire at every route) reaches Postgres as `id = 'abc'`, which fails with
+// 22P02 "invalid input syntax for type uuid". fetchJobRow deliberately throws
+// on query errors (so a transient outage is not cached as a 404), which turned
+// each of those probes into a 500 in the runtime logs instead of a 404 — and
+// gave every distinct probe its own unstable_cache key and `job-${id}` tag.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function fetchJobRow(id: string): Promise<JobDetailRow | null> {
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
@@ -53,6 +62,9 @@ async function fetchJobRow(id: string): Promise<JobDetailRow | null> {
  * instead of misreporting a transient outage as a permanent 404.
  */
 export const getJobDetailRow = cache(async (id: string): Promise<JobDetailRow | null> => {
+  // A malformed id is a genuine "no such job": answer it here, before the
+  // cache key/tag are minted and before Postgres is asked.
+  if (!UUID_RE.test(id)) return null;
   // The id is baked into the key parts AND the tag, so an admin edit can
   // flush exactly this job via revalidateTag(`job-${id}`) while the bulk
   // 'jobs' tag covers create/delete sweeps from /api/jobs.
@@ -92,7 +104,7 @@ export interface ExpiredJobMeta { title: string; company: string }
  * came back empty — so the happy path pays nothing.
  */
 export const getExpiredJobMeta = cache(async (id: string): Promise<ExpiredJobMeta | null> => {
-  if (!id) return null;
+  if (!UUID_RE.test(id)) return null;
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from('jobs')

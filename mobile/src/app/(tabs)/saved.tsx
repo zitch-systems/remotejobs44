@@ -10,8 +10,9 @@ import { JobCard } from '@/components/JobCard';
 import { BrandLoader } from '@/components/BrandLoader';
 import { Button, Screen, Txt } from '@/components/ui';
 import { SEED_JOBS } from '@/lib/seed';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { scheduleAfterAuth } from '@/lib/jobs';
+import { onSessionChange } from '@/lib/session-change';
 import { fetchSavedJobs } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
 import { radii, spacing, useTheme } from '@/theme';
@@ -61,7 +62,7 @@ function useSavedJobs(): { jobs: Job[]; loading: boolean; refreshing: boolean; r
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onSessionChange(() => {
       ++reqRef.current;
       setFetched([]);
       setFetchedFor(null);
@@ -72,7 +73,7 @@ function useSavedJobs(): { jobs: Job[]; loading: boolean; refreshing: boolean; r
     });
     return () => {
       if (timer) clearTimeout(timer);
-      data.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 

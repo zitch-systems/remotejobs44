@@ -15,8 +15,9 @@ import { SEED_JOBS } from '@/lib/seed';
 import { STATUS_FLOW, STATUS_LABEL, type AppStatus } from '@/lib/types';
 import { applicationStats, inStatusFilter, STATUS_FILTERS, type StatusFilter } from '@/lib/stats';
 import { appliedDateLabel } from '@/lib/format';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { scheduleAfterAuth } from '@/lib/jobs';
+import { onSessionChange } from '@/lib/session-change';
 import { fetchApplicationItems, updateApplicationNote } from '@/lib/user-state';
 import { useAppStore } from '@/store/app';
 import { toast } from '@/store/toast';
@@ -103,7 +104,7 @@ function useApplicationJobs(appliedKey: string): {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onSessionChange(() => {
       ++reqRef.current;
       setJobsById({});
       setNotesById({});
@@ -116,7 +117,7 @@ function useApplicationJobs(appliedKey: string): {
     });
     return () => {
       if (timer) clearTimeout(timer);
-      data.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 

@@ -12,6 +12,7 @@ import { bulletsFrom, deriveMatch, gradFor, plainJobText, salaryLabel, tagsFrom,
 import { matchesLevel, type ExperienceLevel, type WorkplaceFilter } from './filters';
 import type { Job } from './types';
 import { subscribeEntitlementInvalidation } from './entitlement-invalidation';
+import { onSessionChange } from './session-change';
 
 // Server-side job query. Every field is optional; an absent field = no filter.
 // category/type are the lowercase DB values (see CATEGORY_OPTIONS/TYPE_OPTIONS).
@@ -372,7 +373,7 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onSessionChange(() => {
       // Supabase awaits auth callbacks while holding its auth lock. Clear any
       // paid response synchronously, then defer getSession/network work until
       // after the callback returns.
@@ -388,7 +389,7 @@ export function useJobs(pageSize = 20, query: JobQuery = {}): JobsFeed {
     });
     return () => {
       if (timer) clearTimeout(timer);
-      data.subscription.unsubscribe();
+      unsubscribe();
     };
   }, [load]);
 
@@ -450,7 +451,7 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onSessionChange(() => {
       ++reqRef.current;
       setJobs([]);
       setError(null);
@@ -460,7 +461,7 @@ export function useRecommendedJobs(limit = 30): { jobs: Job[]; loading: boolean;
     });
     return () => {
       if (timer) clearTimeout(timer);
-      data.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
@@ -512,7 +513,7 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onSessionChange(() => {
       ++reqRef.current; // old Pro response can no longer win the race
       setState({ job: null, loading: true });
       if (timer) clearTimeout(timer);
@@ -520,7 +521,7 @@ export function useJob(id?: string): { job: Job | null; loading: boolean } {
     });
     return () => {
       if (timer) clearTimeout(timer);
-      data.subscription.unsubscribe();
+      unsubscribe();
     };
   }, [id, loadJob]);
 

@@ -48,10 +48,11 @@ test.describe('Pricing Page', () => {
 
   test('plan comparison shows free vs paid differences', async ({ page }) => {
     await page.goto('/pricing');
-    // Page should render check and X icons for features
-    await expect(page.locator('main')).toBeVisible();
-    const content = await page.locator('main').textContent();
-    expect(content).toContain('Free');
-    expect(content).toContain('Pro');
+    // The plan grid renders after a Suspense fallback (useSearchParams), so
+    // <main> is visible-but-empty first. Read it with retrying assertions;
+    // a one-shot textContent() raced the hydration and saw "".
+    const main = page.locator('main');
+    await expect(main).toContainText('Free');
+    await expect(main).toContainText('Pro');
   });
 });

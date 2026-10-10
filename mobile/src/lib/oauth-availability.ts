@@ -17,14 +17,25 @@ export function parseOAuthAvailability(value: unknown): OAuthAvailability {
 
 let cached: Promise<OAuthAvailability> | undefined;
 
-/** Read public GoTrue provider flags; failures keep Google and fail LinkedIn closed. */
+/**
+ * Read public GoTrue provider flags; failures keep Google and fail LinkedIn
+ * closed. Only a successful read is remembered: a cold start while offline (or
+ * a timeout / 5xx) answers this call with the safe defaults but is forgotten,
+ * so the next call retries instead of hiding LinkedIn until the app restarts.
+ */
 export function getOAuthAvailability(url: string, anonKey: string): Promise<OAuthAvailability> {
   if (!url || !anonKey) return Promise.resolve({ google: true, linkedin_oidc: true });
-  cached ??= fetchWithTimeout(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } })
-    .then(async (response) => {
-      if (!response.ok) throw new Error('Could not read authentication settings.');
-      return parseOAuthAvailability(await response.json());
-    })
-    .catch(() => SAFE_DEFAULTS);
+  if (!cached) {
+    const request: Promise<OAuthAvailability> = fetchWithTimeout(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not read authentication settings.');
+        return parseOAuthAvailability(await response.json());
+      })
+      .catch(() => {
+        if (cached === request) cached = undefined;
+        return SAFE_DEFAULTS;
+      });
+    cached = request;
+  }
   return cached;
 }

@@ -39,14 +39,42 @@ test.describe('SEO & Technical', () => {
     });
   }
 
-  test('sitemap.xml is accessible', async ({ page }) => {
-    const response = await page.goto('/sitemap.xml');
-    expect(response?.status()).toBe(200);
-    // Use innerText to avoid Chrome's XML viewer HTML wrapper
-    const text = await getBodyText(page);
-    expect(text).toContain('urlset');
-    // Domain can be remotejobs44.com or remotejobs44.vercel.app depending on deploy
-    expect(text).toMatch(/remotejobs44/);
+  // The sitemap is sharded (generateSitemaps): shards are <urlset> files at
+  // /sitemap/<id>.xml and the <sitemapindex> that links them lives at
+  // /sitemap-index.xml (robots.txt points there). /sitemap.xml is rewritten to
+  // the index. The <loc> host follows NEXT_PUBLIC_APP_URL, which differs per
+  // deploy (and is http://localhost:3000 in CI), so only the paths are asserted.
+  test('sitemap index lists the shards', async ({ request }) => {
+    const response = await request.get('/sitemap-index.xml');
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('xml');
+    const xml = await response.text();
+    expect(xml).toContain('<sitemapindex');
+    // Shard 0 (static shell + slices + companies) always exists.
+    expect(xml).toMatch(/<loc>[^<]+\/sitemap\/0\.xml<\/loc>/);
+  });
+
+  test('sitemap.xml serves the sitemap index', async ({ request }) => {
+    const [conventional, index] = await Promise.all([
+      request.get('/sitemap.xml'),
+      request.get('/sitemap-index.xml'),
+    ]);
+    expect(conventional.status()).toBe(200);
+    expect(conventional.headers()['content-type']).toContain('xml');
+    const conventionalXml = await conventional.text();
+    expect(conventionalXml).toContain('<sitemapindex');
+    // Same set of shards, not merely the same root element. (<lastmod> is a
+    // render timestamp, so compare the <loc> lists.)
+    const locs = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
+    expect(locs(conventionalXml)).toEqual(locs(await index.text()));
+  });
+
+  test('sitemap shard 0 is a urlset of site pages', async ({ request }) => {
+    const response = await request.get('/sitemap/0.xml');
+    expect(response.status()).toBe(200);
+    const xml = await response.text();
+    expect(xml).toContain('<urlset');
+    expect(xml).toMatch(/<loc>[^<]+\/jobs<\/loc>/);
   });
 
   test('robots.txt is accessible', async ({ page }) => {

@@ -17,10 +17,11 @@ import { BASE, JOB_SHARD_SIZE, jobShardCount } from '@/lib/sitemap-shards';
 //   shard 1 .. N      → job-detail URLs, JOB_SHARD_SIZE per shard
 //
 // Next.js serves each shard at /sitemap/<id>.xml; the <sitemapindex> that
-// links them is emitted by app/sitemap.xml/route.ts (Next does NOT generate
-// that index for a root sitemap), and that index is what robots.ts points
-// crawlers at. Shard sizing lives in lib/sitemap-shards.ts so the index and
-// the shards can't disagree on the shard count.
+// links them is emitted by app/sitemap-index.xml/route.ts (Next does NOT
+// generate that index for a root sitemap), and that index is what robots.ts
+// points crawlers at; next.config.js also rewrites /sitemap.xml to it. Shard
+// sizing lives in lib/sitemap-shards.ts so the index and the shards can't
+// disagree on the shard count.
 
 // Daily granularity for lastModified. A per-day value (vs a fresh `new
 // Date()` instant on every build) is a stable freshness signal Google can
