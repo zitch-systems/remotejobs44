@@ -1,12 +1,14 @@
 // app/api/profile/delete-account/route.ts
-// GDPR-style "delete my account" — wipes the user from auth.users; FKs
-// cascade through profiles, applications, saved_jobs, subscriptions.
+// GDPR-style "delete my account" — wipes the user's stored CV and photos, then
+// the user from auth.users; FKs cascade through profiles, applications,
+// saved_jobs, subscriptions.
 //
 // Guard: requires `confirm=DELETE` in the body so a stray POST can't nuke
 // an account. We also block admins from self-deleting via this endpoint —
 // they'd disappear from their own admin panel mid-action.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { removeUserFiles } from '@/supabase/functions/delete-account/remove-user-files';
 import { logError } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
@@ -30,6 +32,17 @@ export async function POST(req: NextRequest) {
       { error: 'Admin accounts must be demoted by another admin before deletion.' },
       { status: 400 }
     );
+  }
+
+  // The auth.users cascade only reaches database rows; the CV and profile
+  // photos live in Storage and would outlive the account. Remove them first and
+  // stop if that fails — nothing has changed yet, so the user can simply retry.
+  // Deleting the account first would orphan the files with no one left to ask.
+  try {
+    await removeUserFiles(admin, user.id);
+  } catch (e) {
+    logError({ event: 'account.storage_cleanup_failed', user_id: user.id, error: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ error: 'Account deletion failed. Please try again.' }, { status: 500 });
   }
 
   // Mark any subscription as cancelled so the next webhook event doesn't

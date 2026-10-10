@@ -2,12 +2,13 @@
 //
 // Permanently deletes the signed-in user's account (the in-app account-deletion
 // flow required by Apple / Google). Verifies the caller's JWT, then deletes
-// their user-owned rows + the auth user with the service role.
+// their stored files, user-owned rows + the auth user with the service role.
 //
 // Deploy: supabase functions deploy delete-account
 // No extra secrets needed — SUPABASE_URL / SUPABASE_ANON_KEY /
 // SUPABASE_SERVICE_ROLE_KEY are injected into every function by default.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { removeUserFiles } from './remove-user-files.ts';
 
 // User-owned rows to clear first (service role bypasses RLS). Done explicitly so
 // deletion succeeds whether or not every FK has ON DELETE CASCADE.
@@ -38,6 +39,17 @@ Deno.serve(async (req: Request) => {
 
   // Delete with the service role.
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  // Stored CVs and profile photos are not rows, so deleting the user does not
+  // reach them. Remove them first and stop if that fails: nothing has changed
+  // yet, so the user can retry, whereas deleting the account first would orphan
+  // the files with no one left to ask.
+  try {
+    await removeUserFiles(admin, user.id);
+  } catch (e) {
+    console.error('delete-account: could not remove stored files', e);
+    return Response.json({ error: 'Could not remove your files. Please try again.' }, { status: 500 });
+  }
 
   // Best-effort cleanup of owned rows (ignore "table doesn't exist" etc.).
   for (const [table, column] of OWNED) {
