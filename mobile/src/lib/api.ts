@@ -24,3 +24,31 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     init.signal?.removeEventListener('abort', abort);
   }
 }
+
+/** An API failure: the HTTP status plus a message that is safe to show the user. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/**
+ * What to tell the user about a failed API call. The web routes write their 4xx
+ * `error` strings for end users ("CV upload is a Pro feature…"), so those pass
+ * through; a 401's wording ("Unauthorized") and anything 5xx are replaced.
+ */
+export function apiErrorMessage(status: number, body: unknown, fallback: string): string {
+  if (status === 401) return 'Please sign in again.';
+  const text = status < 500 && body && typeof body === 'object' ? (body as { error?: unknown }).error : undefined;
+  return typeof text === 'string' && text.trim() ? text.trim() : fallback;
+}
+
+/** Turn a non-OK response into an ApiError. */
+export async function toApiError(res: Response, fallback: string): Promise<ApiError> {
+  const body = await res.json().catch(() => null);
+  return new ApiError(res.status, apiErrorMessage(res.status, body, fallback));
+}

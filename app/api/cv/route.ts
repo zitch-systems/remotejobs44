@@ -1,6 +1,11 @@
 // app/api/cv/route.ts — CV upload to Supabase Storage
+//
+// POST accepts the web session cookie or the native app's `Authorization:
+// Bearer` token (multipart field `cv`), so a CV uploaded from the app goes
+// through the same Pro gate, rate limit and magic-byte check as the web's.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { authenticateRequest } from '@/lib/auth/request-auth';
 import { detectMagicMime } from '@/lib/file-magic';
 import { rateLimit } from '@/lib/rate-limit';
 import { recomputeAndPersistProfileCompletion } from '@/lib/auth/profile-completion-persist';
@@ -10,9 +15,11 @@ import { waitUntil } from '@vercel/functions';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // `supabase` acts as the signed-in user (cookie session or bearer token), so
+    // the storage upload below is still bound by the bucket's own-folder policy.
+    const auth = await authenticateRequest(req);
+    if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, supabase } = auth;
 
     // Email-confirmation gate. CV uploads are private-storage writes
     // tied to a user-id path; an unverified throwaway shouldn't be

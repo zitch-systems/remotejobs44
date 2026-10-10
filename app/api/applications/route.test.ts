@@ -3,6 +3,7 @@
 // free-trial logic run for real (pure helpers). We assert the gate ORDER and
 // status codes that make up the go-live apply flow.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 import { makeSupabaseMock, type QueryResolver } from '@/lib/test/supabase-mock';
 
 // ── Mutable test doubles ─────────────────────────────────────────────────
@@ -10,6 +11,10 @@ let authUser: { id: string; email?: string; email_confirmed_at?: string | null; 
 let serverResolver: QueryResolver = () => ({});
 let adminResolver: QueryResolver = () => ({});
 let rpcResolver: ((n: string, a: unknown) => any) | undefined;
+// The native app authenticates with a bearer token; lib/auth/request-auth builds
+// its client with createClient, so stub that (cookie auth never reaches it).
+let bearerUser: typeof confirmedUser | null = null;
+let bearerResolver: QueryResolver = () => ({});
 
 function serverClient() {
   const base = makeSupabaseMock((ctx) => serverResolver(ctx));
@@ -20,6 +25,15 @@ function adminClient() {
   return makeSupabaseMock((ctx) => adminResolver(ctx), rpcResolver);
 }
 
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => {
+    const client = makeSupabaseMock((ctx) => bearerResolver(ctx));
+    client.auth = {
+      getUser: async () => ({ data: { user: bearerUser }, error: bearerUser ? null : new Error('invalid JWT') }),
+    } as any;
+    return client;
+  },
+}));
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: async () => serverClient(),
   createAdminSupabaseClient: () => adminClient(),
@@ -45,6 +59,10 @@ beforeEach(() => {
   serverResolver = () => ({});
   adminResolver = () => ({});
   rpcResolver = undefined;
+  bearerUser = null;
+  bearerResolver = () => ({});
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon';
 });
 
 describe('POST auth & input gates', () => {
@@ -326,5 +344,59 @@ describe('GET', () => {
     const channelReq = { url: `https://example.test/api/applications?channel=${JOB_UUID}` } as any;
     expect((await GET(channelReq)).status).toBe(403);
     expect((await GET()).status).toBe(200);
+  });
+});
+
+describe('GET ?channel= for the native app (bearer token)', () => {
+  const channelRequest = (headers: Record<string, string> = {}) =>
+    new NextRequest(`https://example.test/api/applications?channel=${JOB_UUID}`, { headers });
+  const trackedApplication: QueryResolver = (ctx) => (ctx.table === 'applications' ? { data: { id: 'a1' } } : {});
+
+  it('releases the apply channel of a job the bearer user has tracked, and forbids caching it', async () => {
+    bearerUser = confirmedUser;
+    bearerResolver = trackedApplication;
+    adminResolver = (ctx) => (ctx.table === 'jobs'
+      ? { data: { apply_url: 'https://acme.test/apply', apply_email: 'jobs@acme.test' } }
+      : {});
+
+    const res = await GET(channelRequest({ authorization: 'Bearer app-token' }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ applyUrl: 'https://acme.test/apply', applyEmail: 'jobs@acme.test' });
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    expect(res.headers.get('vary')).toMatch(/Authorization/);
+  });
+
+  it('withholds the channel until the job is tracked (the application is the capability)', async () => {
+    bearerUser = confirmedUser;
+    bearerResolver = () => ({ data: null });
+    adminResolver = () => ({ data: { apply_url: 'https://acme.test/apply' } });
+
+    const res = await GET(channelRequest({ authorization: 'Bearer app-token' }));
+
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(await res.json())).not.toContain('acme.test');
+  });
+
+  it('401s a token Supabase rejects, even when a cookie session would have passed', async () => {
+    bearerUser = null;
+    authUser = confirmedUser;
+    serverResolver = trackedApplication;
+    adminResolver = () => ({ data: { apply_url: 'https://acme.test/apply' } });
+
+    const res = await GET(channelRequest({ authorization: 'Bearer expired-token' }));
+
+    expect(res.status).toBe(401);
+  });
+
+  it('keeps the cookie path working for the web with no Authorization header', async () => {
+    authUser = confirmedUser;
+    serverResolver = trackedApplication;
+    adminResolver = (ctx) => (ctx.table === 'jobs' ? { data: { apply_url: 'https://acme.test/apply', apply_email: null } } : {});
+
+    const res = await GET(channelRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ applyUrl: 'https://acme.test/apply', applyEmail: null });
   });
 });
