@@ -47,9 +47,12 @@ Needs an owner decision (nothing below was changed) — the ones to read first:
 | D4 | Medium | DB / perf | Listing queries hit the 8 s statement timeout; ingest writes exhaust their retry budget |
 | D5 | Medium | Mobile / product | A free user who tracks an application can't reach the apply link in the app (the web gives it to them) — **implemented in #251** |
 | D6 | Medium | Mobile | Android App Links / iOS universal links can't verify — the `.well-known` files don't exist |
-| D7 | Medium | Mobile / release | No EAS build since 2026-06-18, every listed APK has expired, no production/iOS build, no crash reporting configured |
+| D7 | Medium | Mobile / release | No EAS build since 2026-06-18, every listed APK has expired, no production/iOS build, no crash reporting configured. The GitHub preview APK is current (`android-preview-6`) and checks out — see the follow-up under D7 |
+| D22 | Medium | Mobile / release | Expo SDK 56.0.12 ships the Hermes V1 memory regression Expo fixed in SDK 57.0.9; the app bundles Reanimated/Worklets code, so exposure is plausible |
 
-Everything else is in "Other findings", ordered by severity.
+Everything else is in "Other findings", ordered by severity. Added after the follow-up: **D12** (stored
+CVs and photos survived account deletion) is now fixed, and **D23** (no public deletion page, which
+Play requires), **D24** and **D25** are in the table.
 
 ## Baseline
 
@@ -264,6 +267,42 @@ Net: whatever users have today predates a lot of this repo's fixes, and a new re
 crash visibility unless the DSN is set. Check `preview` signing too (debug keystore) before any
 store submission.
 
+**Follow-up, same day (after #250 and #251 merged).** The GitHub-side pipeline is healthy: the
+`Android APK Release` workflow ran on both merges and published the prerelease `android-preview-6`
+(built from main @ `4abd9a4`, so it includes #250 and #251). That is the newest installable build —
+the EAS artifacts above are all expired. I downloaded it (checksum matches `SHA256SUMS.txt`) and read
+its merged manifest and native libraries without installing it:
+
+* Release build (`debuggable` unset), `minSdk 24`, `targetSdk 36`, no cleartext-traffic flag,
+  `allowBackup` with the secure-store backup rules, `extractNativeLibs=false`.
+* **16 KB page-size ready:** all 27 arm64 libraries have `PT_LOAD` alignment of at least 16 KB and are
+  16 KB-aligned inside the APK (Play enforces this for new apps and updates).
+* Exported components are only `MainActivity` (the two link filters) and two receivers protected by
+  signature-level permissions (`FirebaseInstanceIdReceiver`, `ProfileInstallReceiver`).
+* The preview is signed with the debug keystore and uses package `com.remotejobs44.app.preview`.
+  A store build needs the real package (`com.remotejobs44.app`) and an upload key — EAS manages that
+  for the `production` profile, whose `submit.production` block is empty, so the first upload would be
+  manual in Play Console. `eas-build-android.yml` has been run twice (June; one failure, one success).
+* Permissions worth trimming before a store listing: `SYSTEM_ALERT_WINDOW` (draw over other apps —
+  not used in a release build), `READ/WRITE_EXTERNAL_STORAGE` (capped at Android 12, unused: files are
+  picked through the system picker), and the long list of launcher-badge permissions that
+  `expo-notifications` adds. `android.blockedPermissions` in `app.json` removes them. Left alone
+  because it changes the native build and I can't test it on a device.
+* `npx expo export --platform android` bundles cleanly (8.7 MB Hermes), and every Expo package matches
+  the SDK 56 versions. `expo install --check` and two `expo-doctor` network checks could not run here
+  (outbound policy).
+
+### D22 — Medium — Expo SDK 56.0.12 carries a Hermes memory regression
+
+`expo-doctor` flags it and Expo's SDK 57 changelog confirms it: Hermes V1 in SDK 56 can
+"drastically increase memory usage in apps importing `react-native-worklets` or
+`react-native-reanimated`", fixed in `expo@57.0.9` (React Native 0.86.2). SDK 57 is described as a
+non-breaking bump (`npx expo install expo@^57.0.9 --fix`). This app lists both libraries as
+dependencies; its own code doesn't import them, but strings from both appear in the exported bundle
+(pulled in through `react-native-screens` / gesture-handler integrations), so exposure is plausible and
+unmeasured. Either take the SDK 57 upgrade before a store release or profile memory on a low-end
+device first. Not done here: it touches every native dependency and needs a device test.
+
 ## Other findings
 
 | # | Sev | Area | Finding and recommendation |
@@ -272,7 +311,7 @@ store submission.
 | D9 | Medium | Web SEO | `/pricing` is client-rendered: the server HTML has an empty `<main>` (only the `<title>`/meta and JSON-LD mention the plans; the prices and feature list are absent). `robots.txt` explicitly welcomes GPTBot, ClaudeBot and PerplexityBot, which don't run JS. Server-render the plan grid (the job-detail page already does this deliberately) |
 | D10 | Medium | Web | `lib/rate-limit.ts` is an in-memory `Map`, so on serverless every warm instance has its own counters. The AI cost caps (1/day free, 20/day paid, 30/day/IP) and the `/api/jobs` anti-scrape cap are best-effort only. The file already says to move to Redis; a Postgres-backed counter would avoid a new service |
 | D11 | Medium | Mobile | The three Supabase AI edge functions (`ai-cv-review`, `ai-cover-letter`, `ai-interview-prep`) are Pro-gated server-side but have no per-user rate limit (the web equivalents cap at 20/day); a Pro account can run them unbounded |
-| D12 | Medium | Privacy | `delete-account` removes table rows and the auth user but not Storage objects: `cvs/<uid>/…` (CVs, personal data) and `avatars/<uid>/…` remain after deletion. Nothing cascades (the only trigger on `auth.users` is the signup one) and `storage.protect_delete` blocks SQL deletes, so the function must list and `remove()` the objects through the Storage API. Play and App Store account-deletion rules expect the data to go |
+| D12 | Medium | Privacy | `delete-account` removes table rows and the auth user but not Storage objects: `cvs/<uid>/…` (CVs, personal data) and `avatars/<uid>/…` remain after deletion. Nothing cascades (the only trigger on `auth.users` is the signup one) and `storage.protect_delete` blocks SQL deletes, so the function must list and `remove()` the objects through the Storage API. Play and App Store account-deletion rules expect the data to go. **Implemented:** both the website route and the edge function now remove the user's files first and stop (nothing else changed) if that fails. The edge function change only takes effect once `supabase functions deploy delete-account` is run. Checked in production (read-only counts): `cvs` holds 23 objects for 22 users, all keyed `<uuid>/<file>` with no deeper nesting; `avatars` is empty; **no object belongs to a deleted account**, so the leak was latent and no one-off cleanup is needed |
 | D13 | Low | Web SEO | Missing job ids return HTTP 200 + `noindex` + "Job Not Found" (a soft 404), even for bots. Cause: `loading.tsx` streams the shell before `notFound()` runs. A true 404 means checking existence in the layout, which blocks the first byte on a cold cache — a trade-off, so left alone. Closed jobs correctly serve a noindex "Position Closed" page |
 | D14 | Low | DB | Advisors: leaked-password protection is off; `pg_trgm` and `pg_net` live in `public`; `is_admin` and `job_apply_channel` are `SECURITY DEFINER` and callable by signed-in users (by design — confirm). Default Supabase grants also give `anon`/`authenticated` table-level `TRUNCATE`, `REFERENCES`, `TRIGGER` (and `UPDATE`/`INSERT`/`DELETE` to `anon`) on user tables such as `saved_jobs`; RLS protects rows and PostgREST exposes no `TRUNCATE`, but revoking the unneeded ones is cheap defence in depth |
 | D15 | Low | Web admin | The hard-coded-admin path (`HARDCODED_ADMIN_EMAILS`) doesn't require `email_confirmed_at`, and `/api/rss` + `/api/ats` (admin-only) buffer the whole response before the 5 MB check and validate-then-refetch DNS (rebinding window). Confirm `ADMIN_MFA_REQUIRED` is on in production |
@@ -282,6 +321,9 @@ store submission.
 | D19 | Low | CI | Seven spec files aren't in the CI command (`accessibility`, `blog`, `homepage`, `job-detail`, `navigation`, `performance`, `redirect`); they pass locally (the full suite is 126 / 126) — worth adding. Codemagic has no path filter |
 | D20 | Low | Platform | Next 16 deprecations: `middleware` → `proxy`, React 18 support ends in Next 17, Edge runtime on `/api/og` |
 | D21 | Info | Product copy | The README says to keep copy worldwide, but Nigeria/Africa-specific blog, resource and pricing copy exists (and the CV-review prompt is written for "Africa"). Fine if intentional |
+| D23 | Medium | Compliance | Google Play's Data safety form needs a public "Delete account URL" that works for someone who has uninstalled the app. The privacy policy only says to email `hello@…`, and the real deletion screens sit behind sign-in. **Added:** a public `/delete-account` page (steps for the app and the website, what is deleted, what is kept). Its "what we keep" wording is derived from the schema (`paystack_transactions.user_id` is `ON DELETE SET NULL`; backups expire on the provider's schedule) — have it confirmed before you submit |
+| D24 | Low | Mobile | The app told people to email `support@remotejobs44.com` (contact-support row and the failed-deletion message) while the site and privacy policy publish `hello@remotejobs44.com`. Pointed the app at the published address; if `support@` is a real mailbox, either is fine |
+| D25 | Low | Privacy | Replaced files linger. `/api/cv` writes `<uid>/cv.<ext>` with `upsert`, so switching from a PDF to a Word file leaves the old `cv.pdf` behind, and every avatar change uploads a new `avatar-<timestamp>.<ext>` to the **public** `avatars` bucket without removing the previous one. Account deletion now clears all of them, but while the account lives the old files stay (a signed URL or public URL to the old photo keeps working). Already happening: 1 of the 22 users with a CV has two CV files. Fix: after a successful upload, remove the user's other objects in that folder |
 
 ## Verified sound
 
@@ -308,7 +350,8 @@ store submission.
 
 ## Not covered
 
-* No physical-device or emulator run of the app, and no iOS build or review.
+* No physical-device or emulator run of the app, and no iOS build or review. The preview APK was
+  inspected statically (manifest, libraries), not installed.
 * Production site couldn't be fetched from this environment (outbound policy), so web evidence
   comes from the local build, the Vercel connector's logs, and the database.
 * Paystack dashboard, Resend deliverability, and the Google/LinkedIn provider configuration.
@@ -323,7 +366,9 @@ store submission.
 1. **D1** (profile writes) with D5 — #251 implements both; review and merge it.
 2. **D2** rotate the cron secret; **D3** fix or unschedule the archiver.
 3. **D6** add the `.well-known` files once you have the cert fingerprint and Team ID.
-4. **D7/D8** before any store submission: production build, crash DSN, billing-policy review.
+4. **D7/D8/D22/D23** before any store submission: production build, crash DSN, billing-policy review,
+   the SDK 57 upgrade (or a memory profile), the deletion page wording, and `supabase functions deploy
+   delete-account` so the mobile path removes stored files too.
 5. **D4**, then **D9/D10**.
 6. Merge the CI change in this PR first so the e2e suite starts guarding the pricing/login/sitemap
    behaviour again.

@@ -278,7 +278,7 @@ export default function BillingPage() {
           <Trash2 className="w-4 h-4" /> Delete account
         </h2>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">
-          Permanently wipes your profile, applications, saved jobs, and subscription. Cannot be undone.
+          Permanently wipes your profile, uploaded CV and photos, applications, saved jobs, and subscription. Cannot be undone.
         </p>
 
         {!showDelete ? (

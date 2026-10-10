@@ -89,8 +89,8 @@ export default function Settings() {
   };
 
   const contactSupport = () => {
-    Linking.openURL('mailto:support@remotejobs44.com?subject=RemoteJobs44%20app').catch(() =>
-      toast('No email app found. Email support@remotejobs44.com', 'error'),
+    Linking.openURL('mailto:hello@remotejobs44.com?subject=RemoteJobs44%20app').catch(() =>
+      toast('No email app found. Email hello@remotejobs44.com', 'error'),
     );
   };
 
@@ -102,7 +102,7 @@ export default function Settings() {
       router.replace('/(auth)/sign-in');
     } catch {
       setDeleting(false);
-      toast('Could not delete your account. Email support@remotejobs44.com', 'error');
+      toast('Could not delete your account. Email hello@remotejobs44.com', 'error');
     }
   };
 

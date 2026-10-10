@@ -70,7 +70,11 @@ Create app → then fill every required section (Dashboard shows what's missing)
 - **Privacy policy**: `https://remotejobs44.com/privacy`
 - **Content rating** questionnaire
 - **Target audience & content**
-- **Data safety** (declare account/email, push, CV upload via Supabase)
+- **Data safety** (declare account/email, push, CV upload via Supabase). Play
+  also asks for a **Delete account URL** — use
+  `https://remotejobs44.com/delete-account` (public, no sign-in; the in-app
+  Settings → Delete account covers the in-app half of the requirement). Have
+  the "What we keep" wording on that page confirmed before you submit.
 - **App access** (give Google a test login if features require sign-in)
 - **Ads / Government / Financial** declarations
 
