@@ -16,7 +16,7 @@ test.describe('Authentication', () => {
 
   test('login form validates empty fields', async ({ page }) => {
     await page.goto('/login');
-    const submitBtn = page.getByRole('button', { name: /sign in/i });
+    const submitBtn = page.getByRole('button', { name: /^log in$/i });
     await expect(submitBtn).toBeDisabled();
   });
 
@@ -24,10 +24,14 @@ test.describe('Authentication', () => {
     await page.goto('/login');
     await emailInput(page).fill('wrong@example.com');
     await passwordInput(page).fill('wrongpassword123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await page.waitForTimeout(4000);
-    const errorMsg = page.getByText(/wrong email|invalid|incorrect|try again|credentials/i);
-    await expect(errorMsg).toBeVisible();
+    await page.getByRole('button', { name: /^log in$/i }).click();
+    // The banner is announced via role="alert". Next's route announcer also
+    // carries that role, so narrow by text. Production answers "Invalid email
+    // or password"; a backend that is unreachable or not an auth server (the
+    // CI fixture) lands on "Sign-in failed. Please try again." Either way the
+    // banner appears after a network round-trip, hence the retrying assertion.
+    const banner = page.getByRole('alert').filter({ hasText: /invalid email or password|sign-in failed|try again/i });
+    await expect(banner).toBeVisible({ timeout: 15_000 });
   });
 
   test('forgot password link works', async ({ page }) => {

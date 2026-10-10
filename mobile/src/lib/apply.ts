@@ -5,7 +5,13 @@ import type { Job } from './types';
 
 export type ApplyTarget = { type: 'url'; value: string } | { type: 'email'; value: string };
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// One plain address and nothing else: the value is spliced straight into a
+// `mailto:` URL, where `?` and `&` start extra headers (bcc/cc/body), `,` and
+// `;` add recipients, and `%` can smuggle either past a literal check. The old
+// "anything without @ or whitespace" pattern let all of those through from
+// scraped job data. Real apply addresses fit this subset; a rare exotic one
+// just falls back to the in-app apply flow.
+const EMAIL_RE = /^[A-Za-z0-9._+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/;
 
 /** Prefer a valid http(s) apply URL, then a valid apply email, else null. */
 export function applyTarget(job: Pick<Job, 'applyUrl' | 'applyEmail'>): ApplyTarget | null {

@@ -49,6 +49,16 @@ const nextConfig = {
       },
     ];
   },
+  // app/sitemap.ts is sharded (generateSitemaps), so Next serves no root
+  // /sitemap.xml and reserves the path against a route handler; the sitemap
+  // index lives at /sitemap-index.xml (see app/sitemap-index.xml/route.ts and
+  // robots.ts, which advertises it). /sitemap.xml is still the first path most
+  // crawlers and SEO tools probe by convention, and it 404'd. Serve the index
+  // there too. afterFiles semantics: nothing is shadowed, since no page or
+  // public file owns /sitemap.xml.
+  async rewrites() {
+    return [{ source: '/sitemap.xml', destination: '/sitemap-index.xml' }];
+  },
   async headers() {
     // Content-Security-Policy is the meaningful XSS defence; X-XSS-Protection
     // is deprecated and some Safari versions can be tricked into XSS via it.

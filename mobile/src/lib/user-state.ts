@@ -34,8 +34,15 @@ export async function fetchAppliedMap(userId: string): Promise<Record<string, Ap
 export async function setSavedRemote(userId: string, jobId: string, save: boolean): Promise<void> {
   if (!isUuid(jobId)) return; // seed/demo job — nothing to persist remotely.
   if (save) {
-    // unique(user_id, job_id) makes this idempotent.
-    const { error } = await supabase.from('saved_jobs').upsert({ user_id: userId, job_id: jobId }, { onConflict: 'user_id,job_id' });
+    // unique(user_id, job_id) + ON CONFLICT DO NOTHING makes this idempotent.
+    // ignoreDuplicates matters: the default (merge-duplicates) turns a repeat
+    // save into ON CONFLICT DO UPDATE, and saved_jobs has no UPDATE policy, so
+    // re-saving a job that is already saved (on the web, another device, or an
+    // earlier attempt whose response was lost) failed RLS with 42501 and the
+    // optimistic bookmark was rolled back although the row exists.
+    const { error } = await supabase
+      .from('saved_jobs')
+      .upsert({ user_id: userId, job_id: jobId }, { onConflict: 'user_id,job_id', ignoreDuplicates: true });
     if (error) throw error;
   } else {
     const { error } = await supabase.from('saved_jobs').delete().eq('user_id', userId).eq('job_id', jobId);

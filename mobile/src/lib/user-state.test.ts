@@ -1,11 +1,38 @@
 const mockInsert = jest.fn();
+const mockUpsert = jest.fn();
 jest.mock('./supabase', () => ({
-  supabase: { from: jest.fn(() => ({ insert: mockInsert })) },
+  supabase: { from: jest.fn(() => ({ insert: mockInsert, upsert: mockUpsert })) },
 }));
 jest.mock('./jobs', () => ({ fetchJobsByIds: jest.fn() }));
 
-import { applyRemote, mergeApplicationRows } from './user-state';
+import { applyRemote, mergeApplicationRows, setSavedRemote } from './user-state';
 import type { Job } from './types';
+
+describe('setSavedRemote', () => {
+  beforeEach(() => mockUpsert.mockReset());
+
+  it('ignores a duplicate save instead of merging into the existing row', async () => {
+    // saved_jobs has no UPDATE policy, so merge-duplicates (ON CONFLICT DO
+    // UPDATE) fails RLS when the job is already saved; DO NOTHING does not.
+    mockUpsert.mockResolvedValue({ error: null });
+    await setSavedRemote('user-1', '11111111-1111-4111-8111-111111111111', true);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', job_id: '11111111-1111-4111-8111-111111111111' },
+      { onConflict: 'user_id,job_id', ignoreDuplicates: true },
+    );
+  });
+
+  it('surfaces a failed save so the optimistic bookmark can roll back', async () => {
+    mockUpsert.mockResolvedValue({ error: new Error('network down') });
+    await expect(setSavedRemote('user-1', '11111111-1111-4111-8111-111111111111', true))
+      .rejects.toThrow('network down');
+  });
+
+  it('does not persist a demo job that has no uuid', async () => {
+    await setSavedRemote('user-1', 'seed-1', true);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+});
 
 it('does not persist gated employer identity in an application row', async () => {
   mockInsert.mockResolvedValue({ error: null });
