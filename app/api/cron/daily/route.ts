@@ -32,7 +32,28 @@ import { updateFreshnessIds } from '@/lib/jobs/daily-freshness';
 const STALE_JOB_DAYS = 60;
 const NEW_JOB_DAYS   = 7;
 
+// The route's maxDuration is 120s. Alerts are the last phase and send one email
+// at a time (each can take up to ~30s in the worst case once Resend retries are
+// counted), so stop STARTING sends at 85s: a function killed mid-loop answers
+// nothing, which hides the truncation from the cron log.
+const ALERT_PHASE_DEADLINE_MS = 85_000;
+// A user mailed within this window is not mailed again, so a retried or manually
+// re-run invocation the same day can't send everyone a duplicate. Shorter than
+// 24h so normal schedule drift never skips a day.
+const ALERT_RESEND_GUARD_MS = 20 * 3_600_000;
+
+const ALERT_PROFILE_COLUMNS =
+  'profiles(name, email, role, plan, plan_expires_at, email_prefs, suspended, email_bounced_at, email_complained_at)';
+
+// `job_alerts.last_sent_at` is added by a migration that is applied by hand. Until
+// it lands, selecting it fails with 42703 — fall back to the old behaviour rather
+// than losing every alert email.
+function isMissingLastSentColumn(err: { code?: string | null; message?: string } | null): boolean {
+  return !!err && (err.code === '42703' || /last_sent_at/.test(err.message ?? ''));
+}
+
 export async function GET(req: NextRequest) {
+  const handlerStartedAt = Date.now();
   // Shared guard: fails closed (503) when CRON_SECRET is unset/short;
   // returns 401 on bearer mismatch using a constant-time compare so the
   // secret isn't leakable via timing-side-channel.
@@ -287,17 +308,37 @@ export async function GET(req: NextRequest) {
   // Counted separately from "no matching jobs" so the cron log distinguishes
   // "nothing to send" from "suppressed by the recipient's preferences".
   let alertsSkipped = 0;
+  // Already mailed within ALERT_RESEND_GUARD_MS (a re-run), and sends not started
+  // because the phase ran out of time. Both are reported separately from "skipped".
+  let alertsAlreadySent = 0;
+  let alertsDeferred = 0;
   try {
     // email_prefs comes along because the send loop below has to honour it —
     // the profile toggle at /profile → "Job alerts" wrote to this column but
     // nothing ever read it, so switching it off changed nothing and the user
     // kept receiving alerts. That is both a broken setting and the kind of
     // thing that earns a spam complaint instead of an unsubscribe.
-    const { data: alerts, error: alertsErr } = await supabase
+    //
+    // Least-recently-sent first (never-sent first). The send loop has a deadline,
+    // so without this the same tail of users would be cut off every single day.
+    let trackSent = true;
+    let alerts: any[] | null = null;
+    let alertsErr: { code?: string | null; message: string } | null = null;
+    ({ data: alerts, error: alertsErr } = await supabase
       .from('job_alerts')
-      .select('user_id, category, keywords, profiles(name, email, role, plan, plan_expires_at, email_prefs, suspended, email_bounced_at, email_complained_at)')
+      .select(`id, user_id, category, keywords, last_sent_at, ${ALERT_PROFILE_COLUMNS}`)
       .eq('active', true)
-      .eq('frequency', 'daily');
+      .eq('frequency', 'daily')
+      .order('last_sent_at', { ascending: true, nullsFirst: true }));
+    if (isMissingLastSentColumn(alertsErr)) {
+      trackSent = false;
+      logWarn({ event: 'cron.daily.alerts_last_sent_missing', detail: 'job_alerts.last_sent_at not migrated; duplicate-send guard disabled' });
+      ({ data: alerts, error: alertsErr } = await supabase
+        .from('job_alerts')
+        .select(`id, user_id, category, keywords, ${ALERT_PROFILE_COLUMNS}`)
+        .eq('active', true)
+        .eq('frequency', 'daily'));
+    }
     if (alertsErr) throw alertsErr;
 
     if (alerts && alerts.length > 0) {
@@ -324,6 +365,7 @@ export async function GET(req: NextRequest) {
 
       const allCandidates = newJobs ?? [];
 
+      const alertDeadline = handlerStartedAt + ALERT_PHASE_DEADLINE_MS;
       for (const alert of alerts) {
         const profile = (alert as any).profiles;
         const plan = resolvePlan({ role: profile?.role, dbPlan: profile?.plan, planExpiresAt: profile?.plan_expires_at });
@@ -338,6 +380,12 @@ export async function GET(req: NextRequest) {
         // against the daily quota — and re-mailing a complainant is how a
         // single "report spam" click becomes a domain reputation problem.
         if (profile.email_bounced_at || profile.email_complained_at) { alertsSkipped += 1; continue; }
+
+        const lastSentAt = trackSent ? Date.parse(String((alert as any).last_sent_at ?? '')) : NaN;
+        if (Number.isFinite(lastSentAt) && Date.now() - lastSentAt < ALERT_RESEND_GUARD_MS) {
+          alertsAlreadySent += 1;
+          continue;
+        }
 
         // Tokenise keywords on commas/whitespace, drop empties.
         // Match is case-insensitive substring against title or company.
@@ -358,6 +406,11 @@ export async function GET(req: NextRequest) {
         // alerts; suppress the email rather than send "0 new jobs."
         if (matched.length === 0) continue;
 
+        // Out of time: count what we could not send instead of being killed
+        // mid-loop. Everything past this point in the list is still evaluated (it
+        // is cheap and makes the deferred count exact) but never emailed.
+        if (Date.now() >= alertDeadline) { alertsDeferred += 1; continue; }
+
         // One-click unsubscribe in both the footer and the List-Unsubscribe
         // header — Gmail/Yahoo bulk-sender rules expect the header, and a
         // recipient who can't find an opt-out reaches for "report spam",
@@ -371,8 +424,17 @@ export async function GET(req: NextRequest) {
           html,
           headers: unsubscribeHeaders((alert as any).user_id, 'job_alerts'),
         });
-        if (sent) alertsSent += 1;
-        else {
+        if (sent) {
+          alertsSent += 1;
+          if (trackSent) {
+            const { error: markErr } = await supabase
+              .from('job_alerts')
+              .update({ last_sent_at: new Date().toISOString() })
+              .eq('id', (alert as any).id);
+            // The email is already out; a failed marker only weakens the re-run guard.
+            if (markErr) logWarn({ event: 'cron.daily.alert_mark_sent_failed', error: markErr.message });
+          }
+        } else {
           logError({ event: 'cron.daily.alert_delivery_failed' });
           if (!failures.includes('alerts')) failures.push('alerts');
         }
@@ -383,7 +445,16 @@ export async function GET(req: NextRequest) {
     log.alertsError = err.message;
     failures.push('alerts');
   }
-  log.alerts = { sent: alertsSent, skipped_by_prefs: alertsSkipped };
+  if (alertsDeferred > 0) {
+    logError({ event: 'cron.daily.alerts_deferred', deferred: alertsDeferred, sent: alertsSent });
+    failures.push('alerts_deferred');
+  }
+  log.alerts = {
+    sent: alertsSent,
+    skipped_by_prefs: alertsSkipped,
+    already_sent: alertsAlreadySent,
+    deferred: alertsDeferred,
+  };
 
   log.completedAt = new Date().toISOString();
 
